@@ -674,7 +674,7 @@ ${data.forwardOutlook ? `
   <td><strong>${esc(m.clause)}</strong></td>
   <td>${esc(m.item)}</td>
   <td>${esc(m.department)}</td>
-  <td>${m.status === 'nc' ? `<span class="b4-badge b4-badge--${m.ncrType === 'major' ? 'bad' : 'warn'}">${esc((m.ncrType || 'nc').toUpperCase())}</span>` : `<span class="b4-badge b4-badge--neutral">${esc(m.status || '')}</span>`}</td>
+  <td>${m.status === 'nc' ? `<span class="b4-badge b4-badge--${m.ncrType === 'major' ? 'bad' : 'warn'}">${m.ncrType === 'major' ? '✕ ' : '! '}${esc((m.ncrType || 'nc').toUpperCase())}</span>` : `<span class="b4-badge b4-badge--neutral">${esc(m.status || '')}</span>`}</td>
 </tr>`).join('');
 
         const deptRows = Object.entries(intel.byDepartment).map(([name, v]) => {
@@ -691,7 +691,7 @@ ${data.forwardOutlook ? `
         const sampleCards = intel.evidenced.slice(0, 6).map(e => `
 <div class="b4-card b4-evidence-card">
   <div class="b4-evidence-card-head">
-    <span class="b4-badge b4-badge--${e.status === 'nc' ? (e.ncrType === 'major' ? 'bad' : 'warn') : 'good'}">${esc(e.status === 'nc' ? (e.ncrType || 'NC').toUpperCase() : 'CONFORM')}</span>
+    <span class="b4-badge b4-badge--${e.status === 'nc' ? (e.ncrType === 'major' ? 'bad' : 'warn') : 'good'}">${e.status === 'nc' ? (e.ncrType === 'major' ? '✕ ' : '! ') : '✓ '}${esc(e.status === 'nc' ? (e.ncrType || 'NC').toUpperCase() : 'CONFORM')}</span>
     <span class="b4-caption">${icon('evidence', { size: 13 })} ${e.imageCount} image${e.imageCount === 1 ? '' : 's'}</span>
   </div>
   <div class="b4-card-heading" style="margin-top:6px;">${icon('clause', { size: 14 })} ${esc(e.clause)}</div>
@@ -909,6 +909,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
     const INSIGHT_ICON_MAP = { risks: 'risk', departments: 'department', recurring: 'trend', improvements: 'check', readiness: 'target', strategic: 'shield' };
 
     const PRIORITY_BADGE_CLASS = { 'Immediate': 'b4-badge--bad', 'Near-term': 'b4-badge--warn', 'Monitor': 'b4-badge--neutral' };
+    const PRIORITY_BADGE_SYMBOL = { 'Immediate': '✕ ', 'Near-term': '! ' };
     const CONFIDENCE_BADGE_CLASS = { 'High': 'b4-badge--info', 'Moderate': 'b4-badge--neutral' };
 
     // Normalize one AI/fallback insight entry into {bullets,confidence,priority,recommendation},
@@ -936,7 +937,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
   <div class="b4-card-heading">${icon(INSIGHT_ICON_MAP[def.key] || 'finding')} ${esc(def.title)}</div>
   <div class="b4-badge-row">
     <span class="b4-badge ${confClass}">${esc(entry.confidence || 'Moderate')} Confidence</span>
-    <span class="b4-badge ${prioClass}">${esc(entry.priority || 'Monitor')}</span>
+    <span class="b4-badge ${prioClass}">${PRIORITY_BADGE_SYMBOL[entry.priority] || ''}${esc(entry.priority || 'Monitor')}</span>
   </div>
   <ul class="b4-bullets">${bulletItems}</ul>
   ${entry.recommendation ? `<p class="b4-body b4-insight-rec"><strong>Management recommendation:</strong> ${esc(cleanFindingText(entry.recommendation, 180))}</p>` : ''}
@@ -1215,7 +1216,7 @@ Answer:`;
   --b4-fs-section: 13pt;    /* section heading, 700 uppercase tracked */
   --b4-fs-subhead: 11pt;    /* subheading, 700 */
   --b4-fs-body: 9.75pt;     /* body, 400, line-height 1.55 */
-  --b4-fs-tbl-head: 7.5pt;  /* table header, 700 uppercase */
+  --b4-fs-tbl-head: 8.75pt;  /* table header, 700 uppercase */
   --b4-fs-tbl-body: 9pt;    /* table content, 400 */
   --b4-fs-caption: 8pt;     /* caption, 400 muted */
   --b4-fs-footnote: 7pt;    /* footnote */
@@ -1680,9 +1681,9 @@ Answer:`;
 .b4-heat-cell.b4-heat-med { background: var(--b4-warn-bg); border: 1px solid var(--b4-warn-line); color: var(--b4-warn); }
 .b4-heat-cell.b4-heat-high { background: var(--b4-bad-bg); border: 2px solid var(--b4-bad-line); color: var(--b4-bad); }
 .b4-heat-cell.b4-heat-crit { background: #7f1d1d; border: 2px solid #7f1d1d; color: #ffffff; }
-.b4-tbl--compact th { padding: 7px 8px; font-size: 7pt; }
-.b4-tbl--compact td { padding: 8px 8px; font-size: 8pt; }
-.b4-tbl--compact .b4-badge, .b4-tbl--compact .b4-pill { font-size: 6.5pt; padding: 2px 6px; }
+.b4-tbl--compact th { padding: 7px 8px; font-size: 8.75pt; }
+.b4-tbl--compact td { padding: 8px 8px; font-size: 9pt; }
+.b4-tbl--compact .b4-badge, .b4-tbl--compact .b4-pill { font-size: 9pt; padding: 2px 6px; }
 
 .b4-chart-box {
   border: 1px solid var(--b4-line);

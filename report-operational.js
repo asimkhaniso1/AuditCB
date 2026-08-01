@@ -150,13 +150,14 @@
             var r = byDept[key];
             var resultLabel = r.resultOverride || (r.audited === 0 ? 'Not Audited' : (r.majors > 0 ? 'Major NC Raised' : (r.minorObs > 0 ? 'Minor NC / Obs' : 'Conforming')));
             var sev = r.audited === 0 ? 'neutral' : (r.majors > 0 ? 'bad' : (r.minorObs > 0 ? 'warn' : 'good'));
+            var sevSym = sev === 'good' ? '✓ ' : sev === 'warn' ? '! ' : sev === 'bad' ? '✕ ' : '';
             return '<tr>'
                 + '<td style="font-weight:600;">' + esc(r.process) + '</td>'
                 + '<td style="text-align:center;">' + r.applicable + '/' + r.total + '</td>'
                 + '<td style="text-align:center;">' + r.audited + '</td>'
                 + '<td style="text-align:center;">' + r.sampled + '</td>'
                 + '<td style="text-align:center;">' + r.evidenceRefs + '</td>'
-                + '<td style="text-align:center;"><span class="b4-badge b4-badge--' + sev + '">' + esc(resultLabel) + '</span></td>'
+                + '<td style="text-align:center;"><span class="b4-badge b4-badge--' + sev + '">' + sevSym + esc(resultLabel) + '</span></td>'
                 + '</tr>';
         }).join('');
 
@@ -209,8 +210,8 @@
             var matrixRows = Object.keys(byName).sort().map(function (n) {
                 var r = byName[n];
                 return '<tr><td>' + esc(n) + '</td>'
-                    + '<td style="text-align:center;">' + (r.opening ? '<span class="b4-badge b4-badge--good">Present</span>' : '<span class="b4-caption">—</span>') + '</td>'
-                    + '<td style="text-align:center;">' + (r.closing ? '<span class="b4-badge b4-badge--good">Present</span>' : '<span class="b4-caption">—</span>') + '</td></tr>';
+                    + '<td style="text-align:center;">' + (r.opening ? '<span class="b4-badge b4-badge--good">✓ Present</span>' : '<span class="b4-caption">—</span>') + '</td>'
+                    + '<td style="text-align:center;">' + (r.closing ? '<span class="b4-badge b4-badge--good">✓ Present</span>' : '<span class="b4-caption">—</span>') + '</td></tr>';
             }).join('');
             out += '<div class="b4-mt-5" style="margin-top:var(--b4-s5, 20px);"><div class="b4-card-heading">' + iconSafe('check', { size: 14 }) + ' Combined Presence Matrix</div>'
                 + '<table class="b4-tbl b4-tbl--compact"><thead><tr><th>Name</th><th style="text-align:center;">Opening Meeting</th><th style="text-align:center;">Closing Meeting</th></tr></thead><tbody>' + matrixRows + '</tbody></table></div>';
@@ -341,25 +342,32 @@
             return 'background-color:rgba(76,140,111,' + i3.toFixed(2) + ');color:#fff;font-weight:700;';
         }
 
+        function cellSymbol(cell) {
+            if (!cell || cell.count === 0) return '';
+            if (cell.majors > 0) return '✕ ';
+            if (cell.minorObs > 0) return '! ';
+            return '✓ ';
+        }
+
         var headerCells = clauseCols.map(function (c) { return '<th style="text-align:center;white-space:nowrap;">Clause ' + esc(c) + '</th>'; }).join('');
         var bodyRows = deptRows.map(function (dep) {
             var cells = clauseCols.map(function (c) {
                 var cell = byDept[dep][c];
-                return '<td style="text-align:center;' + cellStyle(cell) + '-webkit-print-color-adjust:exact;print-color-adjust:exact;">' + (cell && cell.count ? cell.count : '—') + '</td>';
+                return '<td style="text-align:center;' + cellStyle(cell) + '-webkit-print-color-adjust:exact;print-color-adjust:exact;">' + (cell && cell.count ? cellSymbol(cell) + cell.count : '—') + '</td>';
             }).join('');
             return '<tr><td style="font-weight:600;white-space:nowrap;">' + esc(dep) + '</td>' + cells + '</tr>';
         }).join('');
 
         var legend = '<div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;justify-content:center;">'
-            + '<span class="b4-caption"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#4c8c6f;margin-right:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>All conforming</span>'
-            + '<span class="b4-caption"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#b8863c;margin-right:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>Minor NC / Observation present</span>'
-            + '<span class="b4-caption"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#b0524b;margin-right:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>Major NC present</span>'
+            + '<span class="b4-caption"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#4c8c6f;margin-right:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>✓ All conforming</span>'
+            + '<span class="b4-caption"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#b8863c;margin-right:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>! Minor NC / Observation present</span>'
+            + '<span class="b4-caption"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#b0524b;margin-right:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>✕ Major NC present</span>'
             + '<span class="b4-caption"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f1f5f9;border:1px solid #e2e8f0;margin-right:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>No items sampled</span>'
             + '</div>';
 
         return '<div style="page-break-inside:avoid;break-inside:avoid;overflow-x:auto;"><table class="b4-tbl b4-tbl--compact" style="table-layout:auto;"><thead><tr><th style="text-align:left;">Process / Department</th>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div>'
             + legend
-            + '<div class="b4-caption" style="justify-content:center;margin-top:8px;">Cell value = number of checklist items sampled for that clause within the process; shading intensity reflects sample volume.</div>';
+            + '<div class="b4-caption" style="justify-content:center;margin-top:8px;">✓ Good/Low &nbsp; ! Watch/Medium &nbsp; ✕ Critical/High — cell value = number of checklist items sampled for that clause within the process; shading intensity reflects sample volume.</div>';
     }
 
     // ── SECTION 5: REPORT DISTRIBUTION (annex) ────────────────────────────────

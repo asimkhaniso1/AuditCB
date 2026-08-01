@@ -224,7 +224,10 @@
             };
         });
 
-        // Resolve all idb:// evidence URLs to data URLs (screen captures stored in IndexedDB)
+        // Resolve all idb:// evidence URLs to data URLs (screen captures stored in IndexedDB).
+        // Each unique image is compressed/thumbnailed exactly ONCE and cached in _evImgCache,
+        // then reused everywhere it's embedded (main report thumbs, gallery index, evidence pack).
+        const _evImgCache = new Map(); // original resolved dataUrl -> {full, thumb}
         const resolveUrl = async (url) => {
             if (!url || typeof url !== 'string' || !url.startsWith('idb://')) return url;
             try {
@@ -232,19 +235,77 @@
                 return dataUrl || '';
             } catch (_e) { return ''; }
         };
+        const getEvVariants = async (dataUrl) => {
+            if (!dataUrl) return { full: dataUrl, thumb: dataUrl };
+            if (_evImgCache.has(dataUrl)) return _evImgCache.get(dataUrl);
+            let full = dataUrl, thumb = dataUrl;
+            try {
+                if (window.EvidenceUtils?.compress) full = await window.EvidenceUtils.compress(dataUrl, { maxPx: 1600, quality: 0.75 }) || dataUrl;
+            } catch (_e) { full = dataUrl; }
+            try {
+                if (window.EvidenceUtils?.thumb) thumb = await window.EvidenceUtils.thumb(dataUrl, { maxPx: 320, quality: 0.7 }) || full;
+            } catch (_e) { thumb = full; }
+            const variants = { full, thumb };
+            _evImgCache.set(dataUrl, variants);
+            return variants;
+        };
         for (const item of hydratedProgress) {
-            if (item.evidenceImage) item.evidenceImage = await resolveUrl(item.evidenceImage);
+            if (item.evidenceImage) {
+                item.evidenceImage = await resolveUrl(item.evidenceImage);
+                if (item.evidenceImage) {
+                    const v = await getEvVariants(item.evidenceImage);
+                    item.evidenceImageThumb = v.thumb;
+                }
+            }
             if (Array.isArray(item.evidenceImages)) {
                 item.evidenceImages = await Promise.all(item.evidenceImages.map(resolveUrl));
                 item.evidenceImages = item.evidenceImages.filter(u => !!u);
+                const variants = await Promise.all(item.evidenceImages.map(getEvVariants));
+                item.evidenceImages = variants.map(v => v.full);
+                item.evidenceThumbs = variants.map(v => v.thumb);
             }
         }
         // Also resolve NCR evidence images
         if (report.ncrs) {
             for (const ncr of report.ncrs) {
-                if (ncr.evidenceImage) ncr.evidenceImage = await resolveUrl(ncr.evidenceImage);
+                if (ncr.evidenceImage) {
+                    ncr.evidenceImage = await resolveUrl(ncr.evidenceImage);
+                    if (ncr.evidenceImage) {
+                        const v = await getEvVariants(ncr.evidenceImage);
+                        ncr.evidenceImageThumb = v.thumb;
+                    }
+                }
             }
         }
+
+        // Build EV id index (report.evidenceIndex / EvidenceUtils.getEvidenceIndex() preferred; else positional).
+        const _evIndex = []; // [{evId, itemRef, image, thumb, comment, clause, dept, findingRef, capturedAt, location}]
+        (function buildEvidenceIndex() {
+            let n = 0;
+            const nextId = () => 'EV-' + String(++n).padStart(2, '0');
+            hydratedProgress.forEach((item) => {
+                const imgs = Array.isArray(item.evidenceImages) && item.evidenceImages.length ? item.evidenceImages : (item.evidenceImage ? [item.evidenceImage] : []);
+                const thumbs = Array.isArray(item.evidenceThumbs) && item.evidenceThumbs.length ? item.evidenceThumbs : (item.evidenceImageThumb ? [item.evidenceImageThumb] : []);
+                if (!imgs.length) return;
+                item._evIds = [];
+                imgs.forEach((img, i) => {
+                    const evId = nextId();
+                    item._evIds.push(evId);
+                    _evIndex.push({
+                        evId,
+                        image: img,
+                        thumb: thumbs[i] || img,
+                        comment: item.comment || '',
+                        clause: item.clause || '',
+                        dept: item.department || item.deptName || '',
+                        findingRef: item.status === 'nc' ? (item.ncrType || 'NC') : (item.status || ''),
+                        capturedAt: item.evidenceCapturedAt || item.capturedAt || '',
+                        location: item.evidenceLocation || item.location || ''
+                    });
+                });
+            });
+            report._evidenceIndexBuilt = _evIndex;
+        })();
 
         // Attempt to get client details for address/logo if available
         const client = window.state.clients.find(c => c.name === report.client) || {};
@@ -461,7 +522,8 @@
         const cardUrl = resolvedBase + cardHash;
         // Use ecc=L (lowest error correction) for higher data density since this URL is dense
         // and the report is printed/PDF'd at high resolution where errors are unlikely.
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=2&ecc=L&data=${encodeURIComponent(cardUrl)}`;
+        // Rendered at <=120px in the report, so request 200x200 instead of 400x400 to cut embedded payload size.
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=2&ecc=L&data=${encodeURIComponent(cardUrl)}`;
         try { console.info('[Report Card QR] URL:', cardUrl, '(base:', resolvedBase + ')'); } catch (_e) { /* noop */ }
         if (usingFallback) {
             try { console.warn('[Report Card QR] Using sentinel fallback URL. Configure cbSettings.cbWebsite or cbSettings.publicReportUrl so scanned QRs resolve to a real address.'); } catch (_e) { /* noop */ }
@@ -1659,11 +1721,12 @@
             </div>
             ${(window.ReportExecutive && window.ReportExecutive.renderAssistantPanel) ? window.ReportExecutive.renderAssistantPanel() : ''}
             <div class="rp-footer">
-                <div style="font-size:0.82rem;color:#64748b;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>${sections.filter(s => !s.hide).length} sections • Click any section to edit • Changes reflect in PDF</div>
+                <div style="font-size:0.82rem;color:#64748b;max-width:46%;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>${sections.filter(s => !s.hide).length} sections • Click any section to edit • Changes reflect in PDF<br><span style="color:#94a3b8;">In the print dialog: turn "Headers and footers" OFF and "Background graphics" ON for correct output.</span></div>
                 <div style="display:flex;gap:10px;align-items:center;">
                     <button data-action="removeElement" data-id="report-preview-overlay" style="padding:10px 20px;border-radius:8px;border:1px solid #cbd5e1;background:white;font-weight:600;cursor:pointer;color:#475569;">Cancel</button>
                     <button id="ai-polish-btn" data-action="polishNotesWithAI" style="padding:10px 20px;border-radius:8px;border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);font-weight:600;cursor:pointer;color:#0369a1;" aria-label="Auto-generate"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>Polish Notes with AI</button>
                     <button data-action="toggleReportStatus" id="rp-status-toggle" style="padding:10px 16px;border-radius:20px;border:2px solid ${(d.report.reportStatus === 'final') ? '#059669' : '#f59e0b'};background:${(d.report.reportStatus === 'final') ? '#ecfdf5' : '#fffbeb'};color:${(d.report.reportStatus === 'final') ? '#059669' : '#b45309'};font-weight:700;cursor:pointer;" aria-label="Toggle report status" title="Click to switch between Draft and Final. Draft exports show a DRAFT watermark and do not advance the revision history."><i class="fa-solid ${(d.report.reportStatus === 'final') ? 'fa-circle-check' : 'fa-pen'}" style="margin-right:6px;"></i>${(d.report.reportStatus === 'final') ? 'FINAL' : 'DRAFT'}</button>
+                    <button data-action="exportEvidencePack" data-arg1="${d.report.id}" style="padding:10px 20px;border-radius:8px;border:1px solid #c2410c;background:#fff7ed;color:#c2410c;font-weight:600;cursor:pointer;" aria-label="Evidence Pack PDF"><i class="fa-solid fa-images" style="margin-right:6px;"></i>Evidence Pack (PDF)</button>
                     <button data-action="exportReportPDF" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Export PDF"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
                 </div>
             </div>
@@ -2334,6 +2397,83 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
     // ============================================
     // EXPORT REPORT PDF (Premium ISO-Compliant)
     // ============================================
+    // EVIDENCE PACK — a separate print blob carrying the full-resolution evidence images that
+    // were removed from the main report to keep its size bounded. Same report reference/EV ids
+    // as the main report's Evidence Index table, so the two documents cross-reference cleanly.
+    // ============================================
+    window.exportEvidencePack = function (reportId) {
+        const d = window._reportPreviewData;
+        if (!d) { window.showNotification && window.showNotification('Open the report preview first.', 'warning'); return; }
+        const evIdx = (d.report._evidenceIndexBuilt || []);
+        if (evIdx.length === 0) {
+            window.showNotification ? window.showNotification('No evidence images recorded for this report.', 'info') : alert('No evidence images recorded for this report.');
+            return;
+        }
+        const esc = window.UTILS && window.UTILS.escapeHtml ? window.UTILS.escapeHtml : function (s) { return String(s == null ? '' : s); };
+        const fmtWhen = function (v) {
+            if (!v) return 'Not recorded';
+            const dt = new Date(v);
+            return isNaN(dt.getTime()) ? 'Not recorded' : dt.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        };
+        const planRef = d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : (d.report.id || reportId || '');
+        const cbName = (d.cbSettings && d.cbSettings.cbName) || '';
+        const standard = d.report.standard || (d.auditPlan && d.auditPlan.standard) || 'ISO Standard';
+
+        const cards = evIdx.map(function (ev) {
+            return '<div class="ep-card page-break">'
+                + '<div class="ep-card-hdr"><span class="ep-id">' + esc(ev.evId) + '</span><span class="ep-ref">Report Ref: ' + esc(planRef) + '</span></div>'
+                + '<img src="' + ev.image + '" class="ep-img" alt="Evidence ' + esc(ev.evId) + '">'
+                + '<table class="ep-meta">'
+                +   '<tr><td>Description</td><td>' + esc((ev.comment || '').toString().replace(/<[^>]*>/g, '').trim() || 'Not recorded') + '</td></tr>'
+                +   '<tr><td>Clause / Requirement</td><td>' + esc(ev.clause || 'Not recorded') + '</td></tr>'
+                +   '<tr><td>Related Finding</td><td>' + esc(ev.findingRef || 'Not recorded') + '</td></tr>'
+                +   '<tr><td>Department / Site</td><td>' + esc(ev.dept || 'Not recorded') + '</td></tr>'
+                +   '<tr><td>Captured</td><td>' + esc(fmtWhen(ev.capturedAt)) + '</td></tr>'
+                +   '<tr><td>Location</td><td>' + esc(ev.location || 'Not recorded') + '</td></tr>'
+                +   '<tr><td>Uploaded By</td><td>' + esc(ev.uploadedBy || d.report.leadAuditor || 'Not recorded') + '</td></tr>'
+                + '</table>'
+                + '</div>';
+        }).join('');
+
+        const packHtml = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'
+            + '<title>Evidence Pack — ' + esc(d.report.client || '') + '</title>'
+            + '<style>'
+            + "*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Inter','Segoe UI',Helvetica,Arial,sans-serif;color:#1e293b;background:white;}"
+            + '@page{size:A4;margin:18mm 14mm;}'
+            + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page-break{page-break-before:always;}}'
+            + '.ep-cover{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border-top:6px solid #c2410c;padding:60px;}'
+            + '.ep-cover h1{font-size:2.2rem;color:#0f172a;letter-spacing:1px;}'
+            + '.ep-cover p{color:#64748b;margin-top:10px;}'
+            + '.ep-conf{margin-top:40px;padding:10px 20px;background:#fff7ed;color:#c2410c;font-weight:700;border-radius:8px;font-size:0.8rem;letter-spacing:0.05em;}'
+            + '.ep-card{padding:24px;}'
+            + '.ep-card-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:0.78rem;color:#64748b;font-weight:700;}'
+            + '.ep-id{background:#c2410c;color:white;padding:3px 10px;border-radius:6px;font-size:0.82rem;}'
+            + '.ep-img{width:100%;max-height:420px;object-fit:contain;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;}'
+            + '.ep-meta{width:100%;margin-top:14px;border-collapse:collapse;font-size:0.85rem;}'
+            + '.ep-meta td{padding:8px 10px;border-bottom:1px solid #eef2f6;vertical-align:top;}'
+            + '.ep-meta td:first-child{width:24%;color:#64748b;font-weight:600;text-transform:uppercase;font-size:0.7rem;letter-spacing:0.04em;}'
+            + '</style></head><body>'
+            + '<div class="ep-cover">'
+            + '<h1>EVIDENCE PACK</h1>'
+            + '<p>' + esc(standard) + ' &mdash; ' + esc(d.report.client || '') + '</p>'
+            + '<p>Report Ref: ' + esc(planRef) + '</p>'
+            + '<div class="ep-conf">CONFIDENTIAL &mdash; issued with, and referencing, the corresponding audit report</div>'
+            + '</div>'
+            + cards
+            + '</body></html>';
+
+        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), packHtml], { type: 'text/html;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        const win = window.open(blobUrl, '_blank');
+        if (!win) {
+            URL.revokeObjectURL(blobUrl);
+            window.showNotification ? window.showNotification('Pop-up blocked. Please allow pop-ups for this site.', 'warning') : alert('Pop-up blocked. Please allow pop-ups for this site.');
+            return;
+        }
+        setTimeout(function () { try { win.print(); } catch (_e) { /* noop */ } }, 800);
+        setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 60000);
+    };
+
     window.exportReportPDF = function () {
         const d = window._reportPreviewData;
         if (!d) return;
@@ -2527,21 +2667,16 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const standard = d.report.standard || d.auditPlan?.standard || 'ISO Standard';
         const cbName = d.cbSettings.cbName || '';
         const cbEmail = d.cbSettings.cbEmail || '';
-        // CSS-string-safe values for the @page margin-box headers/footers (printed on every page).
-        const cssEscape = (s) => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\s+/g, ' ').trim();
-        const planRefForFooter = d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : (d.report.id || '');
-        const pgHdrLeft = '"' + cssEscape('AUDIT REPORT  ·  ' + (d.report.client || '')) + '"';
-        const pgHdrRight = '"' + cssEscape(standard) + '"';
-        const pgFtrLeft = '"' + cssEscape('Doc Ref: ' + planRefForFooter + '  ·  ' + (cbName || 'Certification Body')) + '"';
-        const pgFtrRight = '"' + cssEscape('Ref: ' + (d.report.id || '')) + '"';
         const _cbSiteAddr = d.cbSite.address ? (d.cbSite.address + ', ' + (d.cbSite.city || '') + ' ' + (d.cbSite.country || '')).trim() : '';
         // Helper: render all evidence images for PDF (string concat)
         let renderEvThumbsPdf = function (item) {
-            let imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
-            if (!imgs.length) return '';
-            let limited = imgs.slice(0, 2);
-            let extra = imgs.length > 2 ? ' <span style="font-size:0.75rem;color:#64748b;">(+' + (imgs.length - 2) + ' more)</span>' : '';
-            return '<div class="ev-inline">' + limited.map(function (url) { return '<a href="' + url + '" target="_blank"><img src="' + url + '" style="height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;"></a>'; }).join('') + extra + '</div>';
+            // Main report uses THUMB variants (small, compressed) — full-res images live only in the Evidence Pack.
+            let thumbs = item.evidenceThumbs || (item.evidenceImageThumb ? [item.evidenceImageThumb] : (item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : [])));
+            if (!thumbs.length) return '';
+            let limited = thumbs.slice(0, 2);
+            let extra = thumbs.length > 2 ? ' <span style="font-size:0.75rem;color:#64748b;">(+' + (thumbs.length - 2) + ' more in Evidence Pack)</span>' : '';
+            let evIds = (item._evIds && item._evIds.length) ? '<div style="margin-top:3px;font-size:0.68rem;color:#64748b;">' + item._evIds.join(', ') + '</div>' : '';
+            return '<div class="ev-inline">' + limited.map(function (url) { return '<img src="' + url + '" style="height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;">'; }).join('') + extra + evIds + '</div>';
         };
         const ncRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() !== 'observation' && (i.ncrType || '').toLowerCase() !== 'ofi').map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
@@ -2910,8 +3045,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '*{margin:0;padding:0;box-sizing:border-box;}'
             + "body{font-family:'Inter','Segoe UI',Helvetica,Arial,sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;font-size:11pt;line-height:1.6;}"
             + '@media print{'
-            +   'body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10pt;}'
-            +   '.rpt-hdr,.rpt-ftr{display:none !important;}'
+            // Pagination fix: @page margin-box content (@top-left etc.) and counter(pages) are
+            // not implemented by Chrome's print engine, so those rules were dead code. Instead
+            // we run .rpt-hdr/.rpt-ftr as fixed-position elements that repeat on every printed
+            // page (Chrome DOES support position:fixed repeating across pages), with body
+            // padding so content never underlaps them. "Page X of Y" is not achievable this way
+            // (no live page count in Chrome print CSS) — the footer shows report ref + confidentiality
+            // classification instead of a fake/static page count.
+            +   'body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10pt;padding-top:20mm;padding-bottom:16mm;}'
+            +   '.rpt-hdr,.rpt-ftr{display:flex !important;}'
             +   '.page-break{page-break-before:always;}'
             +   '.no-print{display:none !important;}'
             +   '.section-card,tr,thead{break-inside:avoid;}'
@@ -2932,17 +3074,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // .b4-bar keep their clipping), and no table may exceed the page width.
             +   '.sb [style*="overflow-x"],.sb [style*="overflow:auto"],.sb [style*="overflow: auto"]{overflow:visible !important;}'
             +   '.sb table{max-width:100% !important;min-width:0 !important;width:100% !important;table-layout:fixed;}'
-            +   '@page{size:A4;margin:24mm 14mm 22mm 14mm;'
-            +     '@top-left{content:' + pgHdrLeft + ';font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:8pt;font-weight:500;color:#475569;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
-            +     '@top-right{content:' + pgHdrRight + ';font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:8pt;color:#64748b;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
-            +     '@bottom-left{content:' + pgFtrLeft + ';font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;white-space:nowrap;}'
-            +     '@bottom-center{content:"Page " counter(page) " of " counter(pages);font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;}'
-            +     '@bottom-right{content:' + pgFtrRight + ';font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;white-space:nowrap;}'
-            +   '}'
-            +   '@page :first{@top-left{content:none;}@top-right{content:none;}@bottom-left{content:none;}@bottom-center{content:none;}@bottom-right{content:none;}}'
+            // For long-text findings tables, avoid mid-row splits per-row (readability) while still
+            // letting the table itself break across pages (table{break-inside:auto} above already
+            // allows that) — this is the pragmatic choice over per-row height thresholds, which
+            // Chrome's print engine can't evaluate reliably at layout time anyway.
+            +   '.f-tbl td{max-height:none;}'
+            +   '@page{size:A4;margin:24mm 14mm 22mm 14mm;}'
             + '}'
-            + 'body{counter-reset:page;}'
-            + '.page-break{counter-increment:page;}'
             + '.rpt-hdr{display:none;position:fixed;top:0;left:0;right:0;height:18mm;background:white;color:#1e293b;padding:3mm 12mm;align-items:center;justify-content:space-between;font-size:0.72rem;z-index:100;border-bottom:1px solid #e2e8f0;}'
             + '.rpt-hdr-left{display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.82rem;color:#1e3a5f;max-width:30%;overflow:hidden;}'
             + '.rpt-hdr-logo{height:36px;max-width:160px;object-fit:contain;border-radius:3px;}'
@@ -2993,8 +3131,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     ? '<div class="watermark"><span style="color:rgba(220,38,38,0.16);font-size:48pt;">MODIFIED SINCE ISSUE</span></div>'
                     : '<div class="watermark"><span>CONFIDENTIAL</span></div>'))
             + (modifiedSinceIssue ? '<div class="no-print" style="position:sticky;top:0;left:0;right:0;background:#dc2626;color:white;text-align:center;padding:10px 16px;font-weight:700;font-size:0.85rem;letter-spacing:0.3px;z-index:1001;">&#9888; MODIFIED SINCE ISSUE — this final report has changed since it was last issued (v' + (d.report.issuedSnapshot && d.report.issuedSnapshot.version) + '). Re-issue via Finalize &amp; Publish before distributing.</div>' : '')
-            + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">' + d.report.client + '<br>Ref: ' + d.report.id + '</div></div>'
-            + '<div class="rpt-ftr"><div class="rpt-ftr-left">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>' + (cbName || 'Certification Body') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">' + d.today + '</div></div>'
+            + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">Audit360 &mdash; ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '</div></div>'
+            + '<div class="rpt-ftr"><div class="rpt-ftr-left">Confidential &mdash; ' + (d.report.reportStatus === 'draft' ? 'Draft' : 'Final') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">Generated by Audit360</div></div>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
             + '<button data-action="print" style="background:linear-gradient(135deg,#1d4ed8,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:500;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Download"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
             + '<button data-action="close" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:500;">Close</button></div>'
@@ -3158,7 +3296,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: FINDING DETAILS
             + (secMap['findings'] ? '<div id="sec-findings" class="sh page-break" style="background:#fef2f2;border-left-color:#b91c1c;">' + sBadge('findings') + 'FINDING DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:30%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No findings recorded.</td></tr>') + '</tbody></table></div>' : '')
             // SECTION: NCR REGISTER
-            + (secMap['ncrs'] ? '<div id="sec-ncrs" class="sh page-break" style="background:#fff7ed;border-left-color:#b91c1c;">' + sBadge('ncrs') + 'NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#b91c1c' : '#b45309') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
+            + (secMap['ncrs'] ? '<div id="sec-ncrs" class="sh page-break" style="background:#fff7ed;border-left-color:#b91c1c;">' + sBadge('ncrs') + 'NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#b91c1c' : '#b45309') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + (ncr.evidenceImageThumb || ncr.evidenceImage) + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
 
             // SECTION: CORRECTIVE ACTION REQUIREMENTS
             + (secMap['corrective'] ? '<div id="sec-corrective" class="sh page-break" style="background:#f8fafc;border-left-color:#be185d;">' + sBadge('corrective') + 'CORRECTIVE ACTION REQUIREMENTS</div><div class="sb">'
@@ -3226,63 +3364,41 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '</div></div>' : '')
             // TIER 3: auditor-facing evidence analytics, ahead of the photo appendix
             + renderModSections(modAppendix)
-            // SECTION: EVIDENCE GALLERY (always last — photographic appendix)
+            // SECTION: EVIDENCE INDEX (text-only — no images embedded in main report).
+            // Full-resolution photographic evidence is issued separately via the Evidence Pack
+            // (window.exportEvidencePack) to keep the main report's blob size bounded. This
+            // removes what was previously an unbounded, full-res image gallery.
             + (function () {
                 if (!secMap['evidence']) return '';
-                let evidenceItems = [];
-                // Capture the richer metadata the auditor already recorded so each exhibit
-                // is self-describing: linked clause, department, auditor note, capture time
-                // and geolocation where the device supplied them.
-                const evMeta = function (src) {
-                    return {
-                        department: src.department || '',
-                        note: (src.comment || src.description || '').toString().replace(/<[^>]*>/g, '').trim(),
-                        when: src.evidenceCapturedAt || src.capturedAt || src.createdAt || src.updatedAt || '',
-                        geo: src.evidenceLocation || src.location || src.gps || ''
-                    };
-                };
-                (d.hydratedProgress || []).forEach(function (item) {
-                    let imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
-                    imgs.forEach(function (img) {
-                        evidenceItems.push(Object.assign({
-                            clause: item.kbMatch ? item.kbMatch.clause : item.clause,
-                            title: item.kbMatch ? item.kbMatch.title : (item.requirement || ''),
-                            img: img, status: item.status, ncrType: item.ncrType || ''
-                        }, evMeta(item)));
-                    });
-                });
-                (d.report.ncrs || []).forEach(function (ncr) {
-                    if (ncr.evidenceImage) {
-                        evidenceItems.push(Object.assign({
-                            clause: ncr.clause, title: ncr.type + ' Non-Conformity',
-                            img: ncr.evidenceImage, status: 'nc', ncrType: ncr.type || ''
-                        }, evMeta(ncr)));
-                    }
-                });
-                if (evidenceItems.length === 0) return '';
+                const evIdx = (d.report._evidenceIndexBuilt || []).concat(
+                    // Include NCR-only evidence not already attached to a checklist item.
+                    (d.report.ncrs || []).filter(function (n) { return n.evidenceImage && !n._evIndexed; }).map(function (ncr) {
+                        return { evId: 'EV-NCR-' + (ncr.id || ''), image: ncr.evidenceImage, comment: '', clause: ncr.clause || '', dept: '', findingRef: ncr.type || 'NC', capturedAt: '', location: '' };
+                    })
+                );
+                if (evIdx.length === 0) return '';
                 const fmtWhen = function (v) {
-                    if (!v) return '';
+                    if (!v) return 'Not recorded';
                     const dt = new Date(v);
-                    return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                    return isNaN(dt.getTime()) ? 'Not recorded' : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                 };
-                let cards = evidenceItems.map(function (ev, i) {
-                    let borderColor = ev.status === 'nc' ? '#b91c1c' : ev.status === 'observation' ? '#1d4ed8' : '#15803d';
-                    const meta = [];
-                    if (ev.department) meta.push('<span>' + ev.department + '</span>');
-                    const w = fmtWhen(ev.when); if (w) meta.push('<span>' + w + '</span>');
-                    if (ev.geo) meta.push('<span>' + String(ev.geo).slice(0, 40) + '</span>');
-                    return '<div class="ev-card" style="border-top:3px solid ' + borderColor + ';">'
-                        + '<img src="' + ev.img + '" alt="Evidence exhibit ' + (i + 1) + '">'
-                        + '<div class="ev-cap">'
-                        + '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:3px;">'
-                        + '<span style="font-size:0.62rem;font-weight:700;color:#94a3b8;letter-spacing:0.06em;">EX-' + String(i + 1).padStart(2, '0') + '</span>'
-                        + '<strong style="margin:0;">Clause ' + (ev.clause || '—') + '</strong></div>'
-                        + '<span>' + (ev.title || 'Audit Evidence') + '</span>'
-                        + (ev.note ? '<div style="margin-top:5px;color:#475569;font-size:0.73rem;line-height:1.45;">' + ev.note.slice(0, 140) + (ev.note.length > 140 ? '…' : '') + '</div>' : '')
-                        + (meta.length ? '<div style="margin-top:6px;padding-top:5px;border-top:1px solid #f1f5f9;display:flex;flex-wrap:wrap;gap:8px;font-size:0.66rem;color:#94a3b8;">' + meta.join('') + '</div>' : '')
-                        + '</div></div>';
+                const esc = window.UTILS && window.UTILS.escapeHtml ? window.UTILS.escapeHtml : function (s) { return String(s == null ? '' : s); };
+                const rows = evIdx.map(function (ev, idx) {
+                    const desc = (ev.comment || '').toString().replace(/<[^>]*>/g, '').trim();
+                    const descExcerpt = desc ? (desc.slice(0, 90) + (desc.length > 90 ? '…' : '')) : 'Not recorded';
+                    return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';">'
+                        + '<td style="padding:8px 12px;font-weight:700;white-space:nowrap;">' + esc(ev.evId) + '</td>'
+                        + '<td style="padding:8px 12px;">' + esc(descExcerpt) + '</td>'
+                        + '<td style="padding:8px 12px;">' + esc(ev.clause || 'Not recorded') + '</td>'
+                        + '<td style="padding:8px 12px;">' + esc(ev.dept || 'Not recorded') + '</td>'
+                        + '<td style="padding:8px 12px;">' + esc(ev.findingRef || 'Not recorded') + '</td>'
+                        + '<td style="padding:8px 12px;">' + esc(fmtWhen(ev.capturedAt)) + (ev.location ? ' · ' + esc(String(ev.location).slice(0, 30)) : '') + '</td>'
+                        + '</tr>';
                 }).join('');
-                return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;">' + sBadge('evidence') + 'EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;">' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
+                return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;">' + sBadge('evidence') + 'EVIDENCE INDEX</div><div class="sb">'
+                    + '<table class="f-tbl"><thead><tr><th>EV ID</th><th>Description</th><th>Clause</th><th>Department</th><th>Finding Ref</th><th>Captured</th></tr></thead><tbody>' + rows + '</tbody></table>'
+                    + '<div style="margin-top:14px;font-size:0.82rem;color:#64748b;text-align:center;font-style:italic;">' + evIdx.length + ' evidence exhibit(s) indexed. Full evidence images are issued separately in the Evidence Pack (same report reference).</div>'
+                    + '</div>';
             })()
             + '</div>'
             // CLOSING PAGE — the report ends confidently, board-presentation style.
@@ -3353,7 +3469,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 return 'var mc' + i + '=document.getElementById(' + JSON.stringify(ch.canvasId) + ');if(mc' + i + ')try{new Chart(mc' + i + ',' + ch.configJson + ');}catch(e){}';
             }).join('')
             + 'window._chartsReady=false;'
-            + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);}catch(e){}});window._chartsReady=true;},2500);'
+            // Rasterize each chart canvas as a JPEG (not PNG) to cut embedded payload size — charts are
+            // photographic-free flat vector renders, so JPEG at 0.85 is visually lossless here but far
+            // smaller than PNG. JPEG has no alpha channel, so the canvas is first drawn onto a white-backed
+            // offscreen canvas at device scale to avoid black-background artifacts.
+            + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{'
+            +   'var off=document.createElement("canvas");off.width=cv.width;off.height=cv.height;'
+            +   'var octx=off.getContext("2d");octx.fillStyle="#ffffff";octx.fillRect(0,0,off.width,off.height);octx.drawImage(cv,0,0);'
+            +   'var im=document.createElement("img");im.src=off.toDataURL("image/jpeg",0.85);im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);'
+            + '}catch(e){}});window._chartsReady=true;},2500);'
             + '}function _waitForChart(){if(typeof Chart!=="undefined"){rc();}else{setTimeout(_waitForChart,100);}}_waitForChart();'
             // Wire up data-action buttons (Download PDF, Close) — parent's event delegator does not run in this window
             + 'document.addEventListener("click",function(ev){'
@@ -3382,6 +3506,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // so it works even when parent page CSP disallows inline scripts.
         // BOM ensures browsers interpret as UTF-8 even if charset header missing.
         const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), reportHtmlFinal], { type: 'text/html;charset=utf-8' });
+        // Size guardrail: warn before opening an oversized print blob (mostly driven by embedded
+        // evidence images / charts). Limit is configurable via cbSettings.reportLimits.mainMb.
+        const blobSizeMB = blob.size / 1048576;
+        const mainMbLimit = (d.cbSettings && d.cbSettings.reportLimits && d.cbSettings.reportLimits.mainMb) || 5;
+        if (blobSizeMB > mainMbLimit) {
+            const proceed = window.confirm('Report is ' + blobSizeMB.toFixed(1) + ' MB (limit ' + mainMbLimit + ' MB). Consider excluding sections or using the Evidence Pack. Continue?');
+            if (!proceed) { return; }
+        }
         const blobUrl = URL.createObjectURL(blob);
         const printWindow = window.open(blobUrl, '_blank');
         if (!printWindow) {
@@ -3419,5 +3551,5 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { generateAuditReport: window.generateAuditReport, showReportPreviewModal: window.showReportPreviewModal, toggleReportSection: window.toggleReportSection, exportReportPDF: window.exportReportPDF, runFollowUpAIAnalysis: window.runFollowUpAIAnalysis, polishNotesWithAI: window.polishNotesWithAI, polishSingleNote: window.polishSingleNote };
+    module.exports = { generateAuditReport: window.generateAuditReport, showReportPreviewModal: window.showReportPreviewModal, toggleReportSection: window.toggleReportSection, exportReportPDF: window.exportReportPDF, exportEvidencePack: window.exportEvidencePack, runFollowUpAIAnalysis: window.runFollowUpAIAnalysis, polishNotesWithAI: window.polishNotesWithAI, polishSingleNote: window.polishSingleNote };
 }

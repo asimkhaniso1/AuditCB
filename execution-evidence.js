@@ -60,6 +60,106 @@
     window._EvidenceDB = EvidenceDB;
 
     // ============================================
+    // EVIDENCE UTILS — shared compression/thumb helpers + evidence ID registry
+    // ============================================
+    function _loadImage(dataUrl) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = (e) => reject(e);
+            img.src = dataUrl;
+        });
+    }
+
+    function _canvasDownscale(img, maxPx, quality) {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Never upscale — only cap the longest side at maxPx
+        if (width > maxPx || height > maxPx) {
+            if (width > height) {
+                height = Math.round((height * maxPx) / width);
+                width = maxPx;
+            } else {
+                width = Math.round((width * maxPx) / height);
+                height = maxPx;
+            }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        // White background handles PNG transparency; canvas round-trip strips EXIF automatically
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        return canvas.toDataURL('image/jpeg', quality);
+    }
+
+    async function evidenceCompress(dataUrl, opts) {
+        const { maxPx = 1600, quality = 0.75 } = opts || {};
+        const img = await _loadImage(dataUrl);
+        return _canvasDownscale(img, maxPx, quality);
+    }
+
+    async function evidenceThumb(dataUrl, opts) {
+        const { maxPx = 320, quality = 0.7 } = opts || {};
+        const img = await _loadImage(dataUrl);
+        return _canvasDownscale(img, maxPx, quality);
+    }
+
+    // Persistent Evidence IDs: stable EV-<n> per report session, keyed by uniqueId + idbKey/url.
+    // Sequence and per-item id lists live on window._evidenceMeta (non-colliding __seq key).
+    function registerEvidence(uniqueId, idbKey) {
+        window._evidenceMeta = window._evidenceMeta || {};
+        if (typeof window._evidenceMeta.__seq !== 'number') window._evidenceMeta.__seq = 0;
+
+        const meta = window._evidenceMeta[uniqueId] || (window._evidenceMeta[uniqueId] = {
+            capturedAt: null, capturedAtList: [], location: null, locationRaw: null
+        });
+        if (!Array.isArray(meta.evidenceIds)) meta.evidenceIds = [];
+        if (!Array.isArray(meta.evidenceKeys)) meta.evidenceKeys = [];
+
+        window._evidenceMeta.__seq += 1;
+        const evId = 'EV-' + String(window._evidenceMeta.__seq).padStart(2, '0');
+
+        meta.evidenceIds.push(evId);
+        meta.evidenceKeys.push(idbKey);
+
+        return evId;
+    }
+
+    function getEvidenceIndex() {
+        const out = [];
+        const store = window._evidenceMeta || {};
+        Object.keys(store).forEach((uniqueId) => {
+            if (uniqueId === '__seq') return;
+            const meta = store[uniqueId];
+            if (!meta || !Array.isArray(meta.evidenceIds)) return;
+            meta.evidenceIds.forEach((evId, idx) => {
+                out.push({
+                    evId,
+                    uniqueId,
+                    idbKey: (meta.evidenceKeys && meta.evidenceKeys[idx]) || null,
+                    capturedAt: (meta.capturedAtList && meta.capturedAtList[idx]) || meta.capturedAt || null,
+                    location: meta.location || null
+                });
+            });
+        });
+        return out;
+    }
+
+    window.EvidenceUtils = {
+        compress: evidenceCompress,
+        thumb: evidenceThumb,
+        registerEvidence: registerEvidence,
+        getEvidenceIndex: getEvidenceIndex
+    };
+
+    // ============================================
     // EVIDENCE CAPTURE METADATA (timestamp + opt-in geolocation)
     // ============================================
     // In-memory store keyed by uniqueId (the checklist item's DOM id suffix).
@@ -199,7 +299,7 @@
             img.onload = async function () {
                 try {
                     // 1. Compress
-                    const compressedDataUrl = compressImage(img, file.type);
+                    const compressedDataUrl = await compressImage(img, file.type);
                     const _compressedSize = Math.round((compressedDataUrl.length * 3 / 4) / 1024);
 
                     let finalUrl = compressedDataUrl;
@@ -259,6 +359,9 @@
                     const capturedAtIso = recordCaptureMeta(uniqueId);
                     maybeCaptureLocation(uniqueId);
 
+                    // 2d. Assign a stable Evidence ID for cross-referencing in the report
+                    const evId = window.EvidenceUtils.registerEvidence(uniqueId, finalUrl);
+
                     // 3. Append to multi-image preview strip
                     if (previewDiv) {
                         previewDiv.style.display = 'flex';
@@ -270,6 +373,7 @@
                         thumb.dataset.idx = newIdx;
                         thumb.dataset.saveUrl = finalUrl; // store URL/idb-key for saving
                         thumb.dataset.capturedAt = capturedAtIso; // ISO 8601 capture time, for future consumers
+                        thumb.dataset.evId = evId; // stable Evidence ID (EV-NN) for report cross-reference
                         thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
                         thumb.innerHTML = `
                             <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" data-action="viewEvidenceImageByUrl" data-id="${safeDisplay}"/>
@@ -296,34 +400,11 @@
         reader.readAsDataURL(file);
     };
 
-    // Compress image to reduce storage size
-    function compressImage(img, _fileType) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        // Calculate new dimensions (max 600px on longest side — keeps ~20-40KB per image)
-        const maxDimension = 600;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxDimension || height > maxDimension) {
-            if (width > height) {
-                height = Math.round((height * maxDimension) / width);
-                width = maxDimension;
-            } else {
-                width = Math.round((width * maxDimension) / height);
-                height = maxDimension;
-            }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        // Draw and compress
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Convert to JPEG with 0.5 quality — good enough for evidence, saves storage
-        return canvas.toDataURL('image/jpeg', 0.5);
+    // Compress image to reduce storage size.
+    // Delegates to window.EvidenceUtils.compress (maxPx 1600, quality 0.75) — raised from the old
+    // 600px/0.5 cap, which was too aggressive and hurt evidence readability.
+    async function compressImage(img, _fileType) {
+        return window.EvidenceUtils.compress(img.src, { maxPx: 1600, quality: 0.75 });
     }
 
     // View evidence image in full size (modal/popup)
@@ -503,7 +584,9 @@
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
 
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            const rawDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            // Downscale/compress screen captures (previously stored at native resolution uncapped)
+            const dataUrl = await window.EvidenceUtils.compress(rawDataUrl, { maxPx: 1600, quality: 0.75 });
 
             // Cleanup video element (keep stream alive for reuse)
             video.pause();
@@ -557,6 +640,9 @@
             const capturedAtIso = recordCaptureMeta(uniqueId);
             maybeCaptureLocation(uniqueId);
 
+            // Assign a stable Evidence ID for cross-referencing in the report
+            const evId = window.EvidenceUtils.registerEvidence(uniqueId, finalUrl);
+
             // Append thumbnail to multi-image preview strip
             const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
             if (previewDiv) {
@@ -573,6 +659,7 @@
                 thumb.dataset.idx = newIdx;
                 thumb.dataset.saveUrl = finalUrl;
                 thumb.dataset.capturedAt = capturedAtIso;
+                thumb.dataset.evId = evId; // stable Evidence ID (EV-NN) for report cross-reference
                 thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
                 thumb.innerHTML = `
                     <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" data-action="viewEvidenceImageByUrl" data-id="${safeDisplay}"/>
@@ -666,7 +753,7 @@
         }
     };
 
-    window.captureWebcam = function (uniqueId) {
+    window.captureWebcam = async function (uniqueId) {
         const video = document.getElementById('webcam-video');
         if (!video || !window.activeWebcamStream) return;
 
@@ -681,7 +768,9 @@
             ctx.scale(-1, 1);
             ctx.drawImage(video, 0, 0);
 
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            const rawDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            // Downscale/compress webcam captures (previously stored at native resolution uncapped)
+            const dataUrl = await window.EvidenceUtils.compress(rawDataUrl, { maxPx: 1600, quality: 0.75 });
 
             // Stop stream
             window.activeWebcamStream.getTracks().forEach(track => track.stop());
@@ -691,6 +780,19 @@
             const capturedAtIso = recordCaptureMeta(uniqueId);
             maybeCaptureLocation(uniqueId);
 
+            // Store in IndexedDB so it has a stable key like the other capture paths
+            let finalUrl = dataUrl;
+            try {
+                const idbKey = 'idb://evidence-' + uniqueId + '-cam-' + Date.now();
+                await EvidenceDB.put(idbKey, dataUrl);
+                finalUrl = idbKey;
+            } catch (idbErr) {
+                console.error('[Webcam Capture] IndexedDB store failed:', idbErr);
+            }
+
+            // Assign a stable Evidence ID for cross-referencing in the report
+            const evId = window.EvidenceUtils.registerEvidence(uniqueId, finalUrl);
+
             // Update UI
             const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
             const imgElem = document.getElementById('evidence-img-' + uniqueId);
@@ -699,7 +801,7 @@
 
             if (imgElem) imgElem.src = dataUrl;
             if (previewDiv) previewDiv.style.display = 'block';
-            if (dataInput) { dataInput.value = 'attached'; dataInput.dataset.capturedAt = capturedAtIso; }
+            if (dataInput) { dataInput.value = 'attached'; dataInput.dataset.capturedAt = capturedAtIso; dataInput.dataset.evId = evId; dataInput.dataset.saveUrl = finalUrl; }
             if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
 
             // Close modal
@@ -714,5 +816,5 @@
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { handleEvidenceUpload: window.handleEvidenceUpload, viewEvidenceImage: window.viewEvidenceImage, viewEvidenceImageDirect: window.viewEvidenceImageDirect, removeEvidence: window.removeEvidence, removeEvidenceByIdx: window.removeEvidenceByIdx, viewEvidenceImageByUrl: window.viewEvidenceImageByUrl, captureScreenEvidence: window.captureScreenEvidence, handleCameraButton: window.handleCameraButton, captureWebcam: window.captureWebcam, getEvidenceCaptureMeta: window.getEvidenceCaptureMeta };
+    module.exports = { handleEvidenceUpload: window.handleEvidenceUpload, viewEvidenceImage: window.viewEvidenceImage, viewEvidenceImageDirect: window.viewEvidenceImageDirect, removeEvidence: window.removeEvidence, removeEvidenceByIdx: window.removeEvidenceByIdx, viewEvidenceImageByUrl: window.viewEvidenceImageByUrl, captureScreenEvidence: window.captureScreenEvidence, handleCameraButton: window.handleCameraButton, captureWebcam: window.captureWebcam, getEvidenceCaptureMeta: window.getEvidenceCaptureMeta, EvidenceUtils: window.EvidenceUtils };
 }

@@ -164,8 +164,11 @@
 
     // ─── Badges ─────────────────────────────────────────────────────────────
 
+    var SEVERITY_SYMBOL = { good: '✓ ', warn: '! ', bad: '✕ ' };
+
     function badge(text, sev) {
-        return '<span class="b4-badge b4-badge--' + esc(sev || 'neutral') + '">' + esc(text) + '</span>';
+        var sym = SEVERITY_SYMBOL[sev] || '';
+        return '<span class="b4-badge b4-badge--' + esc(sev || 'neutral') + '">' + sym + esc(text) + '</span>';
     }
 
     function resultBadgeSeverity(status) {
@@ -427,13 +430,13 @@
             // image id), with fields capturedAt (NOT timestamp) and optional location.
             var itemKey = item.uniqueId != null ? item.uniqueId : (item.id != null ? item.id : null);
             var itemMeta = (hasEvidenceMeta && itemKey != null) ? global._evidenceMeta[itemKey] : null;
-            var imgs = safeArr(item.evidenceImages).length ? item.evidenceImages : (item.evidenceImage ? [item.evidenceImage] : []);
+            var imgs = safeArr(item.evidenceThumbs).length ? item.evidenceThumbs : (safeArr(item.evidenceImages).length ? item.evidenceImages : (item.evidenceImage ? [item.evidenceImage] : []));
             var thumbs = imgs.slice(0, 3).map(function (img) {
                 var url = (img && img.url) || (img && img.dataUrl) || (typeof img === 'string' ? img : '');
                 var thumb = evidenceThumbHtml(url);
                 if (thumb && itemMeta) {
                     var metaLine = [itemMeta.capturedAt ? fmtDate(itemMeta.capturedAt) : '', itemMeta.location ? esc(itemMeta.location) : ''].filter(Boolean).join(' · ');
-                    return '<div style="display:inline-block;text-align:center;">' + thumb + (metaLine ? '<div style="font-size:8px;color:var(--b4-muted,#666);">' + metaLine + '</div>' : '') + '</div>';
+                    return '<div style="display:inline-block;text-align:center;">' + thumb + (metaLine ? '<div style="font-size:0.72rem;color:var(--b4-muted,#666);">' + metaLine + '</div>' : '') + '</div>';
                 }
                 return thumb;
             }).join('');
@@ -485,10 +488,8 @@
         var classification = String(item.ncrType || '').toLowerCase() === 'major' ? 'Major' : 'Minor';
         var reportRef = (d && d.report && (d.report.reportNumber || d.report.id)) || '—';
         var reportDate = fmtDate(d && d.report && d.report.date);
-        var cbLogoHtml = (d && d.cbLogo) ? '<img src="' + esc(d.cbLogo) + '" style="max-height:40px;max-width:140px;object-fit:contain;" />' : '';
-
         var header = '<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px;">'
-            + '<div style="display:flex;align-items:center;gap:12px;">' + cbLogoHtml + '<div><div style="font-size:16px;font-weight:800;letter-spacing:0.5px;">CORRECTIVE ACTION REQUEST</div>'
+            + '<div style="display:flex;align-items:center;gap:12px;"><div><div style="font-size:16px;font-weight:800;letter-spacing:0.5px;">AUDIT360 — CORRECTIVE ACTION REQUEST</div>'
             + '<div style="font-size:11px;color:var(--b4-muted,#666);">Report ' + esc(String(reportRef)) + ' · ' + reportDate + '</div></div></div>'
             + '<div style="text-align:right;"><div style="font-weight:700;">' + esc(carNo) + '</div>' + badge(classification, classification === 'Major' ? 'bad' : 'warn') + '</div>'
             + '</div>';

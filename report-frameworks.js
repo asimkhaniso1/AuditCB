@@ -61,12 +61,14 @@
         }
 
         return `
+        <div style="break-inside:avoid;page-break-inside:avoid;">
         <div class="b4-eyebrow">${esc(def.title || blockId)}</div>
         <table class="b4-tbl">
             ${theadHtml}
             <tbody>${bodyRows}</tbody>
         </table>
-        ${footer}`;
+        ${footer}
+        </div>`;
     }
 
     function sections(d) {

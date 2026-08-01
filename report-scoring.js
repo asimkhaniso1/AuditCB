@@ -816,9 +816,13 @@
     }
 
     // ── HTML rendering helpers ────────────────────────────────────────────────
+    const SEVERITY_SYMBOL = { good: '✓ ', warn: '! ', bad: '✕ ' };
+    function sevSymbol(sev) { return SEVERITY_SYMBOL[sev] || ''; }
+
     function scorePillHtml(score) {
         if (score == null) return '<span class="b4-badge b4-badge--neutral">—</span>';
-        return `<span class="b4-badge b4-badge--${scoreSeverity(score)}">${score}</span>`;
+        const sev = scoreSeverity(score);
+        return `<span class="b4-badge b4-badge--${sev}">${sevSymbol(sev)}${score}</span>`;
     }
 
     function barHtml(valuePct, severity) {
@@ -846,7 +850,7 @@
         <div class="b4-bar-row" style="flex-direction:column;align-items:stretch;">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--b4-s3);">
                 <span class="b4-bar-label">${esc(label)} <span class="b4-caption" style="display:inline;">(n=${n})</span></span>
-                <span class="b4-badge b4-badge--${sev}">${v.toFixed(1)}/5</span>
+                <span class="b4-badge b4-badge--${sev}">${sevSymbol(sev)}${v.toFixed(1)}/5</span>
             </div>
             <div class="b4-maturity-bar b4-bar"><div class="b4-maturity-bar-fill b4-bar-fill--${sev}" style="width:${pctW}%;"></div></div>
         </div>`;
@@ -905,11 +909,13 @@
     }
 
     function riskBadgeHtml(level) {
-        return `<span class="b4-badge b4-badge--${levelSeverity(level)}">${esc(level || '—')}</span>`;
+        const sev = levelSeverity(level);
+        return `<span class="b4-badge b4-badge--${sev}">${sevSymbol(sev)}${esc(level || '—')}</span>`;
     }
 
     function statusBadgeHtml(status) {
-        return `<span class="b4-badge b4-badge--${statusSeverity(status)}">${esc(status || '—')}</span>`;
+        const sev = statusSeverity(status);
+        return `<span class="b4-badge b4-badge--${sev}">${sevSymbol(sev)}${esc(status || '—')}</span>`;
     }
 
     function insufficientDataHtml(msg) {
@@ -1049,7 +1055,7 @@
             const hasScore = d.score != null;
             const sev = hasScore ? scoreSeverity(d.score) : 'neutral';
             const scoreCell = hasScore
-                ? `<div style="display:flex;align-items:center;gap:var(--b4-s2);">${barHtml(d.score, sev)}<span class="b4-badge b4-badge--${sev}">${Math.round(d.score)}</span></div>`
+                ? `<div style="display:flex;align-items:center;gap:var(--b4-s2);">${barHtml(d.score, sev)}<span class="b4-badge b4-badge--${sev}">${sevSymbol(sev)}${Math.round(d.score)}</span></div>`
                 : `<span class="b4-caption">N/A (n=${d.n})</span>`;
             return `
             <div class="b4-card" style="break-inside:avoid;${d.needsAttention ? 'border-left:3px solid var(--b4-bad);' : ''}">
@@ -1112,7 +1118,7 @@
         const recurringCallout = recurring.length
             ? `<div class="b4-callout b4-callout--bad" style="margin-bottom:var(--b4-s5);">
                 <div class="b4-card-heading">${iconSafe('alert', { size: 14 })} Recurring Issues</div>
-                <div>${recurring.map((r) => `<span class="b4-badge b4-badge--bad" style="margin:0 var(--b4-s2) var(--b4-s2) 0;">${esc(r.clause)}</span>`).join('')}</div>
+                <div>${recurring.map((r) => `<span class="b4-badge b4-badge--bad" style="margin:0 var(--b4-s2) var(--b4-s2) 0;">✕ ${esc(r.clause)}</span>`).join('')}</div>
             </div>`
             : '';
 

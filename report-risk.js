@@ -617,18 +617,21 @@
         return { Low: 'b4-heat-low', Medium: 'b4-heat-med', High: 'b4-heat-high', Critical: 'b4-heat-crit' }[band] || 'b4-heat-0';
     }
 
+    var SEVERITY_SYMBOL = { good: '✓ ', warn: '! ', bad: '✕ ' };
+    function sevSymbol(sev) { return SEVERITY_SYMBOL[sev] || ''; }
+
     // Risk-band → badge. Critical uses the solid b4-pill-critical treatment (the
     // system's only "alarm" variant); everything else is a standard b4-badge.
     function bandBadge(band) {
-        if (band === 'Critical') return '<span class="b4-pill b4-pill-critical">' + esc(band) + '</span>';
+        if (band === 'Critical') return '<span class="b4-pill b4-pill-critical">✕ ' + esc(band) + '</span>';
         var cls = { Low: 'good', Medium: 'warn', High: 'bad' }[band] || 'neutral';
-        return '<span class="b4-badge b4-badge--' + cls + '">' + esc(band) + '</span>';
+        return '<span class="b4-badge b4-badge--' + cls + '">' + sevSymbol(cls) + esc(band) + '</span>';
     }
 
     function priorityBadge(p) {
-        if (p === 'P1') return '<span class="b4-pill b4-pill-critical">P1</span>';
+        if (p === 'P1') return '<span class="b4-pill b4-pill-critical">✕ P1</span>';
         var cls = { P2: 'bad', P3: 'warn', P4: 'neutral' }[p] || 'neutral';
-        return '<span class="b4-badge b4-badge--' + cls + '">' + esc(p) + '</span>';
+        return '<span class="b4-badge b4-badge--' + cls + '">' + sevSymbol(cls) + esc(p) + '</span>';
     }
 
     // Short, plain-language interpretation for a residual-risk band — drawn
@@ -645,9 +648,9 @@
     }
 
     function statusBadge(status) {
-        if (status === 'Overdue') return '<span class="b4-pill b4-pill-critical">Overdue</span>';
+        if (status === 'Overdue') return '<span class="b4-pill b4-pill-critical">✕ Overdue</span>';
         var cls = { Open: 'bad', 'In Progress': 'warn', Verified: 'info', Closed: 'good' }[status] || 'neutral';
-        return '<span class="b4-badge b4-badge--' + cls + '">' + esc(status) + '</span>';
+        return '<span class="b4-badge b4-badge--' + cls + '">' + sevSymbol(cls) + esc(status) + '</span>';
     }
 
     function tagBadge(label) {
@@ -702,8 +705,11 @@
 
     // Numeric risk-score badge — reuses the heat-cell component (same band colors
     // as the heat map) instead of a bespoke badge.
+    var HEAT_SYMBOL = { Low: '✓ ', Medium: '! ', High: '✕ ', Critical: '✕ ' };
+    function heatSymbol(band) { return HEAT_SYMBOL[band] || ''; }
+
     function scoreBadge(score, band) {
-        return '<span class="b4-heat-cell ' + bandHeatClass(band) + '">' + esc(score) + '</span>';
+        return '<span class="b4-heat-cell ' + bandHeatClass(band) + '">' + heatSymbol(band) + esc(score) + '</span>';
     }
 
     // Thin horizontal progress bar built from the system's b4-bar / b4-bar-fill.
@@ -735,7 +741,7 @@
                 var band = bandFor((impactIdx + 1) * (likIdx + 1));
                 // b4-heat-cell--lg is the design system's enlarged print-size variant
                 // (min 64x64, 12pt) — used here instead of duplicating those dimensions inline.
-                rowsHtml += '<div class="b4-heat-cell b4-heat-cell--lg ' + bandHeatClass(band) + '" style="flex:1;border-radius:6px;">' + (count || '') + '</div>';
+                rowsHtml += '<div class="b4-heat-cell b4-heat-cell--lg ' + bandHeatClass(band) + '" style="flex:1;border-radius:6px;">' + (count ? heatSymbol(band) + count : '') + '</div>';
             }
             rowsHtml += '</div>';
         }
