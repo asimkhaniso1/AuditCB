@@ -1972,6 +1972,10 @@ const SupabaseClient = {
                     else { local.push(cc); added++; }
                 });
                 window.state.checklists = local;
+            } else if (cloudCount === 0 && localCount > 0) {
+                // FULL sync returned nothing but local has data — do NOT wipe local
+                // checklists (cloud may be unreachable, RLS-blocked, or never seeded).
+                Logger.warn(`Full checklist sync returned 0 rows but ${localCount} exist locally — keeping local data. Check checklists table / RLS.`);
             } else {
                 // FULL: Supabase is source of truth — replace entirely
                 window.state.checklists = cloudChecklists;

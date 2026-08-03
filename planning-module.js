@@ -1386,6 +1386,30 @@ window.printAuditChecklist = function (planId) {
             content += `</tbody></table></div>`;
         });
 
+        // Fallback: assigned checklists missing from the library (deleted / cloud
+        // sync gap) — print directly from the report's saved responses so the
+        // execution record is never blank.
+        const resolvedAny = planChecklists.some(clId => checklists.some(c => c.id === clId));
+        if (!resolvedAny && report && Array.isArray(report.checklistProgress) && report.checklistProgress.length > 0) {
+            content += `
+                <div class="section">
+                    <h2>Audit Responses (from saved execution record)</h2>
+                    <p style="font-size:0.8rem;color:#777;">Source checklists are no longer in the library; showing the saved audit responses.</p>
+                    <table>
+                        <thead><tr><th width="10%">Clause</th><th width="40%">Requirement</th><th width="15%">Status</th><th width="35%">Auditor Comments / Evidence</th></tr></thead>
+                        <tbody>
+                            ${report.checklistProgress.map(p => `
+                                <tr>
+                                    <td>${p.clause || ''}</td>
+                                    <td>${p.requirement || p.text || ''}</td>
+                                    <td style="color: ${statusColor[p.status || ''] || '#333'}; font-weight: bold;">${statusText[p.status || ''] || 'Not Assessed'}</td>
+                                    <td>${p.comment || '-'}</td>
+                                </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+        }
+
         if (report && report.ncrs && report.ncrs.length > 0) {
             content += `<div class="section"><h2>Audit Findings (NCRs)</h2><ul>`;
             report.ncrs.forEach(ncr => {
@@ -1642,10 +1666,21 @@ window.renderConfigureChecklist = async function (planId) {
         </div>
     `;
 
+    // Warn about assigned checklists that could not be resolved from state
+    // (e.g. cloud sync returned nothing / records deleted) instead of silently
+    // rendering an empty screen while the plan card still shows an item count.
+    const unresolvedAssigned = selectedIds.filter(id => !checklists.some(c => String(c.id) === String(id)));
+    const missingBanner = unresolvedAssigned.length > 0 ? `
+        <div class="alert" style="margin-bottom: 1.5rem; background: #fef2f2; border-left: 4px solid #dc2626; color: #7f1d1d; padding: 1rem;">
+            <strong><i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.5rem;"></i>${unresolvedAssigned.length} assigned checklist${unresolvedAssigned.length > 1 ? 's' : ''} could not be loaded.</strong>
+            <div style="font-size: 0.85rem; margin-top: 0.25rem;">This audit references checklists that are missing from the library (cloud sync returned no data, or they were deleted). Execution progress and reports are unaffected — they use the saved audit responses. To reconfigure the scope, recreate the checklist from the Knowledge Base or restore the checklists table in the database.</div>
+        </div>` : '';
+
     const html = `
         <div class="fade-in">
             ${headerHtml}
             <div style="max-width: 1200px; margin: 0 auto;">
+                ${missingBanner}
                 ${clientChecklists.length > 0 ? renderGroup(`${plan.client} Checklists`, clientChecklists, 'fa-solid fa-building', '#7c3aed') : `
                     <div style="margin-bottom: 2rem; padding: 1.5rem; background: #faf5ff; border: 2px dashed #c4b5fd; border-radius: 12px; text-align: center;">
                         <i class="fa-solid fa-building" style="font-size: 2rem; color: #7c3aed; margin-bottom: 0.5rem;"></i>
