@@ -2110,7 +2110,7 @@ window.printAuditPlanDetails = function (planId) {
             <div class="header">
                 <div>
                     <div class="logo">AUDIT PLAN</div>
-                    <div>Ref: P-${plan.id}</div>
+                    <div>Ref: ${window.UTILS.getPlanRef(plan)}</div>
                 </div>
                 <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
             </div>
