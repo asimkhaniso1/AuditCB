@@ -1544,7 +1544,8 @@ window.renderConfigureChecklist = async function (planId) {
                             return obj.items[0].requirement;
                         };
                         const text = sub.requirement || sub.title || sub.requirement_text || sub.text || getNestedReq(sub) || 'No requirement text provided';
-                        items.push({ id: `${clause.mainClause}-${idx}`, text: text, clause: clause.mainClause });
+                        const subClauseNo = sub.clause || sub.subClause || (sub.items && sub.items[0] && sub.items[0].clause) || clause.mainClause;
+                        items.push({ id: `${clause.mainClause}-${idx}`, text: text, clause: subClauseNo });
                     });
                 }
             });
