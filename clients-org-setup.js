@@ -191,7 +191,10 @@ window.generateCertificatesFromStandards = function (clientId) {
 };
 window.updateCertField = function (clientId, certIndex, field, value) { const client = window.DataService.findClient(clientId); if (client) client.certificates[certIndex][field] = value; };
 window.updateSiteScope = function (clientId, certIndex, siteName, value) { const client = window.DataService.findClient(clientId); if (client) { if (!client.certificates[certIndex].siteScopes) client.certificates[certIndex].siteScopes = {}; client.certificates[certIndex].siteScopes[siteName] = value; } };
-window.saveCertificateDetails = function (_clientId) { if (window.saveData) window.saveData(); if (window.showNotification) window.showNotification('Saved', 'success'); };
+// saveCertificateDetails is defined in clients-import.js (full implementation:
+// local save + client JSONB sync + per-certificate upsert to Supabase).
+// A local-only stub here used to load later and overwrite it, so cert numbers,
+// dates and scopes silently never reached the cloud — do not redefine it.
 window.getClientSettingsHTML = function (client) {
     return `
     <div class="fade-in">
