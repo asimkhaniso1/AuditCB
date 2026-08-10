@@ -2129,7 +2129,8 @@ window.printAuditPlanDetails = function (planId) {
         <head>
             <title>Audit Plan - ${plan.client}</title>
             <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; padding: 40px; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; padding: 40px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                @media print { thead { display: table-header-group; } tr { break-inside: avoid; } .section-title { break-after: avoid; } }
                 .header { border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
                 .logo { font-size: 24px; font-weight: bold; color: #0f172a; }
                 .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
@@ -2145,12 +2146,14 @@ window.printAuditPlanDetails = function (planId) {
         <body>
             <div class="header">
                 <div>
+                    <div style="font-size: 11px; letter-spacing: 2px; color: #64748b; font-weight: 600;">AUDIT360</div>
                     <div class="logo">AUDIT PLAN</div>
-                    <div>Ref: ${window.UTILS.getPlanRef(plan)}</div>
+                    <div style="color: #475569; font-size: 0.9em;">Ref: <strong>${window.UTILS.getPlanRef(plan)}</strong> &nbsp;·&nbsp; ${window.UTILS.escapeHtml(plan.client)}</div>
                 </div>
                 <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
             </div>
 
+            <table class="meta-table">
                 <tr>
                     <td><span class="meta-label">Client</span>${window.UTILS.escapeHtml(plan.client)}</td>
                     <td><span class="meta-label">Audit Standard</span>${window.UTILS.escapeHtml(plan.standard)}</td>
