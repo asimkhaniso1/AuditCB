@@ -68,7 +68,7 @@ function renderClientsEnhanced() {
             <h2 style="margin: 0;">Client Management</h2>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
                 ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
-                        <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls">
+                        <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls, .csv, .json">
                         <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;" title="Restricted to Cert Managers" aria-label="Export">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
                         </button>

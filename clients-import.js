@@ -663,6 +663,22 @@
     // Update Import Logic for Simplified Bulk Clients (supports CSV and Excel)
     window.importClientsFromExcel = function (file) {
         window.showNotification('Reading file...', 'info');
+
+        // JSON = CCI registry export (companies + nested certificates)
+        if (file.name.toLowerCase().endsWith('.json')) {
+            const jsonReader = new FileReader();
+            jsonReader.onload = function (ev) {
+                try {
+                    window.importFromCCIJson(JSON.parse(ev.target.result));
+                } catch (err) {
+                    console.error('CCI import error:', err);
+                    window.showNotification('CCI Import Failed: ' + err.message, 'error');
+                }
+            };
+            jsonReader.readAsText(file);
+            return;
+        }
+
         const reader = new FileReader();
 
         // Check if it's a CSV file
@@ -841,6 +857,117 @@
     // ============================================
     // ACCOUNT SETUP BULK IMPORT (MASTER UPLOAD)
     // ============================================
+
+    // ─── CCI Registry Import ─────────────────────────────────────────
+    // Accepts the JSON export from the CCI (companycertification.com) Supabase:
+    // either nested rows [{...company, certificates:[...]}] (PostgREST) or flat
+    // company+cert join rows (SQL editor json_agg). Only ACTIVE companies are
+    // imported (active === false is skipped). Maps certificate number, standard,
+    // registration/current-issue/expiry dates and scope text (certificates.body).
+    window.importFromCCIJson = function (data) {
+        const rows = Array.isArray(data) ? data : (data.rows || data.companies || []);
+        if (!rows.length) throw new Error('No records found in JSON');
+
+        const S = window.Sanitizer;
+        const statusMap = { V: 'Active', E: 'Expired', S: 'Suspended', W: 'Withdrawn' };
+
+        // Normalize: group flat join rows by company; nested rows pass through.
+        const companies = new Map();
+        rows.forEach(r => {
+            const name = r.name || r.company_name;
+            if (!name) return;
+            const key = name.trim().toLowerCase();
+            if (!companies.has(key)) {
+                companies.set(key, { src: r, certs: [] });
+            }
+            const bucket = companies.get(key);
+            if (Array.isArray(r.certificates)) {
+                bucket.certs.push(...r.certificates);
+            } else if (r.certificate_no || r.applicable_standard) {
+                bucket.certs.push(r);
+            }
+        });
+
+        let imported = 0, updated = 0, skippedInactive = 0, certCount = 0;
+        companies.forEach(({ src, certs }) => {
+            if (src.active === false) { skippedInactive++; return; }
+            const name = (src.name || src.company_name).trim();
+
+            let client = window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
+            if (client) { updated++; }
+            else {
+                client = { id: crypto.randomUUID(), name: S.sanitizeText(name), status: 'Active', contacts: [], sites: [], certificates: [] };
+                window.state.clients.push(client);
+                imported++;
+            }
+
+            if (src.industry) client.industry = S.sanitizeText(src.industry);
+            if (src.website) client.website = S.sanitizeURL(src.website);
+            if (src.total_employees) client.employees = parseInt(src.total_employees, 10) || client.employees;
+            if (src.group_name) client.groupName = S.sanitizeText(src.group_name);
+            client.source = 'CCI';
+
+            if (src.contact_name || src.email) {
+                const contact = { name: S.sanitizeText(src.contact_name || ''), email: S.sanitizeEmail(src.email || ''), role: 'Primary Contact' };
+                if (client.contacts && client.contacts.length) client.contacts[0] = { ...client.contacts[0], ...contact };
+                else client.contacts = [contact];
+            }
+            if (src.address || src.country) {
+                const site = { name: 'Head Office', address: S.sanitizeText(src.address || ''), country: S.sanitizeText(src.country || ''), employees: parseInt(src.total_employees, 10) || 0 };
+                if (client.sites && client.sites.length) client.sites[0] = { ...client.sites[0], ...site };
+                else client.sites = [site];
+            }
+
+            // Certificates with scope + dates
+            if (!client.certificates) client.certificates = [];
+            const stds = new Set((client.standard || '').split(',').map(s => s.trim()).filter(Boolean));
+            certs.forEach((cert, i) => {
+                const std = S.sanitizeText(cert.applicable_standard || '');
+                const certNo = S.sanitizeText(cert.certificate_no || '');
+                if (!std && !certNo) return;
+                if (std) stds.add(std);
+                let existing = client.certificates.find(c =>
+                    (certNo && c.certificateNo === certNo) || (!certNo && std && c.standard === std));
+                if (!existing) {
+                    existing = { id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 100000) + '-' + i, siteScopes: {} };
+                    client.certificates.push(existing);
+                }
+                existing.standard = std || existing.standard;
+                existing.certificateNo = certNo || existing.certificateNo;
+                existing.status = statusMap[cert.validity_status] || existing.status || 'Active';
+                existing.initialDate = cert.registration_date || existing.initialDate || '';
+                existing.currentIssue = cert.current_issue_date || existing.currentIssue || '';
+                existing.expiryDate = cert.issue_end_date || existing.expiryDate || '';
+                const scope = (cert.scope || cert.body || '').trim();
+                if (scope) {
+                    existing.scope = scope;
+                    if (!existing.siteScopes) existing.siteScopes = {};
+                    existing.siteScopes['Head Office'] = scope;
+                }
+                existing.client = client.name;
+                certCount++;
+            });
+            if (stds.size) client.standard = Array.from(stds).join(', ');
+        });
+
+        window.saveData();
+        window.showNotification(`CCI Import: ${imported} clients created, ${updated} updated, ${certCount} certificates, ${skippedInactive} inactive skipped`, 'success');
+
+        // Push to cloud (client jsonb + individual certificates)
+        if (window.SupabaseClient?.isInitialized) {
+            companies.forEach(({ src }) => {
+                if (src.active === false) return;
+                const name = (src.name || src.company_name).trim();
+                const client = window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
+                if (!client) return;
+                window.DataService.syncClient(client, { saveLocal: false, silent: true });
+                (client.certificates || []).forEach(cert => {
+                    window.SupabaseClient.upsertCertificate(cert).catch(err => console.error('Cert sync failed:', cert.certificateNo, err));
+                });
+            });
+        }
+        if (typeof window.renderClientsEnhanced === 'function') window.renderClientsEnhanced();
+    };
 
     window.openImportAccountSetupModal = function (clientId) {
         const client = window.DataService.findClient(clientId);
