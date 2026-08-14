@@ -923,7 +923,7 @@ function viewAuditPlan(id) {
 
     // Helper to render checklist list
     const _checklistListHTML = planChecklists.length > 0 ? planChecklists.map(clId => {
-        const cl = checklists.find(c => c.id === clId);
+        const cl = checklists.find(c => String(c.id) === String(clId));
         if (!cl) return '';
         const itemCount = getChecklistItemCount(cl);
         return `
@@ -1305,7 +1305,7 @@ window.printAuditChecklist = function (planId) {
         `;
 
         planChecklists.forEach(clId => {
-            const cl = checklists.find(c => c.id === clId);
+            const cl = checklists.find(c => String(c.id) === String(clId));
             if (!cl) return; // Skip if checklist not found
 
             content += `
@@ -1391,7 +1391,7 @@ window.printAuditChecklist = function (planId) {
         // Fallback: assigned checklists missing from the library (deleted / cloud
         // sync gap) — print directly from the report's saved responses so the
         // execution record is never blank.
-        const resolvedAny = planChecklists.some(clId => checklists.some(c => c.id === clId));
+        const resolvedAny = planChecklists.some(clId => checklists.some(c => String(c.id) === String(clId)));
         if (!resolvedAny && report && Array.isArray(report.checklistProgress) && report.checklistProgress.length > 0) {
             content += `
                 <div class="section">

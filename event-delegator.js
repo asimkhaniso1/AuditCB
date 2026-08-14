@@ -138,6 +138,18 @@
             let action = actionTarget.dataset.action;
             if (actionTarget.dataset.stopProp === 'true') e.stopPropagation();
 
+            // An <a href="#"> that carries an action would run the action and
+            // then navigate to '#', and that hash change re-renders the router
+            // straight back to the default view — so the action looks like it
+            // did nothing. Only placeholder hrefs are suppressed; a real link
+            // still navigates.
+            if (actionTarget.tagName === 'A') {
+                let href = actionTarget.getAttribute('href');
+                if (href === '#' || href === '' || href === null || /^javascript:/i.test(href)) {
+                    e.preventDefault();
+                }
+            }
+
             // Check built-in actions first
             if (builtins[action]) {
                 let args = extractArgs(actionTarget);
