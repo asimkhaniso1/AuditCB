@@ -755,6 +755,109 @@ describe('ClientDocsBulk', () => {
         });
     });
 
+    describe('checklist length budget', () => {
+        const client = {
+            id: 'c1', name: 'KTD Select', standard: 'ISO 9001:2015', employees: 40,
+            sites: [{ name: 'HO' }],
+            goodsServices: [{ name: 'Harnesses' }],
+            keyProcesses: Array.from({ length: 8 }, (_, i) => ({ name: 'Process ' + i, category: 'Core' }))
+        };
+        const docs = Array.from({ length: 25 }, (_, i) => ({
+            id: 'd' + i, name: 'Procedure ' + i, category: 'Quality Procedures',
+            linkedClauses: ['4.1', '7.5', '8.1', '8.4', '9.1'][i % 5]
+        }));
+
+        it('sizes a half-day surveillance at about 25 questions', () => {
+            expect(B.checklistBudget('Surveillance', 0.5, { band: 'small' })).toBe(25);
+        });
+
+        it('grows the budget with man-days', () => {
+            expect(B.checklistBudget('Surveillance', 1, {})).toBe(30);
+            expect(B.checklistBudget('Surveillance', 2, {})).toBe(45);
+            expect(B.checklistBudget('Surveillance', 5, {})).toBe(75);
+        });
+
+        it('falls back to a small budget when man-days are not set', () => {
+            expect(B.checklistBudget('Surveillance', '', { band: 'small' })).toBe(25);
+            expect(B.checklistBudget('Surveillance', null, { band: 'large' })).toBe(40);
+        });
+
+        it('does not budget initial or recertification audits', () => {
+            expect(B.checklistBudget('Stage 2', 3, {})).toBeNull();
+            expect(B.checklistBudget('Recertification', 3, {})).toBeNull();
+        });
+
+        it('keeps a budgeted surveillance checklist at or under the target', () => {
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance', maxItems: 25 });
+            expect(cl.itemCount).toBeLessThanOrEqual(25);
+        });
+
+        it('is far longer without a budget — the behaviour that made it unusable', () => {
+            const unbounded = B.buildClientChecklist(client, docs, { auditType: 'surveillance' });
+            expect(unbounded.itemCount).toBeGreaterThan(40);
+        });
+
+        it('never trims the focus points or the mandatory elements', () => {
+            const cl = B.buildClientChecklist(client, docs, {
+                auditType: 'surveillance', maxItems: 25,
+                focusPoints: ['Focus one', 'Focus two', 'Focus three']
+            });
+            expect(cl.clauses.find(c => c.mainClause === 'FOCUS').subClauses).toHaveLength(3);
+            expect(cl.clauses.find(c => c.mainClause === 'SURV').subClauses).toHaveLength(8);
+            expect(cl.itemCount).toBeLessThanOrEqual(25);
+        });
+
+        it('asks about each document once when budgeted', () => {
+            const multi = [{ id: 'd1', name: 'Wide Procedure', category: 'Quality Procedures', linkedClauses: '7.5, 8.1, 8.4' }];
+            const cl = B.buildClientChecklist(client, multi, { auditType: 'surveillance', maxItems: 25, includeOrgContext: false, includeMandatory: false });
+            const mentions = cl.clauses.flatMap(c => c.subClauses).filter(s => /Wide Procedure/.test(s.requirement));
+            expect(mentions).toHaveLength(1);
+        });
+
+        it('still keeps every clause represented after trimming', () => {
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance', maxItems: 25 });
+            const mains = cl.clauses.map(c => c.mainClause);
+            expect(new Set(mains).size).toBe(mains.length);
+            cl.clauses.forEach(c => expect(c.subClauses.length).toBeGreaterThan(0));
+        });
+
+        it('leaves an initial audit at full coverage even with a budget passed', () => {
+            const stdClauses = Array.from({ length: 40 }, (_, i) => ({ clause: `8.${i + 1}`, title: 'Requirement ' + i }));
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'initial', standardClauses: stdClauses, maxItems: 25 });
+            expect(cl.itemCount).toBeGreaterThan(25);
+        });
+    });
+
+    describe('trimToBudget', () => {
+        const section = (main, n) => ({
+            mainClause: main, title: main,
+            subClauses: Array.from({ length: n }, (_, i) => ({ clause: main, requirement: `${main} q${i}`, items: [{}] }))
+        });
+
+        it('returns the checklist untouched when it already fits', () => {
+            const clauses = [section('8', 3)];
+            expect(B.trimToBudget(clauses, 10)[0].subClauses).toHaveLength(3);
+        });
+
+        it('does nothing without a budget', () => {
+            const clauses = [section('8', 30)];
+            expect(B.trimToBudget(clauses, null)[0].subClauses).toHaveLength(30);
+        });
+
+        it('cuts the lowest-priority clause first', () => {
+            const clauses = [section('8', 10), section('4', 10)];
+            const out = B.trimToBudget(clauses, 12);
+            expect(out.find(c => c.mainClause === '8').subClauses.length)
+                .toBeGreaterThan(out.find(c => c.mainClause === '4').subClauses.length);
+        });
+
+        it('drops empty sections rather than leaving them behind', () => {
+            const clauses = [section('FOCUS', 2), section('4', 5)];
+            const out = B.trimToBudget(clauses, 3);
+            expect(out.every(c => c.subClauses.length > 0)).toBe(true);
+        });
+    });
+
     describe('normalizeAuditType', () => {
         it('recognises surveillance in any wording', () => {
             ['surveillance', 'Surveillance 1', 'SURV-2', 'annual surveillance audit'].forEach(v =>

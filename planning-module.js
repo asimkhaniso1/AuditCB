@@ -1569,7 +1569,10 @@ window.renderConfigureChecklist = async function (planId) {
                 </h3>
                 <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
                     ${list.map(cl => {
-            const isMainSelected = selectedIds.includes(cl.id);
+            // selectedChecklists holds string ids (they come from DOM data
+            // attributes) while checklist.id is a number, so this has to
+            // compare as strings or a saved selection never renders as ticked.
+            const isMainSelected = selectedIds.some(id => String(id) === String(cl.id));
             const items = getFlattenedItems(cl);
             const savedItems = savedItemSelections[cl.id];
 
@@ -1589,11 +1592,16 @@ window.renderConfigureChecklist = async function (planId) {
                                 </div>
                                 <div class="items-list hidden" style="margin-top: 1rem; padding: 1.5rem; background: #f8fafc; border-radius: 8px; border: 1px inset #e2e8f0;">
                                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                                        <div style="display: flex; gap: 0.5rem;">
+                                        <div style="display: flex; gap: 0.5rem; align-items: center;">
                                             <button class="btn btn-xs btn-outline-primary" data-action="bulkSelectConfigItems" data-arg1="${cl.id}" data-arg2="true">Select All</button>
                                             <button class="btn btn-xs btn-outline-secondary" data-action="bulkSelectConfigItems" data-arg1="${cl.id}" data-arg2="false">Deselect All</button>
+                                            <button class="btn btn-xs" id="del-items-${cl.id}" disabled
+                                                style="background:#fff;color:var(--danger-color);border:1px solid #fecaca;border-radius:6px;opacity:0.5;"
+                                                data-action="deleteSelectedChecklistItems" data-arg1="${planId}" data-arg2="${cl.id}" aria-label="Delete selected questions">
+                                                <i class="fa-solid fa-trash"></i> Delete Questions <span class="del-items-count"></span>
+                                            </button>
                                         </div>
-                                        <span style="font-size: 0.8rem; color: var(--text-secondary);">Toggle items to include in audit scope</span>
+                                        <span style="font-size: 0.8rem; color: var(--text-secondary);">Ticked items are in audit scope · Delete removes the question from the checklist itself</span>
                                     </div>
                                     <table class="data-table" style="width: 100%; font-size: 0.9rem; border-collapse: collapse;">
                                         <thead>
@@ -1613,7 +1621,7 @@ window.renderConfigureChecklist = async function (planId) {
                 return `
                                             <tr class="item-row" data-item-id="${item.id}" data-checklist-id="${cl.id}" style="border-bottom: 1px solid #e2e8f0; ${isOverridden ? 'background: #eff6ff;' : ''}">
                                                 <td style="padding: 10px; text-align: center; vertical-align: top;">
-                                                    <input type="checkbox" class="item-select-cb" data-item-id="${item.id}" data-checklist-id="${cl.id}" ${itemSelected ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px;">
+                                                    <input type="checkbox" class="item-select-cb" data-item-id="${item.id}" data-checklist-id="${cl.id}" ${itemSelected ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px;" data-action-change="configItemSelectionChanged" data-arg1="${cl.id}">
                                                 </td>
                                                 <td style="padding: 10px; font-weight: 600; color: #475569; font-family: monospace; vertical-align: top;">${item.clause || '-'}</td>
                                                 <td style="padding: 10px; line-height: 1.5; vertical-align: top;">
@@ -1738,6 +1746,114 @@ window.bulkSelectConfigItems = function (clId, status) {
         const clCb = document.querySelector(`.checklist-select-cb[data-id="${clId}"]`);
         if (clCb) clCb.checked = true;
     }
+    window.configItemSelectionChanged(clId);
+};
+
+/** Keep the Delete Questions button in step with what is ticked. */
+window.configItemSelectionChanged = function (clId) {
+    const checked = document.querySelectorAll(`.item-select-cb[data-checklist-id="${clId}"]:checked`).length;
+    const btn = document.getElementById('del-items-' + clId);
+    if (!btn) return;
+    btn.disabled = checked === 0;
+    btn.style.opacity = checked ? '1' : '0.5';
+    const count = btn.querySelector('.del-items-count');
+    if (count) count.textContent = checked ? `(${checked})` : '';
+};
+
+/**
+ * Permanently remove the ticked questions from a checklist.
+ *
+ * Item ids are positional (`mainClause-index`), so deleting shifts the ids of
+ * everything after. The plan's per-item scope selection and requirement
+ * overrides are re-keyed through an old-id → new-id map rather than discarded,
+ * otherwise an override would silently attach itself to a different question.
+ */
+window.deleteSelectedChecklistItems = function (planId, clId) {
+    const checklist = (state.checklists || []).find(c => String(c.id) === String(clId));
+    if (!checklist) return;
+
+    const doomed = new Set(
+        Array.from(document.querySelectorAll(`.item-select-cb[data-checklist-id="${clId}"]:checked`))
+            .map(cb => cb.dataset.itemId)
+    );
+    if (!doomed.size) return;
+
+    const flatten = () => {
+        const out = [];
+        (checklist.clauses || []).forEach(clause => {
+            (clause.subClauses || []).forEach((sub, idx) => out.push({ id: `${clause.mainClause}-${idx}`, clause, sub }));
+        });
+        return out;
+    };
+
+    const before = flatten();
+    const survivors = before.filter(entry => !doomed.has(entry.id));
+    if (!survivors.length) {
+        window.showNotification('That would delete every question. Delete the checklist instead if that is what you want.', 'error');
+        return;
+    }
+
+    const message = `Permanently delete ${doomed.size} question${doomed.size === 1 ? '' : 's'} from "${checklist.name}"? ` +
+        'This edits the checklist itself, not just this audit.';
+
+    window.DataService.confirmAction(message, async function () {
+        // Splice descending within each main clause so indexes stay valid.
+        (checklist.clauses || []).forEach(clause => {
+            const drop = (clause.subClauses || [])
+                .map((_sub, idx) => idx)
+                .filter(idx => doomed.has(`${clause.mainClause}-${idx}`))
+                .sort((a, b) => b - a);
+            drop.forEach(idx => clause.subClauses.splice(idx, 1));
+        });
+        checklist.clauses = (checklist.clauses || []).filter(c => (c.subClauses || []).length > 0);
+        checklist.updatedAt = new Date().toISOString().split('T')[0];
+        if (typeof checklist.itemCount === 'number') {
+            checklist.itemCount = flatten().length;
+        }
+
+        // survivors keep their order, so position maps old id to new id.
+        const after = flatten();
+        const idMap = {};
+        survivors.forEach((entry, i) => { if (after[i]) idMap[entry.id] = after[i].id; });
+
+        const plan = window.DataService.findAuditPlan(planId);
+        if (plan) {
+            if (plan.selectedChecklistItems && plan.selectedChecklistItems[clId]) {
+                plan.selectedChecklistItems[clId] = plan.selectedChecklistItems[clId]
+                    .map(id => idMap[String(id)])
+                    .filter(Boolean);
+            }
+            if (plan.selectedChecklistOverrides && plan.selectedChecklistOverrides[clId]) {
+                const remapped = {};
+                Object.keys(plan.selectedChecklistOverrides[clId]).forEach(oldId => {
+                    const newId = idMap[oldId];
+                    if (newId) remapped[newId] = plan.selectedChecklistOverrides[clId][oldId];
+                });
+                plan.selectedChecklistOverrides[clId] = remapped;
+            }
+        }
+
+        window.saveData();
+
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            try {
+                await window.SupabaseClient.client.from('checklists').upsert({
+                    id: String(checklist.id),
+                    name: checklist.name,
+                    standard: checklist.standard,
+                    type: checklist.type,
+                    clauses: checklist.clauses,
+                    created_by: checklist.createdBy,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'id' });
+            } catch (err) {
+                if (window.Logger) window.Logger.error('Planning', 'Checklist sync failed: ' + err.message);
+            }
+        }
+
+        window.showNotification(`Deleted ${doomed.size} question${doomed.size === 1 ? '' : 's'} — ${after.length} remaining`, 'success');
+        window.renderConfigureChecklist(planId);
+    });
 };
 
 window.editConfigItemRequirement = function (clId, itemId) {

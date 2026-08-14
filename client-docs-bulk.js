@@ -387,6 +387,71 @@
         return bits ? `${doc.name} (${bits})` : doc.name;
     }
 
+    /**
+     * How many questions a surveillance checklist should hold.
+     *
+     * A surveillance audit is a sampling exercise, not a re-audit: a half-day
+     * visit to a small client is about 25 questions, and a 111-item checklist
+     * is unusable on site. Initial and recertification audits return null —
+     * they have to cover the standard, so length is not the constraint.
+     */
+    function checklistBudget(auditType, manDays, profile) {
+        if (normalizeAuditType(auditType) !== 'surveillance') return null;
+        const md = parseFloat(manDays);
+        if (isNaN(md) || md <= 0) {
+            const band = (profile && profile.band) || 'unknown';
+            return band === 'micro' || band === 'small' ? 25 : 40;
+        }
+        if (md <= 0.5) return 25;
+        if (md <= 1) return 30;
+        if (md <= 2) return 45;
+        if (md <= 3) return 60;
+        return 75;
+    }
+
+    // Where the surveillance value is when the checklist has to be cut: the
+    // clauses covering what the organisation actually does come before the
+    // governance clauses, which the mandatory §9.6.2 block already covers.
+    const TRIM_PRIORITY = ['8', '7', '9', '10', '6', '5', '4', 'DOC'];
+
+    /**
+     * Cut a checklist down to `budget` questions.
+     * FOCUS and SURV are never touched — one is why this audit is happening,
+     * the other is required by ISO/IEC 17021-1. ORG keeps a floor so the scope
+     * and core processes are always sampled. Everything else gives way,
+     * lowest-priority clause first, keeping at least one question per clause
+     * so no part of the system disappears from the checklist entirely.
+     */
+    function trimToBudget(clauses, budget) {
+        const count = () => clauses.reduce((t, c) => t + c.subClauses.length, 0);
+        if (!budget || count() <= budget) return clauses;
+
+        const protectedSections = ['FOCUS', 'SURV'];
+        const ORG_FLOOR = 5;
+
+        const order = clauses
+            .map((c, i) => ({ c, i, rank: TRIM_PRIORITY.indexOf(c.mainClause) }))
+            .filter(e => !protectedSections.includes(e.c.mainClause))
+            .sort((a, b) => (b.rank === -1 ? 99 : b.rank) - (a.rank === -1 ? 99 : a.rank));
+
+        // Pass one: trim each section down to one question, lowest value first.
+        for (const entry of order) {
+            const floor = entry.c.mainClause === 'ORG' ? ORG_FLOOR : 1;
+            while (count() > budget && entry.c.subClauses.length > floor) {
+                entry.c.subClauses.pop();
+            }
+            if (count() <= budget) break;
+        }
+        // Pass two: if still over, drop the ORG floor too, then whole sections.
+        if (count() > budget) {
+            for (const entry of order) {
+                while (count() > budget && entry.c.subClauses.length > 1) entry.c.subClauses.pop();
+                if (count() <= budget) break;
+            }
+        }
+        return clauses.filter(c => c.subClauses.length > 0);
+    }
+
     /** Normalise whatever an audit plan calls its type into our three scopes. */
     function normalizeAuditType(raw) {
         const s = String(raw || '').toLowerCase();
@@ -456,11 +521,15 @@
     function buildClientChecklist(client, docs, opts) {
         const o = Object.assign({
             auditType: 'surveillance', standard: '', includeMandatory: true,
-            standardClauses: null, includeOrgContext: true, focusPoints: []
+            standardClauses: null, includeOrgContext: true, focusPoints: [], maxItems: null
         }, opts || {});
         const auditType = normalizeAuditType(o.auditType);
         const list = (docs || []).filter(d => d && d.name);
         const fullCoverage = auditType !== 'surveillance';
+        // Length only ever constrains a surveillance audit. An initial or
+        // recertification audit has to cover the standard, so a budget passed
+        // in by a caller is ignored rather than allowed to cut coverage.
+        const budget = fullCoverage ? null : o.maxItems;
         const clauses = [];
 
         // What the Stage 1 review said this audit has to cover leads the
@@ -537,9 +606,16 @@
             });
         } else {
             // Surveillance, or no clause list available: drive it off the documents.
-            Object.keys(docsByClause).forEach(clause => {
+            // Under a length budget each document is asked about once, on the
+            // first clause it supports, rather than repeated across all of them.
+            const concise = !!budget;
+            const asked = new Set();
+            Object.keys(docsByClause).sort(compareClause).forEach(clause => {
                 docsByClause[clause].forEach(doc => {
-                    docItems(doc, clause).forEach(text => addQuestion(clause, question(clause, doc.name, text)));
+                    const key = doc.id || doc.name;
+                    if (concise && asked.has(key)) return;
+                    asked.add(key);
+                    docItems(doc, clause, concise).forEach(text => addQuestion(clause, question(clause, doc.name, text)));
                 });
             });
         }
@@ -565,8 +641,9 @@
             });
         }
 
+        const trimmed = trimToBudget(clauses, budget);
         const typeLabel = auditType === 'surveillance' ? 'Surveillance' : auditType === 'recertification' ? 'Recertification' : 'Initial';
-        const itemCount = clauses.reduce((t, c) => t + c.subClauses.reduce((s, sc) => s + sc.items.length, 0), 0);
+        const itemCount = trimmed.reduce((t, c) => t + c.subClauses.reduce((s, sc) => s + sc.items.length, 0), 0);
 
         return {
             id: Date.now(),
@@ -576,8 +653,9 @@
             auditType,
             clientName: client.name,
             clientId: client.id,
-            clauses,
+            clauses: trimmed,
             itemCount,
+            targetItems: budget || null,
             documentsUsed: list.length,
             createdBy: (window.state && window.state.currentUser && window.state.currentUser.name) || 'Admin',
             createdAt: new Date().toISOString().split('T')[0],
@@ -605,14 +683,25 @@
         };
     }
 
-    /** The 1–2 verification questions a single document earns on a given clause. */
-    function docItems(doc, _clause) {
+    /**
+     * The verification questions a single document earns on a given clause.
+     * On a budgeted surveillance the control check and the implementation check
+     * become one question — two per document is what turned a half-day audit
+     * into a 111-item checklist.
+     */
+    function docItems(doc, _clause, concise) {
         const ref = docRef(doc);
         if (doc.category === 'Records / Forms Register') {
             return [`Sample completed ${ref} records covering the surveillance period — verify entries are complete, authorised, legible and retained per the retention schedule.`];
         }
+        const isStatic = doc.category === 'Certificate' || doc.category === 'Contract / Agreement';
+        if (concise) {
+            return [isStatic
+                ? `Confirm ${ref} is current and valid for the certified scope.`
+                : `Confirm ${ref} is the current approved issue and verify the process it describes is implemented as written — trace objective evidence generated since the previous audit.`];
+        }
         const texts = [`Confirm ${ref} is the current approved issue, available where used, and that no uncontrolled copies are in circulation.`];
-        if (doc.category !== 'Certificate' && doc.category !== 'Contract / Agreement') {
+        if (!isStatic) {
             texts.push(`Verify the process described in ${ref} is implemented as written — trace objective evidence generated since the previous audit.`);
         }
         return texts;
@@ -2093,6 +2182,8 @@
         ].filter(Boolean).join(', ');
         const planForFocus = planId ? window.DataService.findAuditPlan(planId) : null;
         const focusCount = ((planForFocus && planForFocus.preAudit && planForFocus.preAudit.focusPoints) || []).length;
+        const manDays = planForFocus ? (planForFocus.manDays || planForFocus.man_days || '') : '';
+        const suggestedBudget = checklistBudget(audit, manDays, orgSizeProfile(client));
 
         window.DataService.openFormModal(`Build Checklist — ${client.name}`, `
         <div style="font-size: 0.88rem;">
@@ -2116,6 +2207,18 @@
                     ${standards.length ? standards.map(s => `<option ${s === presetStandard ? 'selected' : ''}>${esc(s)}</option>`).join('') : '<option value="">(not set on client)</option>'}
                 </select>
             </div>
+            <div class="form-group">
+                <label>Checklist length <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.82rem;">— a surveillance audit samples, it does not re-audit</span></label>
+                <select class="form-control" id="cldoc-length">
+                    <option value="25" ${suggestedBudget === 25 ? 'selected' : ''}>Half day — about 25 questions</option>
+                    <option value="30" ${suggestedBudget === 30 ? 'selected' : ''}>One day — about 30 questions</option>
+                    <option value="45" ${suggestedBudget === 45 ? 'selected' : ''}>Two days — about 45 questions</option>
+                    <option value="60" ${suggestedBudget === 60 ? 'selected' : ''}>Three days — about 60 questions</option>
+                    <option value="75" ${suggestedBudget === 75 ? 'selected' : ''}>Longer — about 75 questions</option>
+                    <option value="">No limit — every mapped document and clause</option>
+                </select>
+                <small style="color: var(--text-secondary);">${manDays ? `Plan is ${esc(manDays)} man-day(s).` : 'Man-days not set on the plan.'} Focus points and the ISO 17021-1 mandatory elements are never trimmed. Ignored for initial and recertification audits, which must cover the standard.</small>
+            </div>
             <label style="display: flex; gap: 0.5rem; align-items: center; cursor: pointer; margin-bottom: 0.4rem;">
                 <input type="checkbox" id="cldoc-org" checked>
                 <span>Include scope, sites and key processes from Account Setup</span>
@@ -2134,7 +2237,11 @@
                 : clausesForStandard(standard).clauses;
             const plan = planId ? window.DataService.findAuditPlan(planId) : null;
             const focusPoints = (plan && plan.preAudit && plan.preAudit.focusPoints) || [];
-            createChecklist(client, docs, { auditType, standard, includeMandatory, includeOrgContext, standardClauses, focusPoints }, planId);
+            const lengthValue = document.getElementById('cldoc-length').value;
+            const maxItems = normalizeAuditType(auditType) === 'surveillance' && lengthValue
+                ? parseInt(lengthValue, 10)
+                : null;
+            createChecklist(client, docs, { auditType, standard, includeMandatory, includeOrgContext, standardClauses, focusPoints, maxItems }, planId);
         });
     };
 
@@ -2255,6 +2362,8 @@
         buildClientChecklist,
         buildSurveillanceChecklist,
         normalizeAuditType,
+        checklistBudget,
+        trimToBudget,
         orgContextQuestions,
         clausesForStandard,
         coverageGaps,
