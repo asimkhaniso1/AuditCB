@@ -3569,6 +3569,8 @@ window.exportPreAuditPDF = function (planId) {
                 /* Content */
                 h2 { color: #8b5cf6; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e2e8f0; }
                 h3 { color: #475569; margin: 1.5rem 0 1rem; }
+                ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; }
+                li { margin-bottom: 0.35rem; page-break-inside: avoid; }
                 
                 table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
                 th, td { padding: 0.75rem; text-align: left; border: 1px solid #e2e8f0; }
@@ -3626,6 +3628,35 @@ window.exportPreAuditPDF = function (planId) {
                     </h3>
                     <p style="white-space: pre-wrap; margin-top: 0.5rem;">${plan.preAudit.notes || 'No summary provided.'}</p>
                 </div>
+
+                <!-- Stage 1 findings summary — what the document review established -->
+                ${(() => {
+        const s = plan.preAudit.aiSummary;
+        const focus = plan.preAudit.focusPoints || [];
+        if (!s && !focus.length) return '';
+        const esc = v => window.UTILS.escapeHtml(String(v));
+        const block = (title, value) => {
+            const list = Array.isArray(value) ? value.filter(Boolean) : (value ? [value] : []);
+            if (!list.length) return '';
+            return `<h3>${title}</h3><ul>${list.map(v => `<li>${esc(v)}</li>`).join('')}</ul>`;
+        };
+        return `
+                <h2><i class="fa-solid fa-magnifying-glass-chart"></i> Document Review Findings</h2>
+                <p style="margin: 0.5rem 0 1rem; color: #555;">
+                    Established from the documented information supplied by the client before the audit.
+                </p>
+                ${s ? block('New or changed processes', s.newOrChangedProcesses) : ''}
+                ${s ? block('Documents updated', s.documentsUpdated) : ''}
+                ${s ? block('Competence and training records', s.trainingRecords) : ''}
+                ${s ? block('Last management review', s.managementReview) : ''}
+                ${s ? block('Last internal audit', s.internalAudit) : ''}
+                ${s ? block('Most likely findings', s.keyRisks) : ''}
+                ${focus.length ? `
+                <h3>Points this audit must cover</h3>
+                <ol>${focus.map(p => `<li>${esc(p)}</li>`).join('')}</ol>
+                <p style="font-size: 0.85rem; color: #666;">These are carried into the audit checklist as an Audit Focus section.</p>` : ''}
+                `;
+    })()}
 
                 <!-- Checklist Assessment -->
                 <h2><i class="fa-solid fa-list-check"></i> Checklist Assessment Results</h2>
