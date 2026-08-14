@@ -1123,20 +1123,8 @@ function viewAuditPlan(id) {
             <!--Workflow Stages Grid(Row 2)-->
                 <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.5rem;">
 
-                    <!-- 1. Configuration -->
-                    <div class="card" style="margin: 0; display: flex; flex-direction: column;">
-                        <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Checklist Config</h3>
-                        <div style="flex: 1; margin-bottom: 1rem;">
-                            <p style="font-size: 0.9rem; color: var(--text-secondary);">Assign and customize checklists for this audit.</p>
-                            <div style="font-weight: bold; font-size: 1.25rem; margin-top: 0.5rem;">${totalItems} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">Items</span></div>
-                        </div>
-                        <div>
-                            <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" data-action="printAuditChecklist" data-id="${plan.id}" aria-label="Print"><i class="fa-solid fa-print"></i> Print</button>
-                            <button class="btn btn-sm btn-secondary" style="width: 100%;" data-action="renderConfigureChecklist" data-id="${plan.id}">Configure</button>
-                        </div>
-                    </div>
-
-                    <!-- 2. Pre-Audit Review (Stage 1) -->
+                    <!-- 1. Pre-Audit Review (Stage 1) — the document review comes
+                         first; what it finds is what the checklist is built from. -->
                     <div class="card" style="margin: 0; display: flex; flex-direction: column; border-top: 3px solid #8b5cf6;">
                         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-file-magnifying-glass" style="margin-right: 0.5rem; color: #8b5cf6;"></i> Pre-Audit</h3>
                         <div style="flex: 1; margin-bottom: 1rem;">
@@ -1151,6 +1139,20 @@ function viewAuditPlan(id) {
                         <button class="btn ${plan.preAudit?.status === 'Complete' ? 'btn-secondary' : 'btn-primary'}" style="width: 100%;" data-action="renderPreAuditReview" data-id="${plan.id}">
                             ${plan.preAudit?.status === 'Complete' ? '<i class="fa-solid fa-eye"></i> View Review' : '<i class="fa-solid fa-play"></i> Start Review'}
                         </button>
+                    </div>
+
+                    <!-- 2. Checklist Config — the outcome of the pre-audit review -->
+                    <div class="card" style="margin: 0; display: flex; flex-direction: column;">
+                        <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Checklist Config</h3>
+                        <div style="flex: 1; margin-bottom: 1rem;">
+                            <p style="font-size: 0.9rem; color: var(--text-secondary);">Built from what the pre-audit review found.</p>
+                            <div style="font-weight: bold; font-size: 1.25rem; margin-top: 0.5rem;">${totalItems} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">Items</span></div>
+                            ${(plan.preAudit?.focusPoints || []).length ? `<div style="font-size: 0.75rem; color: #7c3aed; margin-top: 0.4rem;"><i class="fa-solid fa-bullseye"></i> ${plan.preAudit.focusPoints.length} focus point(s) from Stage 1</div>` : ''}
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" data-action="printAuditChecklist" data-id="${plan.id}" aria-label="Print"><i class="fa-solid fa-print"></i> Print</button>
+                            <button class="btn btn-sm btn-secondary" style="width: 100%;" data-action="renderConfigureChecklist" data-id="${plan.id}">Configure</button>
+                        </div>
                     </div>
 
                     <!-- 3. Execution -->
@@ -3016,6 +3018,9 @@ window.renderPreAuditReview = function (planId) {
                     </p>
                 </div>
                 <div style="display: flex; gap: 1rem;">
+                    <button class="btn btn-outline-primary" data-action="aiReviewPreAuditDocuments" data-id="${plan.id}" aria-label="AI document review" title="Let AI review the client's documents and propose a status for each item">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Review
+                    </button>
                     <button class="btn btn-outline-primary" data-action="mapClientDocsToPreAudit" data-id="${plan.id}" aria-label="Map client documents" title="Match the client's uploaded documents to these Stage 1 items">
                         <i class="fa-solid fa-diagram-project" style="margin-right: 0.5rem;"></i> Map Client Docs
                     </button>
@@ -3058,6 +3063,42 @@ window.renderPreAuditReview = function (planId) {
                     </div>
                 </div>
             </div>
+
+            ${plan.preAudit.aiSummary ? (() => {
+        const s = plan.preAudit.aiSummary;
+        const block = (title, icon, value) => {
+            const list = Array.isArray(value) ? value : (value ? [value] : []);
+            if (!list.length) return '';
+            return `<div style="margin-bottom:0.6rem;">
+                        <div style="font-weight:600;font-size:0.85rem;"><i class="fa-solid ${icon}" style="color:#7c3aed;margin-right:0.4rem;"></i>${title}</div>
+                        <ul style="margin:0.2rem 0 0;padding-left:1.4rem;font-size:0.84rem;color:#475569;line-height:1.6;">${list.map(v => `<li>${window.UTILS.escapeHtml(String(v))}</li>`).join('')}</ul>
+                    </div>`;
+        };
+        return `
+            <div class="card" style="margin-bottom: 1.25rem; border-left: 4px solid #7c3aed;">
+                <h3 style="margin: 0 0 0.85rem 0; font-size: 1.05rem;">
+                    <i class="fa-solid fa-clipboard-list" style="margin-right: 0.5rem; color: #7c3aed;"></i>Stage 1 Summary — What to Focus On
+                </h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        ${block('New or changed processes', 'fa-diagram-project', s.newOrChangedProcesses)}
+                        ${block('Documents updated', 'fa-file-pen', s.documentsUpdated)}
+                        ${block('Competence & training records', 'fa-graduation-cap', s.trainingRecords)}
+                    </div>
+                    <div>
+                        ${block('Last management review', 'fa-users-rectangle', s.managementReview)}
+                        ${block('Last internal audit', 'fa-clipboard-check', s.internalAudit)}
+                        ${block('Most likely findings', 'fa-triangle-exclamation', s.keyRisks)}
+                    </div>
+                </div>
+                ${(plan.preAudit.focusPoints || []).length ? `
+                <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;">
+                    <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.3rem;"><i class="fa-solid fa-bullseye" style="color:#7c3aed;margin-right:0.4rem;"></i>Points this audit must cover</div>
+                    <ul style="margin:0;padding-left:1.4rem;font-size:0.85rem;line-height:1.7;">${plan.preAudit.focusPoints.map(p => `<li>${window.UTILS.escapeHtml(String(p))}</li>`).join('')}</ul>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.4rem;">These become an Audit Focus section when the checklist is built from this plan.</div>
+                </div>` : ''}
+            </div>`;
+    })() : ''}
 
             <!-- Bulk actions across all 16 review items -->
             <div class="card" style="margin-bottom: 1.25rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 0.85rem 1.25rem;">

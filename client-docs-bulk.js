@@ -456,12 +456,24 @@
     function buildClientChecklist(client, docs, opts) {
         const o = Object.assign({
             auditType: 'surveillance', standard: '', includeMandatory: true,
-            standardClauses: null, includeOrgContext: true
+            standardClauses: null, includeOrgContext: true, focusPoints: []
         }, opts || {});
         const auditType = normalizeAuditType(o.auditType);
         const list = (docs || []).filter(d => d && d.name);
         const fullCoverage = auditType !== 'surveillance';
         const clauses = [];
+
+        // What the Stage 1 review said this audit has to cover leads the
+        // checklist — it is the reason this checklist looks the way it does,
+        // and it is what the auditor most needs in front of them.
+        const focus = (o.focusPoints || []).filter(p => typeof p === 'string' && p.trim());
+        if (focus.length) {
+            clauses.push({
+                mainClause: 'FOCUS',
+                title: 'Audit Focus — carried over from the Stage 1 document review',
+                subClauses: focus.map((text, i) => question(`FOCUS.${i + 1}`, 'Stage 1 finding', text))
+            });
+        }
 
         if (o.includeMandatory && auditType === 'surveillance') {
             clauses.push({
@@ -1774,6 +1786,256 @@
         setWideModal(true);
     };
 
+    // ── AI Stage 1 document review ────────────────────────────────────
+
+    let _aiReview = null;
+
+    function stage1Corpus(client) {
+        const docs = (client.documents || []).filter(d => d && d.name);
+        const lines = docs.slice(0, 60).map(d => {
+            const bits = [`- ${d.name}`];
+            if (d.docNumber) bits.push(`no ${d.docNumber}`);
+            if (d.revision) bits.push(d.revision);
+            if (d.date) bits.push(`dated ${d.date}`);
+            if (d.category) bits.push(`[${d.category}]`);
+            if (d.linkedClauses) bits.push(`clauses ${d.linkedClauses}`);
+            let line = bits.join(' · ');
+            const detail = (d.headings || []).slice(0, 8).map(h => `${h.clause} ${h.text}`).join('; ') || (d.notes || '').slice(0, 200);
+            if (detail) line += `\n    contents: ${detail}`;
+            return line;
+        });
+        return lines.join('\n');
+    }
+
+    function buildStage1Prompt(client, plan, corpus) {
+        const items = STAGE1_MAP.map(i => `${i.id} | ${i.label}${i.clauses.length ? ' (clauses ' + i.clauses.join(', ') + ')' : ''}`).join('\n');
+        return [
+            'You are an ISO/IEC 17021-1 lead auditor performing the Stage 1 documentation review before an on-site audit.',
+            `Client: ${client.name}${client.industry ? ' — ' + client.industry : ''}. Standard: ${plan.standard || client.standard || 'not stated'}. Audit type: ${plan.auditType || plan.type || 'not stated'}.`,
+            `Employees: ${client.employees || 'not recorded'}. Sites: ${(client.sites || []).length || 1}.`,
+            '',
+            '=== DOCUMENTS THE CLIENT SUPPLIED ===',
+            corpus || '(none)',
+            '=== END DOCUMENTS ===',
+            '',
+            'Review these documents against the 16 Stage 1 items below and judge each one:',
+            items,
+            '',
+            'Status rules — you are judging the DOCUMENTATION only, not implementation:',
+            '- "ok": documented information covering this item was supplied and looks adequate.',
+            '- "minor": something was supplied but it is incomplete, out of date, or only partly covers the item.',
+            '- "major": nothing was supplied for a requirement the standard makes mandatory, so the client is not ready for Stage 2.',
+            '- "": you genuinely cannot tell from what was supplied.',
+            'Base the judgement only on the documents listed. Do not assume a document exists because a company of this type would normally have one.',
+            '',
+            'Return ONLY a JSON object (no markdown, no commentary):',
+            '{"items":[{"id":"<one of the ids above>","status":"ok|minor|major|","comment":"one sentence citing the document, or what is missing"}],',
+            ' "summary":{',
+            '   "newOrChangedProcesses":["processes the documents show as new or changed since the last issue"],',
+            '   "documentsUpdated":["documents whose revision or date shows a recent update, with the revision"],',
+            '   "trainingRecords":"what the documents show about competence and training records, or that nothing was supplied",',
+            '   "managementReview":"what they show about the last management review, or that nothing was supplied",',
+            '   "internalAudit":"what they show about the last internal audit, or that nothing was supplied",',
+            '   "keyRisks":["the two or three things most likely to produce a finding on site"]',
+            ' },',
+            ' "focusPoints":["specific things this audit must cover as a result of this review — phrase each as an audit instruction"]}',
+            '',
+            'Keep focusPoints to at most 8, each traceable to something in the documents.'
+        ].join('\n');
+    }
+
+    function parseStage1Response(text) {
+        const empty = { items: [], summary: null, focusPoints: [] };
+        if (!text) return empty;
+        const cleaned = String(text).replace(/```json/gi, '').replace(/```/g, '').trim();
+        const start = cleaned.indexOf('{');
+        const end = cleaned.lastIndexOf('}');
+        if (start === -1 || end === -1 || end < start) return empty;
+        let parsed;
+        try {
+            parsed = JSON.parse(cleaned.slice(start, end + 1));
+        } catch (_e) {
+            return empty;
+        }
+        const valid = new Set(STAGE1_MAP.map(i => i.id));
+        return {
+            items: Array.isArray(parsed.items)
+                ? parsed.items.filter(i => i && valid.has(i.id)).map(i => ({
+                    id: i.id,
+                    status: ['ok', 'minor', 'major'].includes(i.status) ? i.status : '',
+                    comment: String(i.comment || '').slice(0, 400)
+                }))
+                : [],
+            summary: parsed.summary && typeof parsed.summary === 'object' ? parsed.summary : null,
+            focusPoints: Array.isArray(parsed.focusPoints)
+                ? parsed.focusPoints.filter(p => typeof p === 'string' && p.trim()).slice(0, 8)
+                : []
+        };
+    }
+
+    window.aiReviewPreAuditDocuments = async function (planId) {
+        const plan = window.DataService.findAuditPlan(planId);
+        if (!plan) { notify('Audit plan not found', 'error'); return; }
+        const clients = window.state.clients || [];
+        const client = clients.find(c => String(c.id) === String(plan.clientId)) || clients.find(c => c.name === plan.client);
+        if (!client) { notify(`Client "${plan.client}" not found`, 'error'); return; }
+        const docs = (client.documents || []).filter(d => d && d.name);
+        if (!docs.length) {
+            notify('No client documents on file — upload them from the client\'s Documents tab first.', 'error');
+            return;
+        }
+        if (!window.AI_SERVICE || !window.AI_SERVICE.callProxyAPI) {
+            notify('The AI service is not available in this deployment.', 'error');
+            return;
+        }
+
+        window.DataService.openFormModal(`AI Document Review — ${plan.client}`, `
+        <div id="ai-stage1-body" style="padding: 2.5rem 1rem; text-align: center;">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2rem; color: var(--primary-color);"></i>
+            <p style="margin: 1rem 0 0; font-weight: 600;">Reviewing ${docs.length} document(s) against the 16 Stage 1 items…</p>
+            <p style="margin: 0.25rem 0 0; font-size: 0.84rem; color: var(--text-secondary);">This usually takes 20–40 seconds.</p>
+        </div>`);
+        setWideModal(true);
+
+        try {
+            const response = await window.AI_SERVICE.callProxyAPI(
+                buildStage1Prompt(client, plan, stage1Corpus(client)),
+                { maxTokens: 8192 }
+            );
+            const result = parseStage1Response(response);
+            if (!result.items.length) {
+                document.getElementById('ai-stage1-body').innerHTML =
+                    `<div style="padding:2rem;text-align:center;"><i class="fa-solid fa-triangle-exclamation" style="font-size:1.75rem;color:#f59e0b;"></i>
+                    <p style="margin-top:0.75rem;color:var(--text-secondary);">The AI did not return a usable review. Try again.</p></div>`;
+                return;
+            }
+            _aiReview = { planId, result };
+            renderStage1Review();
+        } catch (err) {
+            if (window.Logger) window.Logger.error('ClientDocsBulk', 'Stage 1 AI review failed: ' + err.message);
+            document.getElementById('ai-stage1-body').innerHTML =
+                `<div style="padding:2rem;text-align:center;"><i class="fa-solid fa-triangle-exclamation" style="font-size:1.75rem;color:#f59e0b;"></i>
+                <p style="margin-top:0.75rem;color:var(--text-secondary);">${esc(err.message || 'The AI request failed.')}</p></div>`;
+        }
+    };
+
+    const STATUS_PILL = {
+        ok: ['#dcfce7', '#166534', 'OK'],
+        minor: ['#fef3c7', '#92400e', 'Minor'],
+        major: ['#fee2e2', '#991b1b', 'Major'],
+        '': ['#f1f5f9', '#475569', 'Not Reviewed']
+    };
+
+    function summaryBlock(title, icon, value) {
+        const list = Array.isArray(value) ? value : (value ? [value] : []);
+        if (!list.length) return '';
+        return `
+        <div style="margin-bottom: 0.75rem;">
+            <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem;"><i class="fa-solid ${icon}" style="color:#7c3aed;margin-right:0.4rem;"></i>${esc(title)}</div>
+            <ul style="margin: 0; padding-left: 1.5rem; font-size: 0.84rem; color: #475569; line-height: 1.6;">
+                ${list.map(v => `<li>${esc(v)}</li>`).join('')}
+            </ul>
+        </div>`;
+    }
+
+    function renderStage1Review() {
+        const { result } = _aiReview;
+        const s = result.summary || {};
+        const byId = {};
+        result.items.forEach(i => { byId[i.id] = i; });
+
+        const body = document.getElementById('ai-stage1-body');
+        if (!body) return;
+        body.style.padding = '0';
+        body.style.textAlign = 'left';
+        body.innerHTML = `
+        <div style="background:#faf5ff;border-left:3px solid #7c3aed;border-radius:0 6px 6px 0;padding:0.9rem 1.1rem;margin-bottom:1rem;">
+            <div style="font-weight:700;margin-bottom:0.6rem;">What the auditor should focus on</div>
+            ${summaryBlock('New or changed processes', 'fa-diagram-project', s.newOrChangedProcesses)}
+            ${summaryBlock('Documents updated', 'fa-file-pen', s.documentsUpdated)}
+            ${summaryBlock('Competence & training records', 'fa-graduation-cap', s.trainingRecords)}
+            ${summaryBlock('Last management review', 'fa-users-rectangle', s.managementReview)}
+            ${summaryBlock('Last internal audit', 'fa-clipboard-check', s.internalAudit)}
+            ${summaryBlock('Most likely findings', 'fa-triangle-exclamation', s.keyRisks)}
+            ${!Object.keys(s).length ? '<div style="font-size:0.85rem;color:#64748b;">No summary returned.</div>' : ''}
+        </div>
+
+        ${result.focusPoints.length ? `
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:0.85rem 1.1rem;margin-bottom:1rem;">
+            <div style="font-weight:700;margin-bottom:0.5rem;"><i class="fa-solid fa-bullseye" style="color:#7c3aed;margin-right:0.4rem;"></i>Points this audit must cover (${result.focusPoints.length})</div>
+            <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.5rem;">These are added to the plan and become an Audit Focus section when the checklist is built.</div>
+            <ul style="margin:0;padding-left:1.5rem;font-size:0.85rem;line-height:1.7;">${result.focusPoints.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
+        </div>` : ''}
+
+        <div class="table-container" style="max-height:38vh;overflow:auto;">
+            <table style="font-size:0.84rem;">
+                <thead style="position:sticky;top:0;background:var(--surface-color);z-index:1;">
+                    <tr><th>Stage 1 item</th><th style="width:110px;">Proposed</th><th>Justification</th></tr>
+                </thead>
+                <tbody>
+                    ${STAGE1_MAP.map(item => {
+            const r = byId[item.id] || { status: '', comment: 'Not assessed.' };
+            const pill = STATUS_PILL[r.status] || STATUS_PILL[''];
+            return `<tr>
+                        <td style="font-weight:500;">${esc(item.label)}</td>
+                        <td><span style="background:${pill[0]};color:${pill[1]};padding:2px 8px;border-radius:4px;font-size:0.75rem;white-space:nowrap;">${pill[2]}</span></td>
+                        <td style="color:#475569;">${esc(r.comment || '')}</td>
+                    </tr>`;
+        }).join('')}
+                </tbody>
+            </table>
+        </div>
+        <p style="font-size:0.8rem;color:var(--text-secondary);margin:0.75rem 0 0;">
+            These are proposals from a documentation review. Applying them sets each item's status and appends the justification to its notes — you remain responsible for the conformity decision.
+        </p>
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;">
+            <button class="btn btn-secondary btn-sm" data-action="closeBulkDocModal">Cancel</button>
+            <button class="btn btn-primary" data-action="applyAIStage1Review" data-id="${esc(_aiReview.planId)}"><i class="fa-solid fa-check-double" style="margin-right:0.4rem;"></i>Apply review to Stage 1</button>
+        </div>`;
+    }
+
+    window.applyAIStage1Review = function (planId) {
+        const plan = window.DataService.findAuditPlan(planId);
+        if (!plan || !_aiReview || String(_aiReview.planId) !== String(planId)) return;
+
+        if (!plan.preAudit) {
+            plan.preAudit = {
+                status: 'Not Started', completedDate: null, completedBy: null,
+                findings: [], documentReview: {}, readinessDecision: null, notes: ''
+            };
+        }
+        if (!plan.preAudit.documentReview) plan.preAudit.documentReview = {};
+
+        const AI_PREFIX = 'AI document review: ';
+        _aiReview.result.items.forEach(item => {
+            const current = plan.preAudit.documentReview[item.id] || {};
+            const kept = String(current.notes || '')
+                .split(/\r?\n/)
+                .filter(l => l.trim() && l.indexOf(AI_PREFIX) !== 0);
+            if (item.comment) kept.push(AI_PREFIX + item.comment);
+            plan.preAudit.documentReview[item.id] = Object.assign({}, current, {
+                status: item.status,
+                notes: kept.join('\n').trim()
+            });
+        });
+
+        plan.preAudit.aiSummary = Object.assign({}, _aiReview.result.summary, {
+            generatedAt: new Date().toISOString()
+        });
+        plan.preAudit.focusPoints = _aiReview.result.focusPoints;
+        if (plan.preAudit.status === 'Not Started') plan.preAudit.status = 'In Progress';
+
+        window.saveData();
+        setWideModal(false);
+        window.closeModal();
+        notify(
+            `Stage 1 review applied to ${_aiReview.result.items.length} items` +
+            (_aiReview.result.focusPoints.length ? `, ${_aiReview.result.focusPoints.length} focus point(s) saved to the plan` : ''),
+            'success'
+        );
+        if (typeof window.renderPreAuditReview === 'function') window.renderPreAuditReview(planId);
+    };
+
     window.applyStage1Evidence = function (planId) {
         const plan = window.DataService.findAuditPlan(planId);
         if (!plan || !_stage1 || String(_stage1.planId) !== String(planId)) return;
@@ -1829,12 +2091,17 @@
             (client.sites || []).length ? `${client.sites.length} site(s)` : '',
             (client.goodsServices || []).length ? `${client.goodsServices.length} product(s)/service(s)` : ''
         ].filter(Boolean).join(', ');
+        const planForFocus = planId ? window.DataService.findAuditPlan(planId) : null;
+        const focusCount = ((planForFocus && planForFocus.preAudit && planForFocus.preAudit.focusPoints) || []).length;
 
         window.DataService.openFormModal(`Build Checklist — ${client.name}`, `
         <div style="font-size: 0.88rem;">
             <p style="margin: 0 0 1rem; color: var(--text-secondary);">
                 Built from <strong>${docs.length} document(s)</strong> on file (${mappedCount} mapped to clauses)${context ? ` and this client's ${context}` : ''}.
             </p>
+            ${focusCount ? `<div style="background:#faf5ff;border-left:3px solid #7c3aed;border-radius:0 6px 6px 0;padding:0.6rem 0.9rem;margin-bottom:1rem;font-size:0.84rem;">
+                <strong>${focusCount} focus point(s)</strong> from the Stage 1 review will lead the checklist as an Audit Focus section.
+            </div>` : ''}
             <div class="form-group">
                 <label>Audit Type</label>
                 <select class="form-control" id="cldoc-audit-type">
@@ -1865,7 +2132,9 @@
             const standardClauses = normalizeAuditType(auditType) === 'surveillance'
                 ? null
                 : clausesForStandard(standard).clauses;
-            createChecklist(client, docs, { auditType, standard, includeMandatory, includeOrgContext, standardClauses }, planId);
+            const plan = planId ? window.DataService.findAuditPlan(planId) : null;
+            const focusPoints = (plan && plan.preAudit && plan.preAudit.focusPoints) || [];
+            createChecklist(client, docs, { auditType, standard, includeMandatory, includeOrgContext, standardClauses, focusPoints }, planId);
         });
     };
 
@@ -1998,6 +2267,8 @@
         extractGoodsServices,
         mapDocumentsToStage1,
         mergeEvidenceNote,
+        parseStage1Response,
+        buildStage1Prompt,
         analyseDocumentGaps,
         clauseSatisfies,
         STAGE1_MAP,

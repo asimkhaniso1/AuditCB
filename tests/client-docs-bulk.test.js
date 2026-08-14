@@ -551,6 +551,79 @@ describe('ClientDocsBulk', () => {
         });
     });
 
+    describe('AI Stage 1 review', () => {
+        const client = { name: 'KTD Select', industry: 'Electronics', employees: 45, sites: [{ name: 'HO' }], documents: [{ name: 'Quality Manual', revision: 'Rev 3', linkedClauses: '4.3' }] };
+        const plan = { standard: 'ISO 9001:2015', auditType: 'Surveillance' };
+
+        it('asks about every Stage 1 item', () => {
+            const prompt = B.buildStage1Prompt(client, plan, 'corpus');
+            B.STAGE1_MAP.forEach(item => expect(prompt).toContain(item.id));
+        });
+
+        it('tells the model to judge documentation, not implementation', () => {
+            expect(B.buildStage1Prompt(client, plan, 'corpus')).toMatch(/DOCUMENTATION only/i);
+        });
+
+        it('asks for the summary the auditor needs', () => {
+            const prompt = B.buildStage1Prompt(client, plan, 'corpus');
+            ['newOrChangedProcesses', 'documentsUpdated', 'trainingRecords', 'managementReview', 'internalAudit', 'focusPoints']
+                .forEach(key => expect(prompt).toContain(key));
+        });
+
+        it('parses a fenced review response', () => {
+            const out = B.parseStage1Response('```json\n{"items":[{"id":"scope","status":"ok","comment":"Manual Rev 3 states the scope."}],"summary":{"internalAudit":"none supplied"},"focusPoints":["Sample the rework line"]}\n```');
+            expect(out.items).toHaveLength(1);
+            expect(out.items[0].status).toBe('ok');
+            expect(out.summary.internalAudit).toBe('none supplied');
+            expect(out.focusPoints).toEqual(['Sample the rework line']);
+        });
+
+        it('drops items whose id is not a real Stage 1 item', () => {
+            const out = B.parseStage1Response('{"items":[{"id":"made_up","status":"ok"},{"id":"scope","status":"minor"}]}');
+            expect(out.items.map(i => i.id)).toEqual(['scope']);
+        });
+
+        it('rejects a status outside the allowed set', () => {
+            const out = B.parseStage1Response('{"items":[{"id":"scope","status":"excellent"}]}');
+            expect(out.items[0].status).toBe('');
+        });
+
+        it('caps focus points', () => {
+            const many = JSON.stringify({ items: [], focusPoints: Array.from({ length: 20 }, (_, i) => 'point ' + i) });
+            expect(B.parseStage1Response(many).focusPoints).toHaveLength(8);
+        });
+
+        it('returns empty rather than throwing on malformed JSON', () => {
+            expect(B.parseStage1Response('{"items": [').items).toEqual([]);
+            expect(B.parseStage1Response('').items).toEqual([]);
+        });
+    });
+
+    describe('checklist audit-focus section', () => {
+        const client = { id: 'c1', name: 'KTD Select', standard: 'ISO 9001:2015' };
+        const docs = [{ name: 'Quality Manual', category: 'System Manual', linkedClauses: '4.3' }];
+
+        it('leads the checklist with the Stage 1 focus points', () => {
+            const cl = B.buildClientChecklist(client, docs, {
+                auditType: 'surveillance',
+                focusPoints: ['Sample the new rework line', 'Verify the 2026 internal audit was completed']
+            });
+            expect(cl.clauses[0].mainClause).toBe('FOCUS');
+            expect(cl.clauses[0].subClauses).toHaveLength(2);
+            expect(cl.clauses[0].subClauses[0].requirement).toContain('rework line');
+        });
+
+        it('omits the section when the pre-audit produced no focus points', () => {
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance', focusPoints: [] });
+            expect(cl.clauses.some(c => c.mainClause === 'FOCUS')).toBe(false);
+        });
+
+        it('ignores non-string focus points', () => {
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance', focusPoints: [null, '', 'Real point'] });
+            expect(cl.clauses[0].subClauses).toHaveLength(1);
+        });
+    });
+
     describe('mergeEvidenceNote', () => {
         it('adds the evidence line above the auditor\'s own notes', () => {
             const out = B.mergeEvidenceNote('Checked on site.', 'Documents on file: QM-01');
