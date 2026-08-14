@@ -46,10 +46,15 @@ describe('ClientAISuggest', () => {
             expect(S.buildContext(client)).toContain('Counterfeit Parts Prevention [clauses 8.4, 8.5]');
         });
 
-        it('appends website text when a scan was run', () => {
+        it('appends website text when a scan was run, marked as the secondary source', () => {
             const ctx = S.buildContext(client, 'We manufacture custom cable assemblies for aerospace.');
-            expect(ctx).toContain('read from the client\'s website');
+            expect(ctx).toContain('SECONDARY SOURCE');
             expect(ctx).toContain('custom cable assemblies');
+        });
+
+        it('warns the model not to infer structure from marketing copy', () => {
+            const ctx = S.buildContext(client, 'Website copy.');
+            expect(ctx).toMatch(/never to invent departments/i);
         });
 
         it('omits sections the client has no data for', () => {
@@ -66,9 +71,20 @@ describe('ClientAISuggest', () => {
     describe('buildPrompt', () => {
         it('asks for the right entity and count', () => {
             const prompt = S.buildPrompt(client, 'goods', 'CONTEXT HERE', 12, '');
-            expect(prompt).toContain('up to 12 Goods & Services');
+            expect(prompt).toContain('at most 12 Goods & Services');
             expect(prompt).toContain('CONTEXT HERE');
             expect(prompt).toContain('JSON array');
+        });
+
+        it('cuts the requested count down to what the organisation size supports', () => {
+            const profile = { band: 'micro', employees: 8, sites: 1, caps: { goods: 6 } };
+            expect(S.buildPrompt(client, 'goods', 'ctx', 20, '', profile)).toContain('at most 6 Goods & Services');
+        });
+
+        it('states the documents are primary and the website secondary', () => {
+            const prompt = S.buildPrompt(client, 'processes', 'ctx', 8, '');
+            expect(prompt).toMatch(/documents are the primary source/i);
+            expect(prompt).toMatch(/website is secondary/i);
         });
 
         it('carries the kind-specific guidance', () => {

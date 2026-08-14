@@ -295,6 +295,121 @@ window._orgTableSearch = function (inputEl, tableId) {
     rows.forEach(row => {
         row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
     });
+    // A row hidden by the search must not stay silently selected.
+    const kind = Object.keys(ORG_TABLES).find(k => ORG_TABLES[k].tableId === tableId);
+    if (kind) {
+        rows.forEach(row => {
+            if (row.style.display === 'none') {
+                const cb = row.querySelector('.org-row-cb');
+                if (cb) cb.checked = false;
+            }
+        });
+        window._orgSelectionChanged(kind);
+    }
+};
+
+// ============================================
+// BULK SELECT & DELETE (all Account Setup tables)
+// ============================================
+
+// Every Account Setup table, the client array behind it, and the wizard step
+// to re-render after a bulk delete.
+const ORG_TABLES = {
+    sites: { field: 'sites', tableId: 'sites-table', step: 2, one: 'site', many: 'sites' },
+    departments: { field: 'departments', tableId: 'depts-table', step: 3, one: 'department', many: 'departments' },
+    designations: { field: 'designations', tableId: 'desig-table', step: 4, one: 'designation', many: 'designations' },
+    contacts: { field: 'contacts', tableId: 'contacts-table', step: 5, one: 'contact', many: 'contacts' },
+    goods: { field: 'goodsServices', tableId: 'goods-table', step: 6, one: 'item', many: 'items' },
+    processes: { field: 'keyProcesses', tableId: 'proc-table', step: 7, one: 'process', many: 'processes' }
+};
+
+/** Header cell holding the select-all box. */
+window._orgSelectAllTh = function (kind) {
+    return `<th style="width:36px;text-align:center;">
+        <input type="checkbox" id="org-all-${kind}" class="org-select-all" title="Select all"
+            data-action-change="_orgSelectAll" data-arg1="${kind}" style="cursor:pointer;width:16px;height:16px;">
+    </th>`;
+};
+
+/** Row cell holding that row's checkbox. `index` is the position in the client array. */
+window._orgSelectTd = function (kind, index) {
+    return `<td style="text-align:center;">
+        <input type="checkbox" class="org-row-cb" data-index="${index}"
+            data-action-change="_orgSelectionChanged" data-arg1="${kind}" style="cursor:pointer;width:16px;height:16px;">
+    </td>`;
+};
+
+/** Toolbar button that deletes whatever is ticked. */
+window._orgBulkDeleteBtn = function (clientId, kind) {
+    if (!(window.AuthManager && window.AuthManager.canPerform('edit', 'client'))) return '';
+    return `<button class="btn btn-sm" id="org-del-${kind}" disabled
+        style="margin-left:auto;background:#fff;color:var(--danger-color);border:1px solid #fecaca;border-radius:8px;opacity:0.5;"
+        data-action="deleteSelectedOrgItems" data-arg1="${clientId}" data-arg2="${kind}" aria-label="Delete selected">
+        <i class="fa-solid fa-trash"></i> Delete Selected <span class="org-del-count"></span>
+    </button>`;
+};
+
+/** Select-all ticks every row the current search leaves visible. */
+window._orgSelectAll = function (kind) {
+    const cfg = ORG_TABLES[kind];
+    if (!cfg) return;
+    const master = document.getElementById('org-all-' + kind);
+    const on = !!(master && master.checked);
+    document.querySelectorAll('#' + cfg.tableId + ' tbody tr').forEach(row => {
+        if (row.style.display === 'none') return;
+        const cb = row.querySelector('.org-row-cb');
+        if (cb) cb.checked = on;
+    });
+    window._orgSelectionChanged(kind);
+};
+
+window._orgSelectionChanged = function (kind) {
+    const cfg = ORG_TABLES[kind];
+    if (!cfg) return;
+    const boxes = Array.from(document.querySelectorAll('#' + cfg.tableId + ' .org-row-cb'));
+    const checked = boxes.filter(cb => cb.checked);
+
+    const btn = document.getElementById('org-del-' + kind);
+    if (btn) {
+        btn.disabled = checked.length === 0;
+        btn.style.opacity = checked.length ? '1' : '0.5';
+        const count = btn.querySelector('.org-del-count');
+        if (count) count.textContent = checked.length ? `(${checked.length})` : '';
+    }
+
+    const master = document.getElementById('org-all-' + kind);
+    if (master) {
+        master.checked = boxes.length > 0 && checked.length === boxes.length;
+        master.indeterminate = checked.length > 0 && checked.length < boxes.length;
+    }
+};
+
+window.deleteSelectedOrgItems = function (clientId, kind) {
+    if (!(window.AuthManager && window.AuthManager.canPerform('edit', 'client'))) {
+        window.showNotification('Access Denied: you do not have permission to edit this client.', 'error');
+        return;
+    }
+    const cfg = ORG_TABLES[kind];
+    const client = window.DataService.findClient(clientId);
+    if (!cfg || !client || !Array.isArray(client[cfg.field])) return;
+
+    // Descending, so each splice leaves the remaining indexes valid.
+    const indexes = Array.from(document.querySelectorAll('#' + cfg.tableId + ' .org-row-cb'))
+        .filter(cb => cb.checked)
+        .map(cb => parseInt(cb.dataset.index, 10))
+        .filter(n => !isNaN(n) && n >= 0 && n < client[cfg.field].length)
+        .sort((a, b) => b - a);
+
+    if (!indexes.length) return;
+    const noun = indexes.length === 1 ? cfg.one : cfg.many;
+
+    window.DataService.confirmAction(`Delete ${indexes.length} ${noun}? This cannot be undone.`, function () {
+        indexes.forEach(i => client[cfg.field].splice(i, 1));
+        window.saveData();
+        window.DataService.syncClient(client, { saveLocal: false });
+        window.showNotification(`Deleted ${indexes.length} ${noun}`, 'success');
+        window.setSetupWizardStep(clientId, cfg.step);
+    });
 };
 
 // View details helper
@@ -384,11 +499,13 @@ window.getClientSitesHTML = function (client) {
         ${sites.length > 0 ? `
         <div class="org-table-toolbar">
             <input class="org-table-search" placeholder="Search sites..." data-action-input="_orgTableSearch" data-id="sites-table">
+            ${window._orgBulkDeleteBtn(client.id, 'sites')}
         </div>
         <div class="org-table">
             <table id="sites-table"><thead><tr>
-                <th>Site Name</th><th>Standards</th><th>Address</th><th>City</th><th>Employees at Site</th><th style="width:140px">Actions</th>
+                ${window._orgSelectAllTh('sites')}<th>Site Name</th><th>Standards</th><th>Address</th><th>City</th><th>Employees at Site</th><th style="width:140px">Actions</th>
             </tr></thead><tbody>${sites.map((s, i) => `<tr>
+                ${window._orgSelectTd('sites', i)}
                 <td class="name-cell">${window.UTILS.escapeHtml(s.name)}</td>
                 <td>${(s.standards || 'Inherited').split(',').map(st => '<span class="badge-tag badge-primary">' + st.trim() + '</span>').join('')}</td>
                 <td>${window.UTILS.escapeHtml(s.address || '-')}</td>
@@ -424,10 +541,12 @@ window.getClientContactsHTML = function (client) {
         ${contacts.length > 0 ? `
         <div class="org-table-toolbar">
             <input class="org-table-search" placeholder="Search contacts..." data-action-input="_orgTableSearch" data-id="contacts-table">
+            ${window._orgBulkDeleteBtn(client.id, 'contacts')}
         </div>
         <div class="org-table">
-            <table id="contacts-table"><thead><tr><th>Name</th><th>Designation</th><th>Department</th><th>Email</th><th style="width:140px">Actions</th></tr></thead>
+            <table id="contacts-table"><thead><tr>${window._orgSelectAllTh('contacts')}<th>Name</th><th>Designation</th><th>Department</th><th>Email</th><th style="width:140px">Actions</th></tr></thead>
             <tbody>${contacts.map((c, i) => `<tr>
+                ${window._orgSelectTd('contacts', i)}
                 <td class="name-cell">${window.UTILS.escapeHtml(c.name)}</td>
                 <td>${c.designation ? '<span class="badge-tag badge-amber">' + window.UTILS.escapeHtml(c.designation) + '</span>' : '-'}</td>
                 <td>${c.department ? '<span class="badge-tag badge-primary">' + window.UTILS.escapeHtml(c.department) + '</span>' : '-'}</td>
@@ -459,12 +578,14 @@ window.getClientDepartmentsHTML = function (client) {
         ${departments.length > 0 ? `
         <div class="org-table-toolbar">
             <input class="org-table-search" placeholder="Search departments..." data-action-input="_orgTableSearch" data-id="depts-table">
+            ${window._orgBulkDeleteBtn(client.id, 'departments')}
         </div>
         <div class="org-table">
-            <table id="depts-table"><thead><tr><th>Department Name</th><th>Head</th><th style="width:140px">Actions</th></tr></thead>
+            <table id="depts-table"><thead><tr>${window._orgSelectAllTh('departments')}<th>Department Name</th><th>Head</th><th style="width:140px">Actions</th></tr></thead>
             <tbody>${departments.map((dept, i) => {
         const deptHead = dept.head || (contacts.find(c => c.department && c.department.toLowerCase() === dept.name.toLowerCase()) || {}).name || '-';
         return `<tr>
+                ${window._orgSelectTd('departments', i)}
                 <td class="name-cell">${window.UTILS.escapeHtml(dept.name)}</td>
                 <td>${deptHead !== '-' ? '<span class="badge-tag badge-blue">' + window.UTILS.escapeHtml(deptHead) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
@@ -494,10 +615,12 @@ window.getClientGoodsServicesHTML = function (client) {
         ${items.length > 0 ? `
         <div class="org-table-toolbar">
             <input class="org-table-search" placeholder="Search goods & services..." data-action-input="_orgTableSearch" data-id="goods-table">
+            ${window._orgBulkDeleteBtn(client.id, 'goods')}
         </div>
         <div class="org-table">
-            <table id="goods-table"><thead><tr><th>Name</th><th>Category</th><th style="width:140px">Actions</th></tr></thead>
+            <table id="goods-table"><thead><tr>${window._orgSelectAllTh('goods')}<th>Name</th><th>Category</th><th style="width:140px">Actions</th></tr></thead>
             <tbody>${items.map((item, i) => `<tr>
+                ${window._orgSelectTd('goods', i)}
                 <td class="name-cell">${window.UTILS.escapeHtml(item.name)}</td>
                 <td><span class="badge-tag badge-green">${window.UTILS.escapeHtml(item.category || '-')}</span></td>
                 <td><div class="actions-cell">
@@ -526,10 +649,12 @@ window.getClientKeyProcessesHTML = function (client) {
         ${processes.length > 0 ? `
         <div class="org-table-toolbar">
             <input class="org-table-search" placeholder="Search processes..." data-action-input="_orgTableSearch" data-id="proc-table">
+            ${window._orgBulkDeleteBtn(client.id, 'processes')}
         </div>
         <div class="org-table">
-            <table id="proc-table"><thead><tr><th>Process Name</th><th>Category</th><th style="width:140px">Actions</th></tr></thead>
+            <table id="proc-table"><thead><tr>${window._orgSelectAllTh('processes')}<th>Process Name</th><th>Category</th><th style="width:140px">Actions</th></tr></thead>
             <tbody>${processes.map((proc, i) => `<tr>
+                ${window._orgSelectTd('processes', i)}
                 <td class="name-cell">${window.UTILS.escapeHtml(proc.name)}</td>
                 <td><span class="badge-tag badge-amber">${window.UTILS.escapeHtml(proc.category || '-')}</span></td>
                 <td><div class="actions-cell">
@@ -559,13 +684,15 @@ window.getClientDesignationsHTML = function (client) {
         ${designations.length > 0 ? `
         <div class="org-table-toolbar">
             <input class="org-table-search" placeholder="Search designations..." data-action-input="_orgTableSearch" data-id="desig-table">
+            ${window._orgBulkDeleteBtn(client.id, 'designations')}
         </div>
         <div class="org-table">
-            <table id="desig-table"><thead><tr><th>Title</th><th>Department</th><th style="width:140px">Actions</th></tr></thead>
+            <table id="desig-table"><thead><tr>${window._orgSelectAllTh('designations')}<th>Title</th><th>Department</th><th style="width:140px">Actions</th></tr></thead>
             <tbody>${designations.map((des, i) => {
         const desTitle = des.title || des.name || '';
         const desDept = des.department || (contacts.find(c => c.designation && c.designation.toLowerCase() === desTitle.toLowerCase()) || {}).department || '';
         return `<tr>
+                ${window._orgSelectTd('designations', i)}
                 <td class="name-cell">${window.UTILS.escapeHtml(desTitle)}</td>
                 <td>${desDept ? '<span class="badge-tag badge-gray">' + window.UTILS.escapeHtml(desDept) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">

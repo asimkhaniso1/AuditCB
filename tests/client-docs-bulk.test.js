@@ -10,6 +10,16 @@ eval(src);
 
 const B = window.ClientDocsBulk;
 
+// Six departments, each with an explicit organisational cue, for cap testing.
+const DEPARTMENT_CUE_TEXT = [
+    'The Production Department runs the line.',
+    'The Quality Department approves releases.',
+    'The Engineering Department owns the drawings.',
+    'The Maintenance Department services the plant.',
+    'The Purchasing Department places orders.',
+    'The Planning Department schedules work.'
+].join(' ');
+
 describe('ClientDocsBulk', () => {
     describe('parseDocumentName — the QMS-section naming clients actually use', () => {
         it('splits "Section 1 - Organization Profile.docx"', () => {
@@ -263,82 +273,185 @@ describe('ClientDocsBulk', () => {
         });
     });
 
+    describe('orgSizeProfile', () => {
+        it('sizes a micro organisation tightly', () => {
+            const p = B.orgSizeProfile({ employees: 8 });
+            expect(p.band).toBe('micro');
+            expect(p.caps.departments).toBe(4);
+        });
+
+        it('scales with headcount', () => {
+            expect(B.orgSizeProfile({ employees: 30 }).band).toBe('small');
+            expect(B.orgSizeProfile({ employees: 120 }).band).toBe('medium');
+            expect(B.orgSizeProfile({ employees: 900 }).band).toBe('large');
+            expect(B.orgSizeProfile({ employees: 900 }).caps.departments)
+                .toBeGreaterThan(B.orgSizeProfile({ employees: 30 }).caps.departments);
+        });
+
+        it('assumes small rather than unlimited when headcount is unknown', () => {
+            const p = B.orgSizeProfile({});
+            expect(p.band).toBe('unknown');
+            expect(p.caps.departments).toBeLessThan(B.orgSizeProfile({ employees: 900 }).caps.departments);
+        });
+
+        it('gives multi-site organisations a little more headroom', () => {
+            const one = B.orgSizeProfile({ employees: 30, sites: [{ name: 'A' }] });
+            const three = B.orgSizeProfile({ employees: 30, sites: [{ name: 'A' }, { name: 'B' }, { name: 'C' }] });
+            expect(three.caps.departments).toBe(one.caps.departments + 2);
+        });
+
+        it('copes with a headcount written as text', () => {
+            expect(B.orgSizeProfile({ employees: '120 staff' }).band).toBe('medium');
+        });
+    });
+
     describe('extractOrgEntities', () => {
+        const client = { name: 'KTD Select', employees: 120, sites: [{ name: 'Head Office' }] };
         const entries = [
             {
                 title: 'Control of Documented Information', category: 'Quality Procedures', clauses: '7.5',
-                text: 'The Quality Assurance Department maintains the master list. The Quality Manager approves each revision and the Document Controller issues copies. Production Department holds controlled copies.'
+                text: 'The Quality Assurance Department maintains the master list. The Quality Manager approves each revision and the Document Controller issues copies. Production Department holds controlled copies. Records are kept after testing and inspection of each batch.'
             },
             {
                 title: 'Rework & Repair Procedure (Class 3)', category: 'Quality Procedures', clauses: '8.7',
-                text: 'The Production Supervisor raises the rework request. The Quality Inspector verifies the repair. Manufacture of wire harnesses and cable assemblies is covered.'
+                text: 'The Production Supervisor raises the rework request. The Quality Inspector verifies the repair. Scope of the QMS: manufacture of wire harnesses and cable assemblies. Work is performed to IPC WHMA-A-620 Class 3.'
             },
             {
                 title: 'Calibration Log', category: 'Records / Forms Register', clauses: '7.1.5',
-                text: 'Maintenance Department records. Calibration performed by an external provider under subcontract.'
+                text: 'Maintenance Department records.'
             }
         ];
 
-        it('finds departments named in the text', () => {
-            const names = B.extractOrgEntities(entries).departments.map(d => d.name.toLowerCase());
+        it('finds departments the documents name as units', () => {
+            const names = B.extractOrgEntities(entries, client).departments.map(d => d.name.toLowerCase());
             expect(names).toContain('quality assurance');
             expect(names).toContain('production');
             expect(names).toContain('maintenance');
         });
 
+        // The old extractor turned every mention of an activity into a department,
+        // which is how one small client ended up with 22 of them.
+        it('does not turn an activity mentioned in a procedure into a department', () => {
+            const names = B.extractOrgEntities(entries, client).departments.map(d => d.name.toLowerCase());
+            expect(names).not.toContain('testing');
+            expect(names).not.toContain('inspection');
+            expect(names).not.toContain('calibration');
+        });
+
+        it('accepts a dictionary department only with an organisational cue', () => {
+            expect(B.extractDepartments('Training is provided annually.', 8)).toHaveLength(0);
+            expect(B.extractDepartments('The Training Department maintains the matrix.', 8)).toHaveLength(1);
+            expect(B.extractDepartments('The Training Manager maintains the matrix.', 8)).toHaveLength(1);
+        });
+
+        it('records why each department was accepted', () => {
+            const dept = B.extractDepartments('The Quality Department approves.', 8)[0];
+            expect(dept.evidence).toBeTruthy();
+        });
+
+        it('caps departments at what the organisation size supports', () => {
+            const wordy = DEPARTMENT_CUE_TEXT;
+            expect(B.extractDepartments(wordy, 3)).toHaveLength(3);
+        });
+
         it('assigns a risk level to dictionary departments', () => {
-            const qa = B.extractOrgEntities(entries).departments.find(d => /quality assurance/i.test(d.name));
+            const qa = B.extractOrgEntities(entries, client).departments.find(d => /quality assurance/i.test(d.name));
             expect(qa.risk).toBe('High');
         });
 
         it('finds job titles and ranks them by how often they appear', () => {
-            const titles = B.extractOrgEntities(entries).designations.map(d => d.title);
+            const titles = B.extractOrgEntities(entries, client).designations.map(d => d.title);
             expect(titles).toContain('Quality Manager');
             expect(titles).toContain('Production Supervisor');
             expect(titles).toContain('Quality Inspector');
         });
 
         it('does not read "Head Office" as a job title', () => {
-            const titles = B.extractDesignations('The Head Office is in Karachi.').map(d => d.title);
-            expect(titles).not.toContain('Head');
+            expect(B.extractDesignations('The Head Office is in Karachi.', 12).map(d => d.title)).not.toContain('Head');
         });
 
         it('does not read a sentence opener as a name', () => {
-            const titles = B.extractDesignations('The Manager shall approve. This Engineer must sign.').map(d => d.title);
+            const titles = B.extractDesignations('The Manager shall approve. This Engineer must sign.', 12).map(d => d.title);
             expect(titles.some(t => /^(the|this)\b/i.test(t))).toBe(false);
         });
 
         it('turns controlled procedures into process names', () => {
-            const names = B.extractOrgEntities(entries).processes.map(p => p.name);
+            const names = B.extractOrgEntities(entries, client).processes.map(p => p.name);
             expect(names).toContain('Rework & Repair');
             expect(names).toContain('Control of Documented Information');
         });
 
         it('classifies a clause 8 procedure as a core process', () => {
-            const proc = B.extractOrgEntities(entries).processes.find(p => p.name === 'Rework & Repair');
-            expect(proc.category).toBe('Core');
+            expect(B.extractOrgEntities(entries, client).processes.find(p => p.name === 'Rework & Repair').category).toBe('Core');
         });
 
-        it('marks a subcontracted activity as outsourced', () => {
-            const procs = B.extractProcesses([{ title: 'Calibration Procedure', category: 'Quality Procedures', clauses: '7.1.5', text: 'performed under subcontract' }]);
-            expect(procs[0].category).toBe('Outsourced');
+        it('marks a process outsourced only on evidence near the title', () => {
+            const outsourced = B.extractProcesses([{ title: 'Calibration Procedure', category: 'Quality Procedures', clauses: '7.1.5', text: 'Calibration is subcontracted to an accredited laboratory.' }], 14);
+            expect(outsourced[0].category).toBe('Outsourced');
+        });
+
+        // A passing mention of external providers deep in a procedure used to
+        // mark in-house processes as outsourced.
+        it('does not mark a process outsourced on a passing mention', () => {
+            const body = 'Assembly is performed in house. ' + 'Filler text. '.repeat(60) + 'Records from an external provider are retained.';
+            const procs = B.extractProcesses([{ title: 'Assembly Procedure', category: 'Quality Procedures', clauses: '8.1', text: body }], 14);
+            expect(procs[0].category).toBe('Core');
         });
 
         it('does not treat a blank form as a process', () => {
-            const names = B.extractOrgEntities(entries).processes.map(p => p.name);
-            expect(names).not.toContain('Calibration Log');
+            expect(B.extractOrgEntities(entries, client).processes.map(p => p.name)).not.toContain('Calibration Log');
         });
 
-        it('reads products out of a manufacture-of statement', () => {
-            const names = B.extractOrgEntities(entries).goods.map(g => g.name.toLowerCase());
+        it('reads products out of a scope statement', () => {
+            const names = B.extractOrgEntities(entries, client).goods.map(g => g.name.toLowerCase());
             expect(names).toContain('wire harnesses');
             expect(names).toContain('cable assemblies');
         });
 
+        it('rejects specification codes as products', () => {
+            const names = B.extractOrgEntities(entries, client).goods.map(g => g.name.toLowerCase());
+            expect(names.some(n => /ipc|whma|iso \d/.test(n))).toBe(false);
+        });
+
+        it('rejects generic nouns as products', () => {
+            const goods = B.extractGoodsServices('Scope: products and services and activities.', 10, client);
+            expect(goods).toHaveLength(0);
+        });
+
+        it('rejects document titles and the client\'s own name as products', () => {
+            const goods = B.extractGoodsServices('Manufacture of KTD Select QMS Section 8 Operations.', 10, client);
+            expect(goods).toHaveLength(0);
+        });
+
+        it('rejects a bare part-number label', () => {
+            expect(B.extractGoodsServices('Supply of Part Number.', 10, client)).toHaveLength(0);
+        });
+
+        it('does not return the verb phrase and the noun phrase as two products', () => {
+            const names = B.extractGoodsServices('Scope: manufacture of wiring harnesses and cabling.', 10, client).map(g => g.name);
+            expect(names).toContain('wiring harnesses');
+            expect(names.some(n => /^manufacture of/i.test(n))).toBe(false);
+        });
+
+        it('keeps a process name longer than a department name', () => {
+            const procs = B.extractProcesses([{ title: 'Section 13 - Counterfeit Parts Prevention and Traceability Procedure', category: 'Quality Procedures', clauses: '8.4', text: '' }], 14);
+            expect(procs.map(p => p.name)).toContain('Counterfeit Parts Prevention and Traceability');
+        });
+
+        it('keeps a meaningful single-word product', () => {
+            expect(B.extractGoodsServices('Manufacture of cabling.', 10, client).map(g => g.name)).toContain('cabling');
+        });
+
+        it('caps products at what the organisation size supports', () => {
+            const many = 'Scope: alpha units, beta units, gamma units, delta units, epsilon units, zeta units.';
+            expect(B.extractGoodsServices(many, 3, client).length).toBeLessThanOrEqual(3);
+        });
+
         it('survives an empty corpus', () => {
-            const out = B.extractOrgEntities([]);
+            const out = B.extractOrgEntities([], client);
             expect(out.departments).toEqual([]);
             expect(out.processes).toEqual([]);
+            expect(out.profile.band).toBe('medium');
         });
     });
 

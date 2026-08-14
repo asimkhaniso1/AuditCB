@@ -618,6 +618,40 @@
 
     // ── Org-setup extraction from document text ───────────────────────
 
+    /**
+     * How much an organisation of this size can plausibly have. A 30-person
+     * shop does not run 22 departments, and returning a list that long makes
+     * the auditor delete rows instead of reviewing them. Employee count is the
+     * primary signal; extra sites widen it a little.
+     */
+    function orgSizeProfile(client) {
+        const employees = parseInt(String((client && client.employees) || '').replace(/\D/g, ''), 10);
+        const sites = Math.max(1, ((client && client.sites) || []).length);
+        let band, caps;
+        if (!isNaN(employees) && employees > 0 && employees < 10) {
+            band = 'micro';
+            caps = { departments: 4, designations: 6, processes: 8, goods: 6 };
+        } else if (!isNaN(employees) && employees < 50) {
+            band = 'small';
+            caps = { departments: 6, designations: 10, processes: 12, goods: 8 };
+        } else if (!isNaN(employees) && employees < 250) {
+            band = 'medium';
+            caps = { departments: 10, designations: 16, processes: 18, goods: 12 };
+        } else if (!isNaN(employees) && employees >= 250) {
+            band = 'large';
+            caps = { departments: 16, designations: 24, processes: 25, goods: 18 };
+        } else {
+            // Unknown headcount — assume small rather than flooding the tables.
+            band = 'unknown';
+            caps = { departments: 8, designations: 12, processes: 14, goods: 10 };
+        }
+        if (sites > 1) {
+            const extra = Math.min(sites - 1, 4);
+            Object.keys(caps).forEach(k => { caps[k] += extra; });
+        }
+        return { band, employees: isNaN(employees) ? null : employees, sites, caps };
+    }
+
     // Departments a management system document set normally names. A dictionary
     // hit is far less noisy than a bare capitalised-phrase match, so both run.
     const DEPARTMENT_DICTIONARY = [
@@ -666,47 +700,66 @@
             .trim();
     }
 
-    function plausibleName(s) {
-        if (!s || s.length < 3 || s.length > 45) return false;
+    function plausibleName(s, maxLength) {
+        if (!s || s.length < 3 || s.length > (maxLength || 45)) return false;
         if (NOISE_PREFIX.test(s)) return false;
         if (!/[A-Za-z]{3}/.test(s)) return false;
         return true;
     }
 
-    /** Departments named in the text, either as "X Department" or by dictionary. */
-    function extractDepartments(text) {
+    /**
+     * Departments the documents actually evidence.
+     *
+     * A word appearing somewhere in a procedure is not a department — "Testing"
+     * turns up in every inspection procedure ever written. A candidate only
+     * counts when the text names it as an organisational unit: "X Department",
+     * "Head of X", "X Manager", "X team". Candidates are then ranked by how
+     * strong that evidence is and cut to what the organisation's size supports.
+     */
+    function extractDepartments(text, cap) {
         const found = new Map();
-        const add = (name, risk) => {
+        const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        const add = (name, risk, score, evidence) => {
             const clean = cleanPhrase(name);
             if (!plausibleName(clean)) return;
             const key = clean.toLowerCase();
-            if (!found.has(key)) found.set(key, { name: clean, risk: 'Medium', count: 0 });
-            // The dictionary knows the risk; the "X Department" regex does not,
-            // so a later dictionary hit upgrades an entry the regex created.
-            if (risk) found.get(key).risk = risk;
-            found.get(key).count++;
+            if (!found.has(key)) found.set(key, { name: clean, risk: 'Medium', score: 0, evidence: '' });
+            const entry = found.get(key);
+            if (risk) entry.risk = risk;
+            if (score > entry.score) { entry.score = score; entry.evidence = evidence; }
         };
 
-        const re = /\b((?:[A-Z][A-Za-z&/-]*\s+){0,3}[A-Z][A-Za-z&/-]*)\s+(?:Department|Dept\.?|Division)\b/g;
+        // Anything explicitly written as a department is accepted outright.
+        const explicit = /\b((?:[A-Z][A-Za-z&/-]*\s+){0,3}[A-Z][A-Za-z&/-]*)\s+(?:Department|Dept\.?|Division)\b/g;
         let m;
-        while ((m = re.exec(text)) !== null) add(stripNoisePrefix(m[1]));
+        while ((m = explicit.exec(text)) !== null) {
+            add(stripNoisePrefix(m[1]), '', 5, 'named as a department');
+        }
 
+        // Dictionary terms need an organisational cue next to them.
         DEPARTMENT_DICTIONARY.forEach(([name, risk]) => {
-            const rx = new RegExp('\\b' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
-            const hits = (text.match(rx) || []).length;
-            if (hits) {
-                add(name, risk);
-                found.get(name.toLowerCase()).count = hits;
+            const n = esc(name);
+            const cues = [
+                [new RegExp('\\b' + n + '\\s+(?:department|dept\\.?|division)\\b', 'i'), 5, 'named as a department'],
+                [new RegExp('\\bhead\\s+of\\s+(?:the\\s+)?' + n + '\\b', 'i'), 4, 'has a named head'],
+                [new RegExp('\\b' + n + '\\s+(?:manager|head|director|supervisor|superintendent)\\b', 'i'), 4, 'has a named manager'],
+                [new RegExp('\\b' + n + '\\s+(?:team|function|section|personnel|staff|unit)\\b', 'i'), 3, 'referred to as a team or function'],
+                [new RegExp('\\b(?:the\\s+)?' + n + '\\s+(?:shall|is responsible|are responsible|maintains|performs|reviews|approves)\\b', 'i'), 3, 'assigned responsibilities']
+            ];
+            for (const [rx, score, evidence] of cues) {
+                if (rx.test(text)) { add(name, risk, score, evidence); break; }
             }
         });
 
         return Array.from(found.values())
-            .sort((a, b) => b.count - a.count)
-            .map(d => ({ name: d.name, risk: d.risk, head: '', count: d.count }));
+            .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+            .slice(0, cap || 8)
+            .map(d => ({ name: d.name, risk: d.risk, head: '', evidence: d.evidence }));
     }
 
     /** Job titles named in the text, most frequently mentioned first. */
-    function extractDesignations(text) {
+    function extractDesignations(text, cap) {
         const found = new Map();
         const re = new RegExp('\\b((?:[A-Z][a-z]{1,15}\\s+){0,3}(?:' + TITLE_NOUNS + '))\\b', 'g');
         let m;
@@ -722,70 +775,122 @@
         }
         return Array.from(found.values())
             .sort((a, b) => b.count - a.count)
-            .slice(0, 30)
+            .slice(0, cap || 12)
             .map(d => ({ title: d.title, department: '', count: d.count }));
     }
 
     /** Every controlled procedure describes a process — that is the strongest signal. */
-    function extractProcesses(entries) {
+    function extractProcesses(entries, cap) {
         const found = new Map();
         (entries || []).forEach(entry => {
             if (!['Quality Procedures', 'Work Instructions', 'Process Map'].includes(entry.category)) return;
             let name = String(entry.title || '')
+                .replace(/^\s*(?:section|part|chapter|clause)\s*[0-9]{1,2}[A-Za-z]?(?:\.[0-9]{1,2})*\s*[-–—:.)]*\s*/i, '')
                 .replace(/\s*\([^)]*\)\s*$/, '')
                 .replace(/\b(procedures?|processes?|work instructions?|sop|policy|manual|guidelines?)\s*$/i, '')
                 .trim();
             name = cleanPhrase(name);
-            if (!plausibleName(name)) return;
+            // Process names run longer than department names — "Counterfeit Parts
+            // Prevention and Traceability" is 58 characters and entirely valid.
+            if (!plausibleName(name, 70)) return;
 
             const main = String(entry.clauses || '').split(',')[0].trim().split('.')[0];
             let category = 'Management';
             if (main === '8') category = 'Core';
             else if (main === '7') category = 'Support';
-            if (/\b(outsourc|subcontract|external(ly)? provid)/i.test(entry.text || '')) category = 'Outsourced';
+
+            // Only the title or the document's opening scope decides outsourcing.
+            // Nearly every procedure mentions external providers somewhere, and
+            // matching on the whole body marked in-house processes as outsourced.
+            const outsourceEvidence = `${name}\n${String(entry.text || '').slice(0, 400)}`;
+            if (/\b(is\s+)?(outsourc|subcontract)\w*|performed by an external|external(ly)?\s+provid\w*\s+(?:performs|carries)/i.test(outsourceEvidence)) {
+                category = 'Outsourced';
+            }
 
             const key = name.toLowerCase();
             if (!found.has(key)) found.set(key, { name, category, owner: '', evidence: entry.title });
         });
-        return Array.from(found.values());
+        return Array.from(found.values()).slice(0, cap || 14);
     }
 
+    // Phrases that are never a product or service in their own right — they are
+    // the words a scope sentence is built from, not the thing being sold.
+    const GOODS_STOPWORDS = /^(products?|services?|activities|activity|items?|goods|works?|manufactured|manufacturing|production|supply|part numbers?|parts?|components?|materials?|assemblies|processes?|operations?|requirements?|documents?|records?|customers?|suppliers?|equipment|systems?|solutions?|applications?|standards?|specifications?|scope|company|organi[sz]ation|quality|management|business|industry|clients?|projects?)$/i;
+
+    // Standard and specification identifiers: IPC, WHMA-A, ISO 9001, AS9100…
+    const SPEC_CODE = /^(iso|iec|ipc|whma|ansi|astm|mil|as|en|bs|din|sae|nadcap|ul|ce)\b|^[A-Z][A-Z0-9-]{1,}$|^[A-Z]{2,}-[A-Z0-9]/;
+
+    // Document titles that leaked out of a scope sentence.
+    const DOC_TITLE_WORDS = /\b(qms|ems|isms|section|clause|procedure|manual|policy|form|record|revision|appendix|annex)\b/i;
+
     /** Products and services, taken from scope and "manufacture of …" statements. */
-    function extractGoodsServices(text) {
+    function extractGoodsServices(text, cap, client) {
         const found = new Map();
-        const add = (raw, category) => {
+        const clientWords = String((client && client.name) || '')
+            .toLowerCase().split(/\W+/).filter(w => w.length > 3);
+
+        const acceptable = phrase => {
+            const words = phrase.split(' ');
+            if (words.length > 8) return false;
+            if (GOODS_STOPWORDS.test(phrase)) return false;
+            if (SPEC_CODE.test(phrase)) return false;
+            if (DOC_TITLE_WORDS.test(phrase)) return false;
+            // "KTD Select QMS ..." — anything echoing the client's own name.
+            if (clientWords.some(w => phrase.toLowerCase().includes(w))) return false;
+            // A single word has to carry its own weight; "IPC" and "cabling"
+            // both survive the checks above, only one of them is a product.
+            if (words.length === 1 && (phrase.length < 5 || phrase === phrase.toUpperCase())) return false;
+            return true;
+        };
+
+        const add = (raw, category, score) => {
             raw.split(/\s*(?:,|;|\band\b|\bor\b|\/)\s*/).forEach(part => {
-                const clean = cleanPhrase(trimTrailingClause(stripNoisePrefix(part)));
-                if (!plausibleName(clean) || clean.split(' ').length > 8) return;
+                // "manufacture of wiring harnesses" and "wiring harnesses" are the
+                // same product; keep only the noun phrase.
+                const stripped = String(part).replace(
+                    /^\s*(?:the\s+)?(?:manufactur\w*|fabricat\w*|assembl\w*|production|supply|suppl\w+|provision|providing|design|delivery)\s+(?:and\s+\w+\s+)?of\s+/i, '');
+                const clean = cleanPhrase(trimTrailingClause(stripNoisePrefix(stripped)));
+                if (!plausibleName(clean, 60) || !acceptable(clean)) return;
                 const key = clean.toLowerCase();
-                if (!found.has(key)) found.set(key, { name: clean, category, description: '' });
+                if (!found.has(key) || found.get(key).score < score) {
+                    found.set(key, { name: clean, category, description: '', score });
+                }
             });
         };
 
+        // A scope statement is the most authoritative source there is, so it
+        // outranks an incidental "manufacture of ..." further down a procedure.
+        const scopeRe = /\bscope\s*(?:of\s+(?:the\s+)?(?:qms|quality management system|certification|registration))?\s*[:-]\s*([^.\n]{10,160})/gi;
         const productRe = /\b(?:manufactur\w*|fabricat\w*|assembl\w*|production|supply|suppl\w+)\s+(?:and\s+\w+\s+)?of\s+([^.;\n]{6,120})/gi;
         const serviceRe = /\b(?:provision|providing|provide[sd]?|delivery)\s+of\s+([^.;\n]{6,120})/gi;
-        const scopeRe = /\bscope[^.\n:]{0,40}[:-]\s*([^.\n]{10,160})/gi;
 
         let m;
-        while ((m = productRe.exec(text)) !== null) add(m[1], 'Product');
-        while ((m = serviceRe.exec(text)) !== null) add(m[1], 'Service');
-        while ((m = scopeRe.exec(text)) !== null) add(m[1], 'Product');
+        while ((m = scopeRe.exec(text)) !== null) add(m[1], 'Product', 3);
+        while ((m = productRe.exec(text)) !== null) add(m[1], 'Product', 2);
+        while ((m = serviceRe.exec(text)) !== null) add(m[1], 'Service', 1);
 
-        return Array.from(found.values()).slice(0, 25);
+        return Array.from(found.values())
+            .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+            .slice(0, cap || 10)
+            .map(g => ({ name: g.name, category: g.category, description: '' }));
     }
 
     /**
-     * Everything the document set says about how the organisation is structured.
+     * Everything the document set says about how the organisation is structured,
+     * bounded by what an organisation of this size can plausibly have.
      * @param {Array} entries - [{title, category, clauses, text}] from the last import
+     * @param {Object} [client] - used for the size profile and to reject self-references
      */
-    function extractOrgEntities(entries) {
+    function extractOrgEntities(entries, client) {
         const list = entries || [];
         const text = list.map(e => e.text || '').join('\n').slice(0, 300000);
+        const profile = orgSizeProfile(client || {});
         return {
-            departments: extractDepartments(text),
-            designations: extractDesignations(text),
-            processes: extractProcesses(list),
-            goods: extractGoodsServices(text)
+            profile,
+            departments: extractDepartments(text, profile.caps.departments),
+            designations: extractDesignations(text, profile.caps.designations),
+            processes: extractProcesses(list, profile.caps.processes),
+            goods: extractGoodsServices(text, profile.caps.goods, client)
         };
     }
 
@@ -1886,6 +1991,7 @@
         coverageGaps,
         readZipEntries,
         extractOrgEntities,
+        orgSizeProfile,
         extractDepartments,
         extractDesignations,
         extractProcesses,

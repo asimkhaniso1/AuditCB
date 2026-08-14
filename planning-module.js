@@ -3059,6 +3059,29 @@ window.renderPreAuditReview = function (planId) {
                 </div>
             </div>
 
+            <!-- Bulk actions across all 16 review items -->
+            <div class="card" style="margin-bottom: 1.25rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 0.85rem 1.25rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600; font-size: 0.9rem;">
+                    <input type="checkbox" id="preaudit-select-all" style="width:16px;height:16px;cursor:pointer;"
+                        data-action-change="togglePreAuditSelectAll" data-arg1="${planId}">
+                    Select all
+                </label>
+                <span style="font-size: 0.85rem; color: var(--text-secondary);"><strong id="preaudit-selected-count">0</strong> of ${totalItems} selected</span>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-left: auto; flex-wrap: wrap;">
+                    <label style="font-size: 0.85rem; color: var(--text-secondary);">Set selected to</label>
+                    <select id="preaudit-bulk-status" style="padding: 0.45rem 0.6rem; border: 1px solid #cbd5e1; border-radius: var(--radius-sm);">
+                        <option value="ok">✓ OK</option>
+                        <option value="minor">⚠ Minor</option>
+                        <option value="major">❌ Major</option>
+                        <option value="">Not Reviewed</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" id="preaudit-bulk-apply" disabled style="opacity:0.5;"
+                        data-action="applyPreAuditBulkStatus" data-id="${planId}" aria-label="Apply to selected">
+                        <i class="fa-solid fa-check-double" style="margin-right: 0.35rem;"></i>Apply
+                    </button>
+                </div>
+            </div>
+
             <!-- Checklist by Category -->
             ${Object.keys(categories).map(categoryName => `
                 <div class="card" style="margin-bottom: 2rem;">
@@ -3072,7 +3095,10 @@ window.renderPreAuditReview = function (planId) {
         return `
                                 <div style="padding: 1rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 4px solid ${review.status === 'ok' ? '#10b981' : review.status === 'minor' ? '#f59e0b' : review.status === 'major' ? '#ef4444' : '#cbd5e1'};">
                                     <div class="pre-audit-item-grid" style="display: grid; grid-template-columns: 2fr 1fr 3fr; gap: 1rem; align-items: start;">
-                                        <div>
+                                        <div style="display: flex; align-items: start; gap: 0.6rem;">
+                                            <input type="checkbox" class="preaudit-cb" data-item-id="${item.id}"
+                                                style="width:16px;height:16px;cursor:pointer;margin-top:2px;flex-shrink:0;"
+                                                data-action-change="preAuditSelectionChanged" data-arg1="${planId}">
                                             <label style="font-weight: 600; color: #1e293b; display: block; margin-bottom: 0.5rem;">
                                                 ${item.label}
                                             </label>
@@ -3168,6 +3194,81 @@ window.updatePreAuditItem = function (planId, itemId, status) {
 
     // Auto-save
     window.saveState();
+};
+
+// ============================================
+// PRE-AUDIT BULK ACTIONS
+// ============================================
+
+/** Enable the Apply button and keep the counter and select-all box honest. */
+window.preAuditSelectionChanged = function () {
+    const boxes = Array.from(document.querySelectorAll('.preaudit-cb'));
+    const checked = boxes.filter(cb => cb.checked);
+
+    const count = document.getElementById('preaudit-selected-count');
+    if (count) count.textContent = String(checked.length);
+
+    const apply = document.getElementById('preaudit-bulk-apply');
+    if (apply) {
+        apply.disabled = checked.length === 0;
+        apply.style.opacity = checked.length ? '1' : '0.5';
+    }
+
+    const master = document.getElementById('preaudit-select-all');
+    if (master) {
+        master.checked = boxes.length > 0 && checked.length === boxes.length;
+        master.indeterminate = checked.length > 0 && checked.length < boxes.length;
+    }
+};
+
+window.togglePreAuditSelectAll = function () {
+    const master = document.getElementById('preaudit-select-all');
+    const on = !!(master && master.checked);
+    document.querySelectorAll('.preaudit-cb').forEach(cb => { cb.checked = on; });
+    window.preAuditSelectionChanged();
+};
+
+/** Set the same conformity status on every ticked review item. */
+window.applyPreAuditBulkStatus = function (planId) {
+    const plan = window.DataService.findAuditPlan(planId);
+    if (!plan) return;
+    if (!plan.preAudit) {
+        plan.preAudit = {
+            status: 'Not Started', completedDate: null, completedBy: null,
+            findings: [], documentReview: {}, readinessDecision: null, notes: ''
+        };
+    }
+    if (!plan.preAudit.documentReview) plan.preAudit.documentReview = {};
+
+    const status = (document.getElementById('preaudit-bulk-status') || {}).value || '';
+    const ids = Array.from(document.querySelectorAll('.preaudit-cb'))
+        .filter(cb => cb.checked)
+        .map(cb => cb.dataset.itemId)
+        .filter(Boolean);
+
+    if (!ids.length) return;
+
+    const label = status === 'ok' ? 'OK' : status === 'minor' ? 'Minor' : status === 'major' ? 'Major' : 'Not Reviewed';
+    const proceed = function () {
+        ids.forEach(id => {
+            if (!plan.preAudit.documentReview[id]) plan.preAudit.documentReview[id] = {};
+            plan.preAudit.documentReview[id].status = status;
+        });
+        if (plan.preAudit.status === 'Not Started') plan.preAudit.status = 'In Progress';
+        window.saveState();
+        window.showNotification(`${ids.length} item${ids.length === 1 ? '' : 's'} set to ${label}`, 'success');
+        window.renderPreAuditReview(planId);
+    };
+
+    // Marking items conforming in bulk is a judgement an auditor has to own.
+    if (status === 'ok' && ids.length > 1) {
+        window.DataService.confirmAction(
+            `Mark ${ids.length} review items as conforming? Each one should have been reviewed against its evidence.`,
+            proceed
+        );
+    } else {
+        proceed();
+    }
 };
 
 /**

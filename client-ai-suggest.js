@@ -136,27 +136,40 @@
             lines.push(`\nOrganization context on file:\n${String(client.profile).slice(0, 1200)}`);
         }
         if (siteText) {
-            lines.push(`\nText read from the client's website just now:\n${String(siteText).slice(0, 9000)}`);
+            lines.push(
+                '\nSECONDARY SOURCE — the client\'s public website. Marketing copy overstates what a company does;' +
+                ' use it only to name products and services the documents left out, and never to invent departments,' +
+                ' roles or processes:\n' + String(siteText).slice(0, 9000)
+            );
         }
         return lines.join('\n');
     }
 
-    function buildPrompt(client, kind, context, count, extra) {
+    function buildPrompt(client, kind, context, count, extra, profile) {
         const cfg = KINDS[kind];
+        const cap = profile && profile.caps && profile.caps[kind]
+            ? Math.min(parseInt(count, 10) || 12, profile.caps[kind])
+            : count;
+        const sizeLine = profile
+            ? `This is a ${profile.band} organisation — ${profile.employees ? profile.employees + ' employees' : 'headcount not recorded'}, ${profile.sites} site(s). Its real structure is correspondingly small.`
+            : '';
         return [
             'You are an ISO/IEC 17021-1 certification body auditor preparing the audit file for a client.',
-            `Suggest up to ${count} ${cfg.label} for the organisation described below.`,
+            `Suggest at most ${cap} ${cfg.label} for the organisation described below.`,
+            sizeLine,
             '',
             '=== EVIDENCE ===',
             context,
             '=== END EVIDENCE ===',
             '',
             'Rules:',
-            '1. Ground every suggestion in the evidence above. Where the website or the client\'s documents name something, use their exact wording.',
-            '2. Do not repeat anything listed as already recorded.',
-            '3. If the evidence is thin, fall back to what is normal for the stated industry and size, and say so in the rationale.',
-            '4. Never invent specific product names, certifications or customers that do not appear in the evidence.',
-            `5. ${cfg.guidance}`,
+            '1. The client\'s own documents are the primary source. The website is secondary — it is marketing copy, so take product and service names from it but never infer departments, roles or processes from it.',
+            '2. Ground every suggestion in the evidence above and use the organisation\'s exact wording.',
+            '3. Return FEWER, better entries. Something the auditor has to delete costs more than something missing.',
+            '4. Do not repeat anything listed as already recorded.',
+            '5. If the evidence is thin, say so in the rationale rather than filling the list with what a typical company of this type would have.',
+            '6. Never invent specific product names, certifications or customers that do not appear in the evidence, and never return standard or specification codes, document titles or part numbers as products.',
+            `7. ${cfg.guidance}`,
             '',
             extra ? `Additional instruction from the auditor: ${extra}\n` : '',
             `Return ONLY a JSON array (no markdown, no commentary) of objects shaped exactly like: ${cfg.schema}`
@@ -316,7 +329,10 @@
 
         try {
             const context = buildContext(client, siteText);
-            const prompt = buildPrompt(client, kind, context, count, extra);
+            const profile = window.ClientDocsBulk && window.ClientDocsBulk.orgSizeProfile
+                ? window.ClientDocsBulk.orgSizeProfile(client)
+                : null;
+            const prompt = buildPrompt(client, kind, context, count, extra, profile);
             const response = await window.AI_SERVICE.callProxyAPI(prompt, { maxTokens: 8192 });
             const parsed = parseSuggestions(response);
 
@@ -521,28 +537,38 @@
         return parts.join('\n\n');
     }
 
-    function buildExtractPrompt(client, corpusText) {
+    function buildExtractPrompt(client, corpusText, profile) {
+        const caps = (profile && profile.caps) || {};
+        const size = profile && profile.employees
+            ? `${profile.employees} employees across ${profile.sites} site(s)`
+            : `${profile ? profile.sites : 1} site(s), headcount not recorded`;
         return [
             'You are an ISO/IEC 17021-1 auditor reading the management system documents a client submitted before an audit.',
             'From these documents, identify how the organisation is actually structured.',
             '',
             `Client: ${client.name}${client.industry ? ' — ' + client.industry : ''}${client.standard ? ' — ' + client.standard : ''}`,
+            `Size: ${size}. This is a ${profile ? profile.band : 'small'} organisation — its real structure is correspondingly small.`,
             '',
             '=== CLIENT DOCUMENTS ===',
             corpusText,
             '=== END DOCUMENTS ===',
             '',
             'Rules:',
-            '1. Only report what these documents actually evidence. Do not pad the lists with what a typical company of this type would have.',
-            '2. Use the organisation\'s own wording for names.',
-            '3. A controlled procedure normally corresponds to a process — name the process, not the document.',
-            '4. Leave a field as an empty string when the documents do not state it. Never guess a person\'s name.',
+            '1. The documents above are the ONLY source. Report what they evidence and nothing else. Do not pad a list with what a typical company of this type would have.',
+            '2. Return FEWER, better entries. An entry you are not confident about is worse than a missing one, because the auditor has to delete it.',
+            `3. Hard limits for an organisation this size: at most ${caps.departments || 8} departments, ${caps.designations || 12} designations, ${caps.processes || 14} processes, ${caps.goods || 10} products/services. Return fewer if the evidence supports fewer.`,
+            '4. A department is an organisational unit the documents name as one ("Quality Department", "Head of Production"). An activity mentioned in a procedure — testing, calibration, training, inspection — is NOT a department unless the documents treat it as a unit.',
+            '5. Products and services are what the organisation sells. Never return standard or specification codes (IPC, WHMA-A-620, ISO 9001), document titles, part numbers, or generic words like "products", "services" or "activities".',
+            '6. A controlled procedure normally corresponds to a process — name the process, not the document. Mark a process Outsourced only if the documents say it is performed by an external provider.',
+            '7. Leave a field as an empty string when the documents do not state it. Never guess a person\'s name.',
             '',
             'Return ONLY a JSON object (no markdown, no commentary) shaped exactly like:',
             '{"departments":[{"name":"","risk":"High|Medium|Low","head":"","rationale":""}],',
             ' "designations":[{"title":"","department":"","rationale":""}],',
             ' "processes":[{"name":"","category":"Core|Support|Management|Outsourced","owner":"","rationale":""}],',
-            ' "goods":[{"name":"","category":"Product|Service","description":"","rationale":""}]}'
+            ' "goods":[{"name":"","category":"Product|Service","description":"","rationale":""}]}',
+            '',
+            'The rationale must quote or point to the specific document evidence. If you cannot, leave the entry out.'
         ].join('\n');
     }
 
@@ -596,14 +622,15 @@
         </div>`);
         await new Promise(r => setTimeout(r, 0));
 
-        const scanned = window.ClientDocsBulk.extractOrgEntities(entries);
+        const scanned = window.ClientDocsBulk.extractOrgEntities(entries, client);
+        const profile = scanned.profile;
         let fromAI = { departments: [], designations: [], processes: [], goods: [] };
         let aiUsed = false;
 
         if (window.AI_SERVICE && window.AI_SERVICE.callProxyAPI) {
             try {
                 const response = await window.AI_SERVICE.callProxyAPI(
-                    buildExtractPrompt(client, buildDocCorpusText(entries)),
+                    buildExtractPrompt(client, buildDocCorpusText(entries), profile),
                     { maxTokens: 8192 }
                 );
                 fromAI = parseExtractResponse(response);
@@ -618,15 +645,21 @@
         EXTRACT_ORDER.forEach(kind => {
             const cfg = KINDS[kind];
             const merged = mergeExtracted(scanned[kind], fromAI[kind], cfg);
+            // The size profile is a hard ceiling on both sources — the model is
+            // asked to respect it, but nothing stops it returning more.
             _extracted[kind] = dedupeAgainstExisting(merged, client[cfg.field] || [], cfg.keyOf)
+                .slice(0, profile.caps[kind] || 12)
                 .map(row => Object.assign(row, { _include: !row._existing }));
         });
 
-        renderExtractReview(entries.length, aiUsed);
+        renderExtractReview(entries.length, aiUsed, profile);
     };
 
-    function renderExtractReview(docCount, aiUsed) {
+    function renderExtractReview(docCount, aiUsed, profile) {
         const total = EXTRACT_ORDER.reduce((t, k) => t + _extracted[k].filter(r => r._include).length, 0);
+        const sizeNote = profile
+            ? `Sized for a ${profile.band} organisation${profile.employees ? ` (${profile.employees} employees` : ' (headcount not recorded'}, ${profile.sites} site${profile.sites === 1 ? '' : 's'}).`
+            : '';
 
         const section = kind => {
             const cfg = KINDS[kind];
@@ -685,7 +718,7 @@
             <div style="font-size: 0.86rem; color: var(--text-secondary);">
                 Read ${docCount} document(s)${aiUsed ? ' with an AI pass over the text' : ' (text scan only)'} ·
                 <strong style="color: var(--text-primary);" id="extract-count">${total}</strong> entries selected.
-                Anything already in Account Setup is unticked so nothing is added twice.
+                ${esc(sizeNote)} Anything already in Account Setup is unticked so nothing is added twice.
             </div>
         </div>
         <div style="max-height: 52vh; overflow: auto; padding-right: 4px;">
