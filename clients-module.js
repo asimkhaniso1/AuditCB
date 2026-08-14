@@ -1187,9 +1187,25 @@ function getClientDocumentsHTML(client) {
                 <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: var(--text-secondary);">System manuals, procedures, and documents provided by the client for audit preparation</p>
             </div>
             ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
-                <button class="btn btn-primary btn-sm" data-action="openClientDocumentModal" data-id="${client.id}" aria-label="Upload to cloud">
-                    <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Add Document
-                </button>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    ${docs.length > 0 ? `
+                    <button class="btn btn-secondary btn-sm" data-action="openDocumentGapAnalysis" data-id="${client.id}" aria-label="Document gap analysis">
+                        <i class="fa-solid fa-chart-pie" style="margin-right: 0.5rem;"></i> Gap Analysis
+                    </button>
+                    <button class="btn btn-secondary btn-sm" data-action="extractOrgSetupFromDocs" data-id="${client.id}" aria-label="Extract account setup from documents">
+                        <i class="fa-solid fa-diagram-project" style="margin-right: 0.5rem;"></i> Extract Setup
+                    </button>
+                    <button class="btn btn-secondary btn-sm" data-action="buildChecklistFromClientDocs" data-id="${client.id}" aria-label="Build checklist from documents">
+                        <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i> Build Checklist
+                    </button>
+                    ` : ''}
+                    <button class="btn btn-secondary btn-sm" data-action="openBulkDocumentUpload" data-id="${client.id}" aria-label="Bulk upload documents">
+                        <i class="fa-solid fa-folder-tree" style="margin-right: 0.5rem;"></i> Bulk Upload
+                    </button>
+                    <button class="btn btn-primary btn-sm" data-action="openClientDocumentModal" data-id="${client.id}" aria-label="Upload to cloud">
+                        <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Add Document
+                    </button>
+                </div>
                 ` : ''}
         </div>
             
@@ -1235,7 +1251,10 @@ function getClientDocumentsHTML(client) {
                     <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">No documents uploaded for this client yet.</p>
                     <p style="color: #94a3b8; font-size: 0.82rem; margin-bottom: 1rem;">Upload system manuals, procedures, org charts and other documents to help prepare custom checklists.</p>
                     ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
-                    <button class="btn btn-outline-primary btn-sm" data-action="openClientDocumentModal" data-id="${client.id}">Add First Document</button>
+                    <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                        <button class="btn btn-primary btn-sm" data-action="openBulkDocumentUpload" data-id="${client.id}"><i class="fa-solid fa-folder-tree" style="margin-right: 0.4rem;"></i>Bulk Upload a Folder or ZIP</button>
+                        <button class="btn btn-outline-primary btn-sm" data-action="openClientDocumentModal" data-id="${client.id}">Add First Document</button>
+                    </div>
                     ` : ''}
                 </div>
             `}

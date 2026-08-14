@@ -1071,6 +1071,8 @@ function openModal(title, body, onSave) {
 function closeModal() {
     document.getElementById('modal-overlay').classList.add('hidden');
     // Reset modal content
+    const _modalContent = document.querySelector('.modal-content');
+    if (_modalContent) _modalContent.classList.remove('modal-wide');
     document.getElementById('modal-title').textContent = 'Modal Title';
     document.getElementById('modal-body').innerHTML = '';
     document.getElementById('modal-save').onclick = null;

@@ -451,6 +451,7 @@ window.getClientDepartmentsHTML = function (client) {
         <div class="org-table-header">
             <h3><i class="fa-solid fa-sitemap" style="color: #f59e0b;"></i> Departments <span class="count-badge">${departments.length}</span></h3>
             <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-outline-secondary" data-action="openAISuggestModal" data-arg1="${client.id}" data-arg2="departments" aria-label="AI suggestions"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest</button>
                 <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDepartments" data-id="${client.id}" aria-label="Upload"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
                 <button class="btn btn-sm" style="background:#f59e0b;color:white;border:none;border-radius:8px" data-action="addDepartment" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i> Add</button>
             </div>
@@ -485,6 +486,7 @@ window.getClientGoodsServicesHTML = function (client) {
         <div class="org-table-header">
             <h3><i class="fa-solid fa-boxes-stacked" style="color: #10b981;"></i> Goods & Services <span class="count-badge">${items.length}</span></h3>
             <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-outline-secondary" data-action="openAISuggestModal" data-arg1="${client.id}" data-arg2="goods" aria-label="AI suggestions"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest</button>
                 <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadGoodsServices" data-id="${client.id}" aria-label="Upload"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
                 <button class="btn btn-sm" style="background:#10b981;color:white;border:none;border-radius:8px" data-action="addGoodsService" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i> Add</button>
             </div>
@@ -516,6 +518,7 @@ window.getClientKeyProcessesHTML = function (client) {
         <div class="org-table-header">
             <h3><i class="fa-solid fa-gears" style="color: #6366f1;"></i> Key Processes <span class="count-badge">${processes.length}</span></h3>
             <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-outline-secondary" data-action="openAISuggestModal" data-arg1="${client.id}" data-arg2="processes" aria-label="AI suggestions"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest</button>
                 <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadKeyProcesses" data-id="${client.id}" aria-label="Upload"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
                 <button class="btn btn-sm" style="background:#6366f1;color:white;border:none;border-radius:8px" data-action="addKeyProcess" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i> Add</button>
             </div>
@@ -548,6 +551,7 @@ window.getClientDesignationsHTML = function (client) {
         <div class="org-table-header">
             <h3><i class="fa-solid fa-id-badge" style="color: #ec4899;"></i> Designations <span class="count-badge">${designations.length}</span></h3>
             <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-outline-secondary" data-action="openAISuggestModal" data-arg1="${client.id}" data-arg2="designations" aria-label="AI suggestions"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest</button>
                 <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDesignations" data-id="${client.id}" aria-label="Upload"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
                 <button class="btn btn-sm" style="background:#ec4899;color:white;border:none;border-radius:8px" data-action="addClientDesignation" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i> Add</button>
             </div>

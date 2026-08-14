@@ -1648,6 +1648,9 @@ window.renderConfigureChecklist = async function (planId) {
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <button class="btn btn-outline-secondary" data-action="viewAuditPlan" data-id="${planId}">Cancel</button>
+                <button class="btn" style="background: #7c3aed; color: white; border: none;" data-action="createClientChecklistForPlan" data-id="${planId}" aria-label="Build from Client Documents">
+                    <i class="fa-solid fa-file-circle-check"></i> Build from Client Documents
+                </button>
                 <button class="btn" style="background: #7c3aed; color: white; border: none;" data-action="reviewMergedQuestions" data-id="${planId}">
                     <i class="fa-solid fa-magnifying-glass-chart"></i> Review & Merge Questions
                 </button>
@@ -1686,10 +1689,15 @@ window.renderConfigureChecklist = async function (planId) {
                     <div style="margin-bottom: 2rem; padding: 1.5rem; background: #faf5ff; border: 2px dashed #c4b5fd; border-radius: 12px; text-align: center;">
                         <i class="fa-solid fa-building" style="font-size: 2rem; color: #7c3aed; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0 0 0.25rem; color: #7c3aed;">${plan.client} &mdash; No Custom Checklists Yet</h4>
-                        <p style="margin: 0 0 1rem; font-size: 0.85rem; color: #6b7280;">Create a tailored checklist from the Knowledge Base for this client</p>
-                        <button class="btn btn-sm" style="background: #7c3aed; color: white; border: none;" data-action="_goToKB" aria-label="Auto-generate">
-                            <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>Create from Knowledge Base
-                        </button>
+                        <p style="margin: 0 0 1rem; font-size: 0.85rem; color: #6b7280;">Built from the documents ${plan.client} supplied and their organisation context</p>
+                        <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                            <button class="btn btn-sm" style="background: #7c3aed; color: white; border: none;" data-action="createClientChecklistForPlan" data-id="${planId}" aria-label="Build from Client Documents">
+                                <i class="fa-solid fa-file-circle-check" style="margin-right: 0.25rem;"></i>Build from Client Documents
+                            </button>
+                            <button class="btn btn-sm btn-secondary" data-action="_goToKB" aria-label="Use Knowledge Base instead">
+                                Use Knowledge Base instead
+                            </button>
+                        </div>
                     </div>
                 `}
                 ${renderGroup('Global Checklists', globalChecklists, 'fa-solid fa-globe', '#0369a1')}
@@ -2098,6 +2106,9 @@ window.saveAuditPlan = saveAuditPlan;
 window.editAuditPlan = editAuditPlan;
 window.viewAuditPlan = viewAuditPlan;
 window.openChecklistSelectionModal = window.renderConfigureChecklist; // Legacy alias
+// The Review & Merge Questions screen's Back/Cancel buttons use this action name;
+// without the alias the delegator finds no handler and the buttons do nothing.
+window.configureChecklists = window.renderConfigureChecklist;
 
 window.printAuditPlanDetails = function (planId) {
     const plan = state.auditPlans.find(p => p.id === planId);
@@ -3005,6 +3016,9 @@ window.renderPreAuditReview = function (planId) {
                     </p>
                 </div>
                 <div style="display: flex; gap: 1rem;">
+                    <button class="btn btn-outline-primary" data-action="mapClientDocsToPreAudit" data-id="${plan.id}" aria-label="Map client documents" title="Match the client's uploaded documents to these Stage 1 items">
+                        <i class="fa-solid fa-diagram-project" style="margin-right: 0.5rem;"></i> Map Client Docs
+                    </button>
                     <button class="btn btn-outline-primary" data-action="exportPreAuditPDF" data-id="${plan.id}" aria-label="Export PDF">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Export PDF
                     </button>

@@ -483,18 +483,12 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
     const modalContent = document.getElementById('modal-body');
     if (!modalContent) return;
 
-    // Build client options for context selector — only clients with matching standards
-    const clients = window.state.clients || [];
-    const kb = window.state.knowledgeBase;
-    const kbDoc = kb?.standards?.find(d => _idEq(d.id, docId));
-    const docISONumbers = (kbDoc?.name || '').match(/\d{4,5}/g) || [];
-    const matchingClients = clients.filter(c => {
-        if (!c.standard || docISONumbers.length === 0) return true;
-        const clientISO = (c.standard || '').match(/\d{4,5}/g) || [];
-        return clientISO.some(n => docISONumbers.includes(n));
-    });
-    const clientOptions = matchingClients.map(c =>
-        `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)}${c.industry ? ' (' + c.industry + ')' : ''}</option>`
+    // Build client options for context selector — all clients, sorted by name
+    const clients = (window.state.clients || []).slice().sort((a, b) =>
+        (a.name || '').localeCompare(b.name || '')
+    );
+    const clientOptions = clients.map(c =>
+        `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)}${c.industry ? ' (' + window.UTILS.escapeHtml(c.industry) + ')' : ''}</option>`
     ).join('');
 
     modalContent.innerHTML = `
@@ -1438,6 +1432,10 @@ function getBuiltInClauses(standardName) {
 
     return iso9001Clauses; // Default fallback
 }
+
+// Exposed so the document gap analysis can fall back to these when a standard
+// has not been analysed into the Knowledge Base yet.
+window.getBuiltInClauses = getBuiltInClauses;
 
 // Lookup clause text from Knowledge Base (for NCR generation)
 window.lookupClauseText = function (standardName, clauseNumber) {
