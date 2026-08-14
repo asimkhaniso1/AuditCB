@@ -647,7 +647,7 @@
         const renderEvThumbs = (item) => {
             const imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
             if (!imgs.length) return '';
-            return `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${imgs.map(url => `<img src="${url}" style="height:50px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" data-action="open" data-arg1="${url}" data-arg2="_blank">`).join('')}</div>`;
+            return `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${imgs.map(url => `<img src="${url}" data-ev-thumb="1" style="height:50px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" data-action="open" data-arg1="${url}" data-arg2="_blank">`).join('')}</div>`;
         };
 
         const ncRows = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() !== 'observation' && (i.ncrType || '').toLowerCase() !== 'ofi').map((item, idx) => {
@@ -2274,7 +2274,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const renderEvThumbs = (item) => {
                     const imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
                     if (!imgs.length) return '';
-                    return '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' + imgs.map(src => '<img src="' + src + '" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" data-action="openImageInNewTab">').join('') + '</div>';
+                    return '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' + imgs.map(src => '<img src="' + src + '" data-ev-thumb="1" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" data-action="openImageInNewTab">').join('') + '</div>';
                 };
                 const conformItems = d.hydratedProgress.filter(i => i.status === 'conform');
                 conformSec.innerHTML = conformItems.map((item, idx) => {
@@ -3052,7 +3052,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // padding so content never underlaps them. "Page X of Y" is not achievable this way
             // (no live page count in Chrome print CSS) — the footer shows report ref + confidentiality
             // classification instead of a fake/static page count.
-            +   'body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10pt;padding-top:20mm;padding-bottom:16mm;}'
+            +   'body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10pt;padding-top:0;padding-bottom:0;}'
             +   '.rpt-hdr,.rpt-ftr{display:flex !important;}'
             +   '.page-break{page-break-before:always;}'
             +   '.no-print{display:none !important;}'
@@ -3079,15 +3079,31 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // allows that) — this is the pragmatic choice over per-row height thresholds, which
             // Chrome's print engine can't evaluate reliably at layout time anyway.
             +   '.f-tbl td{max-height:none;}'
-            +   '@page{size:A4;margin:24mm 14mm 22mm 14mm;}'
+            +   '@page{size:A4;margin:20mm 14mm 16mm 14mm;}'
             + '}'
-            + '.rpt-hdr{display:none;position:fixed;top:0;left:0;right:0;height:18mm;background:white;color:#1e293b;padding:3mm 12mm;align-items:center;justify-content:space-between;font-size:0.72rem;z-index:100;border-bottom:1px solid #e2e8f0;}'
-            + '.rpt-hdr-left{display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.82rem;color:#1e3a5f;max-width:30%;overflow:hidden;}'
-            + '.rpt-hdr-logo{height:36px;max-width:160px;object-fit:contain;border-radius:3px;}'
+            // The running header is 18mm tall with 3mm of vertical padding, so its
+            // content box is only ~12mm (≈34px). A 36px logo did not fit and was
+            // clipped along with the text beside it; 24px sits inside the box with
+            // room for descenders. min-width:0 + ellipsis lets a long certification
+            // body name truncate cleanly instead of being sliced mid-glyph by
+            // overflow:hidden.
+            + '.rpt-hdr{display:none;position:fixed;top:-20mm;left:0;right:0;height:16mm;background:white;color:#1e293b;padding:2mm 0;align-items:center;justify-content:space-between;font-size:0.72rem;line-height:1.25;z-index:100;border-bottom:1px solid #e2e8f0;overflow:hidden;}'
+            + '.rpt-hdr-left{display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.78rem;color:#1e3a5f;max-width:34%;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}'
+            + '.rpt-hdr-left span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}'
+            + '.rpt-hdr-logo{height:24px;max-width:140px;object-fit:contain;border-radius:3px;flex-shrink:0;}'
             + '.rpt-hdr-logo-fallback{width:24px;height:24px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:#1d4ed8;}'
             + '.rpt-hdr-center{text-align:center;flex:1;font-size:0.68rem;color:#475569;letter-spacing:0.3px;text-transform:uppercase;}'
             + '.rpt-hdr-right{text-align:right;font-size:0.68rem;color:#64748b;}'
-            + '.rpt-ftr{display:none;position:fixed;bottom:0;left:0;right:0;height:14mm;border-top:2px solid #1d4ed8;padding:2mm 12mm;align-items:center;justify-content:space-between;font-size:0.65rem;color:#64748b;background:white;z-index:100;}'
+            // Status pills are inline spans carrying vertical padding. On an inline
+            // box that padding does not grow the line box, so the coloured
+            // background bled over the rows above and below wherever a cell wrapped
+            // to more than one line. inline-block makes the padding count toward
+            // layout. Matched on the shared border-radius rather than a class
+            // because the pills are built inline in ~30 row templates.
+            + 'td span[style*="border-radius:12px"],td span[style*="border-radius: 12px"],'
+            + 'td span[style*="border-radius:999px"],th span[style*="border-radius:12px"]'
+            + '{display:inline-block;line-height:1.3;vertical-align:middle;white-space:nowrap;}'
+            + '.rpt-ftr{display:none;position:fixed;bottom:-16mm;left:0;right:0;height:12mm;border-top:2px solid #1d4ed8;padding:2mm 0;align-items:center;justify-content:space-between;font-size:0.65rem;color:#64748b;background:white;z-index:100;}'
             + '.rpt-ftr-left{font-weight:500;color:#1e3a5f;font-size:0.65rem;max-width:35%;}'
             + '.rpt-ftr-center{flex:1;text-align:center;font-size:0.58rem;color:#94a3b8;font-style:italic;padding:0 6px;}'
             + '.rpt-ftr-right{text-align:right;font-weight:700;color:#1e3a5f;font-size:0.68rem;white-space:nowrap;}'
@@ -3473,10 +3489,27 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // photographic-free flat vector renders, so JPEG at 0.85 is visually lossless here but far
             // smaller than PNG. JPEG has no alpha channel, so the canvas is first drawn onto a white-backed
             // offscreen canvas at device scale to avoid black-background artifacts.
+            // Chart.js sizes its backing store at devicePixelRatio, so an 800x500
+            // chart box rasterised at 1600x1000 — roughly 130KB of JPEG each, and
+            // ~2MB of a 4.7MB report, for images printed about 200px tall. Cap the
+            // long edge at 800px: still ~2x the printed size at 300dpi, a quarter
+            // of the pixels.
             + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{'
-            +   'var off=document.createElement("canvas");off.width=cv.width;off.height=cv.height;'
-            +   'var octx=off.getContext("2d");octx.fillStyle="#ffffff";octx.fillRect(0,0,off.width,off.height);octx.drawImage(cv,0,0);'
-            +   'var im=document.createElement("img");im.src=off.toDataURL("image/jpeg",0.85);im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);'
+            +   'var CAP=800;var sc=Math.min(1,CAP/Math.max(cv.width||1,cv.height||1));'
+            +   'var off=document.createElement("canvas");off.width=Math.max(1,Math.round(cv.width*sc));off.height=Math.max(1,Math.round(cv.height*sc));'
+            +   'var octx=off.getContext("2d");octx.fillStyle="#ffffff";octx.fillRect(0,0,off.width,off.height);'
+            +   'octx.imageSmoothingQuality="high";octx.drawImage(cv,0,0,off.width,off.height);'
+            +   'var im=document.createElement("img");im.src=off.toDataURL("image/jpeg",0.82);im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);'
+            + '}catch(e){}});'
+            // Evidence photos are embedded at capture resolution but printed as
+            // ~50px thumbnails. Re-encode them down to their printed size too.
+            +   'document.querySelectorAll("img[data-ev-thumb]").forEach(function(im){try{'
+            +     'if(!im.naturalWidth||im.naturalWidth<=320)return;'
+            +     'var s=Math.min(1,320/im.naturalWidth);'
+            +     'var oc=document.createElement("canvas");oc.width=Math.round(im.naturalWidth*s);oc.height=Math.round(im.naturalHeight*s);'
+            +     'var ox=oc.getContext("2d");ox.fillStyle="#ffffff";ox.fillRect(0,0,oc.width,oc.height);'
+            +     'ox.imageSmoothingQuality="high";ox.drawImage(im,0,0,oc.width,oc.height);'
+            +     'im.src=oc.toDataURL("image/jpeg",0.8);'
             + '}catch(e){}});window._chartsReady=true;},2500);'
             + '}function _waitForChart(){if(typeof Chart!=="undefined"){rc();}else{setTimeout(_waitForChart,100);}}_waitForChart();'
             // Wire up data-action buttons (Download PDF, Close) — parent's event delegator does not run in this window
