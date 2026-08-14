@@ -3340,6 +3340,38 @@ window.renderPreAuditReview = function (planId) {
 /**
  * Update Pre-Audit item status
  */
+/**
+ * Save pre-audit data locally AND to the cloud.
+ *
+ * saveState() only writes IndexedDB. The cloud loader maps
+ * `pre_audit || data.preAudit` onto the plan and Object.assigns it over the
+ * local copy, so anything recorded here — statuses, notes, the AI document
+ * review summary and its focus points — was silently discarded the next time
+ * plans synced. Writes both the dedicated column and the data blob, since the
+ * loader reads the column first. Debounced because the status dropdowns call
+ * it on every change.
+ */
+let _preAuditSaveTimer = null;
+window.persistPreAudit = function (planId) {
+    const plan = window.DataService.findAuditPlan(planId);
+    if (!plan) return;
+    window.saveState();
+
+    clearTimeout(_preAuditSaveTimer);
+    _preAuditSaveTimer = setTimeout(async () => {
+        if (!window.SupabaseClient || !window.SupabaseClient.isInitialized) return;
+        try {
+            await window.SupabaseClient.db.update('audit_plans', String(plan.id), {
+                data: plan,
+                pre_audit: plan.preAudit || null,
+                updated_at: new Date().toISOString()
+            });
+        } catch (e) {
+            if (window.Logger) window.Logger.error('Planning', 'Pre-audit cloud save failed: ' + e.message);
+        }
+    }, 800);
+};
+
 window.updatePreAuditItem = function (planId, itemId, status) {
     const plan = window.DataService.findAuditPlan(planId);
     if (!plan || !plan.preAudit) return;
@@ -3349,8 +3381,8 @@ window.updatePreAuditItem = function (planId, itemId, status) {
     }
     plan.preAudit.documentReview[itemId].status = status;
 
-    // Auto-save
-    window.saveState();
+    // Auto-save (local + cloud)
+    window.persistPreAudit(planId);
 };
 
 // ============================================
@@ -3412,7 +3444,7 @@ window.applyPreAuditBulkStatus = function (planId) {
             plan.preAudit.documentReview[id].status = status;
         });
         if (plan.preAudit.status === 'Not Started') plan.preAudit.status = 'In Progress';
-        window.saveState();
+        window.persistPreAudit(planId);
         window.showNotification(`${ids.length} item${ids.length === 1 ? '' : 's'} set to ${label}`, 'success');
         window.renderPreAuditReview(planId);
     };
@@ -3440,8 +3472,8 @@ window.updatePreAuditNotes = function (planId, itemId, notes) {
     }
     plan.preAudit.documentReview[itemId].notes = notes;
 
-    // Auto-save
-    window.saveState();
+    // Auto-save (local + cloud)
+    window.persistPreAudit(planId);
 };
 
 /**
@@ -3452,7 +3484,7 @@ window.updateReadinessDecision = function (planId, decision) {
     if (!plan || !plan.preAudit) return;
 
     plan.preAudit.readinessDecision = decision;
-    window.saveState();
+    window.persistPreAudit(planId);
 };
 
 /**
@@ -3463,7 +3495,7 @@ window.updateReadinessNotes = function (planId, notes) {
     if (!plan || !plan.preAudit) return;
 
     plan.preAudit.notes = notes;
-    window.saveState();
+    window.persistPreAudit(planId);
 };
 
 /**
@@ -3474,7 +3506,7 @@ window.savePreAuditReview = function (planId) {
     if (!plan || !plan.preAudit) return;
 
     plan.preAudit.status = 'In Progress';
-    window.saveState();
+    window.persistPreAudit(planId);
     window.showNotification('Pre-Audit review saved successfully', 'success');
 };
 
@@ -3496,7 +3528,7 @@ window.completePreAuditReview = function (planId) {
     plan.preAudit.completedDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
     plan.preAudit.completedBy = window.state.currentUser?.name || 'Auditor';
 
-    window.saveState();
+    window.persistPreAudit(planId);
     window.showNotification('Pre-Audit review completed successfully', 'success');
 
     // Return to audit plan view

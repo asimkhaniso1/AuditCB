@@ -2114,7 +2114,7 @@
         plan.preAudit.focusPoints = _aiReview.result.focusPoints;
         if (plan.preAudit.status === 'Not Started') plan.preAudit.status = 'In Progress';
 
-        window.saveData();
+        persistPlan(plan);
         setWideModal(false);
         window.closeModal();
         notify(
@@ -2150,7 +2150,7 @@
         // Same persistence path savePreAuditReview uses — plans ride along with
         // the app state rather than syncing individually.
         if (plan.preAudit.status === 'Not Started') plan.preAudit.status = 'In Progress';
-        window.saveData();
+        persistPlan(plan);
 
         setWideModal(false);
         window.closeModal();
@@ -2286,11 +2286,20 @@
         return plan;
     }
 
-    /** Persist a mutated plan the way planning-module.js does. */
+    /**
+     * Persist a mutated plan locally and to the cloud.
+     * pre_audit is written as its own column as well as inside the data blob,
+     * because the cloud loader reads `pre_audit || data.preAudit` and then
+     * overwrites the local plan — a data-only write would be lost on the next sync.
+     */
     async function persistPlan(plan) {
         try {
-            if (window.SupabaseClient && window.SupabaseClient.db) {
-                await window.SupabaseClient.db.update('audit_plans', String(plan.id), { data: plan });
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized && window.SupabaseClient.db) {
+                await window.SupabaseClient.db.update('audit_plans', String(plan.id), {
+                    data: plan,
+                    pre_audit: plan.preAudit || null,
+                    updated_at: new Date().toISOString()
+                });
             }
         } catch (err) {
             if (window.Logger) window.Logger.error('ClientDocsBulk', 'Plan sync failed: ' + err.message);
