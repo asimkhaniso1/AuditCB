@@ -1562,6 +1562,29 @@ Answer:`;
   .b4-glance-strip { grid-template-columns: repeat(4, 1fr); break-inside: avoid; }
 }
 
+/* Print tables: nine columns on a 180mm page left the prose columns squeezed to
+   their minimum, wrapping "Define or update the process..." one word per line
+   and running rows down the page. Uppercase headers with 0.07em letter-spacing
+   and 14px side padding were claiming that width for columns holding a pip or a
+   date. Tightening both hands the slack back to the text columns — on a
+   nine-column table it returns roughly 25mm of usable width — and stops long
+   headings such as LIKELIHOOD / IMPACT colliding with their neighbours. */
+@media print {
+  .b4-tbl thead th {
+    padding: 6px 7px;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    overflow-wrap: break-word;
+  }
+  .b4-tbl tbody td {
+    padding: 6px 7px;
+    overflow-wrap: break-word;
+  }
+  /* Columns holding only a pip, badge, score or date should take what they need
+     and no more, so the remaining width goes to the prose. */
+  .b4-tbl td:has(> .b4-pill), .b4-tbl td:has(> .b4-badge) { white-space: nowrap; width: 1%; }
+}
+
 /* ---------- Board Decision Brief (top of exec-summary body) ---------- */
 .b4-board-brief {
   border: 1px solid var(--b4-line);
