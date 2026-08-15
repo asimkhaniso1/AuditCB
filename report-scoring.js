@@ -150,6 +150,9 @@
     // published as a hard number. Below this, we show "insufficient sample" rather
     // than let 1-2 items swing a headline score to 1.0 or 5.0.
     const MIN_SAMPLE_N = 3;
+    // Dimensions that must clear MIN_SAMPLE_N before an overall maturity level
+    // is reported at all.
+    const MIN_MATURITY_DIMENSIONS = 3;
     // James-Stein-style shrinkage strength: larger k pulls small samples harder
     // toward the audit-wide mean; effect fades out as n grows.
     const SHRINK_K = 5;
@@ -257,8 +260,17 @@
             meta[dim] = { n, insufficient: false, raw, shrunk };
             sum += level; count++;
         });
-        maturity.overall = count > 0 ? round(sum / count) : null;
+        // An "overall management system maturity" headline has to rest on more
+        // than one dimension. With five of six dimensions below the sample
+        // threshold, sum/count returned the single surviving dimension's level
+        // and captioned it "Level 5 — Optimized", reading as a system-wide
+        // verdict drawn from one theme. Same principle the dimensions already
+        // apply to thin samples, raised to the headline.
+        const dimensionTotal = Object.keys(MATURITY_DIMENSIONS).length;
+        const enoughDimensions = count >= MIN_MATURITY_DIMENSIONS;
+        maturity.overall = (count > 0 && enoughDimensions) ? round(sum / count) : null;
         maturity.interpretation = maturity.overall != null ? (MATURITY_INTERPRETATION[clamp(Math.round(maturity.overall), 1, 5)] || null) : null;
+        maturity.basis = { scored: count, total: dimensionTotal, sufficient: enoughDimensions };
         maturity.meta = meta;
         return maturity;
     }
@@ -1000,10 +1012,19 @@
         if (!hasAny) return { bodyHtml: insufficientDataHtml('No maturity data could be derived from this audit\'s checklist coverage.'), charts: [] };
 
         const bars = dims.map((k) => maturityBarHtml(k, m[k], m.meta?.[k])).join('');
+        // Always state what the headline rests on. A level derived from one
+        // dimension out of six is not a system-wide verdict, and when it is
+        // withheld the reader needs to know why rather than seeing a bare dash.
+        const basis = m.basis || {};
+        const basisNote = basis.total
+            ? `${basis.scored} of ${basis.total} dimensions had enough sampled items to score`
+            : '';
         const headline = `<div class="b4-card b4-kpi-card--accent" style="text-align:center;break-inside:avoid;padding:var(--b4-s4);">
-            <div class="b4-kpi-value">${m.overall != null ? m.overall.toFixed(1) : '—'}<span class="b4-kpi-value-unit">/5</span></div>
+            <div class="b4-kpi-value">${m.overall != null ? m.overall.toFixed(1) : 'N/A'}${m.overall != null ? '<span class="b4-kpi-value-unit">/5</span>' : ''}</div>
             <div class="b4-kpi-label">Overall Management System Maturity</div>
             ${m.interpretation ? `<div class="b4-kpi-sub">${esc(m.interpretation)}</div>` : ''}
+            ${m.overall == null && basis.total ? `<div class="b4-kpi-sub">Not reported — ${basisNote}. A maturity level needs at least ${MIN_MATURITY_DIMENSIONS}.</div>` : ''}
+            ${basisNote ? `<div class="b4-caption b4-mt-2">Based on ${esc(basisNote)}.</div>` : ''}
         </div>`;
 
         const radarLabels = dims.filter((k) => m[k] != null);
