@@ -1005,6 +1005,25 @@ window.finalizeAndPublish = function (reportId) {
     const scopeText = report.scope || report.auditScope || (plan && (plan.auditObjectives || plan.scope || plan.auditCriteria));
     if (!scopeText) blockers.push('Audit scope/criteria is not recorded on the report or linked audit plan.');
 
+    // Lead auditor: fall back to the linked plan, mirroring the scope check above.
+    // report.leadAuditor is only backfilled when the report PREVIEW is opened
+    // (execution-reporting.js:320-331), so finalizing without having opened the preview
+    // blocked on a name the plan already holds. Resolve and persist it here instead.
+    if (!report.leadAuditor && plan) {
+        const auditors = (window.state && window.state.auditors) || [];
+        const resolveName = function (v) {
+            if (!v) return '';
+            if (typeof v === 'object') return v.name || '';
+            const a = auditors.find(x => String(x.id) === String(v));
+            return a ? a.name : String(v);
+        };
+        report.leadAuditor = resolveName(plan.leadAuditor)
+            || resolveName(plan.lead)
+            || resolveName(plan.teamIds && plan.teamIds[0])
+            || resolveName(plan.team && plan.team[0])
+            || '';
+    }
+
     if (!report.leadAuditor) blockers.push('Lead auditor is not set on the report.');
 
     let rs = null;
