@@ -846,9 +846,14 @@
             var provenance = hasReal
                 ? '<div class="b4-caption b4-mt-2">' + iconSafe('check', { size: 12 }) + 'Recorded by auditor' + (rec.raisedBy ? ' (' + esc(rec.raisedBy) + ')' : '') + '</div>'
                 : '<div class="b4-caption b4-mt-2">' + iconSafe('finding', { size: 12 }) + 'Working hypothesis (rule-generated draft) — auditor review required</div>';
+            // The rule-generated "immediate cause" is the finding text with a
+            // prefix, so rendering it under its own heading printed the same
+            // paragraph twice in every finding card. Only show this step when the
+            // auditor recorded an actual correction, which says something the
+            // finding does not.
             var chain = '<div class="b4-timeline">'
                 + flowStep('Finding', (f.clause ? 'Clause ' + f.clause + ' — ' : '') + cleanFindingText(f.text || 'Non-conformance identified'))
-                + flowStep(hasReal && rec.correction ? 'Correction' : 'Immediate Cause', immediateCause)
+                + (hasReal && rec.correction ? flowStep('Correction', immediateCause) : '')
                 + flowStep('Root Cause', rootCauseText, 'warn')
                 + flowStep('Business Impact', f.businessImpacts.join(', '))
                 + flowStep('Corrective Action', correctiveActionText, 'good')
