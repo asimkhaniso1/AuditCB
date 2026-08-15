@@ -2854,13 +2854,23 @@ window.navigateToReporting = function (planId) {
         return;
     }
 
-    // Switch to reporting tab
+    // Switch to reporting. Clicking the global sidebar entry only works from the
+    // global shell — inside a client workspace that element does not exist, so
+    // the button silently did nothing. Fall back to rendering the module
+    // directly, which works in both shells.
     const tab = document.querySelector('[data-module="audit-reporting"]');
-    if (tab) tab.click();
+    if (tab) {
+        tab.click();
+    } else if (typeof window.renderModule === 'function') {
+        window.renderModule('audit-reporting');
+    } else {
+        window.location.hash = 'audit-reporting';
+    }
 
     setTimeout(() => {
         if (window.openReportingDetail) window.openReportingDetail(report.id);
-    }, 200);
+        else window.showNotification('Reporting module is still loading — try again in a moment.', 'warning');
+    }, 250);
 };
 window.updateClientDetails = updateClientDetails;
 window.autoCalculateDays = autoCalculateDays;
