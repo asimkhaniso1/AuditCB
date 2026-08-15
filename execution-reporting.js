@@ -3077,6 +3077,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             +   '.no-print{display:none !important;}'
             +   '.section-card,tr,thead{break-inside:avoid;}'
             +   'thead{display:table-header-group;}'
+            +   'tfoot{display:table-footer-group;}'
             +   '.sh{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;page-break-after:avoid;break-after:avoid;page-break-inside:avoid;break-inside:avoid;}'
             +   '.sb{page-break-before:avoid;break-before:avoid;}'
             +   (d.report.reportStatus === 'draft' ? '.watermark{display:flex !important;}' : '')
@@ -3106,7 +3107,16 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // room for descenders. min-width:0 + ellipsis lets a long certification
             // body name truncate cleanly instead of being sliced mid-glyph by
             // overflow:hidden.
-            + '.rpt-hdr{display:none;position:fixed;top:-20mm;left:0;right:0;height:16mm;background:white;color:#1e293b;padding:2mm 0;align-items:center;justify-content:space-between;font-size:0.72rem;line-height:1.25;z-index:100;border-bottom:1px solid #e2e8f0;overflow:hidden;}'
+            // The running header/footer are rows of a table that wraps the whole
+            // report, NOT position:fixed elements. Measured in Chrome: a fixed element
+            // in print anchors to the page CONTENT BOX (inside the @page margins) and a
+            // negative offset does not escape into the margin — it wraps by the page-area
+            // height, so top:-20mm painted the header at ~261mm, i.e. straight through the
+            // body text. thead/table-header-group repeats per page and reserves its space
+            // in flow, so content genuinely starts below it on every page.
+            + '.rpt-running{width:100%;border-collapse:collapse;}'
+            + '.rpt-running > thead > tr > td,.rpt-running > tfoot > tr > td,.rpt-running > tbody > tr > td{padding:0;}'
+            + '.rpt-hdr{display:none;height:16mm;background:white;color:#1e293b;padding:2mm 0;align-items:center;justify-content:space-between;font-size:0.72rem;line-height:1.25;border-bottom:1px solid #e2e8f0;overflow:hidden;}'
             + '.rpt-hdr-left{display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.78rem;color:#1e3a5f;max-width:34%;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}'
             + '.rpt-hdr-left span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}'
             + '.rpt-hdr-logo{height:24px;max-width:140px;object-fit:contain;border-radius:3px;flex-shrink:0;}'
@@ -3122,7 +3132,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + 'td span[style*="border-radius:12px"],td span[style*="border-radius: 12px"],'
             + 'td span[style*="border-radius:999px"],th span[style*="border-radius:12px"]'
             + '{display:inline-block;line-height:1.3;vertical-align:middle;white-space:nowrap;}'
-            + '.rpt-ftr{display:none;position:fixed;bottom:-16mm;left:0;right:0;height:12mm;border-top:2px solid #1d4ed8;padding:2mm 0;align-items:center;justify-content:space-between;font-size:0.65rem;color:#64748b;background:white;z-index:100;}'
+            + '.rpt-ftr{display:none;height:12mm;border-top:2px solid #1d4ed8;padding:2mm 0;align-items:center;justify-content:space-between;font-size:0.65rem;color:#64748b;background:white;}'
             + '.rpt-ftr-left{font-weight:500;color:#1e3a5f;font-size:0.65rem;max-width:35%;}'
             + '.rpt-ftr-center{flex:1;text-align:center;font-size:0.58rem;color:#94a3b8;font-style:italic;padding:0 6px;}'
             + '.rpt-ftr-right{text-align:right;font-weight:700;color:#1e3a5f;font-size:0.68rem;white-space:nowrap;}'
@@ -3174,8 +3184,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     ? '<div class="watermark"><span style="color:rgba(220,38,38,0.16);font-size:48pt;">MODIFIED SINCE ISSUE</span></div>'
                     : '<div class="watermark"><span>CONFIDENTIAL</span></div>'))
             + (modifiedSinceIssue ? '<div class="no-print" style="position:sticky;top:0;left:0;right:0;background:#dc2626;color:white;text-align:center;padding:10px 16px;font-weight:700;font-size:0.85rem;letter-spacing:0.3px;z-index:1001;">&#9888; MODIFIED SINCE ISSUE — this final report has changed since it was last issued (v' + (d.report.issuedSnapshot && d.report.issuedSnapshot.version) + '). Re-issue via Finalize &amp; Publish before distributing.</div>' : '')
+            // Everything printable lives in one table so the header/footer rows repeat
+            // per page and reserve their own space in flow (see .rpt-running above).
+            + '<table class="rpt-running"><thead><tr><td>'
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">Audit360 &mdash; ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '</div></div>'
+            + '</td></tr></thead><tfoot><tr><td>'
             + '<div class="rpt-ftr"><div class="rpt-ftr-left">Confidential &mdash; ' + (d.report.reportStatus === 'draft' ? 'Draft' : 'Final') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">Generated by Audit360</div></div>'
+            + '</td></tr></tfoot><tbody><tr><td>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
             + '<button data-action="print" style="background:linear-gradient(135deg,#1d4ed8,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:500;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Download"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
             + '<button data-action="close" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:500;">Close</button></div>'
@@ -3527,11 +3542,19 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             +   'octx.imageSmoothingQuality="high";octx.drawImage(cv,0,0,off.width,off.height);'
             +   'var im=document.createElement("img");im.src=off.toDataURL("image/jpeg",0.82);im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);'
             + '}catch(e){}});'
-            // Evidence photos are embedded at capture resolution but printed as
-            // ~50px thumbnails. Re-encode them down to their printed size too.
-            +   'document.querySelectorAll("img[data-ev-thumb]").forEach(function(im){try{'
-            +     'if(!im.naturalWidth||im.naturalWidth<=320)return;'
-            +     'var s=Math.min(1,320/im.naturalWidth);'
+            // Evidence photos and logos are embedded at capture resolution but printed
+            // at 24-80px. Select every <img>, NOT img[data-ev-thumb]: that attribute is
+            // only emitted on the in-app UI thumbnails (:669, :2296) and matches nothing
+            // in this exported document, so this pass silently downscaled zero images and
+            // full-resolution photos stayed embedded. Images actually present here are
+            // .ev-inline (:2698), report-findings-ops.js:409, and the CB/client logos.
+            // Target ~3x the printed box (comfortably past 300dpi at these sizes) and
+            // leave anything already small alone, which also spares the QR codes.
+            +   'document.querySelectorAll("img").forEach(function(im){try{'
+            +     'if(!im.naturalWidth||im.naturalWidth<=400)return;'
+            +     'var shown=Math.round((im.getBoundingClientRect().width||im.clientWidth||0));'
+            +     'var target=Math.max(320,shown*3);if(target>=im.naturalWidth)return;'
+            +     'var s=target/im.naturalWidth;'
             +     'var oc=document.createElement("canvas");oc.width=Math.round(im.naturalWidth*s);oc.height=Math.round(im.naturalHeight*s);'
             +     'var ox=oc.getContext("2d");ox.fillStyle="#ffffff";ox.fillRect(0,0,oc.width,oc.height);'
             +     'ox.imageSmoothingQuality="high";ox.drawImage(im,0,0,oc.width,oc.height);'
@@ -3559,7 +3582,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 return '<div id="sec-' + key + '" class="sh page-break" style="background:#f8fafc;border-left-color:' + c + ';">';
             }
         );
-        const reportHtmlFinal = reportHtmlColored + '<script src="' + chartScriptUrl + '"></script></body></html>';
+        const reportHtmlFinal = reportHtmlColored + '</td></tr></tbody></table>'
+            + '<script src="' + chartScriptUrl + '"></script></body></html>';
 
         // Open via Blob URL. Chart script is also a Blob URL (loaded via <script src>)
         // so it works even when parent page CSP disallows inline scripts.
