@@ -281,6 +281,15 @@
     // Derives lifecycle status for a REAL register record from its actual
     // status / effectiveness / verifiedDate fields (not inferred from due date
     // alone, except for the Overdue case which genuinely depends on today vs due).
+    // A withdrawn or superseded record stays in the register for the audit
+    // trail but is no longer a live corrective action, so it must not be
+    // counted as Open or drawn on the CAPA dashboard.
+    function isRetiredCapa(rec) {
+        var st = String((rec && rec.status) || '').toLowerCase();
+        var cst = String((rec && rec.carStatus) || '').toLowerCase();
+        return st === 'withdrawn' || cst === 'withdrawn' || !!(rec && rec._supersededBy);
+    }
+
     function realCapaStatus(rec) {
         var status = String((rec && rec.status) || '').toLowerCase();
         var effectiveness = String((rec && rec.effectiveness) || '').toLowerCase();
@@ -484,6 +493,8 @@
         // register data it doesn't have.
         var today = new Date();
         var capaItems, lifecycleCounts, closureDurations, overdueItems, capaSource;
+
+        linked = linked.filter(function (rec) { return !isRetiredCapa(rec); });
 
         if (linked.length > 0) {
             capaSource = 'register';

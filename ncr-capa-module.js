@@ -118,6 +118,75 @@ function isWithdrawnNCR(n) {
 }
 window.isWithdrawnNCR = isWithdrawnNCR;
 
+/**
+ * Reconcile duplicate NCR/CAPA records without destroying any of them.
+ *
+ * Rebuilding a checklist used to mint a fresh NCR for a finding that already
+ * had one, because the dedupe key embedded checklistId and itemIdx. That left
+ * the register — and the report's CAPA table — with two Open records for the
+ * same finding.
+ *
+ * Records are never deleted. Within each group (same audit + clause + finding
+ * text) the record that carries the most auditor work is kept, and the rest are
+ * marked Withdrawn with a pointer to the survivor, so the full history stays
+ * auditable and traceable while only one live action remains.
+ *
+ * @param {Object} [opts] - { dryRun: true } to report what would change.
+ * @returns {{groups:number, superseded:number, kept:number, details:Array}}
+ */
+window.reconcileDuplicateNCRs = function (opts) {
+    const dryRun = !!(opts && opts.dryRun);
+    const all = (window.state && window.state.ncrs) || [];
+    const norm = (v) => String(v == null ? '' : v).toLowerCase().replace(/\s+/g, ' ').trim();
+
+    // How much real work a record carries — the survivor should be the one an
+    // auditor has already progressed, not simply the oldest.
+    const weight = (n) => (n.correctiveAction ? 4 : 0) + (n.rootCause ? 3 : 0)
+        + (n.correction ? 2 : 0) + (n.verifiedDate ? 5 : 0)
+        + (norm(n.status) === 'closed' ? 6 : 0) + ((n.evidence || []).length ? 1 : 0);
+
+    const groups = new Map();
+    all.forEach((n) => {
+        if (!n || isWithdrawnNCR(n) || n._supersededBy) return;
+        const key = [norm(n.auditId), norm(n.clause), norm(n.description).slice(0, 180)].join('||');
+        if (!norm(n.description)) return;          // nothing to match on — leave alone
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(n);
+    });
+
+    const details = [];
+    let superseded = 0, kept = 0, dupGroups = 0;
+
+    groups.forEach((recs) => {
+        if (recs.length < 2) return;
+        dupGroups++;
+        recs.sort((a, b) => weight(b) - weight(a)
+            || String(a.raisedDate || '').localeCompare(String(b.raisedDate || '')));
+        const survivor = recs[0];
+        kept++;
+        recs.slice(1).forEach((dupe) => {
+            details.push({ supersededRef: dupe.ncrNumber || dupe.id, byRef: survivor.ncrNumber || survivor.id, clause: dupe.clause });
+            if (dryRun) return;
+            dupe.status = 'Withdrawn';
+            dupe.carStatus = 'Withdrawn';
+            dupe._supersededBy = survivor.ncrNumber || survivor.id || null;
+            dupe.withdrawnReason = 'Duplicate of ' + (survivor.ncrNumber || survivor.id || 'the retained record')
+                + ' — same finding recorded twice when the checklist was rebuilt. Retained for the audit trail.';
+            dupe.withdrawnDate = new Date().toISOString().split('T')[0];
+            superseded++;
+            if (typeof persistNCR === 'function') persistNCR(dupe).catch(() => { });
+        });
+    });
+
+    if (!dryRun && superseded > 0) {
+        if (window.saveData) window.saveData();
+        if (window.showNotification) {
+            window.showNotification(superseded + ' duplicate CAPA record(s) superseded — originals retained in the register', 'success');
+        }
+    }
+    return { groups: dupGroups, superseded: dryRun ? details.length : superseded, kept: kept, details: details };
+};
+
 // --------------------------------------------
 // DATA SYNCHRONIZATION (Supabase)
 // --------------------------------------------

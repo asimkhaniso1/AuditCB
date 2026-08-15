@@ -1868,8 +1868,34 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const sourceKey = `exec-${reportId}-${item.checklistId || 'custom'}-${item.itemIdx}`;
                 activeSourceKeys.add(sourceKey);
 
-                // Check if already synced
-                const existing = window.state.ncrs.find(n => n._sourceKey === sourceKey);
+                // Check if already synced.
+                //
+                // _sourceKey embeds checklistId and itemIdx, both of which change
+                // when a checklist is rebuilt or its questions are re-indexed —
+                // which minted a second NCR for a finding that already had one and
+                // put duplicate rows in the CAPA register. Fall back to matching
+                // the same audit + clause + finding text, and adopt that record by
+                // re-pointing its _sourceKey, so the audit trail keeps one record
+                // per finding across checklist changes.
+                const findingKey = (item.ncrDescription || item.comment || '')
+                    .toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 180);
+                const sameFinding = (n) => {
+                    if (!n || n._sourceKey === sourceKey) return false;
+                    if (String(n.auditId || '') !== String(report.planId || '')) return false;
+                    if (String(n.clause || '').trim() !== String(clauseText || '').trim()) return false;
+                    if (String(n.status || '').toLowerCase() === 'withdrawn') return false;
+                    const d = String(n.description || '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 180);
+                    return !!findingKey && d === findingKey;
+                };
+                let existing = window.state.ncrs.find(n => n._sourceKey === sourceKey);
+                if (!existing) {
+                    const adopted = window.state.ncrs.find(sameFinding);
+                    if (adopted) {
+                        adopted._sourceKey = sourceKey;   // re-point to the current checklist
+                        persist(adopted);
+                        existing = adopted;
+                    }
+                }
                 if (existing) {
                     // Legacy records created by the old buggy behavior (severity was
                     // Observation/OFI) are no longer valid register entries — withdraw
