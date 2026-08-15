@@ -29,8 +29,11 @@
  *
  * All scoring is deterministic, rule-table driven, and offline (no network /
  * AI calls). Rule tables are exported as data constants (CLAUSE_THEMES,
- * IMPACT_KEYWORDS, BUSINESS_IMPACT_RULES) so other standards / clause sets
- * can extend them without touching the scoring logic.
+ * TEXT_THEMES, BUSINESS_IMPACT_RULES) so other standards / clause sets
+ * can extend them without touching the scoring logic. Theme classification
+ * (classifyTheme) checks TEXT_THEMES against the finding's own text first and
+ * only falls back to the CLAUSE_THEMES clause-number table when the text has
+ * no confident keyword match.
  *
  * Styling consumes the shared Big-Four design system (window.ReportExecutive
  * .bigFourCss() `b4-*` classes + window.ReportExecutive.icon()) — no ad-hoc
@@ -66,6 +69,122 @@
             if (CLAUSE_THEMES[i].test.test(c)) return CLAUSE_THEMES[i];
         }
         return { theme: 'general management system requirements', impactBoost: 0 };
+    }
+
+    // Theme classification by what the finding actually SAYS, checked before the
+    // clause-number table above.
+    //
+    // CLAUSE_THEMES buckets purely by clause number prefix, which misclassifies
+    // any finding whose own clause coding doesn't line up with the theme table —
+    // e.g. an internal-audit finding logged against a "7.x" competence clause id
+    // came out as a resource/competence root cause purely because of the digit,
+    // regardless of what the auditor actually wrote. Score keyword hits against
+    // the finding's own text first; only fall back to CLAUSE_THEMES when the text
+    // gives no confident signal (empty, or no keywords matched).
+    //
+    // Kept as a separate table rather than folded into CLAUSE_THEMES because it
+    // matches on free text, not clause numbers, and some themes here (internal
+    // audit, management review, CAPA/continual improvement) are more specific
+    // than anything CLAUSE_THEMES distinguishes.
+    var TEXT_THEMES = [
+        {
+            theme: 'internal audit programme and performance monitoring',
+            impactBoost: 1,
+            tag: 'internal audit',
+            kw: /internal audit(?:s|ing|or|ors|ee)?\b|audit programme|audit program\b|audit schedule/gi
+        },
+        {
+            theme: 'management review',
+            impactBoost: 1,
+            tag: 'management review',
+            kw: /management review/gi
+        },
+        {
+            theme: 'nonconformity and continual improvement',
+            impactBoost: 1,
+            kw: /corrective action|root cause analysis|capa\b|continual improvement|preventive action/gi
+        },
+        {
+            theme: 'control of externally provided processes and suppliers',
+            impactBoost: 2,
+            tag: 'supplier',
+            kw: /supplier|vendor|external provider|subcontract|procurement\b/gi
+        },
+        {
+            theme: 'customer requirements determination',
+            impactBoost: 1,
+            tag: 'customer',
+            kw: /customer requirement|contract review|order review|customer complaint/gi
+        },
+        {
+            theme: 'documented information control',
+            impactBoost: 0,
+            tag: 'documented info',
+            kw: /document control|documented information|version control|approval of document/gi
+        },
+        {
+            theme: 'resource and competence management',
+            impactBoost: 0,
+            kw: /competence|competency|training record|skills matrix|job description|induction/gi
+        },
+        {
+            theme: 'operational planning and control',
+            impactBoost: 2,
+            kw: /work instruction|process control|nonconforming product|production process|calibration|preventive maintenance/gi
+        },
+        {
+            theme: 'planning and risk management',
+            impactBoost: 1,
+            kw: /risk assessment|risk register|risk-based thinking|contingency plan/gi
+        },
+        {
+            theme: 'leadership and commitment',
+            impactBoost: 1,
+            kw: /top management|quality policy|management commitment/gi
+        },
+        {
+            theme: 'context of the organization',
+            impactBoost: 0,
+            kw: /interested part(?:y|ies)|context of the organization|scope of the (?:qms|management system)/gi
+        },
+        {
+            theme: 'legal and regulatory compliance',
+            impactBoost: 2,
+            tag: 'legal',
+            kw: /legal requirement|regulat|statutory|permit\b|licen[cs]e requirement/gi
+        }
+    ];
+
+    // Returns the TEXT_THEMES entry with the strongest keyword signal in `text`,
+    // or null when nothing matched (caller falls back to clauseTheme). "Strongest"
+    // is the sum of matched-substring lengths (so a longer, more specific phrase
+    // like "internal audit programme" outweighs a single short hit), with table
+    // order as the tie-break — deliberately simple, not fuzzy/stemmed, so two
+    // genuinely different findings that merely share a generic word don't collapse
+    // onto the same theme.
+    function scoreTextThemes(text) {
+        var t = String(text || '').toLowerCase();
+        if (!t.trim()) return null;
+        var best = null;
+        var bestScore = 0;
+        for (var i = 0; i < TEXT_THEMES.length; i++) {
+            var entry = TEXT_THEMES[i];
+            var matches = t.match(entry.kw);
+            if (!matches || !matches.length) continue;
+            var score = 0;
+            for (var j = 0; j < matches.length; j++) score += matches[j].length;
+            if (score > bestScore) {
+                bestScore = score;
+                best = entry;
+            }
+        }
+        return best;
+    }
+
+    // Single entry point used by scoreFinding: text match first, clause-number
+    // fallback second.
+    function classifyTheme(text, clauseRef) {
+        return scoreTextThemes(text) || clauseTheme(clauseRef);
     }
 
     // Keyword → business impact category rules. First match per category wins;
@@ -120,7 +239,7 @@
         text = text.replace(CHECKLIST_LEADIN, '');
         // 3. Collapse whitespace, trim stray punctuation.
         text = text.replace(/\s+/g, ' ').trim();
-        text = text.replace(/^[\s,:;.\-]+/, '').replace(/[\s]+$/, '');
+        text = text.replace(/^[\s,:;.-]+/, '').replace(/[\s]+$/, '');
         if (!text) text = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
         // 4. Capitalize first letter.
         if (text) text = text.charAt(0).toUpperCase() + text.slice(1);
@@ -129,7 +248,7 @@
             var cut = text.slice(0, maxLen - 1);
             var lastSpace = cut.lastIndexOf(' ');
             if (lastSpace > maxLen * 0.6) cut = cut.slice(0, lastSpace);
-            text = cut.replace(/[\s,:;.\-]+$/, '') + '…';
+            text = cut.replace(/[\s,:;.-]+$/, '') + '…';
         }
         return text;
     }
@@ -150,8 +269,11 @@
 
     function normalizeFinding(raw, source, index) {
         // Normalizes checklistProgress items and ncrs entries into one shape.
+        // `statement` is included for records built by the ReportStats canonical
+        // pipeline, which uses that field name; evidence is images/attachments
+        // (see ncr.evidenceImage(s)), never descriptive text, so it's excluded.
         var clause = raw.clauseRef || raw.clause || '';
-        var text = raw.comment || raw.description || raw.finding || '';
+        var text = raw.comment || raw.description || raw.finding || raw.statement || '';
         var type = (raw.ncrType || raw.type || 'Minor');
         return {
             ref: (source === 'ncr' ? 'NCR-' : 'CL-') + (index + 1),
@@ -273,7 +395,7 @@
             });
 
             return matched;
-        } catch (e) {
+        } catch (_e) {
             return [];
         }
     }
@@ -315,7 +437,7 @@
         var isMajor = /^major$/i.test(ncrType);
         var isMinor = /^minor$/i.test(ncrType);
         if (!isMajor && !isMinor) return null;
-        var theme = clauseTheme(clause);
+        var theme = classifyTheme(text, clause);
 
         // Likelihood (1-5): base by severity, then adjust for systemic/recurrence wording.
         var likelihood = isMajor ? 4 : 3;
@@ -395,7 +517,7 @@
                 if (f.clause && prevClauses[f.clause]) repeated.push(f);
             });
             return { repeated: repeated, byClause: prevClauses };
-        } catch (e) {
+        } catch (_e) {
             return { repeated: repeated, byClause: {} };
         }
     }
@@ -617,7 +739,7 @@
             return (global.ReportExecutive && typeof global.ReportExecutive.icon === 'function')
                 ? global.ReportExecutive.icon(name, opts)
                 : '';
-        } catch (e) {
+        } catch (_e) {
             return '';
         }
     }
@@ -685,7 +807,7 @@
     // (already folded into f.status by normalizeFinding); falls back to a
     // due-date-based inference so the dashboard degrades gracefully when the
     // underlying data has no real CAPA status field yet.
-    function deriveStatus(f, baseDate) {
+    function deriveStatus(f, _baseDate) {
         var raw = String((f && f.status) || '').toLowerCase();
         if (/closed|complete/.test(raw)) return 'Closed';
         if (/verif/.test(raw)) return 'Verified';
@@ -1077,7 +1199,10 @@
         linkedCapaRecords: linkedCapaRecords,
         // Exposed rule tables for extension by other standards.
         CLAUSE_THEMES: CLAUSE_THEMES,
-        BUSINESS_IMPACT_RULES: BUSINESS_IMPACT_RULES
+        TEXT_THEMES: TEXT_THEMES,
+        BUSINESS_IMPACT_RULES: BUSINESS_IMPACT_RULES,
+        // Exposed for direct unit testing of the text-first / clause-fallback rule.
+        classifyTheme: classifyTheme
     };
 
     if (typeof module !== 'undefined' && module.exports) {
