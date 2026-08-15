@@ -126,10 +126,21 @@ window.isWithdrawnNCR = isWithdrawnNCR;
  * the register — and the report's CAPA table — with two Open records for the
  * same finding.
  *
- * Records are never deleted. Within each group (same audit + clause + finding
+ * Records are never deleted. Within each group (same CLIENT + clause + finding
  * text) the record that carries the most auditor work is kept, and the rest are
  * marked Withdrawn with a pointer to the survivor, so the full history stays
  * auditable and traceable while only one live action remains.
+ *
+ * The key is scoped by client, not by audit: the checklist-sync path
+ * (execution-module-v2.js) already adopts/merges same-audit duplicates at
+ * mint time via its own auditId+clause+text match, so by the time a record
+ * reaches this pass, two rows for the same finding necessarily come from
+ * *different* audit engagements (e.g. a Major NC re-entered on a later
+ * surveillance visit). Keying on auditId — as this function used to — could
+ * therefore never find a group; it's excluded here on purpose. Client is the
+ * real tenant boundary: two NCRs on the same clause with the same wording for
+ * the same client are the same duplicate regardless of which audit raised
+ * them.
  *
  * @param {Object} [opts] - { dryRun: true } to report what would change.
  * @returns {{groups:number, superseded:number, kept:number, details:Array}}
@@ -138,6 +149,26 @@ window.reconcileDuplicateNCRs = function (opts) {
     const dryRun = !!(opts && opts.dryRun);
     const all = (window.state && window.state.ncrs) || [];
     const norm = (v) => String(v == null ? '' : v).toLowerCase().replace(/\s+/g, ' ').trim();
+
+    // Resolve the tenant boundary for a record. clientId is populated directly
+    // on NCR records at creation time — both the manual-entry path
+    // (saveNewNCR, above) and the checklist auto-mint path
+    // (execution-module-v2.js's exec-sync block) set it, and it round-trips
+    // through Supabase as audit_ncrs.client_id (see fetchNCRs/persistNCR
+    // above) — so that's the primary, authoritative source. Some legacy rows
+    // synced before that column existed may carry only auditId; for those,
+    // fall back to the linked audit plan's clientId. A record whose client
+    // truly can't be resolved either way is left out of grouping entirely —
+    // two unresolved records are not evidence they share a tenant.
+    const plans = (window.state && window.state.auditPlans) || [];
+    const resolveClientId = (n) => {
+        if (n.clientId != null && String(n.clientId) !== '') return String(n.clientId);
+        if (n.auditId != null) {
+            const plan = plans.find((p) => p && String(p.id) === String(n.auditId));
+            if (plan && plan.clientId != null && String(plan.clientId) !== '') return String(plan.clientId);
+        }
+        return null;
+    };
 
     // How much real work a record carries — the survivor should be the one an
     // auditor has already progressed, not simply the oldest.
@@ -148,8 +179,15 @@ window.reconcileDuplicateNCRs = function (opts) {
     const groups = new Map();
     all.forEach((n) => {
         if (!n || isWithdrawnNCR(n) || n._supersededBy) return;
-        const key = [norm(n.auditId), norm(n.clause), norm(n.description).slice(0, 180)].join('||');
         if (!norm(n.description)) return;          // nothing to match on — leave alone
+        const clientKey = resolveClientId(n);
+        if (!clientKey) return;                     // unresolvable client — never guess at a tenant match
+        // Description is normalized (case-folded, whitespace-collapsed, trimmed)
+        // and capped to the same 180-char window the checklist-sync matcher uses
+        // (execution-module-v2.js's sameFinding), so trivial text differences
+        // don't defeat grouping without loosening the match into fuzzy/stemmed
+        // territory that could collapse genuinely distinct findings.
+        const key = [clientKey, norm(n.clause), norm(n.description).slice(0, 180)].join('||');
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(n);
     });
