@@ -31,8 +31,12 @@ function renderDashboardEnhanced() {
     const auditPlans = (typeof window.getVisiblePlans === 'function') ? window.getVisiblePlans() : [];
     const auditReports = (typeof window.getVisibleReports === 'function') ? window.getVisibleReports() : [];
 
-    // PERF: Fingerprint-based cache — skip expensive stats computation if data hasn't changed
-    const cacheKey = `${visibleClients.length}|${auditors.length}|${auditPlans.length}|${auditReports.length}|${(window.state.certificates || []).length}`;
+    // PERF: Fingerprint-based cache — skip expensive stats computation if data hasn't changed.
+    // Lengths alone miss in-place status flips (e.g. closing an audit doesn't
+    // add/remove a plan), so the status lists are folded into the key too —
+    // otherwise a dashboard rendered before a completion stays stuck showing
+    // it as not completed until some other array's length changes.
+    const cacheKey = `${visibleClients.length}|${auditors.length}|${auditPlans.length}|${auditReports.length}|${(window.state.certificates || []).length}|${auditPlans.map(p => p.status).join(',')}|${auditReports.map(r => r.status).join(',')}`;
     let stats;
 
     if (window._dashboardStatsCache && window._dashboardStatsCache._key === cacheKey) {
@@ -47,10 +51,14 @@ function renderDashboardEnhanced() {
         const totalAuditors = auditors.length;
         const leadAuditors = auditors.filter(a => a.role === 'Lead Auditor').length;
 
-        const upcomingAudits = auditPlans.filter(p => p.status !== 'Completed').length;
-        const completedAudits = auditPlans.filter(p => p.status === 'Completed').length;
+        // Single derivation shared with the client-workspace Overview cards and
+        // the Audit Plans "programme" table, so all three agree on what counts
+        // as completed instead of each re-inlining `p.status === 'Completed'`.
+        const planCompletion = window.DataService.getPlanCompletionStats(auditPlans);
+        const upcomingAudits = planCompletion.upcoming;
+        const completedAudits = planCompletion.completed;
         const draftPlans = auditPlans.filter(p => p.status === 'Draft').length;
-        const completionRate = auditPlans.length > 0 ? Math.round((completedAudits / auditPlans.length) * 100) : 0;
+        const completionRate = planCompletion.completionRate;
 
         const leadAuditorCount = leadAuditors;
         const supportAuditorCount = totalAuditors - leadAuditorCount;
@@ -558,7 +566,7 @@ function renderAuditTrendsChart() {
         if (monthDiff >= 0 && monthDiff <= 5) {
             const index = 5 - monthDiff;
 
-            if (plan.status === 'Completed' || plan.status === 'Closed') {
+            if (window.DataService.isPlanCompleted(plan)) {
                 completed[index]++;
             } else if (plan.status !== 'Cancelled') {
                 // Count everything else (Planned, Scheduled, In Progress) as "Planned"
@@ -932,7 +940,7 @@ function renderAuditorWorkloadChart() {
         // Count lead auditor
         if (lead && workload[lead]) {
             workload[lead].total++;
-            if (plan.status === 'Completed') workload[lead].completed++;
+            if (window.DataService.isPlanCompleted(plan)) workload[lead].completed++;
         }
 
         // Count team members
@@ -940,7 +948,7 @@ function renderAuditorWorkloadChart() {
             const aName = typeof name === 'object' ? (name.name || '') : name;
             if (aName && workload[aName]) {
                 workload[aName].total++;
-                if (plan.status === 'Completed') workload[aName].completed++;
+                if (window.DataService.isPlanCompleted(plan)) workload[aName].completed++;
             }
         });
     });

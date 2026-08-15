@@ -252,7 +252,7 @@ function renderAuditExecutionEnhanced() {
 // eslint-disable-next-line no-unused-vars
 function openCreateReportModal() {
     // Filter out plans that already have a report OR are marked Completed
-    const allOpenPlans = state.auditPlans.filter(p => !p.reportId && p.status !== 'Completed');
+    const allOpenPlans = state.auditPlans.filter(p => !p.reportId && !window.DataService.isPlanCompleted(p));
     allOpenPlans.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     // Helpers exposed for HTML interaction

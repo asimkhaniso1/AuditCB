@@ -162,6 +162,74 @@ describe('DataService', () => {
         });
     });
 
+    describe('isPlanCompleted', () => {
+        it('is true once an audit plan is marked Completed', () => {
+            expect(window.DataService.isPlanCompleted({ id: 'p1', status: 'Completed' })).toBe(true);
+        });
+
+        it('is true for the legacy Closed status too', () => {
+            expect(window.DataService.isPlanCompleted({ id: 'p1', status: 'Closed' })).toBe(true);
+        });
+
+        it('is false for any in-progress/other status', () => {
+            expect(window.DataService.isPlanCompleted({ id: 'p1', status: 'In Progress' })).toBe(false);
+            expect(window.DataService.isPlanCompleted({ id: 'p1', status: 'Draft' })).toBe(false);
+            expect(window.DataService.isPlanCompleted({ id: 'p1', status: 'Approved' })).toBe(false);
+        });
+
+        it('is false for a missing/null plan without throwing', () => {
+            expect(window.DataService.isPlanCompleted(null)).toBe(false);
+            expect(window.DataService.isPlanCompleted(undefined)).toBe(false);
+        });
+    });
+
+    describe('getPlanCompletionStats — the single figure the dashboard and the programme table both read', () => {
+        it('counts a single completed audit as 1 total / 1 completed (Total Audits 1 / Completed 1, not 0)', () => {
+            const plans = [{ id: 'p1', status: 'Completed' }];
+            const stats = window.DataService.getPlanCompletionStats(plans);
+            expect(stats).toEqual({ total: 1, completed: 1, upcoming: 0, completionRate: 100 });
+        });
+
+        it('does not count an in-progress audit as completed', () => {
+            const plans = [{ id: 'p1', status: 'In Progress' }];
+            const stats = window.DataService.getPlanCompletionStats(plans);
+            expect(stats).toEqual({ total: 1, completed: 0, upcoming: 1, completionRate: 0 });
+        });
+
+        it('handles a mixed set of plans', () => {
+            const plans = [
+                { id: 'p1', status: 'Completed' },
+                { id: 'p2', status: 'In Progress' },
+                { id: 'p3', status: 'Draft' },
+                { id: 'p4', status: 'Completed' }
+            ];
+            const stats = window.DataService.getPlanCompletionStats(plans);
+            expect(stats).toEqual({ total: 4, completed: 2, upcoming: 2, completionRate: 50 });
+        });
+
+        it('returns zeroed stats for an empty/missing plan list', () => {
+            expect(window.DataService.getPlanCompletionStats([])).toEqual({ total: 0, completed: 0, upcoming: 0, completionRate: 0 });
+            expect(window.DataService.getPlanCompletionStats(undefined)).toEqual({ total: 0, completed: 0, upcoming: 0, completionRate: 0 });
+        });
+
+        it('the dashboard figure and the programme table figure agree for the same plans, because both call this function', () => {
+            // Simulates the exact scenario from the bug report: one audit plan,
+            // just marked Completed. The global dashboard (dashboard-module.js)
+            // and the client workspace's Audit Plans / programme table
+            // (client-workspace.js) both derive their "Completed" count via
+            // window.DataService.getPlanCompletionStats — so passing the same
+            // plans array into each call site cannot produce different answers.
+            const clientPlans = [{ id: 'p1', client: 'Acme Corp', status: 'Completed' }];
+
+            const dashboardCompletedAudits = window.DataService.getPlanCompletionStats(clientPlans).completed;
+            const programmeTableCompletedPlans = window.DataService.getPlanCompletionStats(clientPlans).completed;
+
+            expect(dashboardCompletedAudits).toBe(1);
+            expect(programmeTableCompletedPlans).toBe(1);
+            expect(dashboardCompletedAudits).toBe(programmeTableCompletedPlans);
+        });
+    });
+
     describe('openFormModal', () => {
         it('should set modal title and body', () => {
             // Setup DOM mock

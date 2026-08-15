@@ -1100,17 +1100,17 @@ function getClientAuditsHTML(client) {
         const report = clientReports.find(r => r.planId === plan.id || r.date === plan.date);
         const ncrCount = report ? (report.ncrs || []).length : 0;
         return `
-                            <div style="display: flex; align-items: center; padding: 1rem; background: #f8fafc; border-radius: 8px; border-left: 4px solid ${plan.status === 'Completed' ? '#10b981' : '#3b82f6'};">
+                            <div style="display: flex; align-items: center; padding: 1rem; background: #f8fafc; border-radius: 8px; border-left: 4px solid ${window.DataService.isPlanCompleted(plan) ? '#10b981' : '#3b82f6'};">
                                 <div style="flex: 1;">
                                     <div style="font-weight: 600;">${plan.type || 'Audit'} - ${plan.standard || client.standard}</div>
                                     <div style="font-size: 0.85rem; color: #64748b;">
-                                        <i class="fa-solid fa-calendar"></i> ${plan.date} 
+                                        <i class="fa-solid fa-calendar"></i> ${plan.date}
                                         <span style="margin-left: 1rem;"><i class="fa-solid fa-user"></i> ${plan.team ? plan.team[0] : 'TBD'}</span>
                                     </div>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 1rem;">
                                     ${ncrCount > 0 ? `<span style="background: #fef3c7; color: #d97706; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">${ncrCount} Findings</span>` : ''}
-                                    <span class="badge" style="background: ${plan.status === 'Completed' ? '#10b981' : plan.status === 'Draft' ? '#94a3b8' : '#3b82f6'};">${plan.status}</span>
+                                    <span class="badge" style="background: ${window.DataService.isPlanCompleted(plan) ? '#10b981' : plan.status === 'Draft' ? '#94a3b8' : '#3b82f6'};">${plan.status}</span>
                                     ${report ? `<button class="btn btn-sm btn-outline-primary" data-action="openReportingDetail" data-id="${report.id}" aria-label="Document"><i class="fa-solid fa-file-lines"></i> View Report</button>` : ''}
                                 </div>
                             </div>

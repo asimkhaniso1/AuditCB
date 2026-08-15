@@ -431,7 +431,9 @@ function renderClientOverview(client) {
     const openNCs = clientReports.reduce((count, r) => count + (getAllFindings(r).filter(f => f.status !== 'Closed' && f.status !== 'closed').length), 0);
 
     // Calculate additional metrics
-    const completedAudits = clientPlans.filter(p => p.status === 'Completed').length;
+    // Same derivation the dashboard and the Audit Plans table use, so the
+    // "Completed" figure here can't drift from either of those views.
+    const completedAudits = window.DataService.getPlanCompletionStats(clientPlans).completed;
     const upcomingAudits = clientPlans.filter(p => p.status === 'Planned' || p.status === 'Approved').length;
     const validCerts = clientCerts.filter(c => c.status === 'Valid').length;
     const totalSites = (client.sites || []).length;
@@ -800,6 +802,17 @@ window.switchClientOverviewTab = function (element, tabId, clientId) {
 
 // Compact Certification Cycle Widget for Overview Dashboard
 // Render Timeline Widget for EACH active standard
+//
+// NOTE ON "DISAGREEING" WITH THE AUDIT PLANS TABLE: this widget's stage and
+// progress % are a pure calendar projection — they answer "where should this
+// client be in their 3-year cycle today", computed only from the active
+// certificate's issue/expiry dates (surv1/surv2/expiry below). They never
+// read plan.status or report.status. The Audit Plans table (renderClientPlans)
+// answers a different question — "what is the actual recorded state of each
+// audit" — via window.DataService.isPlanCompleted/getPlanCompletionStats. The
+// two are expected to diverge when audits run early/late or are still in
+// progress; that gap is exactly what should make this widget's "urgent/red"
+// styling meaningful. Do not collapse them into one derived value.
 function renderCertificationCycleWidget(client) {
     const certs = client.certificates || [];
     const standards = [...new Set(certs.map(c => c.standard).filter(Boolean))];
@@ -1065,7 +1078,7 @@ function renderClientPlans(client) {
     const plans = (window.state.auditPlans || []).filter(p => matchesClient(p, client));
 
     const totalPlans = plans.length;
-    const completedPlans = plans.filter(p => p.status === 'Completed').length;
+    const completedPlans = window.DataService.getPlanCompletionStats(plans).completed;
     const inProgressPlans = plans.filter(p => p.status === 'Approved' || p.status === 'In Progress').length;
     const upcomingPlans = plans.filter(p => p.status === 'Planned').length;
 

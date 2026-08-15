@@ -182,6 +182,38 @@
         return (window.state.auditPlans || []).find(p => String(p.id) === String(planId));
     }
 
+    // ---- Audit-plan completion (single source of truth) ----
+
+    /**
+     * Whether an audit plan represents a finished/closed audit.
+     * Every dashboard card, client-overview stat and audit-plans "programme"
+     * table needs to agree on this, so route them all through here instead of
+     * re-inlining `plan.status === 'Completed'` in each view (which is how the
+     * dashboard's Completed count and the programme table's Status column
+     * used to drift apart).
+     */
+    function isPlanCompleted(plan) {
+        return !!plan && (plan.status === 'Completed' || plan.status === 'Closed');
+    }
+
+    /**
+     * Canonical completion stats for a set of audit plans. Used by both the
+     * global dashboard and the per-client Overview/Audit-Plans views so the
+     * "Completed" figure is computed once and read everywhere, rather than
+     * separately re-derived per screen.
+     */
+    function getPlanCompletionStats(plans) {
+        const list = plans || [];
+        const total = list.length;
+        const completed = list.filter(isPlanCompleted).length;
+        return {
+            total,
+            completed,
+            upcoming: total - completed,
+            completionRate: total > 0 ? Math.round((completed / total) * 100) : 0
+        };
+    }
+
     // ---- Modal helper ----
 
     /**
@@ -265,7 +297,11 @@
         // State lookups
         findClient,
         findAuditReport,
-        findAuditPlan
+        findAuditPlan,
+
+        // Audit-plan completion (single source of truth)
+        isPlanCompleted,
+        getPlanCompletionStats
     };
 
     log('DataService initialized');

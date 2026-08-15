@@ -953,7 +953,7 @@ function viewAuditPlan(id) {
     else if (plan.status === 'In Progress' || progress > 0) activeStep = 2;
     // For Reporting/Closing, we might need to check report status
     if (report) activeStep = 3;
-    if (plan.status === 'Completed') activeStep = 4;
+    if (window.DataService.isPlanCompleted(plan)) activeStep = 4;
 
     const stepperHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; position: relative;">
@@ -1212,14 +1212,14 @@ function viewAuditPlan(id) {
             if (decisionExists) {
                 return '<div style="text-align: center; color: var(--success-color);"><i class="fa-solid fa-certificate" style="font-size: 2rem;"></i><div style="font-size: 0.8rem; margin-top: 0.25rem;">Certified</div></div>';
             }
-            if (plan.status === 'Completed') {
+            if (window.DataService.isPlanCompleted(plan)) {
                 return '<div style="text-align: center; color: #64748b;"><i class="fa-solid fa-flag-checkered" style="font-size: 2rem;"></i><div style="font-size: 0.8rem; margin-top: 0.25rem;">Closed</div></div>';
             }
             return '<div style="text-align: center; color: #cbd5e1;"><i class="fa-solid fa-lock" style="font-size: 2rem;"></i></div>';
         })()}
                         </div>
-                        <button class="btn btn-success" ${report?.status !== 'Finalized' || plan.status === 'Completed' ? 'disabled' : ''} data-action="closeAuditPlan" data-id="${plan.id}" style="width: 100%;">
-                            ${plan.status === 'Completed' ? 'Closed' : 'Close Audit'}
+                        <button class="btn btn-success" ${report?.status !== 'Finalized' || window.DataService.isPlanCompleted(plan) ? 'disabled' : ''} data-action="closeAuditPlan" data-id="${plan.id}" style="width: 100%;">
+                            ${window.DataService.isPlanCompleted(plan) ? 'Closed' : 'Close Audit'}
                         </button>
                     </div>
 
@@ -1444,14 +1444,33 @@ window.printAuditChecklist = function (planId) {
     }
 };
 
-window.closeAuditPlan = function (planId) {
+window.closeAuditPlan = async function (planId) {
     const plan = state.auditPlans.find(p => p.id === planId);
     if (!plan) return;
 
     if (confirm('Are you sure you want to close this audit? This marks the audit cycle as complete. The certification decision is recorded separately in Certificates.')) {
         plan.status = 'Completed';
 
+        // Persist locally AND to the cloud. saveData()/saveState() only writes
+        // IndexedDB — syncAuditPlansFromSupabase (supabase-client.js) reads the
+        // audit_plans.status column first on every sync and Object.assigns the
+        // result over this plan, so a local-only write here would silently
+        // revert to whatever status Supabase still has on the next sync/reload.
+        // Same pattern as the pre-audit persistence fix in 8cb492a.
         window.saveData();
+        try {
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+                await window.SupabaseClient.db.update('audit_plans', String(plan.id), {
+                    status: plan.status,
+                    data: plan,
+                    updated_at: new Date().toISOString()
+                });
+            }
+        } catch (e) {
+            if (window.Logger) window.Logger.error('Planning', 'Audit close cloud sync failed: ' + e.message);
+            window.showNotification('Audit closed locally, but cloud sync failed — it may revert on next sync.', 'warning');
+        }
+
         viewAuditPlan(planId);
         window.showNotification('Audit closed successfully.');
 
