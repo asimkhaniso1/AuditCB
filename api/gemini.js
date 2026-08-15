@@ -49,15 +49,20 @@ export default async function handler(req, res) {
         } else {
             // Use the requested model or fallback to current stable model
             const requestedModel = req.body.model || 'gemini-2.0-flash';
-            // Map old model names to current ones
+            // Map old/retired model names to current, valid v1beta models.
+            // gemini-2.0-flash, gemini-2.0-flash-lite, and gemini-1.5-flash were
+            // retired (June 2026 / earlier) — callers (e.g. ai-service.js) still
+            // request them in sequence as a fallback chain, so each legacy name is
+            // mapped to a distinct, currently-active replacement to preserve that
+            // chain's redundancy across model generations.
             const modelMap = {
-                'gemini-pro': 'gemini-2.0-flash',
-                'gemini-1.5-flash': 'gemini-1.5-flash',
-                'gemini-1.5-flash-latest': 'gemini-1.5-flash',
-                'gemini-1.5-pro': 'gemini-1.5-pro',
-                'gemini-1.5-pro-latest': 'gemini-1.5-pro',
-                'gemini-2.0-flash': 'gemini-2.0-flash',
-                'gemini-2.0-flash-lite': 'gemini-2.0-flash-lite'
+                'gemini-pro': 'gemini-2.5-flash',
+                'gemini-1.5-flash': 'gemini-3.5-flash-lite',
+                'gemini-1.5-flash-latest': 'gemini-3.5-flash-lite',
+                'gemini-1.5-pro': 'gemini-2.5-pro',
+                'gemini-1.5-pro-latest': 'gemini-2.5-pro',
+                'gemini-2.0-flash': 'gemini-2.5-flash-lite',
+                'gemini-2.0-flash-lite': 'gemini-2.5-flash'
             };
             const modelName = modelMap[requestedModel] || requestedModel;
             url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
