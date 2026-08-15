@@ -3132,8 +3132,16 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.chart-box canvas{max-height:200px;max-width:100%;}'
             + '.chart-title{font-size:0.8rem;font-weight:700;color:#1e293b;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.3px;}'
             + '.ev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}.ev-card{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;break-inside:avoid;}.ev-card img{width:100%;height:160px;object-fit:cover;}.ev-cap{padding:8px 12px;font-size:0.78rem;}.ev-cap strong{display:block;color:#1e293b;margin-bottom:2px;}.ev-cap span{color:#64748b;}'
-            + '.toc{padding:30px 40px;}.toc-title{font-size:1.6rem;font-weight:700;color:#0f172a;margin-bottom:4px;}.toc-sub{font-size:0.88rem;color:#64748b;margin-bottom:20px;}.toc-line{width:60px;height:3px;background:linear-gradient(90deg,#1d4ed8,#1d4ed8);border-radius:2px;margin-bottom:25px;}'
-            + '.toc-item{display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;}.toc-num{min-width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.82rem;color:white;flex-shrink:0;}.toc-item-body{flex:1;}.toc-item-title{font-weight:700;font-size:0.95rem;color:#1e293b;}.toc-item-desc{font-size:0.78rem;color:#94a3b8;margin-top:3px;}'
+            // Contents page: two columns of tight rows rather than one column of
+            // 34px medallions with a description each, which ran the section list
+            // over two pages. Square index chips and a hairline rule read as a
+            // report contents page rather than a dashboard.
+            + '.toc{padding:22px 34px;}.toc-title{font-size:1.35rem;font-weight:700;color:#0f172a;letter-spacing:-0.2px;margin-bottom:2px;}.toc-sub{font-size:0.8rem;color:#64748b;margin-bottom:12px;}.toc-line{width:44px;height:2px;background:#1d4ed8;border-radius:1px;margin-bottom:16px;}'
+            + '.toc-list{column-count:2;column-gap:30px;}'
+            + '.toc-item{display:flex;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px dotted #e2e8f0;text-decoration:none;color:inherit;break-inside:avoid;-webkit-column-break-inside:avoid;}'
+            + '.toc-num{min-width:19px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:0.62rem;color:white;flex-shrink:0;font-variant-numeric:tabular-nums;}'
+            + '.toc-item-body{flex:1;min-width:0;}.toc-item-title{font-weight:600;font-size:0.8rem;color:#1e293b;line-height:1.3;}'
+            + '.toc-item-desc{font-size:0.68rem;color:#94a3b8;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
             + 'footer{display:none;}'
             + '.content{padding:0 32px;}'
             + '.callout{padding:12px 16px;border-radius:8px;margin-top:14px;font-size:0.88rem;line-height:1.7;}'
@@ -3198,13 +3206,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                         + '<div class="toc-item-desc">' + s.desc + '</div></div></a>';
                 });
                 if (tocItems.length === 0) return '';
-                return '<div class="toc page-break"><div class="toc-title">Table of Contents</div>'
+                return '<div class="toc page-break"><div class="toc-title">Contents</div>'
                     + '<div class="toc-sub">' + d.report.client + ' — ' + standard + '</div>'
                     + '<div class="toc-line"></div>'
-                    + tocItems.join('')
-                    + '<div style="margin-top:30px;text-align:center;font-size:0.78rem;color:#94a3b8;">'
-                    + ''
-                    + tocItems.length + ' sections in this report</div></div>';
+                    + '<div class="toc-list">' + tocItems.join('') + '</div>'
+                    + '<div style="margin-top:14px;padding-top:8px;border-top:1px solid #f1f5f9;text-align:right;font-size:0.68rem;color:#94a3b8;">'
+                    + tocItems.length + ' sections</div></div>';
             })()
             + '<div class="content">'
             // TIER 1: executive briefing — first thing the CEO/Board reads
