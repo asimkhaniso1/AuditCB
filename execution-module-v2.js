@@ -1050,15 +1050,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <label style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; display: block;">Audit Conclusion & Recommendation</label>
                                 <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
                                     <label style="display: flex; align-items: center; cursor: pointer;">
-                                        <input type="radio" name="recommendation-${report.id}" value="Recommended" ${report.recommendation === 'Recommended' ? 'checked' : ''} data-action-change="setReportRecommendation" data-id="${report.id}">
+                                        <input type="radio" name="recommendation-${report.id}" value="Recommended" ${report.recommendation === 'Recommended' ? 'checked' : ''} data-action-change="setReportRecommendation" data-arg1="this" data-id="${report.id}">
                                         <span style="margin-left: 0.5rem;">Recommended for Certification</span>
                                     </label>
                                     <label style="display: flex; align-items: center; cursor: pointer;">
-                                        <input type="radio" name="recommendation-${report.id}" value="Pending" ${report.recommendation === 'Pending' ? 'checked' : ''} data-action-change="setReportRecommendation" data-id="${report.id}">
+                                        <input type="radio" name="recommendation-${report.id}" value="Pending" ${report.recommendation === 'Pending' ? 'checked' : ''} data-action-change="setReportRecommendation" data-arg1="this" data-id="${report.id}">
                                         <span style="margin-left: 0.5rem;">Recommended Pending Plan Verification</span>
                                     </label>
                                     <label style="display: flex; align-items: center; cursor: pointer;">
-                                        <input type="radio" name="recommendation-${report.id}" value="Not Recommended" ${report.recommendation === 'Not Recommended' ? 'checked' : ''} data-action-change="setReportRecommendation" data-id="${report.id}">
+                                        <input type="radio" name="recommendation-${report.id}" value="Not Recommended" ${report.recommendation === 'Not Recommended' ? 'checked' : ''} data-action-change="setReportRecommendation" data-arg1="this" data-id="${report.id}">
                                         <span style="margin-left: 0.5rem;">Not Recommended (Major NCs)</span>
                                     </label>
                                 </div>

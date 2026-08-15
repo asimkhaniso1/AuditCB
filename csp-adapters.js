@@ -42,7 +42,12 @@
 
     // ─── Set report recommendation ──────────────────────────────────
     window.setReportRecommendation = function (el, dataset) {
-        let reportId = dataset.id;
+        // The delegator calls handlers as (el, dataset, event) ONLY when the control
+        // carries no positional args. These radios carry data-id, so extractArgs()
+        // returns [data-id] and apply()s it — el is then the id string and dataset is
+        // undefined. Read the dataset off the element when it wasn't passed.
+        let ds = dataset || (el && el.dataset) || {};
+        let reportId = ds.id;
         if (!window.state || !window.state.auditReports) return;
         let report = window.state.auditReports.find(function (r) { return String(r.id) === String(reportId); });
         if (report) {
