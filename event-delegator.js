@@ -174,6 +174,17 @@
                     return;
                 }
                 let args2 = extractArgs(actionTarget);
+                // Resolve the same 'this' / 'this.value' placeholders the change
+                // handler supports. Without this, data-arg2="this" arrived as the
+                // literal string and handlers expecting the element threw — the
+                // NCR & CAPA tabs (OFI/OBS, CAPA Tracker, Verification, Analytics)
+                // all failed on "this".classList.add. 19 call sites use it.
+                args2 = args2.map(function (a) {
+                    if (a === 'this.value') return actionTarget.value;
+                    if (a === 'this.checked') return actionTarget.checked;
+                    if (a === 'this') return actionTarget;
+                    return a;
+                });
                 if (args2.length > 0) {
                     fn.apply(null, args2);
                 } else {
