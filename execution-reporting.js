@@ -620,15 +620,34 @@
             if (/surveillance/.test(t)) return 2;
             return 1;
         })();
-        const pvBaseDate = (d.report.date || d.auditPlan?.startDate || d.auditPlan?.date) ? new Date(d.report.date || d.auditPlan?.startDate || d.auditPlan?.date) : new Date();
-        const pvMonthYear = (offset) => { const dt = new Date(pvBaseDate.getTime()); dt.setMonth(dt.getMonth() + offset); return dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }); };
+        // The certification cycle is anchored on the client's INITIAL certification
+        // date, not on the date of whichever audit is being reported. Anchoring on
+        // the current audit put Stage 1 and Stage 2 in the month of a surveillance
+        // visit and pushed recertification three years past the certificate's real
+        // expiry. Fall back to the audit date only when no certificate is on file.
+        const pvAuditDate = (d.report.date || d.auditPlan?.startDate || d.auditPlan?.date)
+            ? new Date(d.report.date || d.auditPlan?.startDate || d.auditPlan?.date) : new Date();
+        const pvCycleCert = ((d.client && d.client.certificates) || []).find(function (c) {
+            return String(c.standard || '').toLowerCase() === String(pvStandard).toLowerCase();
+        }) || ((d.client && d.client.certificates) || [])[0] || null;
+        const pvParseDate = (v) => { const dt = v ? new Date(v) : null; return (dt && !isNaN(dt.getTime())) ? dt : null; };
+        const pvCycleStart = (pvCycleCert && (pvParseDate(pvCycleCert.initialDate) || pvParseDate(pvCycleCert.issueDate))) || null;
+        const pvCycleExpiry = pvCycleCert ? pvParseDate(pvCycleCert.expiryDate) : null;
+        const pvBaseDate = pvCycleStart || pvAuditDate;
+        const pvFmt = (dt) => dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+        const pvMonthYear = (offset) => { const dt = new Date(pvBaseDate.getTime()); dt.setMonth(dt.getMonth() + offset); return pvFmt(dt); };
+        // Recertification is bounded by the certificate, not by a fixed +36 months.
+        const pvRecertTiming = pvCycleExpiry ? ('by ' + pvFmt(pvCycleExpiry)) : pvMonthYear(36);
         const pvProgrammeStages = [
             { id: 's1',     label: 'Stage 1',                         offset: 0,  editId: 'rp-prog-s1',     def: 'Readiness review — documentation, context, scope confirmation' },
             { id: 's2',     label: 'Stage 2 (Initial Certification)', offset: 0,  editId: 'rp-prog-s2',     def: 'Full system implementation audit' },
             { id: 'sv1',    label: 'Surveillance 1',                  offset: 12, editId: 'rp-prog-sv1',    def: 'Key processes, use of marks, changes, previous findings follow-up' },
             { id: 'sv2',    label: 'Surveillance 2',                  offset: 24, editId: 'rp-prog-sv2',    def: 'Key processes, use of marks, changes, previous findings follow-up' },
             { id: 'recert', label: 'Recertification',                 offset: 36, editId: 'rp-prog-recert', def: 'Full system re-assessment over the certification cycle' }
-        ].map((s, i) => Object.assign({}, s, { timing: pvMonthYear(s.offset), status: i < pvStageBase ? 'Completed' : (i === pvStageBase ? 'This audit' : 'Planned') }));
+        ].map((s, i) => Object.assign({}, s, {
+            timing: s.id === 'recert' ? pvRecertTiming : pvMonthYear(s.offset),
+            status: i < pvStageBase ? 'Completed' : (i === pvStageBase ? 'This audit' : 'Planned')
+        }));
 
         // ─── Multi-site sampling — preview data ────────────────────────────
         const pvAllSites = (d.client && Array.isArray(d.client.sites)) ? d.client.sites : [];
@@ -859,7 +878,7 @@
                 <div class="rp-sec" id="sec-audit-programme">
                     <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-calendar-days"></i></span>AUDIT PROGRAMME<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div style="font-size:0.82rem;color:#64748b;margin-bottom:0.75rem;">3-year certification cycle, based on the current audit date of ${d.report.date || '—'}.</div>
+                        <div style="font-size:0.82rem;color:#64748b;margin-bottom:0.75rem;">3-year certification cycle, anchored on ${pvCycleStart ? 'the initial certification date of ' + pvCycleStart.toLocaleDateString('en-GB') : 'the current audit date of ' + (d.report.date || '—') + ' (no certificate on file)'}.</div>
                         <table style="width:100%;font-size:0.85rem;border-collapse:collapse;">
                             <thead><tr style="background:#f0f9ff;"><th style="padding:7px 12px;text-align:left;">Audit Stage</th><th style="padding:7px 12px;text-align:left;">Planned Timing</th><th style="padding:7px 12px;text-align:left;">Focus & Scope</th><th style="padding:7px 12px;text-align:center;">Status</th></tr></thead>
                             <tbody>
