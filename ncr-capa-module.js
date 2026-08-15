@@ -118,6 +118,88 @@ function isWithdrawnNCR(n) {
 }
 window.isWithdrawnNCR = isWithdrawnNCR;
 
+// --------------------------------------------
+// SHARED CONTRACT: capaDisplayStatus / isOverdue
+// The single source for "is this record overdue" and for mapping the
+// internal 13-state carStatus/status lifecycle onto the auditor-facing
+// display vocabulary. Other modules (dashboard-module.js, the report
+// engine) must call these rather than reimplementing the date/status math,
+// so overdue detection and CAPA status wording agree everywhere.
+// --------------------------------------------
+
+/**
+ * Whether a register record is past its due date without being closed.
+ * Never true before dueDate has passed, never true once closed/withdrawn.
+ */
+function isOverdueNCR(rec) {
+    if (!rec || isWithdrawnNCR(rec)) return false;
+    if (rec.status === 'Closed' || rec.carStatus === 'Closed' || rec.carStatus === 'Effective') return false;
+    if (!rec.dueDate) return false;
+    const due = new Date(rec.dueDate);
+    if (isNaN(due)) return false;
+    return due < new Date();
+}
+window.NCRModule.isOverdue = isOverdueNCR;
+
+/**
+ * Map a register record's underlying lifecycle fields (status / carStatus /
+ * response fields / dueDate) onto the auditor-facing CAPA display vocabulary:
+ *
+ *   'Awaiting Auditee Response'      — no correction/rootCause/correctiveAction
+ *                                       yet, and dueDate hasn't passed
+ *   'Response Received'              — some response field filled, not yet
+ *                                       reviewed (carStatus not yet advanced)
+ *   'Under Auditor Review'           — carStatus Verification Pending or
+ *                                       Evidence Submitted (and not already
+ *                                       covered by the more specific
+ *                                       Effectiveness Review Pending case)
+ *   'Additional Evidence Required'   — carStatus Ineffective (rejected/needs
+ *                                       more evidence)
+ *   'Accepted — Implementation Pending' — carStatus Approved or In Progress
+ *   'Effectiveness Review Pending'   — capaImplementedDate set, no
+ *                                       effectiveness verdict recorded yet
+ *   'Closed'                         — status/carStatus Closed, or carStatus
+ *                                       Effective
+ *   'Overdue'                        — past dueDate, unclosed, and would
+ *                                       otherwise be one of the two
+ *                                       "awaiting" states above (it never
+ *                                       overrides the more specific
+ *                                       in-review/implementation states, and
+ *                                       never shows before dueDate passes)
+ *
+ * Presentation logic only — never writes back to ncr.status/carStatus.
+ *
+ * @param {Object} rec
+ * @returns {string}
+ */
+function capaDisplayStatus(rec) {
+    if (!rec) return '';
+
+    const isClosed = rec.status === 'Closed' || rec.carStatus === 'Closed' || rec.carStatus === 'Effective';
+    if (isClosed) return 'Closed';
+
+    if (rec.carStatus === 'Ineffective') return 'Additional Evidence Required';
+
+    // "Implemented, awaiting effectiveness" is the more informative read of a
+    // record that also usually carries carStatus 'Verification Pending' (see
+    // computeAutoCarStatus) — check it before the generic under-review case.
+    const effectivenessRecorded = rec.effectiveness === 'Effective' || rec.effectiveness === 'Not Effective';
+    if (rec.capaImplementedDate && !effectivenessRecorded) return 'Effectiveness Review Pending';
+
+    if (rec.carStatus === 'Verification Pending' || rec.carStatus === 'Evidence Submitted') return 'Under Auditor Review';
+
+    if (rec.carStatus === 'Approved' || rec.carStatus === 'In Progress') return 'Accepted — Implementation Pending';
+
+    const responseStarted = !!(rec.correction || rec.rootCause || rec.correctiveAction);
+    const base = responseStarted ? 'Response Received' : 'Awaiting Auditee Response';
+
+    if (isOverdueNCR(rec)) return 'Overdue';
+
+    return base;
+}
+window.NCRModule.capaDisplayStatus = capaDisplayStatus;
+window.capaDisplayStatus = capaDisplayStatus;
+
 /**
  * Reconcile duplicate NCR/CAPA records without destroying any of them.
  *
@@ -241,36 +323,56 @@ window.fetchNCRs = async function () {
 
         if (error) throw error;
 
+        // criterionRef/criterionSource/riskLikelihood/riskImpact columns exist since
+        // migrations/ADD_NCR_CRITERION_AND_RISK_FIELDS.sql. Records written before
+        // that mapping have NULLs in the DB but may hold real values locally, so the
+        // local value still wins whenever the row comes back empty.
+        const prevById = new Map((window.state.ncrs || []).map(n => [String(n.id), n]));
+
         // Map DB snake_case to app camelCase
-        window.state.ncrs = (data || []).map(row => ({
-            id: row.id,
-            clientId: row.client_id,
-            auditId: row.audit_id,
-            // audit_id is the FK to audit_plans – no separate audit_plan_id column
-            level: row.level,
-            clientName: row.client_name,
-            source: row.source,
-            standard: row.standard,
-            clause: row.clause,
-            severity: row.severity,
-            description: row.description,
-            raisedBy: row.raised_by,
-            raisedDate: row.raised_date,
-            dueDate: row.due_date,
-            status: row.status,
-            correction: row.correction,
-            correctionDate: row.correction_date,
-            rootCause: row.root_cause,
-            correctiveAction: row.corrective_action,
-            capaResponsible: row.capa_responsible,
-            capaImplementedDate: row.capa_implemented_date,
-            verificationMethod: row.verification_method,
-            verifiedBy: row.verified_by,
-            verifiedDate: row.verified_date,
-            effectiveness: row.effectiveness,
-            carStatus: row.car_status,
-            evidence: row.evidence || []
-        }));
+        window.state.ncrs = (data || []).map(row => {
+            const mapped = {
+                id: row.id,
+                clientId: row.client_id,
+                auditId: row.audit_id,
+                // audit_id is the FK to audit_plans – no separate audit_plan_id column
+                level: row.level,
+                clientName: row.client_name,
+                source: row.source,
+                standard: row.standard,
+                clause: row.clause,
+                severity: row.severity,
+                description: row.description,
+                raisedBy: row.raised_by,
+                raisedDate: row.raised_date,
+                dueDate: row.due_date,
+                status: row.status,
+                correction: row.correction,
+                correctionDate: row.correction_date,
+                rootCause: row.root_cause,
+                correctiveAction: row.corrective_action,
+                capaResponsible: row.capa_responsible,
+                capaImplementedDate: row.capa_implemented_date,
+                verificationMethod: row.verification_method,
+                verifiedBy: row.verified_by,
+                verifiedDate: row.verified_date,
+                effectiveness: row.effectiveness,
+                carStatus: row.car_status,
+                criterionRef: row.criterion_ref,
+                criterionSource: row.criterion_source,
+                riskLikelihood: row.risk_likelihood,
+                riskImpact: row.risk_impact,
+                evidence: row.evidence || []
+            };
+            const prev = prevById.get(String(row.id));
+            if (prev) {
+                if (mapped.criterionRef == null && prev.criterionRef !== undefined) mapped.criterionRef = prev.criterionRef;
+                if (mapped.criterionSource == null && prev.criterionSource !== undefined) mapped.criterionSource = prev.criterionSource;
+                if (mapped.riskLikelihood == null && prev.riskLikelihood !== undefined) mapped.riskLikelihood = prev.riskLikelihood;
+                if (mapped.riskImpact == null && prev.riskImpact !== undefined) mapped.riskImpact = prev.riskImpact;
+            }
+            return mapped;
+        });
 
         updateNCRAnalytics();
 
@@ -317,6 +419,10 @@ async function persistNCR(ncr) {
         verified_date: toNullable(ncr.verifiedDate),   // DATE column
         effectiveness: ncr.effectiveness,
         car_status: ncr.carStatus || null,
+        criterion_ref: ncr.criterionRef || null,
+        criterion_source: ncr.criterionSource || null,
+        risk_likelihood: ncr.riskLikelihood != null ? ncr.riskLikelihood : null,
+        risk_impact: ncr.riskImpact != null ? ncr.riskImpact : null,
         evidence: ncr.evidence || []
     };
 
@@ -1002,8 +1108,13 @@ function getAnalyticsHTML() {
                     <div style="opacity: 0.9; font-size: 0.85rem;">Closed</div>
                 </div>
                 <div class="card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: white; padding: 1.25rem; text-align:center;">
+                    ${closed > 0 ? `
                     <div style="font-size: 2rem; font-weight: bold;">${effectivenessRate}%</div>
                     <div style="opacity: 0.9; font-size: 0.85rem;">CAPA Effective</div>
+                    ` : `
+                    <div style="font-size: 1rem; font-weight: 700; line-height: 1.3;">Not yet available</div>
+                    <div style="opacity: 0.9; font-size: 0.75rem; margin-top: 0.25rem;">no closed CAPAs</div>
+                    `}
                 </div>
             </div>
 
@@ -1064,8 +1175,13 @@ function getAnalyticsHTML() {
                             <div style="font-size: 0.8rem; color: #64748b;">Pending Verification</div>
                         </div>
                         <div style="text-align: center; padding: 1rem; background: #fef3c7; border-radius: 8px;">
+                            ${closed > 0 ? `
                             <div style="font-size: 1.5rem; font-weight: 700; color: #d97706;">${effectivenessRate}%</div>
                             <div style="font-size: 0.8rem; color: #64748b;">CAPA Effective Rate</div>
+                            ` : `
+                            <div style="font-size: 0.85rem; font-weight: 700; color: #d97706;">Not yet available</div>
+                            <div style="font-size: 0.75rem; color: #64748b;">no closed CAPAs</div>
+                            `}
                         </div>
                     </div>
                 </div>
@@ -1379,6 +1495,20 @@ window.editNCR = function (ncrId) {
     window.openModal();
 };
 
+// 1-5 risk-scale <option> lists shared by the Likelihood/Impact selects below.
+// riskLikelihood/riskImpact are optional, auditor-entered integers — leaving
+// either blank means "not formally assessed", not zero risk.
+const RISK_LIKELIHOOD_LABELS = ['1 - Rare', '2 - Unlikely', '3 - Possible', '4 - Likely', '5 - Almost Certain'];
+const RISK_IMPACT_LABELS = ['1 - Negligible', '2 - Minor', '3 - Moderate', '4 - Major', '5 - Severe'];
+function riskScaleOptionsHTML(labels, selected) {
+    const opts = ['<option value="">Not assessed</option>'];
+    labels.forEach((label, i) => {
+        const v = i + 1;
+        opts.push(`<option value="${v}" ${Number(selected) === v ? 'selected' : ''}>${label}</option>`);
+    });
+    return opts.join('');
+}
+
 window.openAddCAPAModal = function (ncrId) {
     const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
     if (!ncr) return;
@@ -1393,8 +1523,9 @@ window.openAddCAPAModal = function (ncrId) {
             <div class="form-group"><label>Correction (Immediate Action)</label>
                 <textarea id="capa-corr" class="form-control" rows="2" placeholder="What immediate correction was taken?">${window.UTILS.escapeHtml(ncr.correction || '')}</textarea>
             </div>
-            <div class="form-group"><label>Root Cause Analysis <span style="color: var(--danger-color);">*</span></label>
+            <div class="form-group"><label>Root Cause Analysis (auditee-provided) <span style="color: var(--danger-color);">*</span></label>
                 <textarea id="capa-rc" class="form-control" rows="3" placeholder="Describe the root cause...">${window.UTILS.escapeHtml(ncr.rootCause || '')}</textarea>
+                <small style="color: var(--text-secondary);">Root cause is determined by the auditee. AI/auto-drafted text must be confirmed before use.</small>
             </div>
             <div class="form-group"><label>Corrective Action <span style="color: var(--danger-color);">*</span></label>
                 <textarea id="capa-ca" class="form-control" rows="3" placeholder="Describe corrective action planned...">${window.UTILS.escapeHtml(ncr.correctiveAction || '')}</textarea>
@@ -1405,6 +1536,23 @@ window.openAddCAPAModal = function (ncrId) {
                 </div>
                 <div class="form-group"><label>Target Completion Date</label>
                     <input type="date" class="form-control" id="capa-target-date" value="${ncr.dueDate || ''}">
+                </div>
+            </div>
+            <div class="form-group" style="border-top: 1px dashed var(--border-color); padding-top: 0.75rem; margin-top: 0.5rem;">
+                <label>Formal risk assessment <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.8rem;">(optional — leave blank if not performed)</span></label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.4rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.85rem;">Likelihood (1-5)</label>
+                        <select id="capa-risk-likelihood" class="form-control">
+                            ${riskScaleOptionsHTML(RISK_LIKELIHOOD_LABELS, ncr.riskLikelihood)}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.85rem;">Impact (1-5)</label>
+                        <select id="capa-risk-impact" class="form-control">
+                            ${riskScaleOptionsHTML(RISK_IMPACT_LABELS, ncr.riskImpact)}
+                        </select>
+                    </div>
                 </div>
             </div>
         </form>
@@ -1420,6 +1568,10 @@ window.openAddCAPAModal = function (ncrId) {
         ncr.correctiveAction = document.getElementById('capa-ca').value;
         ncr.capaResponsible = document.getElementById('capa-responsible').value;
         ncr.dueDate = document.getElementById('capa-target-date').value;
+        const likelihoodVal = document.getElementById('capa-risk-likelihood').value;
+        const impactVal = document.getElementById('capa-risk-impact').value;
+        ncr.riskLikelihood = likelihoodVal ? parseInt(likelihoodVal, 10) : null;
+        ncr.riskImpact = impactVal ? parseInt(impactVal, 10) : null;
         // Auto-transition CAR status from whichever CAPA fields were actually recorded
         ncr.carStatus = computeAutoCarStatus(ncr);
         ncr.status = legacyStatusFromCar(ncr.carStatus);
@@ -1559,8 +1711,9 @@ window.updateCAPAProgress = function (ncrId) {
                 <strong>NCR-${String(ncr.id).padStart(3, '0')}:</strong> ${window.UTILS.escapeHtml(ncr.description || '')}
                 <br><small style="color: var(--text-secondary);">Severity: ${ncr.severity || 'N/A'} | Status: ${ncr.status || 'Open'}</small>
             </div>
-            <div class="form-group"><label>Root Cause</label>
+            <div class="form-group"><label>Root Cause Analysis (auditee-provided)</label>
                 <textarea id="prog-rc" class="form-control" rows="2">${window.UTILS.escapeHtml(ncr.rootCause || '')}</textarea>
+                <small style="color: var(--text-secondary);">Root cause is determined by the auditee. AI/auto-drafted text must be confirmed before use.</small>
             </div>
             <div class="form-group"><label>Corrective Action</label>
                 <textarea id="prog-ca" class="form-control" rows="2">${window.UTILS.escapeHtml(ncr.correctiveAction || '')}</textarea>
@@ -1611,5 +1764,5 @@ window.switchNCRTab = switchNCRTab;
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getNCRAuditPlanOptions, updateNCRAuditPlanOptions, initNCRAnalyticsCharts, openNewNCRModal, viewNCRDetails, editNCR, openAddCAPAModal, printNCRRegister, verifyCAPA, updateCAPAProgress, renderNCRCAPAModule, switchNCRTab };
+    module.exports = { getNCRAuditPlanOptions, updateNCRAuditPlanOptions, initNCRAnalyticsCharts, openNewNCRModal, viewNCRDetails, editNCR, openAddCAPAModal, printNCRRegister, verifyCAPA, updateCAPAProgress, renderNCRCAPAModule, switchNCRTab, capaDisplayStatus, isOverdueNCR };
 }

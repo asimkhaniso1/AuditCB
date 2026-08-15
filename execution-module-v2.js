@@ -635,6 +635,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     // Resolve clause from checklist definition
                     let clauseText = 'Checklist Item';
                     let reqText = '';
+                    // Carried from the checklist item when present (FOCUS.n/SURV items
+                    // store the real ISO clause here since their own `clause` is an
+                    // internal pseudo-reference — see client-docs-bulk.js's question()).
+                    let criterionRef;
+                    let criterionSource;
                     const { assignedChecklists = [] } = contextData;
 
                     if (item.checklistId && assignedChecklists.length > 0) {
@@ -644,12 +649,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
                                 const mainObj = cl.clauses.find(m => m.mainClause === mainClauseVal);
                                 if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
-                                    clauseText = mainObj.subClauses[subIdxVal].clause || `Clause ${mainClauseVal}`;
-                                    reqText = mainObj.subClauses[subIdxVal].requirement || '';
+                                    const subItem = mainObj.subClauses[subIdxVal];
+                                    clauseText = subItem.clause || `Clause ${mainClauseVal}`;
+                                    reqText = subItem.requirement || '';
+                                    if (subItem.criterionRef !== undefined) criterionRef = subItem.criterionRef;
+                                    if (subItem.criterionSource) criterionSource = subItem.criterionSource;
                                 }
                             } else if (cl.items && cl.items[item.itemIdx]) {
                                 clauseText = cl.items[item.itemIdx].clause || 'Checklist Item';
                                 reqText = cl.items[item.itemIdx].requirement || '';
+                                if (cl.items[item.itemIdx].criterionRef !== undefined) criterionRef = cl.items[item.itemIdx].criterionRef;
+                                if (cl.items[item.itemIdx].criterionSource) criterionSource = cl.items[item.itemIdx].criterionSource;
                             }
                         }
                     } else if (item.isCustom) {
@@ -662,13 +672,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
                     return {
                         type: item.ncrType || window.CONSTANTS.NCR_TYPES.OBSERVATION,
+                        // clause is kept as-is (the internal FOCUS/SURV/ORG/DOC reference
+                        // when that's what it is) — criterionRef/criterionSource, when
+                        // present, tell a consumer to display criterionRef as the criterion.
                         clause: clauseText,
                         description: item.ncrDescription || item.comment || reqText || 'Non-conformity identified in checklist',
                         status: 'Open',
                         source: 'checklist',
                         department: item.department || '',
                         designation: item.designation || '',
-                        evidenceImage: item.evidenceImage
+                        evidenceImage: item.evidenceImage,
+                        ...(criterionSource ? { criterionRef: criterionRef || '', criterionSource } : {})
                     };
                 });
 
@@ -870,7 +884,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 `;
             } else if (canOneClickFinalize) {
                 primaryActionBtn = `
-                    <button class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);" data-action="finalizeAndPublish" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled' : ''}>
+                    <button id="btn-finalize-publish" class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);" data-action="finalizeAndPublish" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled' : ''}>
                         <i class="fa-solid fa-check-double" style="margin-right: 0.5rem;"></i> Finalize & Publish
                     </button>
                 `;
@@ -919,7 +933,22 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <div style="font-size: 0.85rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">Observations</div>
                         </div>
                     </div>
-                    
+
+                    <!-- Report Integrity -->
+                    <div class="card" id="report-integrity-card" style="margin-bottom: 2rem; border: 1px solid #e2e8f0; padding: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">
+                                <i class="fa-solid fa-shield-halved" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Report Integrity
+                            </h4>
+                            <button class="btn btn-sm btn-outline-secondary" data-action="runReportIntegrityCheck" data-id="${report.id}" aria-label="Run check">
+                                <i class="fa-solid fa-magnifying-glass-chart" style="margin-right: 0.5rem;"></i> Run Report Integrity Check
+                            </button>
+                        </div>
+                        <div id="report-integrity-results">
+                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Not yet run for this session.</p>
+                        </div>
+                    </div>
+
                     <!-- 2. Findings Review -->
                     <div style="margin-bottom: 2rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -1138,6 +1167,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         window.saveData();
                     });
                 });
+
+                // Auto-run the Report Integrity check when this tab renders — silent
+                // (no spinner/error UI) since it's a background convenience, not a
+                // user-initiated action; the button re-runs it visibly on demand.
+                if (typeof window.runReportIntegrityCheck === 'function') {
+                    window.runReportIntegrityCheck(report.id, { silent: true });
+                }
             }, 100);
         }
             break;
@@ -1868,6 +1904,30 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const sourceKey = `exec-${reportId}-${item.checklistId || 'custom'}-${item.itemIdx}`;
                 activeSourceKeys.add(sourceKey);
 
+                // Resolve clause text (and any criterionRef/criterionSource the
+                // checklist item carries) up front — sameFinding()'s dedupe match
+                // below needs clauseText, and it's needed again to build/refresh the
+                // register record. FOCUS.n/SURV items store the real ISO clause in
+                // criterionRef because their own `clause` is an internal
+                // pseudo-reference (see client-docs-bulk.js's question()); the report
+                // engine displays criterionRef as the criterion when it's present.
+                let clauseText = item.clause || 'Checklist Item';
+                let criterionRef;
+                let criterionSource;
+                if (item.checklistId && assignedChecklists.length > 0) {
+                    const cl = assignedChecklists.find(c => String(c.id) === String(item.checklistId));
+                    if (cl && cl.clauses && String(item.itemIdx).includes('-')) {
+                        const [mc, si] = String(item.itemIdx).split('-');
+                        const mainObj = cl.clauses.find(m => m.mainClause === mc);
+                        if (mainObj && mainObj.subClauses && mainObj.subClauses[si]) {
+                            const subItem = mainObj.subClauses[si];
+                            clauseText = subItem.clause || clauseText;
+                            if (subItem.criterionRef !== undefined) criterionRef = subItem.criterionRef;
+                            if (subItem.criterionSource) criterionSource = subItem.criterionSource;
+                        }
+                    }
+                }
+
                 // Check if already synced.
                 //
                 // _sourceKey embeds checklistId and itemIdx, both of which change
@@ -1916,21 +1976,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         existing.severity = newSeverity;
                         existing.description = item.ncrDescription || item.comment || existing.description;
                         existing.status = existing.status === 'Withdrawn' ? 'Open' : existing.status;
+                        if (criterionSource) {
+                            existing.criterionSource = criterionSource;
+                            existing.criterionRef = criterionRef || '';
+                        }
                         persist(existing);
                         return;
-                    }
-                }
-
-                // Resolve clause text
-                let clauseText = item.clause || 'Checklist Item';
-                if (item.checklistId && assignedChecklists.length > 0) {
-                    const cl = assignedChecklists.find(c => String(c.id) === String(item.checklistId));
-                    if (cl && cl.clauses && String(item.itemIdx).includes('-')) {
-                        const [mc, si] = String(item.itemIdx).split('-');
-                        const mainObj = cl.clauses.find(m => m.mainClause === mc);
-                        if (mainObj && mainObj.subClauses && mainObj.subClauses[si]) {
-                            clauseText = mainObj.subClauses[si].clause || clauseText;
-                        }
                     }
                 }
 
@@ -1961,6 +2012,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     correctiveAction: '',
                     evidence: item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : [])
                 };
+                if (criterionSource) {
+                    ncrRecord.criterionSource = criterionSource;
+                    ncrRecord.criterionRef = criterionRef || '';
+                }
 
                 window.state.ncrs.push(ncrRecord);
 
@@ -2195,6 +2250,24 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         };
     };
 
+    // A clause value that is actually an internal checklist pseudo-reference
+    // (FOCUS.n / SURV / ORG / DOC — see client-docs-bulk.js's buildClientChecklist)
+    // rather than a standard clause. Shared by the manual NCR create/edit forms'
+    // inline warning and their non-blocking save-time check.
+    window.NCR_PSEUDO_CLAUSE_PATTERN = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
+
+    // CSP-safe data-action-input handler: toggles the inline warning shown under
+    // the free-text Clause/Requirement input when its value looks like an
+    // internal pseudo-reference rather than an ISO clause. Non-blocking — it
+    // never prevents save, it just prompts the auditor to also fill in the
+    // "Actual criterion" field.
+    window.checkNCRClausePseudoPattern = function (el) {
+        const warningId = (el.dataset && el.dataset.id) || 'ncr-clause-warning';
+        const warning = document.getElementById(warningId);
+        if (!warning) return;
+        warning.style.display = window.NCR_PSEUDO_CLAUSE_PATTERN.test(String(el.value || '').trim()) ? 'block' : 'none';
+    };
+
     function createNCR(reportId) {
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
         if (!report) return;
@@ -2213,7 +2286,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             </div>
             <div class="form-group">
                 <label>Clause/Requirement</label>
-                <input type="text" class="form-control" id="ncr-clause" placeholder="e.g. 7.2, 8.3">
+                <input type="text" class="form-control" id="ncr-clause" placeholder="e.g. 7.2, 8.3" data-action-input="checkNCRClausePseudoPattern" data-id="ncr-clause-warning">
+                <small id="ncr-clause-warning" style="display:none; color: #b45309; margin-top: 0.35rem;">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.25rem;"></i>This is an internal reference, not an ISO clause — enter the applicable standard clause.
+                </small>
+            </div>
+            <div class="form-group">
+                <label>Actual criterion (standard clause) <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.8rem;">— optional</span></label>
+                <input type="text" class="form-control" id="ncr-criterion-ref" placeholder="e.g. 8.5.2">
             </div>
             <div class="form-group">
                 <label>Description <span style="color: var(--danger-color);">*</span></label>
@@ -2288,6 +2368,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // 4. Sanitize Input
             const type = document.getElementById('ncr-type').value;
             const clause = Sanitizer.sanitizeText(document.getElementById('ncr-clause').value);
+            const criterionRefInput = Sanitizer.sanitizeText(document.getElementById('ncr-criterion-ref')?.value || '');
             const description = Sanitizer.sanitizeText(document.getElementById('ncr-description').value);
             const evidence = Sanitizer.sanitizeText(document.getElementById('ncr-evidence').value);
             const evidenceImage = Sanitizer.sanitizeURL(document.getElementById('ncr-evidence-image-url').value);
@@ -2308,7 +2389,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 designation,
                 department,
                 status: 'Open',
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                // criterionRef is optional (auditor-supplied "actual criterion"); it's
+                // only attached when the auditor filled it in or flagged the clause as
+                // an internal reference, so plain manual NCRs stay unchanged.
+                ...(criterionRefInput || window.NCR_PSEUDO_CLAUSE_PATTERN.test(clause)
+                    ? { criterionRef: criterionRefInput, criterionSource: 'manual' } : {})
             });
             report.findings = report.ncrs.length;
 
@@ -2419,7 +2505,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         </div>
         <div class="form-group">
             <label>Clause/Requirement</label>
-            <input type="text" class="form-control" id="ncr-clause" placeholder="e.g. 7.2, 8.3" value="${window.UTILS.escapeHtml(ncr.clause || '')}">
+            <input type="text" class="form-control" id="ncr-clause" placeholder="e.g. 7.2, 8.3" value="${window.UTILS.escapeHtml(ncr.clause || '')}" data-action-input="checkNCRClausePseudoPattern" data-id="edit-ncr-clause-warning">
+            <small id="edit-ncr-clause-warning" style="display:${window.NCR_PSEUDO_CLAUSE_PATTERN.test(String(ncr.clause || '').trim()) ? 'block' : 'none'}; color: #b45309; margin-top: 0.35rem;">
+                <i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.25rem;"></i>This is an internal reference, not an ISO clause — enter the applicable standard clause.
+            </small>
+        </div>
+        <div class="form-group">
+            <label>Actual criterion (standard clause) <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.8rem;">— optional</span></label>
+            <input type="text" class="form-control" id="ncr-criterion-ref" placeholder="e.g. 8.5.2" value="${window.UTILS.escapeHtml(ncr.criterionRef || '')}">
         </div>
         <div class="form-group">
             <label>Description <span style="color: var(--danger-color);">*</span></label>
@@ -2467,6 +2560,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 `, () => {
             const type = document.getElementById('ncr-type').value;
             const clause = Sanitizer.sanitizeText(document.getElementById('ncr-clause').value);
+            const criterionRefInput = Sanitizer.sanitizeText(document.getElementById('ncr-criterion-ref')?.value || '');
             const description = Sanitizer.sanitizeText(document.getElementById('ncr-description').value);
             const evidence = Sanitizer.sanitizeText(document.getElementById('ncr-evidence').value);
             const personnel = Sanitizer.sanitizeText(document.getElementById('ncr-personnel-modal')?.value || '');
@@ -2492,7 +2586,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 designation,
                 department,
                 status,
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                // criterionRef is optional — only attach/refresh it when the
+                // auditor supplied one or flagged the clause as an internal
+                // reference; otherwise leave whatever the record already had.
+                ...(criterionRefInput || window.NCR_PSEUDO_CLAUSE_PATTERN.test(clause)
+                    ? { criterionRef: criterionRefInput, criterionSource: 'manual' } : {})
             };
 
             window.saveData();
@@ -2633,6 +2732,110 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         });
 
         window.showNotification('Meeting records saved successfully', 'success');
+    };
+
+    /**
+     * Run window.ReportIntegrity.checkById(reportId) (owned by another agent —
+     * see report-integrity.js) and render its result into the Finalization
+     * tab's Report Integrity card. Defensive throughout: the module may not be
+     * loaded yet, may not exist in this build, or may reject — none of that
+     * should break the Finalization tab. `opts.silent` is used for the
+     * automatic on-render check (no spinner/error text, and it simply does
+     * nothing when the module isn't available); the button click always shows
+     * some outcome.
+     */
+    window.runReportIntegrityCheck = async function (reportId, opts) {
+        const silent = !!(opts && opts.silent);
+        const container = document.getElementById('report-integrity-results');
+        if (!container) return;
+        const esc = window.UTILS.escapeHtml;
+
+        if (!window.ReportIntegrity || typeof window.ReportIntegrity.checkById !== 'function') {
+            if (silent) return;
+            container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Report Integrity checks are not available in this build.</p>';
+            return;
+        }
+
+        if (!silent) {
+            container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;"><i class="fa-solid fa-spinner fa-spin"></i> Running checks...</p>';
+        }
+
+        let result;
+        try {
+            result = await window.ReportIntegrity.checkById(reportId);
+        } catch (err) {
+            console.warn('Report Integrity check failed:', err);
+            if (!silent) {
+                container.innerHTML = '<p style="color: #dc2626; font-size: 0.9rem; margin: 0;">Report Integrity check failed to run: ' + esc(err && err.message ? err.message : 'Unknown error') + '</p>';
+            }
+            return;
+        }
+
+        if (!result || typeof result !== 'object') {
+            if (!silent) container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">No integrity data returned.</p>';
+            return;
+        }
+
+        const blockers = Array.isArray(result.blockers) ? result.blockers : [];
+        const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+        const information = Array.isArray(result.information) ? result.information : [];
+        const allItems = [...blockers, ...warnings, ...information];
+        const ready = blockers.length === 0;
+
+        const statusLine = ready
+            ? '<div style="color: #059669; font-weight: 700;"><i class="fa-solid fa-circle-check" style="margin-right: 0.4rem;"></i>READY FOR AUDITOR REVIEW</div>'
+            : '<div style="color: #dc2626; font-weight: 700;"><i class="fa-solid fa-circle-exclamation" style="margin-right: 0.4rem;"></i>BLOCKED — resolve blockers before finalization</div>';
+
+        container.innerHTML = `
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                <div style="background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px; padding: 0.75rem 1rem; min-width: 100px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #dc2626;">${blockers.length}</div>
+                    <div style="font-size: 0.75rem; color: #64748b;">Blockers</div>
+                </div>
+                <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 0.75rem 1rem; min-width: 100px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #d97706;">${warnings.length}</div>
+                    <div style="font-size: 0.75rem; color: #64748b;">Warnings</div>
+                </div>
+                <div style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; padding: 0.75rem 1rem; min-width: 100px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #2563eb;">${information.length}</div>
+                    <div style="font-size: 0.75rem; color: #64748b;">Information</div>
+                </div>
+            </div>
+            <div style="margin-bottom: 1rem; font-size: 0.95rem;">${statusLine}</div>
+            ${allItems.length ? `
+            <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                ${allItems.map(it => {
+        const sevKey = String((it && it.severity) || '').toLowerCase();
+        const badgeColor = sevKey === 'blocker' ? '#dc2626' : sevKey === 'warning' ? '#d97706' : '#3b82f6';
+        return `
+                    <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; flex-wrap: wrap;">
+                            <span style="background: ${badgeColor}; color: white; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 10px;">${esc(it && it.severity || 'info')}</span>
+                            ${it && it.section ? `<span style="font-size: 0.8rem; color: #475569; font-weight: 600;">${esc(it.section)}</span>` : ''}
+                        </div>
+                        <div style="font-size: 0.9rem; color: #1e293b; margin-bottom: 0.25rem;">${esc(it && it.message || '')}</div>
+                        ${it && it.source ? `<div style="font-size: 0.75rem; color: #94a3b8;">Source: ${esc(it.source)}</div>` : ''}
+                        ${it && it.suggestion ? `<div style="font-size: 0.8rem; color: #059669; margin-top: 0.25rem;"><i class="fa-solid fa-lightbulb" style="margin-right: 0.3rem;"></i>${esc(it.suggestion)}</div>` : ''}
+                    </div>
+                `;
+    }).join('')}
+            </div>
+            ` : '<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">No issues found.</p>'}
+        `;
+
+        // Visual hint only — the hard finalize gate lives in finalizeAndPublish.
+        const finalizeBtn = document.getElementById('btn-finalize-publish');
+        if (finalizeBtn) {
+            if (!ready) {
+                finalizeBtn.style.outline = '2px solid #dc2626';
+                finalizeBtn.style.outlineOffset = '2px';
+                finalizeBtn.title = blockers.length + ' report integrity blocker(s) must be resolved before finalizing.';
+            } else {
+                finalizeBtn.style.outline = '';
+                finalizeBtn.style.outlineOffset = '';
+                finalizeBtn.title = '';
+            }
+        }
     };
 
     // Export functions

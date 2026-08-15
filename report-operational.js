@@ -56,8 +56,17 @@
         } catch (_e) { return String(v); }
     }
 
-    var UNASSIGNED_LABEL = 'General';
+    var UNASSIGNED_LABEL = 'Unassigned / Cross-functional';
+    // Prefer the canonical window.ReportStats.normalizeDeptName() when that
+    // module has loaded (shared single source of truth across report-*.js);
+    // fall back to this local copy — kept consistent with the same label —
+    // so this file still works standalone if load order varies.
     function normalizeDeptName(raw) {
+        try {
+            if (global.ReportStats && typeof global.ReportStats.normalizeDeptName === 'function') {
+                return global.ReportStats.normalizeDeptName(raw);
+            }
+        } catch (_e) { /* fall through to local logic */ }
         var s = String(raw == null ? '' : raw).trim();
         if (!s) return UNASSIGNED_LABEL;
         if (/^(unassigned|general|n\/?a|none|other)$/i.test(s)) return UNASSIGNED_LABEL;

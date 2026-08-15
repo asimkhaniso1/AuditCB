@@ -100,16 +100,16 @@ function renderDashboardEnhanced() {
         });
 
         // Overdue NCRs — computed from the live NCR register (window.state.ncrs),
-        // not from checklist findings: any non-closed/withdrawn record whose
-        // due date has passed.
-        const todayForOverdue = new Date();
-        todayForOverdue.setHours(0, 0, 0, 0);
-        overdueNCRs = (window.state.ncrs || []).filter(n => {
-            if (['Closed', 'Withdrawn'].includes(n.status)) return false;
-            if (!n.dueDate) return false;
-            const due = new Date(n.dueDate);
-            return !isNaN(due) && due < todayForOverdue;
-        }).length;
+        // not from checklist findings: any non-closed/withdrawn record whose due
+        // date has passed. Delegates to ncr-capa-module.js's shared isOverdue
+        // helper (window.NCRModule.isOverdue) so this dashboard tile, the NCR
+        // register/analytics views and capaDisplayStatus all agree on what
+        // "overdue" means instead of each re-deriving the same date math.
+        overdueNCRs = (window.state.ncrs || []).filter(n =>
+            (window.NCRModule && typeof window.NCRModule.isOverdue === 'function')
+                ? window.NCRModule.isOverdue(n)
+                : (!['Closed', 'Withdrawn'].includes(n.status) && n.dueDate && !isNaN(new Date(n.dueDate)) && new Date(n.dueDate) < new Date())
+        ).length;
 
         const certificatesIssued = (window.state.certificates || []).length || completedAudits;
         const avgComplianceScore = complianceCount > 0 ? Math.round(complianceScoreSum / complianceCount) : 0;

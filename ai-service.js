@@ -420,7 +420,9 @@ Return a raw JSON array with 'id' and 'refined' fields only:
                     result[r.id] = {
                         ...result[r.id],
                         comment: r.refined,
-                        _originalComment: result[r.id].comment || result[r.id].remarks || result[r.id].transcript || ''
+                        _originalComment: result[r.id].comment || result[r.id].remarks || result[r.id].transcript || '',
+                        _aiGenerated: true,
+                        _auditorConfirmed: false
                     };
                 }
             });
@@ -502,7 +504,8 @@ Return a raw JSON array with 'id' and 'text' fields only:
                     result[g.id] = {
                         ...result[g.id],
                         comment: g.text,
-                        _aiGenerated: true
+                        _aiGenerated: true,
+                        _auditorConfirmed: false
                     };
                 }
             });
@@ -594,6 +597,10 @@ CRITICAL RULES — CCI Gold Standard:
 - Do NOT mix clauses across different standards — if multiple standards are audited, keep them clearly separated
 - Use legally defensible, accreditation-ready language suitable for external review by an accreditation body
 - The report must follow ISO 17021 certification body reporting requirements
+- Never state, estimate, or imply financial figures, revenue, penalties, contract values, customer loss, or reputational damage unless the exact figure appears in the context provided above
+- Never assert a certification decision or recommendation — that is decided separately by the audit team, not drafted by you
+- Never describe a finding as recurring, repeated, persistent, or systemic unless the prior-audit records provided above demonstrate it
+- Prefer plain, objective audit language: requirement, objective evidence, evaluation, finding
 
 Instructions:
 1. Executive Summary: Write a comprehensive, authoritative paragraph (150-250 words) summarizing the audit scope, methodology, and overall conclusion. Open with the audit context (type, standard, dates). ${planScopeContext ? 'Reference the stated audit objectives and methodology from the audit plan.' : ''} Briefly reference the opening meeting (attendees, date). State the overall assessment outcome, mentioning the number of non-conformities (${ncCount}) and observations/OFIs (${obsCount}) raised. Conclude with the audit team's overall impression of the management system's maturity and effectiveness. Use language that reflects 30+ years of assessment experience — measured, precise, and professional.
@@ -964,10 +971,28 @@ window._reportContentHash = function (report, statsSummary) {
         const findings = (report.checklistProgress || [])
             .filter(i => i && i.status === 'nc')
             .map(i => ({ clause: i.clause, ncrType: i.ncrType, comment: i.comment }));
+
+        // Master-data drift detection: fold in the resolved client name + primary
+        // site address so an edit to the client record AFTER issuance (e.g. a
+        // corrected site address) also trips the MODIFIED SINCE ISSUE banner, not
+        // just changes to the report's own findings/stats.
+        let clientName = report.client || '';
+        let primarySiteAddress = '';
+        try {
+            const client = (window.state && window.state.clients || []).find(c => String(c.id) === String(report.clientId));
+            if (client) {
+                clientName = client.name || clientName;
+                const site = Array.isArray(client.sites) && client.sites[0];
+                if (site) primarySiteAddress = site.address || '';
+            }
+        } catch (_e) { /* best-effort — hash still valid without master-data fields */ }
+
         const payload = JSON.stringify({
             findings,
             ncrs: report.ncrs || [],
-            statsSummary: statsSummary || null
+            statsSummary: statsSummary || null,
+            clientName,
+            primarySiteAddress
         });
         return _djb2Hash(payload);
     } catch (e) { return '0'; }
@@ -1057,12 +1082,41 @@ window.finalizeAndPublish = function (reportId) {
         warnings.push('Technical review outcome is not "Approved" for this certification-type audit.');
     }
 
+    // ─── Report Integrity Validator: additional cross-cutting checks (evidence,
+    // criterion refs, chronology, financial claims, AI-content review, etc).
+    // Defensive — the validator module may not have loaded, or may throw on
+    // unexpected data shapes; never let it block finalize on its own failure. ───
+    let integrityResult = null;
+    try {
+        if (window.ReportIntegrity && typeof window.ReportIntegrity.check === 'function') {
+            const client = (window.state && window.state.clients || []).find(c => String(c.id) === String(report.clientId));
+            integrityResult = window.ReportIntegrity.check({ report, auditPlan: plan, client, stats: rs });
+        }
+    } catch (e) { console.error('ReportIntegrity.check failed during finalize gate:', e); }
+
+    if (integrityResult) {
+        integrityResult.blockers.forEach(b => blockers.push(b.message));
+        integrityResult.warnings.forEach(w => warnings.push(w.message));
+    }
+
     if (blockers.length) {
-        alert('This report cannot be finalized yet:\n\n- ' + blockers.join('\n- '));
+        const infoCount = integrityResult ? integrityResult.information.length : 0;
+        const preview = blockers.slice(0, 5).map(m => '- ' + m).join('\n');
+        const more = blockers.length > 5 ? `\n… and ${blockers.length - 5} more.` : '';
+        alert(
+            'REPORT INTEGRITY — Blockers: ' + blockers.length + ' / Warnings: ' + warnings.length + ' / Information: ' + infoCount +
+            '\n\nThis report cannot be finalized yet:\n\n' + preview + more
+        );
         return;
     }
     if (warnings.length) {
-        const proceed = confirm('The following issues were found but do not block finalization:\n\n- ' + warnings.join('\n- ') + '\n\nFinalize anyway?');
+        const infoCount = integrityResult ? integrityResult.information.length : 0;
+        const preview = warnings.slice(0, 5).map(m => '- ' + m).join('\n');
+        const more = warnings.length > 5 ? `\n… and ${warnings.length - 5} more.` : '';
+        const proceed = confirm(
+            'REPORT INTEGRITY — Blockers: 0 / Warnings: ' + warnings.length + ' / Information: ' + infoCount +
+            '\n\nThe following issues were found but do not block finalization:\n\n' + preview + more + '\n\nFinalize anyway?'
+        );
         if (!proceed) return;
     }
 
@@ -1166,6 +1220,8 @@ window.runFollowUpAIAnalysis = async function (reportId) {
                 const finding = findings.find(f => f.id === s.id);
                 if (finding && report.checklistProgress[finding.originalIdx]) {
                     report.checklistProgress[finding.originalIdx].ncrType = s.type.toLowerCase();
+                    report.checklistProgress[finding.originalIdx]._aiGenerated = true;
+                    report.checklistProgress[finding.originalIdx]._auditorConfirmed = false;
                     updateCount++;
                 }
             }
@@ -1251,23 +1307,54 @@ window.runAutoSummary = async function (reportId) {
         // Helper to strip any remaining markdown from AI response
         const stripMd = (text) => text ? text.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1').replace(/^#+\s*/gm, '').replace(/^[-•]\s*/gm, '').trim() : '';
 
+        // Guard against silently clobbering auditor-edited text: if a field already
+        // has non-empty content that would change, require explicit confirmation
+        // and preserve the previous value for recovery.
+        const trim = (s) => (s == null ? '' : String(s)).trim();
+        const confirmOverwrite = (fieldLabel, existing, incoming) => {
+            if (!existing || !trim(existing) || trim(existing) === trim(incoming)) return true;
+            return confirm(`Overwrite the current ${fieldLabel} text with a new AI draft?`);
+        };
+
         if (result.executiveSummary) {
-            report.executiveSummary = stripMd(result.executiveSummary);
-            const execInput = document.getElementById('exec-summary-' + reportId) || document.getElementById('exec-summary');
-            if (execInput) execInput.value = report.executiveSummary;
+            const draft = stripMd(result.executiveSummary);
+            if (confirmOverwrite('Executive Summary', report.executiveSummary, draft)) {
+                if (trim(report.executiveSummary) && trim(report.executiveSummary) !== trim(draft)) {
+                    report._previousExecutiveSummary = report.executiveSummary;
+                }
+                report.executiveSummary = draft;
+                const execInput = document.getElementById('exec-summary-' + reportId) || document.getElementById('exec-summary');
+                if (execInput) execInput.value = report.executiveSummary;
+            }
         }
 
         if (result.positiveObservations) {
-            report.positiveObservations = stripMd(Array.isArray(result.positiveObservations) ? result.positiveObservations.join('\n') : result.positiveObservations);
-            const posInput = document.getElementById('positive-observations');
-            if (posInput) posInput.value = report.positiveObservations;
+            const draft = stripMd(Array.isArray(result.positiveObservations) ? result.positiveObservations.join('\n') : result.positiveObservations);
+            if (confirmOverwrite('Positive Observations', report.positiveObservations, draft)) {
+                if (trim(report.positiveObservations) && trim(report.positiveObservations) !== trim(draft)) {
+                    report._previousPositiveObservations = report.positiveObservations;
+                }
+                report.positiveObservations = draft;
+                const posInput = document.getElementById('positive-observations');
+                if (posInput) posInput.value = report.positiveObservations;
+            }
         }
 
         if (result.ofi && Array.isArray(result.ofi)) {
-            report.ofi = result.ofi.map(s => stripMd(s)).join('\n');
-            const ofiInput = document.getElementById('ofi');
-            if (ofiInput) ofiInput.value = report.ofi;
+            const draft = result.ofi.map(s => stripMd(s)).join('\n');
+            if (confirmOverwrite('Opportunities for Improvement', report.ofi, draft)) {
+                if (trim(report.ofi) && trim(report.ofi) !== trim(draft)) {
+                    report._previousOfi = report.ofi;
+                }
+                report.ofi = draft;
+                const ofiInput = document.getElementById('ofi');
+                if (ofiInput) ofiInput.value = report.ofi;
+            }
         }
+
+        report.aiContent = Object.assign({}, report.aiContent, {
+            execSummary: { status: 'draft', generatedAt: new Date().toISOString(), generatedBy: 'gemini' }
+        });
 
         window.saveChecklist(reportId);
         window.showNotification("Executive Summary & Observations drafted by AI.", "success");
@@ -1279,6 +1366,49 @@ window.runAutoSummary = async function (reportId) {
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
+};
+
+// 4. Confirm AI-generated content (auditor sign-off)
+// Flips _aiGenerated checklist items to _auditorConfirmed:true and report.aiContent
+// entries to status:'approved'. CSP-safe: exposed on window so a data-action button
+// (built by another agent's UI panel) can invoke it without an inline handler.
+// scope: 'all' (default) | 'findings' (checklistProgress only) | an aiContent key
+// (e.g. 'execSummary') to confirm just that piece of narrative content.
+window.confirmAiContent = function (reportId, scope) {
+    const report = window.DataService.findAuditReport(reportId);
+    if (!report) return false;
+
+    const targetScope = scope || 'all';
+    let changed = false;
+
+    if (targetScope === 'all' || targetScope === 'findings') {
+        (report.checklistProgress || []).forEach(item => {
+            if (item && item._aiGenerated === true && item._auditorConfirmed !== true) {
+                item._auditorConfirmed = true;
+                changed = true;
+            }
+        });
+    }
+
+    if (report.aiContent) {
+        Object.keys(report.aiContent).forEach(key => {
+            if (targetScope !== 'all' && targetScope !== 'findings' && targetScope !== key) return;
+            const entry = report.aiContent[key];
+            if (entry && entry.status !== 'approved') {
+                entry.status = 'approved';
+                entry.approvedAt = new Date().toISOString();
+                changed = true;
+            }
+        });
+    }
+
+    if (changed) {
+        if (typeof window.saveChecklist === 'function') window.saveChecklist(reportId);
+        else if (typeof window.saveData === 'function') window.saveData();
+        window.showNotification && window.showNotification('AI-generated content confirmed by auditor.', 'success');
+    }
+
+    return changed;
 };
 
 // Support CommonJS/test environments

@@ -165,27 +165,25 @@
         ).join('\n');
 
         return `
-You are a senior engagement partner at a Big Four consulting firm (Deloitte/PwC/EY/KPMG style), presenting the outcome of an ISO management system audit directly to the CEO and Board. They will read nothing else — this must stand alone as the strategic picture.
+You are an ISO management-system audit reporting assistant. Produce an executive summary of THIS audit for the client's senior management, using only the data provided below. Do not invent, assume, or infer any fact not present in the Audit Data or Non-Conformity Detail sections.
 
-Narrative structure (answer in this order across the fields, so a board member reading top-to-bottom gets the full story):
-1. Overall health (health field) — is the management system fundamentally sound?
+Narrative structure (answer in this order across the fields, so a reader top-to-bottom gets the full picture):
+1. Overall health (health field) — is the management system fundamentally sound, based on the conformity rate and findings below?
 2. Certification status (outcome, recommendation) — where does this leave certification?
-3. Major risks and their business impact (risks, businessImpact, concerns) — what could this cost the business?
+3. Consequences of the findings (risks, businessImpact, concerns) — what does this mean for the certification process (closure timelines, scope of verification at the next audit)?
 4. What management should do (priorities, managementActions) — the concrete next steps.
-5. Forward readiness / confidence (forwardOutlook) — how confident should the board be heading into the next audit stage?
+5. Forward readiness / confidence (forwardOutlook) — how ready is the organization heading into the next audit stage?
 
 Voice rules (strict):
-- Lead every statement with the business consequence, not the audit mechanic. Do not write "an audit was conducted" — write what it means for the business.
-- Register examples — transform certification-speak into executive consequence language exactly like these:
-  1. Certification-speak: "No material business risk identified." -> Executive register: "Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term."
-  2. Certification-speak: "The organization demonstrates compliance with clause 8.5.1." -> Executive register: "Production controls under clause 8.5.1 are operating as designed, supporting consistent on-time delivery."
-  3. Certification-speak: "It is recommended that corrective action be taken within 30 days." -> Executive register: "Closing this finding within 30 days keeps the certification timeline intact and avoids a follow-up audit cost."
-  4. Certification-speak: "The audit was conducted in accordance with the requirements of ISO 9001." -> Executive register: "This review tested whether the management system reliably protects quality, delivery, and compliance outcomes."
+- Use plain audit language: requirement -> objective evidence -> evaluation -> finding. State only what the audit evidence supports.
 - EVERY paragraph-level field (outcome, health, businessImpact, risks, forwardOutlook) MUST contain at least one concrete quantified reference — a score, a count, a clause number, or a named department — pulled from the data below. A sentence with no number, clause, or department name is not acceptable.
-- Never write generic filler like "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "healthy operational posture", "in conclusion", or "moving forward". Banned phrases, do not use any of these anywhere: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of". Banned: any sentence that could be pasted into a different company's report unchanged. Target register instead, e.g.: "The management system is effectively implemented and supports operational resilience. Opportunities remain to strengthen preventive controls within supplier management."
+- Never write generic filler like "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "healthy operational posture", "in conclusion", or "moving forward". Banned phrases, do not use any of these anywhere: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of". Banned: any sentence that could be pasted into a different company's report unchanged.
+- Never state or estimate financial figures, revenue, penalties, customer loss, cost, contract exposure, or reputational damage. Consequences may reference ONLY certification-process outcomes — e.g. closure timelines, certification decision status, or the scope of verification at the next audit — never business, commercial, or financial outcomes.
+- Never claim a weakness is "recurring", "repeated", "systemic", or a "pattern" — recurrence can only be stated if the data below explicitly identifies that the same clause failed in a prior audit. If no prior-audit data is provided, describe multiple related findings only by count or as a concentration within this audit, never as a trend across audits.
+- Never list a department or clause under "strengths" if that same department or clause also appears in the Non-Conformity Detail list below.
 - For each bullet list (strengths, weaknesses, concerns, priorities, managementActions): identify only genuinely DISTINCT points — do not restate the same underlying theme in different words to pad the list. Cap each list at 3 bullets maximum, even if fewer than 3 distinct points exist. It is better to return 1 sharp bullet than 3 that repeat one theme.
-- No hedging. Take a clear position. Quantify wherever possible (percentages, counts, timeframes).
-- Write in plain, declarative sentences a CEO reads in 90 seconds. No jargon, no markdown symbols.
+- No hedging beyond what the evidence supports, but do not overstate certainty either — take a clear position grounded strictly in the data above. Quantify wherever possible (percentages, counts, timeframes).
+- Write in plain, declarative sentences a senior manager reads in 90 seconds. No jargon, no markdown symbols.
 
 Audit Data:
 - Client: ${report.client || client.name || 'the organization'}
@@ -209,13 +207,13 @@ Write a JSON object with these fields (plain text, NO markdown symbols like ** o
   "verdict": "one short phrase, 2-5 words, the overall health verdict a CEO could repeat in a hallway (e.g. 'Certifiable with targeted fixes' or 'At risk — major gaps in Production')",
   "outcome": "1-2 sentence overall audit outcome statement citing actual counts",
   "health": "1-2 sentence organizational health / management system maturity statement",
-  "strengths": ["up to 3 short bullet strings, each a genuinely distinct key strength, cite departments/clauses"],
+  "strengths": ["up to 3 short bullet strings, each a genuinely distinct key strength, cite departments/clauses — never a department or clause that also appears in the Non-Conformity Detail list above"],
   "weaknesses": ["up to 3 short bullet strings, each a genuinely distinct key weakness, cite departments/clauses — do not repeat the same theme worded differently"],
-  "concerns": ["up to 3 short bullet strings, each a genuinely distinct strategic concern for leadership"],
+  "concerns": ["up to 3 short bullet strings, each a genuinely distinct concern for management, framed only in certification-process terms (closure timelines, verification scope) — never financial or commercial terms"],
   "priorities": ["up to 3 short bullet strings, recommended management priorities, action-oriented, owner-implied"],
   "recommendation": "1-2 sentence certification recommendation statement",
-  "risks": "1-2 sentence forward-looking business-impact risk statement with at least one number/clause/department (what could jeopardize certification, revenue, or customer trust if unaddressed)",
-  "businessImpact": "1-2 sentence statement translating the findings into business terms with at least one number/clause/department (cost of delay, customer/contract exposure, operational risk)",
+  "risks": "1-2 sentence forward-looking risk statement with at least one number/clause/department — certification-process consequences only (e.g. what could delay closure or affect the scope of verification at the next audit); never revenue, cost, penalties, or customer/business impact",
+  "businessImpact": "1-2 sentence statement on the certification-process implications of the findings with at least one number/clause/department (e.g. effect on closure timeline or scope of the next audit) — never a financial, revenue, or commercial figure",
   "managementActions": ["up to 3 short bullet strings, each a genuinely distinct top-management responsibility per ISO clause 5/9.3 style, action-oriented with implied ownership"],
   "forwardOutlook": "1-2 sentence statement on forward readiness/confidence heading into the next audit stage, citing at least one number/clause/department"
 }
@@ -242,7 +240,7 @@ Return ONLY the raw JSON object, no markdown fences.`;
 
         const concerns = [];
         if (stats.majorNC > 0) concerns.push(`${stats.majorNC} major non-conformity(ies) present a certification risk requiring immediate corrective action.`);
-        if (stats.minorNC > 2) concerns.push(`A cluster of ${stats.minorNC} minor non-conformities suggests systemic process gaps rather than isolated incidents.`);
+        if (stats.minorNC > 2) concerns.push(`Multiple minor nonconformities (${stats.minorNC}) were identified across processes; collectively they warrant a review of the underlying controls.`);
         if (!concerns.length) concerns.push('No material strategic concerns identified at this time.');
 
         const priorities = realNCs.slice(0, 5).map(i => `Close the ${((i.ncrType || 'nc')).toUpperCase()} finding at clause ${clauseLabel(i)}${i.department ? ' in ' + i.department : ''} within the required timeframe.`);
@@ -273,19 +271,19 @@ Return ONLY the raw JSON object, no markdown fences.`;
         return {
             verdict,
             outcome: `Against ${report.standard || 'the applicable standard'}, ${report.client || 'the organization'} closed this audit cycle with ${stats.actualNCCount || 0} non-conformity(ies) (${stats.majorNC || 0} major, ${stats.minorNC || 0} minor) and ${stats.obsOfiCount || 0} observation(s)/opportunity(ies) across ${stats.applicableCount || 0} applicable requirements.`,
-            health: `The management system is ${conformPct >= 80 ? 'effectively implemented and supports operational resilience' : conformPct >= 60 ? 'functioning but unevenly embedded across departments' : 'still maturing, with core controls not yet consistently applied'} at a ${conformPct}% conformity rate${worstDept ? `. Opportunities remain to strengthen preventive controls within ${worstDept[0]}` : ''}.`,
+            health: `The management system is ${conformPct >= 80 ? 'effectively implemented, with controls consistently applied across assessed areas' : conformPct >= 60 ? 'functioning but unevenly embedded across departments' : 'still maturing, with core controls not yet consistently applied'} at a ${conformPct}% conformity rate${worstDept ? `. Opportunities remain to strengthen preventive controls within ${worstDept[0]}` : ''}.`,
             strengths,
             weaknesses,
             concerns,
             recommendation,
             priorities,
             businessImpact: stats.majorNC > 0
-                ? `Unresolved major findings put certification timing and downstream customer/contract commitments at risk; each week of delay compounds audit and re-audit cost.`
-                : `Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.`,
+                ? `Unresolved major findings (${stats.majorNC}) put the certification decision and closure timeline at risk; each week of delay extends the scope of verification required at the next audit stage.`
+                : `Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.`,
             managementActions,
             risks: stats.majorNC > 0
                 ? 'Failure to close major non-conformities within the required timeframe may delay or jeopardize certification issuance.'
-                : 'Continued monitoring of minor findings and observations is advised to prevent escalation into systemic issues.',
+                : 'Continued monitoring of minor findings and observations is advised to prevent them from compounding into a broader pattern of control gaps.',
             forwardOutlook
         };
     }
@@ -552,6 +550,35 @@ ${data.forwardOutlook ? `
 <div class="b4-rule"></div>`;
     }
 
+    // Cross-checks AI-authored "strengths" against the real NC list before it
+    // is ever merged/rendered: a department or clause that appears in the
+    // non-conformity list must never also be cited as a strength — the model
+    // has no reliable self-check against the data it was given, so this is
+    // enforced in code, not just via prompt instruction.
+    function buildNCExclusionSet(d) {
+        const realNCs = getRealNCs(d);
+        const depts = new Set();
+        const clauses = new Set();
+        realNCs.forEach(i => {
+            const dep = (i.department && String(i.department).trim()) || '';
+            if (dep) depts.add(dep.toLowerCase());
+            const cl = clauseLabel(i);
+            if (cl && cl !== 'General') clauses.add(String(cl).toLowerCase());
+        });
+        return { depts, clauses };
+    }
+
+    function filterStrengthsAgainstNCs(d, strengths) {
+        const excl = buildNCExclusionSet(d);
+        if (!excl.depts.size && !excl.clauses.size) return safeArr(strengths);
+        return safeArr(strengths).filter(s => {
+            const low = String(s == null ? '' : s).toLowerCase();
+            for (const dep of excl.depts) { if (dep && low.indexOf(dep) !== -1) return false; }
+            for (const cl of excl.clauses) { if (cl && low.indexOf(cl) !== -1) return false; }
+            return true;
+        });
+    }
+
     async function generateExecutiveSummary(d) {
         const fallback = fallbackExecSummaryData(d);
         if (!window.AI_SERVICE || typeof window.AI_SERVICE.callProxyAPI !== 'function') {
@@ -564,6 +591,7 @@ ${data.forwardOutlook ? `
             const cleaned = String(text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
             const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
+            if (Array.isArray(parsed.strengths)) parsed.strengths = filterStrengthsAgainstNCs(d, parsed.strengths);
             const merged = capExecSummaryLists(Object.assign({}, fallback, parsed));
             return { html: renderExecSummaryHtml(merged, buildGlance(d, merged), buildBoardBrief(d, merged)) };
         } catch (err) {
@@ -779,6 +807,48 @@ ${intel.missingEvidence.length ? `
         { key: 'strategic', title: 'Suggested Strategic Priorities', icon: '&#127919;' }
     ];
 
+    // Genuine cross-audit recurrence: a clause only counts as "recurring" when
+    // it failed (major/minor) in THIS audit AND in the most recent prior
+    // finalized audit for the same client/standard. Mirrors the pattern used
+    // by report-scoring.js's clauseIntelligence(). Returns null when no prior
+    // finalized audit exists for this client — callers must retitle/reword
+    // rather than claim recurrence in that case.
+    function computeGenuineRecurrence(d) {
+        try {
+            const report = (d && d.report) || {};
+            const clientId = report.clientId;
+            if (!clientId) return null;
+            const allReports = (window.state && window.state.auditReports) || [];
+            const prevReports = allReports
+                .filter(r => r && r.clientId === clientId && String(r.id) !== String(report.id) &&
+                    r.reportStatus === 'final' && (!report.standard || r.standard === report.standard))
+                .sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+            const prevReport = prevReports[0];
+            if (!prevReport) return null;
+
+            const prevFailedClauses = new Set(
+                (prevReport.checklistProgress || [])
+                    .filter(p => p && p.status === 'nc' && ['major', 'minor'].includes(String(p.ncrType || '').toLowerCase()))
+                    .map(p => p.clause)
+                    .filter(Boolean)
+            );
+
+            const clauseCounts = {};
+            getRealNCs(d).forEach(i => {
+                const c = i.clause || (i.kbMatch && i.kbMatch.clause) || '';
+                if (!c) return;
+                clauseCounts[c] = (clauseCounts[c] || 0) + 1;
+            });
+            const recurringClauses = Object.entries(clauseCounts)
+                .filter(([c]) => prevFailedClauses.has(c))
+                .map(([clause, count]) => ({ clause, count }));
+
+            return { hasPrior: true, recurringClauses };
+        } catch (_e) {
+            return null;
+        }
+    }
+
     // Confidence is "High" when a card is grounded directly in counted findings/register
     // data (real NC counts, department tallies, evidence coverage numbers); "Moderate"
     // when the card is heuristic/derived (pattern inference, forward-looking judgment).
@@ -791,11 +861,19 @@ ${intel.missingEvidence.length ? `
         const deptEntries = Object.entries(depts);
         const intel = computeEvidenceIntel(d);
 
+        const recurrenceData = computeGenuineRecurrence(d);
+
         const risks = [];
         if (stats.majorNC > 0) risks.push(`${stats.majorNC} major non-conformity(ies) could delay certification issuance.`);
         if (intel.coveragePct < 50) risks.push('Low evidence coverage weakens the defensibility of findings under accreditation scrutiny.');
-        if (stats.minorNC > 3) risks.push(`${stats.minorNC} minor non-conformities suggest possible systemic control gaps.`);
-        if (!risks.length) risks.push('Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.');
+        if (stats.minorNC > 3) {
+            if (recurrenceData && recurrenceData.hasPrior && recurrenceData.recurringClauses.length) {
+                risks.push(`${stats.minorNC} minor non-conformities include ${recurrenceData.recurringClauses.length} clause(s) that also failed in the client's prior audit — a genuine recurrence pattern.`);
+            } else {
+                risks.push(`${stats.minorNC} minor non-conformities were identified across processes; collectively they warrant a review of the underlying controls.`);
+            }
+        }
+        if (!risks.length) risks.push('Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.');
 
         const departments = deptEntries
             .filter(([, v]) => v.major > 0 || v.minor > 0)
@@ -805,11 +883,26 @@ ${intel.missingEvidence.length ? `
         if (!departments.length) departments.push('No department currently requires elevated attention.');
         const worstDept = deptEntries.filter(([, v]) => v.major > 0 || v.minor > 0).sort((a, b) => (b[1].major * 2 + b[1].minor) - (a[1].major * 2 + a[1].minor))[0];
 
-        const clauseCounts = {};
-        realNCs.forEach(i => { const c = clauseLabel(i).split('.').slice(0, 2).join('.'); clauseCounts[c] = (clauseCounts[c] || 0) + 1; });
-        const recurringPairs = Object.entries(clauseCounts).filter(([, c]) => c > 1);
-        const recurring = recurringPairs.map(([c, count]) => `Clause ${c}: ${count} related findings — indicates a recurring weakness area.`);
-        if (!recurring.length) recurring.push('No recurring weakness patterns detected across clauses.');
+        // Recurring card: only use "recurring" language when a prior finalized
+        // audit for this client actually shows the same clause failing again.
+        // Absent that data, retitle as a same-audit concentration — never imply
+        // a cross-audit trend the report can't back up.
+        var recurring, recurringPairsLen, recurringTitle;
+        if (recurrenceData && recurrenceData.hasPrior) {
+            recurringPairsLen = recurrenceData.recurringClauses.length;
+            recurring = recurrenceData.recurringClauses.map(({ clause, count }) =>
+                `Clause ${clause}: ${count} finding(s) this audit, and also failed in the client's prior audit.`);
+            if (!recurring.length) recurring.push('No clauses failed in both this audit and the client\'s prior audit.');
+            recurringTitle = 'Recurring Weaknesses';
+        } else {
+            const clauseCounts = {};
+            realNCs.forEach(i => { const c = clauseLabel(i).split('.').slice(0, 2).join('.'); clauseCounts[c] = (clauseCounts[c] || 0) + 1; });
+            const concentrationPairs = Object.entries(clauseCounts).filter(([, c]) => c > 1);
+            recurringPairsLen = concentrationPairs.length;
+            recurring = concentrationPairs.map(([c, count]) => `Clause ${c}: ${count} findings in this audit.`);
+            if (!recurring.length) recurring.push('No clause concentrations detected in this audit.');
+            recurringTitle = 'Clause Concentrations (this audit)';
+        }
 
         const improvements = [];
         deptEntries.filter(([, v]) => v.total > 0 && v.nc === 0).slice(0, 4).forEach(([name]) => improvements.push(`${name} showed full conformity — a positive indicator of process maturity.`));
@@ -842,11 +935,14 @@ ${intel.missingEvidence.length ? `
                     : 'No department currently requires elevated management attention.'
             },
             recurring: {
+                title: recurringTitle,
                 bullets: recurring,
-                confidence: recurringPairs.length ? 'High' : 'Moderate',
-                priority: recurringPairs.length ? 'Near-term' : 'Monitor',
-                recommendation: recurringPairs.length
-                    ? 'Commission a root-cause review of the recurring clause area(s) above rather than closing each finding in isolation.'
+                confidence: recurringPairsLen ? 'High' : 'Moderate',
+                priority: recurringPairsLen ? 'Near-term' : 'Monitor',
+                recommendation: recurringPairsLen
+                    ? ((recurrenceData && recurrenceData.hasPrior)
+                        ? 'Commission a root-cause review of the recurring clause area(s) above rather than closing each finding in isolation.'
+                        : 'Review the clause concentration(s) above at the next management review; a prior-audit comparison will be available from the next audit cycle.')
                     : 'Continue routine clause-level trend monitoring at each management review.'
             },
             improvements: {
@@ -882,8 +978,18 @@ ${intel.missingEvidence.length ? `
         const deptSummary = Object.entries(depts).map(([n, v]) => `${n}: total ${v.total}, conform ${v.conform}, major ${v.major}, minor ${v.minor}`).join('; ');
         const ncLines = realNCs.slice(0, 20).map((i, idx) => `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseLabel(i)} (${i.department || 'General'})`).join('\n');
 
+        const recurrenceData = computeGenuineRecurrence(d);
+        let priorAuditLines = 'Not available — no prior finalized audit found for this client/standard.';
+        if (recurrenceData && recurrenceData.hasPrior) {
+            priorAuditLines = recurrenceData.recurringClauses.length
+                ? `Prior finalized audit exists. Clauses that failed both then and in this audit: ${recurrenceData.recurringClauses.map(r => r.clause).join(', ')}.`
+                : 'Prior finalized audit exists for this client, but no clause that failed previously failed again in this audit.';
+        }
+
         return `
-You are a senior engagement partner at a Big Four consulting firm generating executive insight cards for a CEO/Board-level ISO audit report dashboard. Each bullet must be specific and decision-oriented — cite real numbers, clause numbers, and department names from the data. No hedging, no generic filler ("it is important to note", "overall", "the organization demonstrates compliance"). Banned phrases, do not use any of these anywhere: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of". Lead with the business consequence. Write in the senior-consultant register (e.g. "The management system is effectively implemented and supports operational resilience. Opportunities remain to strengthen preventive controls within supplier management."), not generic audit-speak. Example transformation: instead of "No material business risk identified", write "Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term."
+You are an ISO management-system audit reporting assistant generating executive insight cards for an audit report dashboard, using only the data provided below. Each bullet must be specific and decision-oriented — cite real numbers, clause numbers, and department names from the data. No hedging, no generic filler ("it is important to note", "overall", "the organization demonstrates compliance"). Banned phrases, do not use any of these anywhere: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of". Use plain audit language: requirement -> objective evidence -> evaluation -> finding.
+- Never state or estimate financial figures, revenue, penalties, customer loss, cost, contract exposure, or reputational damage. Frame consequences only in certification-process terms (closure timelines, verification scope at the next audit).
+- Never claim a finding, weakness, or clause is "recurring," "repeated," "systemic," or part of a "pattern" across audits unless the Prior-Audit Comparison line below explicitly shows it failed previously too. Absent that, describe same-audit clusters only as a count or "concentration within this audit."
 
 Context:
 - Client: ${report.client || ''}
@@ -892,6 +998,7 @@ Context:
 - Department Summary: ${deptSummary || 'N/A'}
 - Non-conformities:
 ${ncLines || 'None'}
+- Prior-Audit Comparison: ${priorAuditLines}
 
 For each key, return an object with: "bullets" (2-3 short plain-text bullet strings, no markdown), "confidence" (exactly "High" if the bullets are grounded directly in counted findings/register data from above, or "Moderate" if they are heuristic/derived judgment), "priority" (exactly "Immediate", "Near-term", or "Monitor" reflecting real urgency), and "recommendation" (one bolded-lead-in-ready sentence of management guidance, e.g. "Direct an executive owner to close the 2 major findings above before the certification decision is finalized.").
 
@@ -913,12 +1020,16 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
     const CONFIDENCE_BADGE_CLASS = { 'High': 'b4-badge--info', 'Moderate': 'b4-badge--neutral' };
 
     // Normalize one AI/fallback insight entry into {bullets,confidence,priority,recommendation},
-    // tolerating a legacy plain-array shape from either source.
+    // tolerating a legacy plain-array shape from either source. `title` is
+    // always taken from the deterministic fallback — it reflects whether
+    // genuine cross-audit recurrence data exists, which the AI has no
+    // reliable way to self-report, so it is never AI-controlled.
     function normalizeInsightEntry(raw, fallbackEntry) {
         const fb = fallbackEntry || { bullets: [], confidence: 'Moderate', priority: 'Monitor', recommendation: '' };
         if (!raw) return fb;
-        if (Array.isArray(raw)) return Object.assign({}, fb, { bullets: raw });
+        if (Array.isArray(raw)) return Object.assign({}, fb, { bullets: raw, title: fb.title });
         return {
+            title: fb.title,
             bullets: (Array.isArray(raw.bullets) && raw.bullets.length) ? raw.bullets : fb.bullets,
             confidence: (raw.confidence === 'High' || raw.confidence === 'Moderate') ? raw.confidence : fb.confidence,
             priority: (raw.priority === 'Immediate' || raw.priority === 'Near-term' || raw.priority === 'Monitor') ? raw.priority : fb.priority,
@@ -934,7 +1045,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
             const prioClass = PRIORITY_BADGE_CLASS[entry.priority] || 'b4-badge--neutral';
             return `
 <div class="b4-card b4-insight-card">
-  <div class="b4-card-heading">${icon(INSIGHT_ICON_MAP[def.key] || 'finding')} ${esc(def.title)}</div>
+  <div class="b4-card-heading">${icon(INSIGHT_ICON_MAP[def.key] || 'finding')} ${esc(entry.title || def.title)}</div>
   <div class="b4-badge-row">
     <span class="b4-badge ${confClass}">${esc(entry.confidence || 'Moderate')} Confidence</span>
     <span class="b4-badge ${prioClass}">${PRIORITY_BADGE_SYMBOL[entry.priority] || ''}${esc(entry.priority || 'Monitor')}</span>
@@ -1106,7 +1217,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
         try {
             const context = buildAskContext(d);
             const prompt = `
-You are an audit intelligence assistant embedded in an ISO certification body's report preview tool. Answer the user's question about THIS audit concisely (2-5 sentences, plain text, no markdown symbols), using only the JSON context provided. If the answer requires data not present in the context, say so plainly rather than inventing facts.
+You are an audit intelligence assistant embedded in an ISO certification body's report preview tool. Answer the user's question about THIS audit concisely (2-5 sentences, plain text, no markdown symbols), using only the JSON context provided. If the answer requires data not present in the context, say so plainly rather than inventing facts. Never state or estimate financial figures, revenue, penalties, customer loss, cost, or reputational damage. Never describe a finding as "recurring," "repeated," or "systemic" unless the context explicitly shows it also failed in a prior audit.
 
 Audit Context (JSON):
 ${JSON.stringify(context).substring(0, 6000)}

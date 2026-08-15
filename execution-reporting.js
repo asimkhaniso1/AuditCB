@@ -30,6 +30,32 @@
     };
     window._fmtRemark = fmtRemark;
 
+    // ─── Criterion display for findings (#7) ───────────────────────────────────
+    // Checklist items carried over from a Stage 1 FOCUS item (or other internal
+    // tracking refs like SURV./ORG./DOC.) use an internal reference in `clause`
+    // that is never a real ISO clause. When a parallel agent has resolved the real
+    // clause onto `criterionRef` (criterionSource 'checklist'|'focus-carryover'),
+    // show that instead. Otherwise, an internal ref with no resolved clause is a
+    // visible reporting gap — flagged so it cannot pass unnoticed (the integrity
+    // validator, report-integrity.js, blocks finalization on this).
+    const INTERNAL_REF_PREFIX_RE = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
+    const displayCriterion = (finding) => {
+        const esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml : (s) => String(s == null ? '' : s);
+        if (!finding) return '';
+        if (finding.criterionRef) {
+            const suffix = finding.criterionSource === 'focus-carryover'
+                ? ' <span style="font-size:0.72em;color:#94a3b8;font-style:italic;">(from Stage 1 focus item)</span>'
+                : '';
+            return esc(finding.criterionRef) + suffix;
+        }
+        const clause = finding.clause || '';
+        if (INTERNAL_REF_PREFIX_RE.test(clause)) {
+            return '<span style="color:#b91c1c;font-weight:700;" title="Criterion not assigned — internal tracking reference only">Criterion not assigned — internal ref ' + esc(clause) + '</span>';
+        }
+        return esc(clause);
+    };
+    window._displayCriterion = displayCriterion;
+
     // Build the list of revision-history rows to render on the cover page.
     // Does NOT mutate the report — pure read helper used by both the preview modal and PDF export.
     // Version bumps now happen ONLY at finalize/re-issue time (see ai-service.js
@@ -250,6 +276,13 @@
             return variants;
         };
         for (const item of hydratedProgress) {
+            // Snapshot the pre-resolution keys (idb:// URLs or as-captured URLs) so the
+            // evidence indexer below can match them against EvidenceUtils.getEvidenceIndex()
+            // and reuse the same EV-IDs assigned at capture time, instead of renumbering.
+            item._origEvKeys = {
+                single: item.evidenceImage || null,
+                list: Array.isArray(item.evidenceImages) ? item.evidenceImages.slice() : []
+            };
             if (item.evidenceImage) {
                 item.evidenceImage = await resolveUrl(item.evidenceImage);
                 if (item.evidenceImage) {
@@ -278,18 +311,41 @@
             }
         }
 
-        // Build EV id index (report.evidenceIndex / EvidenceUtils.getEvidenceIndex() preferred; else positional).
+        // Build EV id index. Preferred: window.EvidenceUtils.getEvidenceIndex(), which carries
+        // the EV-IDs assigned at capture time (keyed by the pre-resolution idb:// key), so
+        // capture-time EV-IDs match printed ones within a session. Falls back to positional
+        // numbering only when the capture-time index is empty or a given image has no match in it.
         const _evIndex = []; // [{evId, itemRef, image, thumb, comment, clause, dept, findingRef, capturedAt, location}]
         (function buildEvidenceIndex() {
-            let n = 0;
-            const nextId = () => 'EV-' + String(++n).padStart(2, '0');
+            const captureIdx = (window.EvidenceUtils && typeof window.EvidenceUtils.getEvidenceIndex === 'function')
+                ? (window.EvidenceUtils.getEvidenceIndex() || []) : [];
+            const evIdByKey = {};
+            let maxCaptureNum = 0;
+            captureIdx.forEach((e) => {
+                if (e && e.idbKey && e.evId) {
+                    evIdByKey[e.idbKey] = e.evId;
+                    const m = /(\d+)$/.exec(e.evId);
+                    if (m) maxCaptureNum = Math.max(maxCaptureNum, parseInt(m[1], 10));
+                }
+            });
+            const usedIds = new Set();
+            let n = maxCaptureNum;
+            const nextId = () => {
+                let id;
+                do { id = 'EV-' + String(++n).padStart(2, '0'); } while (usedIds.has(id));
+                return id;
+            };
             hydratedProgress.forEach((item) => {
                 const imgs = Array.isArray(item.evidenceImages) && item.evidenceImages.length ? item.evidenceImages : (item.evidenceImage ? [item.evidenceImage] : []);
                 const thumbs = Array.isArray(item.evidenceThumbs) && item.evidenceThumbs.length ? item.evidenceThumbs : (item.evidenceImageThumb ? [item.evidenceImageThumb] : []);
+                const origKeys = (item._origEvKeys && item._origEvKeys.list.length) ? item._origEvKeys.list : (item._origEvKeys && item._origEvKeys.single ? [item._origEvKeys.single] : []);
                 if (!imgs.length) return;
                 item._evIds = [];
                 imgs.forEach((img, i) => {
-                    const evId = nextId();
+                    const origKey = origKeys[i];
+                    let evId = (origKey && evIdByKey[origKey]) ? evIdByKey[origKey] : null;
+                    if (!evId) evId = nextId();
+                    usedIds.add(evId);
                     item._evIds.push(evId);
                     _evIndex.push({
                         evId,
@@ -297,6 +353,8 @@
                         thumb: thumbs[i] || img,
                         comment: item.comment || '',
                         clause: item.clause || '',
+                        criterionRef: item.criterionRef || null,
+                        criterionSource: item.criterionSource || null,
                         dept: item.department || item.deptName || '',
                         findingRef: item.status === 'nc' ? (item.ncrType || 'NC') : (item.status || ''),
                         capturedAt: item.evidenceCapturedAt || item.capturedAt || '',
@@ -374,12 +432,18 @@
         // OBS/OFI combined count (advisories — do not reduce conformity)
         const obsOfiCount = observationCount + ofiCount;
 
-        // NC breakdown by clause group (for bar chart) — majors/minors only, advisories excluded
+        // NC breakdown by clause group (for bar chart) — majors/minors only, advisories excluded.
+        // Internal refs (FOCUS.x / SURV.x / ORG.x / DOC.x carryover items) are never mixed into
+        // the numeric ISO clause buckets — they get their own "Internal focus items" bucket.
+        const INTERNAL_REF_RE = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
         const ncByClause = {};
         ncItems.forEach(item => {
             const t = (item.ncrType || '').toLowerCase();
             if (t !== 'major' && t !== 'minor') return;
-            const g = (item.clause || '').split('.')[0] || '?';
+            const clauseStr = item.criterionRef || item.clause || '';
+            const g = (!item.criterionRef && INTERNAL_REF_RE.test(item.clause || ''))
+                ? 'Internal focus items'
+                : (clauseStr.split('.')[0] || '?');
             ncByClause[g] = (ncByClause[g] || 0) + 1;
         });
 
@@ -430,15 +494,29 @@
         if (majorNC > 0) { auditStatus = 'Action Required'; statusColor = '#dc2626'; }
         else if (minorNC > 0) { auditStatus = 'Satisfactory with Minor Issues'; statusColor = '#d97706'; }
         else { auditStatus = 'Satisfactory'; statusColor = '#16a34a'; }
-        let recommendation, recColor;
-        if (majorNC > 0) { recommendation = 'Conditional Recommendation'; recColor = '#d97706'; }
-        else { recommendation = 'Recommended for Certification'; recColor = '#16a34a'; }
 
         // Preferred: shared ReportStats module (single source of truth across all report agents).
         // Legacy fallback: compute the same corrected semantics inline if the module isn't loaded.
         const rs = (window.ReportStats && typeof window.ReportStats.build === 'function')
             ? window.ReportStats.build({ report, hydratedProgress, auditPlan, client })
             : null;
+
+        // Recommendation: audit-type-aware, deterministic — never AI, never a fixed
+        // "Recommended for Certification" regardless of audit type (a surveillance
+        // audit must never print that certification-granting phrase). Prefer the
+        // shared ReportStats.recommendationText computation; fall back to the same
+        // logic inline only when the module failed to load.
+        const REC_COLOR_HEX = { bad: '#dc2626', warn: '#d97706', good: '#16a34a', neutral: '#64748b' };
+        let recommendation, recColor;
+        if (rs && rs.recommendation) {
+            recommendation = rs.recommendation;
+            recColor = REC_COLOR_HEX[rs.recColor] || '#16a34a';
+        } else if (window.ReportStats && typeof window.ReportStats.recommendationText === 'function') {
+            const auditTypeForRec = report.auditType || auditPlan?.type || auditPlan?.auditType || '';
+            recommendation = window.ReportStats.recommendationText(auditTypeForRec, { majorNC, minorNC });
+            recColor = majorNC > 0 ? '#dc2626' : (minorNC > 0 ? '#d97706' : '#16a34a');
+        } else if (majorNC > 0) { recommendation = 'Conditional Recommendation'; recColor = '#d97706'; }
+        else { recommendation = 'Recommended for Certification'; recColor = '#16a34a'; }
 
         const assessedCount = conformityItems.length + actualNCCount + obsOfiCount;
         const notAssessedCount = rs ? rs.resultCounts.notAssessed : notAssessedItems.length;
@@ -566,8 +644,10 @@
         const _ncCount = d.stats.ncCount || 0;
         const _riskLevel = (_majorNC > 0 || _ncCount > 3) ? 'HIGH' : (_ncCount > 0 ? 'MEDIUM' : 'LOW');
         const _riskColor = _riskLevel === 'HIGH' ? '#ef4444' : _riskLevel === 'MEDIUM' ? '#f59e0b' : '#10b981';
-        const _maturityStars = (_majorNC > 0) ? '⭐⭐' : (_ncCount === 0 ? '⭐⭐⭐⭐⭐' : _ncCount <= 2 ? '⭐⭐⭐⭐' : _ncCount <= 5 ? '⭐⭐⭐' : '⭐⭐');
-        const _maturityLabel = (_majorNC > 0) ? 'Early Stage' : (_ncCount === 0 ? 'Excellent' : _ncCount <= 2 ? 'Good' : _ncCount <= 5 ? 'Developing' : 'Early Stage');
+        // Ad-hoc "maturity" star rating removed — it was a raw-NC-count guess that
+        // contradicted report-scoring's gated maturity engine. The KPI card below
+        // now shows the findings-count summary instead, with an explicit
+        // "(analytical indicator)" sub-label since it is engine-derived, not audited.
 
         // Remove existing overlay
         const existing = document.getElementById('report-preview-overlay');
@@ -588,7 +668,6 @@
             { id: 'findings', label: 'Findings', icon: 'fa-triangle-exclamation', color: '#dc2626' },
             { id: 'ncrs', label: 'NCRs', icon: 'fa-clipboard-check', color: '#ea580c' },
             { id: 'corrective', label: 'Corrective Actions', icon: 'fa-wrench', color: '#be185d' },
-            { id: 'meetings', label: 'Meetings', icon: 'fa-handshake', color: '#0891b2' },
             { id: 'changes', label: 'Changes', icon: 'fa-clock-rotate-left', color: '#78716c' },
             { id: 'mgmt-effectiveness', label: 'Mgmt Effectiveness', icon: 'fa-gauge-high', color: '#0e7490' },
             { id: 'conclusion', label: 'Conclusion', icon: 'fa-gavel', color: '#4338ca' },
@@ -605,49 +684,41 @@
 
         // Sections whose preview toggle starts unchecked (opt-in annexes).
         const DEFAULT_OFF = ['carForms'];
+        // Persisted toggle choices (report.reportConfig.sectionToggles) take priority over
+        // the always-reset default so re-opening the preview keeps what was chosen last time.
+        const _persistedToggles = (d.report.reportConfig && d.report.reportConfig.sectionToggles) || null;
         window._reportSectionState = {};
-        sections.forEach(s => { window._reportSectionState[s.id] = !s.hide && DEFAULT_OFF.indexOf(s.id) < 0; });
+        sections.forEach(s => {
+            if (_persistedToggles && Object.prototype.hasOwnProperty.call(_persistedToggles, s.id)) {
+                window._reportSectionState[s.id] = !!_persistedToggles[s.id];
+            } else {
+                window._reportSectionState[s.id] = !s.hide && DEFAULT_OFF.indexOf(s.id) < 0;
+            }
+        });
+
+        // Annex master toggles (#3): default formal always on; evidence on (NC evidence
+        // traceability); analytics/capa off. Persisted at report.reportConfig.annexes.
+        const _annexToggles = Object.assign({ analytics: false, evidence: true, capa: false }, (d.report.reportConfig && d.report.reportConfig.annexes) || {});
+        window._reportAnnexState = _annexToggles;
 
         // ─── Audit Programme (3-year certification cycle) — preview data ──
+        // Single computation shared with the export path via ReportStats.buildProgramme:
+        // anchors on the client's certificate, overlays real history, and never
+        // fabricates Stage 1/2 dates when there is nothing to anchor on.
         const pvStandard = d.report.standard || d.auditPlan?.standard || 'ISO Standard';
-        const pvStageBase = (function () {
-            const t = (d.auditPlan?.auditType || d.report.auditType || 'Initial').toLowerCase();
-            if (/stage\s*1|stage1/.test(t)) return 0;
-            if (/stage\s*2|stage2|initial/.test(t)) return 1;
-            if (/surveillance\s*1|sv1|1st\s*surveillance|first\s*surveillance/.test(t)) return 2;
-            if (/surveillance\s*2|sv2|2nd\s*surveillance|second\s*surveillance/.test(t)) return 3;
-            if (/re-?cert/.test(t)) return 4;
-            if (/surveillance/.test(t)) return 2;
-            return 1;
-        })();
-        // The certification cycle is anchored on the client's INITIAL certification
-        // date, not on the date of whichever audit is being reported. Anchoring on
-        // the current audit put Stage 1 and Stage 2 in the month of a surveillance
-        // visit and pushed recertification three years past the certificate's real
-        // expiry. Fall back to the audit date only when no certificate is on file.
-        const pvAuditDate = (d.report.date || d.auditPlan?.startDate || d.auditPlan?.date)
-            ? new Date(d.report.date || d.auditPlan?.startDate || d.auditPlan?.date) : new Date();
-        const pvCycleCert = ((d.client && d.client.certificates) || []).find(function (c) {
-            return String(c.standard || '').toLowerCase() === String(pvStandard).toLowerCase();
-        }) || ((d.client && d.client.certificates) || [])[0] || null;
-        const pvParseDate = (v) => { const dt = v ? new Date(v) : null; return (dt && !isNaN(dt.getTime())) ? dt : null; };
-        const pvCycleStart = (pvCycleCert && (pvParseDate(pvCycleCert.initialDate) || pvParseDate(pvCycleCert.issueDate))) || null;
-        const pvCycleExpiry = pvCycleCert ? pvParseDate(pvCycleCert.expiryDate) : null;
-        const pvBaseDate = pvCycleStart || pvAuditDate;
-        const pvFmt = (dt) => dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-        const pvMonthYear = (offset) => { const dt = new Date(pvBaseDate.getTime()); dt.setMonth(dt.getMonth() + offset); return pvFmt(dt); };
-        // Recertification is bounded by the certificate, not by a fixed +36 months.
-        const pvRecertTiming = pvCycleExpiry ? ('by ' + pvFmt(pvCycleExpiry)) : pvMonthYear(36);
-        const pvProgrammeStages = [
-            { id: 's1',     label: 'Stage 1',                         offset: 0,  editId: 'rp-prog-s1',     def: 'Readiness review — documentation, context, scope confirmation' },
-            { id: 's2',     label: 'Stage 2 (Initial Certification)', offset: 0,  editId: 'rp-prog-s2',     def: 'Full system implementation audit' },
-            { id: 'sv1',    label: 'Surveillance 1',                  offset: 12, editId: 'rp-prog-sv1',    def: 'Key processes, use of marks, changes, previous findings follow-up' },
-            { id: 'sv2',    label: 'Surveillance 2',                  offset: 24, editId: 'rp-prog-sv2',    def: 'Key processes, use of marks, changes, previous findings follow-up' },
-            { id: 'recert', label: 'Recertification',                 offset: 36, editId: 'rp-prog-recert', def: 'Full system re-assessment over the certification cycle' }
-        ].map((s, i) => Object.assign({}, s, {
-            timing: s.id === 'recert' ? pvRecertTiming : pvMonthYear(s.offset),
-            status: i < pvStageBase ? 'Completed' : (i === pvStageBase ? 'This audit' : 'Planned')
-        }));
+        const EDIT_ID_BY_STAGE = { s1: 'rp-prog-s1', s2: 'rp-prog-s2', sv1: 'rp-prog-sv1', sv2: 'rp-prog-sv2', recert: 'rp-prog-recert' };
+        const pvProgramme = (window.ReportStats && typeof window.ReportStats.buildProgramme === 'function')
+            ? window.ReportStats.buildProgramme({ client: d.client, auditPlan: d.auditPlan, report: d.report, allReports: (window.state && window.state.auditReports) || [] })
+            : { stages: [], anchored: 'audit-date-fallback', issues: ['Certification programme module unavailable.'], anchorDate: null };
+        const pvProgrammeStages = pvProgramme.stages.map((s) => Object.assign({}, s, { editId: EDIT_ID_BY_STAGE[s.id] || ('rp-prog-' + s.id) }));
+        const programmeAnchorCaption = (programme) => {
+            const dt = programme.anchorDate ? new Date(programme.anchorDate) : null;
+            const fmtDate = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('en-GB') : '';
+            if (programme.anchored === 'certificate') return 'anchored on the initial certification date of ' + fmtDate;
+            if (programme.anchored === 'history') return 'based on recorded audit history' + (fmtDate ? ' (earliest record ' + fmtDate + ')' : '');
+            return 'prior stage dates unavailable — no certificate on file';
+        };
+        window._programmeAnchorCaption = programmeAnchorCaption;
 
         // ─── Multi-site sampling — preview data ────────────────────────────
         const pvAllSites = (d.client && Array.isArray(d.client.sites)) ? d.client.sites : [];
@@ -670,7 +741,7 @@
         };
 
         const ncRows = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() !== 'observation' && (i.ncrType || '').toLowerCase() !== 'ofi').map((item, idx) => {
-            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             const sevRaw = (item.ncrType || '').toLowerCase();
@@ -688,7 +759,7 @@
 
         // OBS rows (Observations only)
         const obsOnlyRows = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() === 'observation').map((item, idx) => {
-            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             return `<tr style="background:${idx % 2 ? '#f5f3ff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
@@ -696,7 +767,7 @@
 
         // OFI rows (Opportunities for Improvement only)
         const ofiOnlyRows = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() === 'ofi').map((item, idx) => {
-            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             return `<tr style="background:${idx % 2 ? '#f0fbff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
@@ -704,7 +775,7 @@
 
         // Conformance rows (items with comments or evidence)
         const conformRows = d.hydratedProgress.filter(i => i.status === 'conform').map((item, idx) => {
-            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             return `<tr style="background:${idx % 2 ? '#f0fdf4' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
@@ -746,6 +817,13 @@
                 <div style="flex:1;"></div>
                 <button data-action="expandAllSections" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Expand All</button>
                 <button data-action="collapseAllSections" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Collapse All</button>
+            </div>
+            <div class="rp-pills" style="background:#f8fafc;">
+                <span style="font-size:0.78rem;color:#64748b;font-weight:600;margin-right:4px;">REPORT PARTS:</span>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;color:#0f172a;font-weight:600;"><input type="checkbox" checked disabled> Formal Certification Report (always included)</label>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;color:#334155;"><input type="checkbox" id="annex-toggle-analytics" ${_annexToggles.analytics ? 'checked' : ''} data-action="toggleReportAnnex" data-arg1="analytics"> Management Analytics Annex</label>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;color:#334155;"><input type="checkbox" id="annex-toggle-evidence" ${_annexToggles.evidence ? 'checked' : ''} data-action="toggleReportAnnex" data-arg1="evidence"> Evidence Annex</label>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;color:#334155;"><input type="checkbox" id="annex-toggle-capa" ${_annexToggles.capa ? 'checked' : ''} data-action="toggleReportAnnex" data-arg1="capa"> CAPA Annex</label>
             </div>
             <div class="rp-content">
                 <!-- COVER PAGE -->
@@ -859,7 +937,7 @@
                             <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Audit Type</td><td style="padding:7px 12px;">${d.auditPlan?.auditType || 'Initial'}</td></tr>
                             <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Dates</td><td style="padding:7px 12px;">${d.report.date || '—'} ${d.report.endDate ? '→ ' + d.report.endDate : ''}</td></tr>
                             <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Lead Auditor</td><td style="padding:7px 12px;">${d.report.leadAuditor || '—'}</td></tr>
-                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${[d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ') || '—'}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${(function () { var s = (d.client.sites && d.client.sites[0]) || {}; return [d.client.address || s.address, d.client.city || s.city, d.client.province, d.client.country || s.country].filter(Boolean).join(', ') || '—'; })()}</td></tr>
                 ${(() => {
                 const locAddr = [d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ');
                 const addrFallback = locAddr ? `<div style="padding:16px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;text-align:center;"><i class="fa-solid fa-map-location-dot" style="font-size:1.5rem;color:#64748b;margin-bottom:6px;display:block;"></i><div style="color:#334155;font-size:0.9rem;font-weight:600;">${locAddr}</div></div>` : '';
@@ -878,13 +956,14 @@
                 <div class="rp-sec" id="sec-audit-programme">
                     <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-calendar-days"></i></span>AUDIT PROGRAMME<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div style="font-size:0.82rem;color:#64748b;margin-bottom:0.75rem;">3-year certification cycle, anchored on ${pvCycleStart ? 'the initial certification date of ' + pvCycleStart.toLocaleDateString('en-GB') : 'the current audit date of ' + (d.report.date || '—') + ' (no certificate on file)'}.</div>
+                        <div style="font-size:0.82rem;color:#64748b;margin-bottom:0.75rem;">3-year certification cycle, ${programmeAnchorCaption(pvProgramme)}.</div>
+                        ${pvProgramme.issues && pvProgramme.issues.length ? `<div style="font-size:0.78rem;color:#92400e;background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 10px;margin-bottom:0.75rem;border-radius:4px;">${pvProgramme.issues.map(i => window.UTILS.escapeHtml(i)).join('<br>')}</div>` : ''}
                         <table style="width:100%;font-size:0.85rem;border-collapse:collapse;">
                             <thead><tr style="background:#f0f9ff;"><th style="padding:7px 12px;text-align:left;">Audit Stage</th><th style="padding:7px 12px;text-align:left;">Planned Timing</th><th style="padding:7px 12px;text-align:left;">Focus & Scope</th><th style="padding:7px 12px;text-align:center;">Status</th></tr></thead>
                             <tbody>
                             ${pvProgrammeStages.map(s => {
-        const statusBg = s.status === 'Completed' ? '#dcfce7' : (s.status === 'This audit' ? '#dbeafe' : '#f1f5f9');
-        const statusFg = s.status === 'Completed' ? '#166534' : (s.status === 'This audit' ? '#1d4ed8' : '#64748b');
+        const statusBg = s.status === 'Completed' ? '#dcfce7' : (s.status === 'This audit' ? '#dbeafe' : (s.status === 'Unknown' ? '#fef3c7' : '#f1f5f9'));
+        const statusFg = s.status === 'Completed' ? '#166534' : (s.status === 'This audit' ? '#1d4ed8' : (s.status === 'Unknown' ? '#92400e' : '#64748b'));
         return `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:7px 12px;font-weight:600;">${s.label}</td><td style="padding:7px 12px;">${s.timing}</td><td style="padding:7px 12px;"><div id="${s.editId}" class="rp-edit" contenteditable="true">${s.def}</div></td><td style="padding:7px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:${statusBg};color:${statusFg};">${s.status}</span></td></tr>`;
     }).join('')}
                             </tbody>
@@ -969,13 +1048,13 @@
                                     <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">per ISO 17021-1</div>
                                 </div>
                                 
-                                <!-- Client Maturity -->
+                                <!-- Conformity (analytical indicator, not a maturity rating) -->
                                 <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid #8b5cf6;">
-                                    <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Maturity</div>
+                                    <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Conformity</div>
                                     <div style="font-size:1.8rem;font-weight:800;color:#8b5cf6;">
-                                        ${_maturityStars}
+                                        ${d.stats.conformityPct === null || d.stats.conformityPct === undefined ? '—' : d.stats.conformityPct + '%'}
                                     </div>
-                                    <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">${_maturityLabel}</div>
+                                    <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">(analytical indicator)</div>
                                 </div>
                             </div>
                             
@@ -1241,13 +1320,15 @@
                                     // Group findings by main clause (e.g., 4.x -> 4, 5.x -> 5)
                                     const clauseData = {};
                                     const allItems = ${JSON.stringify(d.hydratedProgress.map(i => ({
-                clause: i.kbMatch?.clause || i.clause || '—',
+                clause: i.criterionRef || i.kbMatch?.clause || i.clause || '—',
+                rawClause: i.clause || '',
+                hasCriterionRef: !!i.criterionRef,
                 status: i.status,
                 ncrType: (i.ncrType || '').toLowerCase()
             })))};
-                                    
+                                    const INTERNAL_REF_RE_CHART = /^(FOCUS|SURV|ORG|DOC)([.\\s]|$)/i;
                                     allItems.forEach(item => {
-                                        const mainClause = item.clause.split('.')[0]; // Extract main clause (e.g., "4" from "4.1.2")
+                                        const mainClause = (!item.hasCriterionRef && INTERNAL_REF_RE_CHART.test(item.rawClause)) ? 'Internal focus items' : item.clause.split('.')[0]; // Extract main clause (e.g., "4" from "4.1.2")
                                         if (!clauseData[mainClause]) {
                                             clauseData[mainClause] = { major: 0, minor: 0, obs: 0, ofi: 0, ok: 0 };
                                         }
@@ -1665,7 +1746,7 @@
                             if (allRiskClauses.length === 0) return '';
                             return '<div style="margin-bottom:14px;padding:14px;background:#fef2f2;border-radius:10px;border-left:4px solid #dc2626;"><div style="font-size:0.82rem;font-weight:700;color:#991b1b;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>RISK AREAS IDENTIFIED</div><div style="font-size:0.85rem;color:#7f1d1d;line-height:1.6;">The following clause areas have been identified as requiring management attention due to non-conformity findings: <strong>' + allRiskClauses.join(', ') + '</strong>. These areas should be prioritized for corrective action and root cause analysis to prevent recurrence.</div></div>';
                         })()}
-                        <div id="rp-conclusion" class="rp-edit" contenteditable="true">${d.report.conclusion || 'Based on the audit findings, the audit team concludes that the organization\'s management system has been assessed against the applicable standard requirements. Click to edit this conclusion.'}</div>
+                        <div id="rp-conclusion" class="rp-edit" contenteditable="true">${d.report.conclusion || ('Based on the audit findings, the audit team concludes that the organization\'s management system has been assessed against the applicable standard requirements. ' + (d.stats.rs && d.stats.rs.recommendation ? d.stats.rs.recommendation : d.stats.recommendation || '') + ' Click to edit this conclusion.')}</div>
                         <div style="margin-top:14px;"><strong style="color:#334155;font-size:0.85rem;">Unresolved Issues / Diverging Opinions:</strong> <span id="rp-unresolved" class="rp-edit" contenteditable="true" style="margin-left:6px;">${d.report.unresolvedIssues || 'None. All findings were acknowledged by the auditee at the closing meeting.'}</span></div>
                         <p style="font-style:italic;font-size:0.78rem;color:#64748b;margin-top:12px;">This audit was conducted through a sampling process of the available information. Consequently, nonconformities may exist which have not been identified within this report.</p>
                     </div>
@@ -1788,8 +1869,8 @@
                 if (clauseCtx) {
                     const clauseData = {};
                     d.hydratedProgress.forEach(item => {
-                        const clause = item.kbMatch?.clause || item.clause || '—';
-                        const mainClause = clause.split('.')[0];
+                        const clause = item.criterionRef || item.kbMatch?.clause || item.clause || '—';
+                        const mainClause = (!item.criterionRef && INTERNAL_REF_PREFIX_RE.test(item.clause || '')) ? 'Internal focus items' : clause.split('.')[0];
                         if (!clauseData[mainClause]) clauseData[mainClause] = { major: 0, minor: 0, obs: 0, ok: 0 };
                         if (item.status === 'nc') {
                             const t = (item.ncrType || '').toLowerCase();
@@ -1934,6 +2015,24 @@
         setTimeout(() => window._initPreviewCharts(), 300);
     };
 
+    // Persist preview toggle choices to report.reportConfig so re-opening the preview
+    // (or exporting) remembers what the auditor selected, instead of always resetting.
+    const _persistReportConfig = function () {
+        const d = window._reportPreviewData;
+        if (!d || !d.report) return;
+        try {
+            d.report.reportConfig = d.report.reportConfig || {};
+            d.report.reportConfig.sectionToggles = Object.assign({}, window._reportSectionState || {});
+            d.report.reportConfig.annexes = Object.assign({}, window._reportAnnexState || {});
+            if (window.DataService && typeof window.DataService.syncAuditReport === 'function') {
+                window.DataService.syncAuditReport(d.report.id, { reportConfig: d.report.reportConfig });
+            } else if (typeof window.saveData === 'function') {
+                window.saveData();
+            }
+        } catch (_e) { /* noop — persistence is best-effort, preview state still updates */ }
+    };
+    window._persistReportConfig = _persistReportConfig;
+
     window.toggleReportSection = function (id, color) {
         const pill = document.getElementById('pill-' + id);
         const sec = document.getElementById('sec-' + id);
@@ -1949,6 +2048,17 @@
             pill.style.background = color; pill.style.color = 'white'; pill.style.borderColor = color;
             if (sec) sec.style.display = '';
         }
+        _persistReportConfig();
+    };
+
+    // Annex master toggle checkbox (Management Analytics / Evidence / CAPA annexes).
+    // CSP-safe: wired via data-action, not inline onclick.
+    window.toggleReportAnnex = function (group) {
+        if (!window._reportAnnexState) window._reportAnnexState = {};
+        window._reportAnnexState[group] = !window._reportAnnexState[group];
+        const cb = document.getElementById('annex-toggle-' + group);
+        if (cb) cb.checked = !!window._reportAnnexState[group];
+        _persistReportConfig();
     };
 
     // ============================================
@@ -2236,6 +2346,11 @@
                 const ncTotal = d.stats.ncCount;
                 const obsTotal = d.stats.observationCount + d.stats.ofiCount;
                 const _conformRate = d.stats.complianceScore;
+                // Deterministic recommendation sentence — never AI-authored. The prompt
+                // instructs the model to reproduce it verbatim so the certification
+                // decision language stays audit-type-correct (e.g. a surveillance audit
+                // must never read "Recommended for Certification").
+                const deterministicRec = (d.stats.rs && d.stats.rs.recommendation) || d.stats.recommendation || 'Certification recommendation pending.';
                 const conclusionPrompt = `You are a Senior Lead Auditor at a top-tier Certification Body. Write a formal audit conclusion (150-200 words) for the following audit:
 
 Client: ${d.report.client}
@@ -2243,17 +2358,19 @@ Standard: ${standardName}
 Audit Type: ${d.auditPlan?.auditType || d.auditPlan?.type || 'Certification Audit'}
 Items Audited: ${d.stats.totalItems} | Conforming: ${d.stats.conformCount} | NC: ${ncTotal} (${d.stats.majorNC} Major, ${d.stats.minorNC} Minor) | Observations: ${obsTotal}
 Recommendation: ${d.report.recommendation || 'Pending'}
+Deterministic recommendation sentence (mandatory, audit-type-verified — reproduce this recommendation wording verbatim; do not rephrase it): "${deterministicRec}"
 
 CRITICAL RULES — CCI Gold Standard:
 - Do NOT use percentage scoring or compliance percentages
 - Use legally defensible, accreditation-ready language
 - Follow ISO 17021 certification body reporting requirements
+- The final sentence of the conclusion MUST be exactly the deterministic recommendation sentence above, reproduced verbatim — do not rephrase, summarize, or substitute your own wording for it
 
 Instructions:
 1. State whether the management system has demonstrated conformity with the standard
 2. Reference the number of non-conformities and observations raised
 3. ${ncTotal > 0 ? 'State that corrective actions must be submitted within the specified timeframes' : 'Note that no non-conformities were identified'}
-4. Conclude with the audit team's recommendation regarding ${d.report.recommendation === 'Recommended' ? 'continuation/granting of certification' : d.report.recommendation === 'Not Recommended' ? 'withholding certification pending corrective action' : 'the certification decision'}
+4. Conclude the conclusion with the deterministic recommendation sentence above, verbatim
 5. Use measured, authoritative language befitting 30+ years of audit experience
 
 Return ONLY the conclusion text, no JSON, no formatting.`;
@@ -2278,7 +2395,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             if (findingsBody && d.hydratedProgress) {
                 const items = d.hydratedProgress.filter(i => i.status !== 'pending');
                 findingsBody.innerHTML = items.map((item, idx) => {
-                    const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+                    const clause = displayCriterion(item);
                     const sevRaw = item.status === 'nc' ? (item.ncrType || 'NC') : item.status === 'observation' ? 'OBS' : 'OK';
                     const sev = sevRaw;
                     const sevLc = String(sevRaw).toLowerCase();
@@ -2297,7 +2414,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 };
                 const conformItems = d.hydratedProgress.filter(i => i.status === 'conform');
                 conformSec.innerHTML = conformItems.map((item, idx) => {
-                    const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+                    const clause = displayCriterion(item);
                     const title = item.kbMatch ? item.kbMatch.title : '';
                     const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
                     return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:10px 14px;font-weight:700;">' + clause + '</td><td style="padding:10px 14px;">' + (title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req) + '</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">' + (item.comment || '<span style="color:#94a3b8;">No remarks</span>') + renderEvThumbs(item) + '</td></tr>';
@@ -2698,7 +2815,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             return '<div class="ev-inline">' + limited.map(function (url) { return '<img src="' + url + '" style="height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;">'; }).join('') + extra + evIds + '</div>';
         };
         const ncRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() !== 'observation' && (i.ncrType || '').toLowerCase() !== 'ofi').map((item, idx) => {
-            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             const sevRaw2 = (item.ncrType || '').toLowerCase();
@@ -2714,7 +2831,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
 
         // OBS rows for PDF (Observations only)
         const obsOnlyRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() === 'observation').map((item, idx) => {
-            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             return '<tr style="background:' + (idx % 2 ? '#f5f3ff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
@@ -2722,7 +2839,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
 
         // OFI rows for PDF (Opportunities for Improvement only)
         const ofiOnlyRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() === 'ofi').map((item, idx) => {
-            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             return '<tr style="background:' + (idx % 2 ? '#f0fbff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
@@ -2730,7 +2847,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
 
         // Conformance rows for PDF (items with comments or evidence)
         const conformRowsHtml = d.hydratedProgress.filter(i => i.status === 'conform' && (i.comment || i.evidenceImage || (i.evidenceImages && i.evidenceImages.length))).map((item, idx) => {
-            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
@@ -2774,7 +2891,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const groups = {};
             const order = [];
             (d.hydratedProgress || []).forEach(function (item) {
-                const dept = (item.department && String(item.department).trim()) || 'General';
+                const dept = (window.ReportStats && window.ReportStats.normalizeDeptName)
+                    ? window.ReportStats.normalizeDeptName(item.department)
+                    : ((item.department && String(item.department).trim()) || 'Unassigned / Cross-functional');
                 if (!groups[dept]) { groups[dept] = { personnel: new Set(), clauses: new Set(), count: 0, worst: 'conform' }; order.push(dept); }
                 const g = groups[dept];
                 if (item.personnel) String(item.personnel).split(/[,;]/).map(function (p) { return p.trim(); }).filter(Boolean).forEach(function (p) { g.personnel.add(p); });
@@ -2826,7 +2945,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const groups = {};
             const order = [];
             (d.hydratedProgress || []).forEach(function (item) {
-                const dept = (item.department && String(item.department).trim()) || 'General';
+                const dept = (window.ReportStats && window.ReportStats.normalizeDeptName)
+                    ? window.ReportStats.normalizeDeptName(item.department)
+                    : ((item.department && String(item.department).trim()) || 'Unassigned / Cross-functional');
                 if (!groups[dept]) { groups[dept] = { personnel: new Set(), clauses: new Set(), count: 0, nc: 0, major: 0 }; order.push(dept); }
                 const g = groups[dept];
                 if (item.personnel) String(item.personnel).split(/[,;]/).map(function (p) { return p.trim(); }).filter(Boolean).forEach(function (p) { g.personnel.add(p); });
@@ -2892,34 +3013,24 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             return rows;
         })();
         // ─── Audit Programme (3-year certification cycle) ────────────────
-        const auditStageBase = (function () {
-            const t = (d.auditPlan?.auditType || d.report.auditType || 'Initial').toLowerCase();
-            // Fuzzy-match the current audit type against the standard cycle stages.
-            if (/stage\s*1|stage1/.test(t)) return 0;
-            if (/stage\s*2|stage2|initial/.test(t)) return 1;
-            if (/surveillance\s*1|sv1|1st\s*surveillance|first\s*surveillance/.test(t)) return 2;
-            if (/surveillance\s*2|sv2|2nd\s*surveillance|second\s*surveillance/.test(t)) return 3;
-            if (/re-?cert/.test(t)) return 4;
-            if (/surveillance/.test(t)) return 2; // generic "Surveillance" defaults to SV1
-            return 1; // default to Stage 2 / Initial
-        })();
-        const auditBaseDateStr = d.report.date || d.auditPlan?.startDate || d.auditPlan?.date || null;
-        const auditBaseDate = auditBaseDateStr ? new Date(auditBaseDateStr) : new Date();
-        const monthYear = function (monthsOffset) {
-            const dt = new Date(auditBaseDate.getTime());
-            dt.setMonth(dt.getMonth() + monthsOffset);
-            return dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-        };
-        const programmeStages = [
-            { id: 's1',     label: 'Stage 1',                         offset: 0,  editId: 'rp-prog-s1',     def: 'Readiness review — documentation, context, scope confirmation' },
-            { id: 's2',     label: 'Stage 2 (Initial Certification)', offset: 0,  editId: 'rp-prog-s2',     def: 'Full system implementation audit' },
-            { id: 'sv1',    label: 'Surveillance 1',                  offset: 12, editId: 'rp-prog-sv1',    def: 'Key processes, use of marks, changes, previous findings follow-up' },
-            { id: 'sv2',    label: 'Surveillance 2',                  offset: 24, editId: 'rp-prog-sv2',    def: 'Key processes, use of marks, changes, previous findings follow-up' },
-            { id: 'recert', label: 'Recertification',                 offset: 36, editId: 'rp-prog-recert', def: 'Full system re-assessment over the certification cycle' }
-        ].map(function (s, i) {
-            const status = i < auditStageBase ? 'Completed' : (i === auditStageBase ? 'This audit' : 'Planned');
-            return Object.assign({}, s, { timing: monthYear(s.offset), status: status });
+        // Single computation shared with the preview path via ReportStats.buildProgramme
+        // (anchors on the client's certificate, overlays real audit history, never
+        // fabricates Stage 1/2 dates when there's nothing to anchor on).
+        const EDIT_ID_BY_STAGE_EXPORT = { s1: 'rp-prog-s1', s2: 'rp-prog-s2', sv1: 'rp-prog-sv1', sv2: 'rp-prog-sv2', recert: 'rp-prog-recert' };
+        const auditProgramme = (window.ReportStats && typeof window.ReportStats.buildProgramme === 'function')
+            ? window.ReportStats.buildProgramme({ client: d.client, auditPlan: d.auditPlan, report: d.report, allReports: (window.state && window.state.auditReports) || [] })
+            : { stages: [], anchored: 'audit-date-fallback', issues: ['Certification programme module unavailable.'], anchorDate: null };
+        const programmeStages = auditProgramme.stages.map(function (s) {
+            return Object.assign({}, s, { editId: EDIT_ID_BY_STAGE_EXPORT[s.id] || ('rp-prog-' + s.id) });
         });
+        const auditStageBase = programmeStages.findIndex(function (s) { return s.status === 'This audit'; });
+        const programmeAnchorCaptionExport = function (programme) {
+            const dt = programme.anchorDate ? new Date(programme.anchorDate) : null;
+            const fmtDate = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('en-GB') : '';
+            if (programme.anchored === 'certificate') return 'anchored on the initial certification date of ' + fmtDate;
+            if (programme.anchored === 'history') return 'based on recorded audit history' + (fmtDate ? ' (earliest record ' + fmtDate + ')' : '');
+            return 'prior stage dates unavailable — no certificate on file';
+        };
         // ─── Multi-site sampling ──────────────────────────────────────────
         const allSites = (d.client && Array.isArray(d.client.sites)) ? d.client.sites : [];
         const isMultiSite = allSites.length > 1;
@@ -2952,28 +3063,41 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             { key: 'signature',    name: 'SIGNATURE &amp; ATTESTATION',        desc: 'Signatures and attestation',                            color: '#1e293b', present: en['signature'] !== false },
             { key: 'distribution', name: 'DISTRIBUTION LIST',                  desc: 'Controlled distribution of this report',                color: '#0d9488', present: en['distribution'] !== false },
             { key: 'annexures',    name: 'ANNEXURES &amp; APPENDICES',         desc: 'Supporting documents and appendices',                   color: '#9333ea', present: en['annexures'] !== false },
-            { key: 'evidence',     name: 'EVIDENCE GALLERY',                   desc: 'Photographic evidence collected during the audit',      color: '#c2410c', present: hasEvidence }
+            { key: 'evidence',     name: 'EVIDENCE INDEX',                     desc: 'Indexed photographic evidence collected during the audit', color: '#c2410c', present: hasEvidence }
         ];
-        // ─── Executive module sections (report-scoring / report-risk / report-executive) ──
-        // Each module returns [{key,name,desc,color,bodyHtml,charts}]. Placement is
-        // deliberate and audience-driven: a CEO/Board must understand overall health
-        // within the first minutes, so the executive briefing sits BEFORE the ISO
-        // administrative front matter. Deeper analysis sits mid-report for management,
-        // and evidence analytics sit with the evidence annexes for auditors.
-        //   TIER 1 'front'    — executive briefing, ahead of AUDIT INFORMATION
-        //   TIER 2 'analysis' — management analytics, after ANALYTICS DASHBOARD
-        //   TIER 3 'appendix' — auditor-facing detail, before EVIDENCE GALLERY
-        const secMapRef = { map: {}, badge: function () { return ''; } };
-        const MODULE_PLACEMENT = {
-            'exec-summary': 'front', 'exec-dashboard': 'front', 'exec-insights': 'front',
-            'evidence-intel': 'appendix',
-            // Universal Audit Framework v2.0 — operational analytics (management tier)
-            'opsCoverage': 'analysis', 'opsAttendance': 'analysis', 'opsSampling': 'analysis',
-            'opsHeatmap': 'analysis', 'reqMatrix': 'analysis', 'findingLifecycle': 'analysis',
-            // …and auditor-facing annexes
-            'opsDistribution': 'appendix', 'evidenceTrace': 'appendix',
-            'carForms': 'appendix', 'fwPack': 'appendix'
+        // ─── Formal report vs optional annexes (#3) ────────────────────────
+        // The formal certification report (numbered 1..N) is the ISO 17021 deliverable.
+        // Everything analytical/evidentiary/CAPA-working-doc is an OPTIONAL annex the
+        // certification decision does not depend on — gated by report.reportConfig.annexes,
+        // physically separated behind a divider page, and numbered A.n/B.n/C.n so it can
+        // never be mistaken for part of the formal report's numbering.
+        const SECTION_GROUPS = {
+            'audit-info': 'formal', 'audit-programme': 'formal', 'multi-site': 'formal',
+            'objectives': 'formal', 'summary': 'formal', 'conformance': 'formal',
+            'audit-trails': 'formal', 'prev-findings': 'formal', 'obs': 'formal', 'ofi': 'formal',
+            'findings': 'formal', 'ncrs': 'formal', 'corrective': 'formal', 'changes': 'formal',
+            'mgmt-effectiveness': 'formal', 'conclusion': 'formal', 'signature': 'formal',
+            'distribution': 'formal', 'exec-summary': 'formal',
+            'exec-dashboard': 'analytics', 'exec-insights': 'analytics', 'charts': 'analytics',
+            'maturity': 'analytics', 'dept-performance': 'analytics', 'clause-intel': 'analytics',
+            'trends': 'analytics', 'risk-heatmap': 'analytics', 'business-impact': 'analytics',
+            'root-cause': 'analytics', 'risk-register': 'analytics', 'action-plan': 'analytics',
+            'capa-dashboard': 'analytics', 'opsCoverage': 'analytics', 'opsAttendance': 'analytics',
+            'opsSampling': 'analytics', 'opsHeatmap': 'analytics', 'reqMatrix': 'analytics',
+            'findingLifecycle': 'analytics',
+            'evidence-intel': 'evidence', 'evidenceTrace': 'evidence', 'evidence': 'evidence',
+            'fwPack': 'evidence', 'annexures': 'evidence',
+            'carForms': 'capa'
+            // 'opsDistribution' deliberately absent — duplicate of 'distribution', dropped entirely.
         };
+        const groupOf = function (key) { return SECTION_GROUPS[key] || 'formal'; };
+        const reportConfigAnnexes = Object.assign(
+            { analytics: false, evidence: true, capa: false },
+            (d.report.reportConfig && d.report.reportConfig.annexes) || {}
+        );
+        const annexEnabled = function (group) { return group === 'formal' ? true : !!reportConfigAnnexes[group]; };
+
+        const secMapRef = { map: {}, badge: function () { return ''; } };
         const allModuleSections = []
             .concat(
                 (window.ReportExecutive && window.ReportExecutive.sections) ? window.ReportExecutive.sections(d) : [],
@@ -2983,39 +3107,91 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 (window.ReportFindingsOps && window.ReportFindingsOps.sections) ? window.ReportFindingsOps.sections(d) : [],
                 (window.ReportFrameworks && window.ReportFrameworks.sections) ? window.ReportFrameworks.sections(d) : []
             )
-            .filter(function (s) { return s && s.bodyHtml && en[s.key] !== false; });
-        // Preserve the intended reading order within the executive briefing tier.
+            // opsDistribution dropped entirely — duplicate of the formal Distribution List.
+            .filter(function (s) { return s && s.bodyHtml && en[s.key] !== false && s.key !== 'opsDistribution'; })
+            // Disabled annexes are simply excluded from the print HTML.
+            .filter(function (s) { return annexEnabled(groupOf(s.key)); });
+        // Preserve the intended reading order within the executive-briefing/analytics group.
         const FRONT_ORDER = ['exec-summary', 'exec-dashboard', 'exec-insights'];
-        const modGroup = function (tier) {
-            const g = allModuleSections.filter(function (s) { return (MODULE_PLACEMENT[s.key] || 'analysis') === tier; });
-            if (tier !== 'front') return g;
-            return g.sort(function (a, b) {
+        const sortFront = function (arr) {
+            return arr.slice().sort(function (a, b) {
                 const ia = FRONT_ORDER.indexOf(a.key), ib = FRONT_ORDER.indexOf(b.key);
                 return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
             });
         };
-        const modFront = modGroup('front');
-        const modAnalysis = modGroup('analysis');
-        const modAppendix = modGroup('appendix');
+        const modFormalFront = allModuleSections.filter(function (s) { return groupOf(s.key) === 'formal'; });
+        // ─── Executive summary consolidation (#4) ──────────────────────────
+        // exec-summary is the SINGLE executive summary in the formal report — prepend a
+        // compact facts table built engine-side (no report-executive.js edit needed) so a
+        // reader gets audit type/standard/scope/dates/team/counts/recommendation at a glance.
+        (function () {
+            const execSummarySec = modFormalFront.find(function (s) { return s.key === 'exec-summary'; });
+            if (!execSummarySec) return;
+            const stats = d.stats || {};
+            const rs = stats.rs || {};
+            const client = d.client || {};
+            const report = d.report || {};
+            const plan = d.auditPlan || {};
+            const esc = window.UTILS && window.UTILS.escapeHtml ? window.UTILS.escapeHtml : function (s) { return String(s == null ? '' : s); };
+            const sites = (Array.isArray(client.sites) && client.sites.length)
+                ? client.sites.map(function (s) { return s.name; }).filter(Boolean).join(', ')
+                : ([client.address, client.city].filter(Boolean).join(', ') || '—');
+            const team = (Array.isArray(plan.team) && plan.team.length) ? plan.team.join(', ') : (report.leadAuditor || '—');
+            const prevStatus = report.previousFindingsStatus ? 'Reviewed — see Previous Findings Status section' : '—';
+            const recommendation = (rs && rs.recommendation) || stats.recommendation || '—';
+            const row = function (label, value) {
+                return '<tr><td style="padding:6px 12px;color:#64748b;font-weight:600;width:34%;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;vertical-align:top;">' + esc(label) + '</td><td style="padding:6px 12px;font-size:0.85rem;color:#1e293b;">' + (value || '—') + '</td></tr>';
+            };
+            const factsTable = '<div style="margin-bottom:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 4px;">'
+                + '<table style="width:100%;border-collapse:collapse;">'
+                + row('Audit Type', esc(plan.auditType || plan.type || report.auditType || 'Initial'))
+                + row('Standard', esc(report.standard || plan.standard || '—'))
+                + row('Scope', esc(client.certificationScope || '—'))
+                + row('Sites / Locations', esc(sites))
+                + row('Audit Dates', esc((report.date || '—') + (report.endDate ? ' — ' + report.endDate : '')))
+                + row('Audit Team', esc(team))
+                + row('Major NC / Minor NC / Observations / OFI', (stats.majorNC || 0) + ' / ' + (stats.minorNC || 0) + ' / ' + (stats.observationCount || 0) + ' / ' + (stats.ofiCount || 0))
+                + row('Previous NC Status', prevStatus)
+                + row('Recommendation', esc(recommendation))
+                + '</table></div>';
+            execSummarySec.bodyHtml = factsTable + (execSummarySec.bodyHtml || '');
+        })();
+        const modAnalyticsMods = sortFront(allModuleSections.filter(function (s) { return groupOf(s.key) === 'analytics'; }));
+        const modEvidenceMods = allModuleSections.filter(function (s) { return groupOf(s.key) === 'evidence'; });
+        const modCapaMods = allModuleSections.filter(function (s) { return groupOf(s.key) === 'capa'; });
         const modChartEntries = allModuleSections.reduce(function (acc, s) { return acc.concat(s.charts || []); }, []);
-        // Splice defs at each anchor (last first, so earlier indexes stay valid).
+        // Splice the formal-group module sections (exec-summary) at the front, ahead of
+        // AUDIT INFORMATION — the only module content that stays inside the formal report.
         (function () {
             const toDefs = function (arr) { return arr.map(function (s) { return { key: s.key, name: s.name, desc: s.desc, color: s.color, present: true }; }); };
             const anchor = function (key, fallback) {
                 const i = sectionDefs.findIndex(function (s) { return s.key === key; });
                 return i < 0 ? fallback : i;
             };
-            const iAppendix = anchor('evidence', sectionDefs.length);
-            sectionDefs.splice.apply(sectionDefs, [iAppendix, 0].concat(toDefs(modAppendix)));
-            const iAnalysis = anchor('conformance', sectionDefs.length);
-            sectionDefs.splice.apply(sectionDefs, [iAnalysis, 0].concat(toDefs(modAnalysis)));
-            sectionDefs.splice.apply(sectionDefs, [anchor('audit-info', 0), 0].concat(toDefs(modFront)));
+            sectionDefs.splice.apply(sectionDefs, [anchor('audit-info', 0), 0].concat(toDefs(modFormalFront)));
         })();
-        // Shared renderer for a module tier's section bodies.
-        const renderModSections = function (arr) {
+        // charts / annexures / evidence are annex-group built-ins — gate their presence on
+        // the matching annex toggle in addition to their existing presence logic.
+        (function () {
+            const gate = function (key, group) {
+                const def = sectionDefs.find(function (s) { return s.key === key; });
+                if (def) def.present = def.present && annexEnabled(group);
+            };
+            gate('charts', 'analytics');
+            gate('annexures', 'evidence');
+            gate('evidence', 'evidence');
+        })();
+        // Shared renderer for a module section's body.
+        // annexLabel (e.g. 'A') prints a small eyebrow above the section title so a
+        // reader flipping straight to a page (skipping the divider) still sees this is
+        // annex content, not part of the formal certification report — running header
+        // stays static ('AUDIT REPORT') per-page switching is impractical with the
+        // thead/tfoot repeating-header approach, so the label lives here instead.
+        const renderModSections = function (arr, annexLabel) {
             return arr.map(function (s) {
                 if (!secMapRef.map[s.key]) return '';
-                return '<div id="sec-' + s.key + '" class="sh page-break" style="border-left-color:' + s.color + ';">' + secMapRef.badge(s.key) + s.name + '</div><div class="sb">' + s.bodyHtml + '</div>';
+                const eyebrow = annexLabel ? '<div style="font-size:0.62rem;letter-spacing:0.08em;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Annex ' + annexLabel + '</div>' : '';
+                return '<div id="sec-' + s.key + '" class="sh page-break" style="border-left-color:' + s.color + ';flex-direction:column;align-items:flex-start;gap:2px;">' + eyebrow + '<div style="display:flex;align-items:center;gap:12px;width:100%;">' + secMapRef.badge(s.key) + s.name + '</div></div><div class="sb">' + s.bodyHtml + '</div>';
             }).join('');
         };
         // Section category colors: subtle audience-based coding instead of a
@@ -3042,12 +3218,43 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             'evidenceTrace': '#15803d', 'opsDistribution': '#64748b', 'fwPack': '#0f2a43'
         };
         sectionDefs.forEach(function (s) { if (SECTION_CATEGORY_COLOR[s.key]) s.color = SECTION_CATEGORY_COLOR[s.key]; });
+        // ─── Two-pass numbering: formal report 1..N, each annex A.n/B.n/C.n ──────
         const secMap = {};
+        const formalDefs = sectionDefs.filter(function (s) { return groupOf(s.key) === 'formal'; });
         let _secCounter = 0;
-        sectionDefs.forEach(function (s) { if (s.present) { _secCounter++; secMap[s.key] = { num: _secCounter, name: s.name, desc: s.desc, color: s.color }; } });
+        formalDefs.forEach(function (s) { if (s.present) { _secCounter++; secMap[s.key] = { num: _secCounter, name: s.name, desc: s.desc, color: s.color, group: 'formal' }; } });
+        const numberAnnex = function (letter, items) {
+            let n = 0;
+            items.forEach(function (it) {
+                if (it.present === false) return;
+                n++;
+                secMap[it.key] = { num: letter + '.' + n, name: it.name, desc: it.desc, color: it.color, group: it.group };
+            });
+        };
+        const toAnnexItem = function (s, group) { return { key: s.key, name: s.name, desc: s.desc, color: s.color, present: true, group: group }; };
+        const analyticsItems = sectionDefs.filter(function (s) { return s.key === 'charts'; }).map(function (s) { return Object.assign({}, s, { group: 'analytics' }); })
+            .concat(modAnalyticsMods.map(function (s) { return toAnnexItem(s, 'analytics'); }));
+        const evidenceItems = sectionDefs.filter(function (s) { return s.key === 'annexures'; }).map(function (s) { return Object.assign({}, s, { group: 'evidence' }); })
+            .concat(modEvidenceMods.map(function (s) { return toAnnexItem(s, 'evidence'); }))
+            .concat(sectionDefs.filter(function (s) { return s.key === 'evidence'; }).map(function (s) { return Object.assign({}, s, { group: 'evidence' }); }));
+        const capaItems = modCapaMods.map(function (s) { return toAnnexItem(s, 'capa'); });
+        if (annexEnabled('analytics')) numberAnnex('A', analyticsItems);
+        if (annexEnabled('evidence')) numberAnnex('B', evidenceItems);
+        if (annexEnabled('capa')) numberAnnex('C', capaItems);
         const sBadge = function (key) {
             const m = secMap[key]; if (!m) return '';
-            return '<span class="sn" style="background:' + m.color + ';">' + m.num + '</span>';
+            const wide = /\./.test(String(m.num)) ? 'min-width:28px;width:auto;padding:0 4px;border-radius:6px;' : '';
+            return '<span class="sn" style="background:' + m.color + ';' + wide + '">' + m.num + '</span>';
+        };
+        // Divider page for an annex — reuses the TOC-page pattern so it reads as a
+        // genuine section break, not just another header row.
+        const annexDivider = function (label, title, disclaimer) {
+            return '<div class="toc page-break" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-height:60vh;">'
+                + '<div style="font-size:0.78rem;letter-spacing:0.18em;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:10px;">Annex ' + label + '</div>'
+                + '<div style="font-size:1.6rem;font-weight:800;color:#0f172a;margin-bottom:18px;">' + title + '</div>'
+                + '<div class="toc-line"></div>'
+                + '<div style="max-width:520px;font-size:0.85rem;color:#475569;line-height:1.6;margin-top:18px;">' + disclaimer + '</div>'
+                + '</div>';
         };
         // Late-bound refs so renderModSections (defined above secMap) can use them.
         secMapRef.map = secMap;
@@ -3230,26 +3437,40 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + revisionRows.map(r => '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.ver + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.date + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.author + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.desc + '</td></tr>').join('')
             + '</tbody></table></div>'
             + '</div>'
-            // TABLE OF CONTENTS — driven by unified sectionDefs / secMap
+            // TABLE OF CONTENTS — formal report first, then each enabled annex under
+            // its own heading, driven by the same secMap numbering used in the body.
             + (function () {
-                const tocItems = sectionDefs.filter(function (s) { return s.present; }).map(function (s) {
+                const tocLink = function (s) {
                     const num = secMap[s.key].num;
                     return '<a href="#sec-' + s.key + '" class="toc-item">'
                         + '<div class="toc-num" style="background:' + s.color + ';">' + num + '</div>'
                         + '<div class="toc-item-body"><div class="toc-item-title">' + s.name + '</div>'
                         + '<div class="toc-item-desc">' + s.desc + '</div></div></a>';
-                });
-                if (tocItems.length === 0) return '';
+                };
+                const formalTocItems = formalDefs.filter(function (s) { return s.present; }).map(tocLink);
+                const analyticsTocItems = annexEnabled('analytics') ? analyticsItems.filter(function (s) { return s.present !== false; }).map(tocLink) : [];
+                const evidenceTocItems = annexEnabled('evidence') ? evidenceItems.filter(function (s) { return s.present !== false; }).map(tocLink) : [];
+                const capaTocItems = annexEnabled('capa') ? capaItems.map(tocLink) : [];
+                const totalCount = formalTocItems.length + analyticsTocItems.length + evidenceTocItems.length + capaTocItems.length;
+                if (totalCount === 0) return '';
+                const annexHeading = function (label, title) {
+                    return '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;break-inside:avoid;">Annex ' + label + ' — ' + title + '</div>';
+                };
                 return '<div class="toc page-break"><div class="toc-title">Contents</div>'
                     + '<div class="toc-sub">' + d.report.client + ' — ' + standard + '</div>'
                     + '<div class="toc-line"></div>'
-                    + '<div class="toc-list">' + tocItems.join('') + '</div>'
+                    + '<div class="toc-list">'
+                    + formalTocItems.join('')
+                    + (analyticsTocItems.length ? annexHeading('A', 'Management Analytics') + analyticsTocItems.join('') : '')
+                    + (evidenceTocItems.length ? annexHeading('B', 'Evidence') + evidenceTocItems.join('') : '')
+                    + (capaTocItems.length ? annexHeading('C', 'Corrective Action Forms') + capaTocItems.join('') : '')
+                    + '</div>'
                     + '<div style="margin-top:14px;padding-top:8px;border-top:1px solid #f1f5f9;text-align:right;font-size:0.68rem;color:#94a3b8;">'
-                    + tocItems.length + ' sections</div></div>';
+                    + totalCount + ' sections</div></div>';
             })()
             + '<div class="content">'
-            // TIER 1: executive briefing — first thing the CEO/Board reads
-            + renderModSections(modFront)
+            // Formal report front matter — only the exec-summary module (formal group)
+            + renderModSections(modFormalFront)
             // SECTION: AUDIT INFORMATION
             + (secMap['audit-info'] ? '<div id="sec-audit-info" class="sh page-break" style="background:#eff6ff;border-left-color:#1d4ed8;">' + sBadge('audit-info') + 'AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
                 + '<tr><td>Client Name</td><td><strong>' + d.report.client + '</strong></td></tr>'
@@ -3269,13 +3490,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '</div>' : '')
             // SECTION: AUDIT PROGRAMME
             + (secMap['audit-programme'] ? '<div id="sec-audit-programme" class="sh page-break" style="background:#eff6ff;border-left-color:#0ea5e9;">' + sBadge('audit-programme') + 'AUDIT PROGRAMME</div><div class="sb">'
-                + '<div style="font-size:0.85rem;color:#475569;margin-bottom:12px;">Planned audit activities across the 3-year certification cycle, based on the current audit date of ' + (d.report.date || '—') + '.</div>'
+                + '<div style="font-size:0.85rem;color:#475569;margin-bottom:12px;">Planned audit activities across the 3-year certification cycle, ' + programmeAnchorCaptionExport(auditProgramme) + '.</div>'
+                + (auditProgramme.issues && auditProgramme.issues.length ? '<div style="font-size:0.8rem;color:#92400e;background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 12px;margin-bottom:12px;border-radius:4px;">' + auditProgramme.issues.map(function (i) { return window.UTILS.escapeHtml(i); }).join('<br>') + '</div>' : '')
                 + '<table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:22%;">Audit Stage</th><th style="width:14%;">Planned Timing</th><th style="width:44%;">Focus &amp; Scope</th><th style="width:20%;text-align:center;">Status</th></tr></thead><tbody>'
                 + programmeStages.map(function (s) {
                     const editedMap = { 'rp-prog-s1': editedProgS1, 'rp-prog-s2': editedProgS2, 'rp-prog-sv1': editedProgSv1, 'rp-prog-sv2': editedProgSv2, 'rp-prog-recert': editedProgRecert };
                     const editedTxt = editedMap[s.editId] || s.def;
-                    const statusBg = s.status === 'Completed' ? '#ecfdf5' : (s.status === 'This audit' ? '#eff6ff' : '#f1f5f9');
-                    const statusFg = s.status === 'Completed' ? '#15803d' : (s.status === 'This audit' ? '#1d4ed8' : '#64748b');
+                    const statusBg = s.status === 'Completed' ? '#ecfdf5' : (s.status === 'This audit' ? '#eff6ff' : (s.status === 'Unknown' ? '#fffbeb' : '#f1f5f9'));
+                    const statusFg = s.status === 'Completed' ? '#15803d' : (s.status === 'This audit' ? '#1d4ed8' : (s.status === 'Unknown' ? '#92400e' : '#64748b'));
                     return '<tr><td style="font-weight:700;">' + s.label + '</td><td>' + s.timing + '</td><td>' + editedTxt + '</td><td style="text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">' + s.status + '</span></td></tr>';
                 }).join('')
                 + '</tbody></table></div>' : '')
@@ -3310,26 +3532,6 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="padding:16px;background:#ecfdf5;border-radius:10px;margin-top:14px;border-left:4px solid #475569;"><strong style="color:#475569;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + fmtRemark(editedOpeningNotes) + '</td></tr>' : '') + '</table></div>'
                 + (editedPositiveObs ? '<div style="margin-top:20px;padding:14px 16px;background:#ecfdf5;border-radius:10px;border-left:4px solid #15803d;break-inside:avoid;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><h4 style="margin:0;color:#15803d;font-size:0.95rem;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;">Positive Observations</h4></div><div style="color:#15803d;font-size:0.9rem;line-height:1.6;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
                 + '</div>' : '')
-            // SECTION: ANALYTICS DASHBOARD
-            + (secMap['charts'] ? '<div id="sec-charts" class="sh page-break" style="background:#eff6ff;border-left-color:#1d4ed8;">' + sBadge('charts') + 'ANALYTICS DASHBOARD</div><div class="sb">'
-                + '<div class="stat-grid">'
-                + '<div class="stat-box" style="background:' + d.stats.statusColor + '14;border-color:' + d.stats.statusColor + ';"><div class="stat-val" style="font-size:0.95rem;line-height:1.25;color:' + d.stats.statusColor + ';">' + d.stats.auditStatus + '</div><div class="stat-lbl">Certification Status</div></div>'
-                + '<div class="stat-box" style="background:#fef2f2;border-color:#dc2626;"><div class="stat-val" style="color:#dc2626;">' + d.stats.majorNC + '</div><div class="stat-lbl">Major NC</div></div>'
-                + '<div class="stat-box" style="background:#fffbeb;border-color:#b45309;"><div class="stat-val" style="color:#b45309;">' + d.stats.minorNC + (d.stats.pendingClassificationCount ? ' †' : '') + '</div><div class="stat-lbl">Minor NC</div></div>'
-                + '<div class="stat-box" style="background:#eff6ff;border-color:#1d4ed8;"><div class="stat-val" style="color:#1d4ed8;">' + d.stats.observationCount + '</div><div class="stat-lbl">Observations</div></div>'
-                + '<div class="stat-box" style="background:#f1f5f9;border-color:#475569;"><div class="stat-val" style="color:#475569;">' + d.stats.ofiCount + '</div><div class="stat-lbl">OFI</div></div>'
-                + '<div class="stat-box" style="background:#f8fafc;border-color:#94a3b8;"><div class="stat-val" style="color:#64748b;">' + d.stats.notAssessedCount + '</div><div class="stat-lbl">Not Assessed</div></div></div>'
-                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0;">'
-                + '<div class="stat-box" style="background:#ecfdf5;border-color:#059669;"><div class="stat-val" style="color:#059669;">' + (d.stats.coveragePct === null || d.stats.coveragePct === undefined ? '—' : d.stats.coveragePct + '%') + '</div><div class="stat-lbl">Audit Coverage %</div></div>'
-                + '<div class="stat-box" style="background:#eef2ff;border-color:#4338ca;"><div class="stat-val" style="color:#4338ca;">' + (d.stats.conformityPct === null || d.stats.conformityPct === undefined ? '—' : d.stats.conformityPct + '%') + '</div><div class="stat-lbl">Conformity %</div></div></div>'
-                + '<div style="font-size:0.76rem;color:#64748b;line-height:1.5;margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:6px;">' + (d.stats.rs?.methodologyNote || 'Coverage = items assessed (conform + NC + advisories) ÷ applicable items (excludes N/A). Conformity = conform ÷ (conform + NC); observations and OFIs are advisories and do not reduce conformity.') + '</div>'
-                + (d.stats.rs?.reconciliation?.length ? '<div class="b4-card b4-callout b4-callout--warn" style="margin-bottom:16px;"><strong style="display:block;margin-bottom:4px;">Data Quality Notes</strong><ul style="margin:0;padding-left:18px;">' + d.stats.rs.reconciliation.map(function (r) { return '<li>' + (r.message || r.code || '') + '</li>'; }).join('') + '</ul></div>' : '')
-                + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Findings Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
-                + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div></div>'
-                + '<div class="chart-grid" style="grid-template-columns:1fr;margin-top:16px;"><div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
-                + '</div>' : '')
-            // TIER 2: management analytics modules (scoring / risk)
-            + renderModSections(modAnalysis)
             // SECTION: CONFORMANCE VERIFICATION
             + (secMap['conformance'] ? '<div id="sec-conformance" class="sh page-break" style="background:#ecfdf5;border-left-color:#15803d;">' + sBadge('conformance') + 'CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#ecfdf5;"><th style="width:10%;">Clause</th><th style="width:30%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
             // SECTION: AUDIT TRAILS
@@ -3408,8 +3610,38 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<table class="info-tbl"><thead><tr style="background:#f8fafc;"><th style="width:5%;">#</th><th style="width:30%;">Recipient</th><th style="width:25%;">Role</th><th style="width:25%;">Organization</th><th style="width:15%;">Format</th></tr></thead><tbody>'
                 + distributionRows
                 + '</tbody></table></div>' : '')
+            // ═══ END OF FORMAL CERTIFICATION REPORT — everything below is an optional,
+            // separately-toggled annex (report.reportConfig.annexes) that does NOT form
+            // part of the certification decision. ═══
+            // ANNEX A — MANAGEMENT ANALYTICS
+            + (annexEnabled('analytics') && analyticsItems.some(function (it) { return it.present !== false; })
+                ? annexDivider('A', 'MANAGEMENT ANALYTICS', 'This annex contains Audit360 analytical indicators provided for management insight only. It does not form part of the certification decision.')
+                : '')
+            // SECTION: ANALYTICS DASHBOARD
+            + (secMap['charts'] ? '<div id="sec-charts" class="sh page-break" style="background:#eff6ff;border-left-color:#1d4ed8;flex-direction:column;align-items:flex-start;gap:2px;"><div style="font-size:0.62rem;letter-spacing:0.08em;color:#94a3b8;text-transform:uppercase;">Annex A</div><div style="display:flex;align-items:center;gap:12px;width:100%;">' + sBadge('charts') + 'ANALYTICS DASHBOARD</div></div><div class="sb">'
+                + '<div class="stat-grid">'
+                + '<div class="stat-box" style="background:' + d.stats.statusColor + '14;border-color:' + d.stats.statusColor + ';"><div class="stat-val" style="font-size:0.95rem;line-height:1.25;color:' + d.stats.statusColor + ';">' + d.stats.auditStatus + '</div><div class="stat-lbl">Certification Status</div></div>'
+                + '<div class="stat-box" style="background:#fef2f2;border-color:#dc2626;"><div class="stat-val" style="color:#dc2626;">' + d.stats.majorNC + '</div><div class="stat-lbl">Major NC</div></div>'
+                + '<div class="stat-box" style="background:#fffbeb;border-color:#b45309;"><div class="stat-val" style="color:#b45309;">' + d.stats.minorNC + (d.stats.pendingClassificationCount ? ' †' : '') + '</div><div class="stat-lbl">Minor NC</div></div>'
+                + '<div class="stat-box" style="background:#eff6ff;border-color:#1d4ed8;"><div class="stat-val" style="color:#1d4ed8;">' + d.stats.observationCount + '</div><div class="stat-lbl">Observations</div></div>'
+                + '<div class="stat-box" style="background:#f1f5f9;border-color:#475569;"><div class="stat-val" style="color:#475569;">' + d.stats.ofiCount + '</div><div class="stat-lbl">OFI</div></div>'
+                + '<div class="stat-box" style="background:#f8fafc;border-color:#94a3b8;"><div class="stat-val" style="color:#64748b;">' + d.stats.notAssessedCount + '</div><div class="stat-lbl">Not Assessed</div></div></div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0;">'
+                + '<div class="stat-box" style="background:#ecfdf5;border-color:#059669;"><div class="stat-val" style="color:#059669;">' + (d.stats.coveragePct === null || d.stats.coveragePct === undefined ? '—' : d.stats.coveragePct + '%') + '</div><div class="stat-lbl">Audit Coverage %</div></div>'
+                + '<div class="stat-box" style="background:#eef2ff;border-color:#4338ca;"><div class="stat-val" style="color:#4338ca;">' + (d.stats.conformityPct === null || d.stats.conformityPct === undefined ? '—' : d.stats.conformityPct + '%') + '</div><div class="stat-lbl">Conformity %</div></div></div>'
+                + '<div style="font-size:0.76rem;color:#64748b;line-height:1.5;margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:6px;">' + (d.stats.rs?.methodologyNote || 'Coverage = items assessed (conform + NC + advisories) ÷ applicable items (excludes N/A). Conformity = conform ÷ (conform + NC); observations and OFIs are advisories and do not reduce conformity.') + '</div>'
+                + (d.stats.rs?.reconciliation?.length ? '<div class="b4-card b4-callout b4-callout--warn" style="margin-bottom:16px;"><strong style="display:block;margin-bottom:4px;">Data Quality Notes</strong><ul style="margin:0;padding-left:18px;">' + d.stats.rs.reconciliation.map(function (r) { return '<li>' + (r.message || r.code || '') + '</li>'; }).join('') + '</ul></div>' : '')
+                + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Findings Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
+                + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div></div>'
+                + '<div class="chart-grid" style="grid-template-columns:1fr;margin-top:16px;"><div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
+                + '</div>' : '')
+            + renderModSections(modAnalyticsMods, 'A')
+            // ANNEX B — EVIDENCE
+            + (annexEnabled('evidence') && evidenceItems.some(function (it) { return it.present !== false; })
+                ? annexDivider('B', 'EVIDENCE', 'This annex contains supporting evidence records for traceability. It does not form part of the certification decision.')
+                : '')
             // SECTION: ANNEXURES
-            + (secMap['annexures'] ? '<div id="sec-annexures" class="sh page-break" style="background:#eff6ff;border-left-color:#9333ea;">' + sBadge('annexures') + 'ANNEXURES &amp; APPENDICES</div><div class="sb">'
+            + (secMap['annexures'] ? '<div id="sec-annexures" class="sh page-break" style="background:#eff6ff;border-left-color:#9333ea;flex-direction:column;align-items:flex-start;gap:2px;"><div style="font-size:0.62rem;letter-spacing:0.08em;color:#94a3b8;text-transform:uppercase;">Annex B</div><div style="display:flex;align-items:center;gap:12px;width:100%;">' + sBadge('annexures') + 'ANNEXURES &amp; APPENDICES</div></div><div class="sb">'
                 + '<div style="line-height:1.55;color:#334155;">'
                 + '<div style="font-weight:700;margin-bottom:6px;">Annexure A — Audit Plan Reference</div>'
                 + '<div style="margin-bottom:4px;">• Plan Reference: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A') + '</div>'
@@ -3419,8 +3651,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="margin-bottom:4px;">• Conforming: ' + d.stats.conformCount + ' | NC: ' + (d.stats.ncCount) + ' | Observations: ' + d.stats.observationCount + ' | OFI: ' + d.stats.ofiCount + '</div>'
                 + '<div style="margin-bottom:12px;">• N/A Items: ' + d.stats.naCount + '</div>'
                 + '</div></div>' : '')
-            // TIER 3: auditor-facing evidence analytics, ahead of the photo appendix
-            + renderModSections(modAppendix)
+            // Auditor-facing evidence analytics (evidence-intel, evidenceTrace, fwPack)
+            + renderModSections(modEvidenceMods, 'B')
             // SECTION: EVIDENCE INDEX (text-only — no images embedded in main report).
             // Full-resolution photographic evidence is issued separately via the Evidence Pack
             // (window.exportEvidencePack) to keep the main report's blob size bounded. This
@@ -3430,7 +3662,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const evIdx = (d.report._evidenceIndexBuilt || []).concat(
                     // Include NCR-only evidence not already attached to a checklist item.
                     (d.report.ncrs || []).filter(function (n) { return n.evidenceImage && !n._evIndexed; }).map(function (ncr) {
-                        return { evId: 'EV-NCR-' + (ncr.id || ''), image: ncr.evidenceImage, comment: '', clause: ncr.clause || '', dept: '', findingRef: ncr.type || 'NC', capturedAt: '', location: '' };
+                        return { evId: 'EV-NCR-' + (ncr.id || ''), image: ncr.evidenceImage, comment: '', clause: ncr.clause || '', criterionRef: ncr.criterionRef || null, criterionSource: ncr.criterionSource || null, dept: '', findingRef: ncr.type || 'NC', capturedAt: '', location: '' };
                     })
                 );
                 if (evIdx.length === 0) return '';
@@ -3443,31 +3675,37 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const rows = evIdx.map(function (ev, idx) {
                     const desc = (ev.comment || '').toString().replace(/<[^>]*>/g, '').trim();
                     const descExcerpt = desc ? (desc.slice(0, 90) + (desc.length > 90 ? '…' : '')) : 'Not recorded';
+                    const clauseCell = ev.clause ? displayCriterion(ev) : 'Not recorded';
                     return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';">'
                         + '<td style="padding:8px 12px;font-weight:700;white-space:nowrap;">' + esc(ev.evId) + '</td>'
                         + '<td style="padding:8px 12px;">' + esc(descExcerpt) + '</td>'
-                        + '<td style="padding:8px 12px;">' + esc(ev.clause || 'Not recorded') + '</td>'
+                        + '<td style="padding:8px 12px;">' + clauseCell + '</td>'
                         + '<td style="padding:8px 12px;">' + esc(ev.dept || 'Not recorded') + '</td>'
                         + '<td style="padding:8px 12px;">' + esc(ev.findingRef || 'Not recorded') + '</td>'
                         + '<td style="padding:8px 12px;">' + esc(fmtWhen(ev.capturedAt)) + (ev.location ? ' · ' + esc(String(ev.location).slice(0, 30)) : '') + '</td>'
                         + '</tr>';
                 }).join('');
-                return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;">' + sBadge('evidence') + 'EVIDENCE INDEX</div><div class="sb">'
+                return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;">' + sBadge('evidence') + (secMap['evidence'] ? secMap['evidence'].name : 'EVIDENCE INDEX') + '</div><div class="sb">'
                     + '<table class="f-tbl"><thead><tr><th>EV ID</th><th>Description</th><th>Clause</th><th>Department</th><th>Finding Ref</th><th>Captured</th></tr></thead><tbody>' + rows + '</tbody></table>'
                     + '<div style="margin-top:14px;font-size:0.82rem;color:#64748b;text-align:center;font-style:italic;">' + evIdx.length + ' evidence exhibit(s) indexed. Full evidence images are issued separately in the Evidence Pack (same report reference).</div>'
                     + '</div>';
             })()
+            // ANNEX C — CORRECTIVE ACTION FORMS
+            + (annexEnabled('capa') && capaItems.length
+                ? annexDivider('C', 'CORRECTIVE ACTION FORMS', 'This annex contains CAPA working documents; it supplements but does not replace the formal Corrective Action Requirements section and does not form part of the certification decision.')
+                : '')
+            + renderModSections(modCapaMods, 'C')
             + '</div>'
             // CLOSING PAGE — the report ends confidently, board-presentation style.
             + (function () {
                 const nextStage = (function () {
-                    // Reuse the audit-programme stage logic: the stage after the current one.
-                    const stages = ['Stage 1', 'Stage 2 (Initial Certification)', 'Surveillance 1', 'Surveillance 2', 'Recertification'];
-                    const offsets = [0, 0, 12, 24, 36];
-                    if (typeof auditStageBase !== 'number' || auditStageBase >= stages.length - 1) return null;
-                    const dt = new Date(auditBaseDate.getTime());
-                    dt.setMonth(dt.getMonth() + offsets[auditStageBase + 1]);
-                    return stages[auditStageBase + 1] + ' — ' + dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+                    // Read directly from the shared programme computation — the stage
+                    // immediately after "This audit" — instead of a second, independent
+                    // offset table that could silently drift from the Audit Programme section.
+                    if (typeof auditStageBase !== 'number' || auditStageBase < 0 || auditStageBase >= programmeStages.length - 1) return null;
+                    const next = programmeStages[auditStageBase + 1];
+                    if (!next) return null;
+                    return next.label + ' — ' + next.timing;
                 })();
                 const row = function (label, value) {
                     return value ? '<tr><td style="padding:9px 14px;color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;font-weight:500;width:40%;">' + label + '</td><td style="padding:9px 14px;color:#0f2a43;font-weight:500;font-size:0.9rem;">' + value + '</td></tr>' : '';

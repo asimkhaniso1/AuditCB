@@ -892,7 +892,7 @@
     }
 
     function kpiCardHtml(opts) {
-        const { icon, label, value, suffix, sub, severity, deltaVal, direction, deltaSuffix, isText, accent, hasPrior } = opts;
+        const { icon, label, value, suffix, sub, severity, deltaVal, direction, deltaSuffix, isText, accent, hasPrior, tag } = opts;
         // Long non-numeric values (e.g. "Recommended for Certification") must
         // never use the huge numeric size or overflow-hide — render smaller
         // with wrapping allowed instead of clipping.
@@ -907,6 +907,11 @@
                 ? esc(String(value))
                 : `${value}${suffix ? `<span class="b4-kpi-value-unit">${suffix}</span>` : ''}`);
         const trendPart = trendHtml(deltaVal, direction, deltaSuffix, hasPrior);
+        // "Analytical indicator" tag: flags KPI cards (Audit Grade, Maturity,
+        // Overall Compliance, CAPA Progress) that are Audit360-computed
+        // scores/percentages, not an ISO certification score or decision —
+        // see the footnote under the KPI grid for the full disclaimer.
+        const tagHtml = tag ? `<span class="b4-badge b4-badge--neutral" style="font-size:7pt;letter-spacing:0.03em;text-transform:uppercase;margin-left:var(--b4-s2);vertical-align:middle;">${esc(tag)}</span>` : '';
         // Board-report style: number, label, one explanation line, trend —
         // left-aligned, generous padding; icon is small/muted, tucked top-right
         // rather than dominating the card.
@@ -914,7 +919,7 @@
         <div class="b4-kpi-card${accent ? ' b4-kpi-card--accent' : ''}" style="text-align:left;position:relative;padding:var(--b4-s5) var(--b4-s4);">
             ${icon ? `<div class="b4-kpi-icon" style="position:absolute;top:var(--b4-s3);right:var(--b4-s3);margin-bottom:0;opacity:0.4;">${iconSafe(icon, { size: 13 })}</div>` : ''}
             <div class="b4-kpi-value"${valStyle}>${valHtml}</div>
-            <div class="b4-kpi-label">${esc(label)}</div>
+            <div class="b4-kpi-label">${esc(label)}${tagHtml}</div>
             ${sub ? `<div class="b4-kpi-sub">${esc(sub)}</div>` : ''}
             ${trendPart ? `<div>${trendPart}</div>` : ''}
         </div>`;
@@ -948,16 +953,25 @@
             : null;
         const maturitySub = ed.maturityOverall != null ? maturityShortLabel(ed.maturityOverall) : null;
 
+        // The Certification Recommendation is the actual audit outcome and is
+        // rendered as its own highlighted card, visually separate from the
+        // analytical/indicator cards below it — it must never be mistaken for
+        // just another score in the grid.
+        const certCard = kpiCardHtml({ icon: 'shield', label: 'Certification Recommendation', value: ed.certificationRecommendation || 'Pending', isText: true, accent: true });
+
+        // Analytical indicator cards: Audit Grade, Maturity Score, and Overall
+        // Compliance are Audit360-computed scores, not an ISO certification
+        // score/grade/decision — tagged individually and covered by the
+        // footnote below the grid.
         const cards = [
-            kpiCardHtml({ icon: 'check', label: 'Overall Compliance', value: ed.compliancePct, suffix: '%', sub: scoreInterpretationLabel(ed.compliancePct), severity: scoreSeverity(ed.compliancePct), deltaVal: dl.compliance, direction: 'higherBetter', deltaSuffix: 'pt', hasPrior }),
-            kpiCardHtml({ icon: 'shield', label: 'Certification Recommendation', value: ed.certificationRecommendation || 'Pending', isText: true }),
-            kpiCardHtml({ icon: 'target', label: 'Audit Grade', value: ed.grade ? ed.grade.letter : null, sub: gradeSub, severity: ed.grade ? ed.grade.severity : 'neutral', deltaVal: dl.auditScore, direction: 'higherBetter', hasPrior }),
-            kpiCardHtml({ icon: 'department', label: 'Maturity Score', value: ed.maturityOverall, suffix: '/5', sub: maturitySub, severity: scoreSeverity(ed.maturityOverall != null ? ed.maturityOverall * 20 : null), deltaVal: dl.maturity, direction: 'higherBetter', hasPrior }),
+            kpiCardHtml({ icon: 'check', label: 'Overall Compliance', value: ed.compliancePct, suffix: '%', sub: scoreInterpretationLabel(ed.compliancePct), severity: scoreSeverity(ed.compliancePct), deltaVal: dl.compliance, direction: 'higherBetter', deltaSuffix: 'pt', hasPrior, tag: 'Analytical indicator' }),
+            kpiCardHtml({ icon: 'target', label: 'Audit Grade', value: ed.grade ? ed.grade.letter : null, sub: gradeSub, severity: ed.grade ? ed.grade.severity : 'neutral', deltaVal: dl.auditScore, direction: 'higherBetter', hasPrior, tag: 'Analytical indicator' }),
+            kpiCardHtml({ icon: 'department', label: 'Maturity Score', value: ed.maturityOverall, suffix: '/5', sub: maturitySub, severity: scoreSeverity(ed.maturityOverall != null ? ed.maturityOverall * 20 : null), deltaVal: dl.maturity, direction: 'higherBetter', hasPrior, tag: 'Analytical indicator' }),
             kpiCardHtml({ icon: 'finding', label: 'Findings Summary', value: (ed.majorNC || 0) + (ed.minorNC || 0), sub: findingsSummary, severity: (ed.majorNC || 0) > 0 ? 'bad' : (ed.minorNC || 0) > 0 ? 'warn' : 'good' }),
             kpiCardHtml({ icon: 'risk', label: 'High Risks', value: ed.riskRating, severity: levelSeverity(ed.riskRating), isText: true })
         ];
         if (ed.businessImpact) {
-            cards.push(kpiCardHtml({ icon: 'alert', label: 'Business Impact', value: ed.businessImpact.count, sub: ed.businessImpact.category, severity: 'info' }));
+            cards.push(kpiCardHtml({ icon: 'alert', label: 'Top Impact Theme', value: ed.businessImpact.count, sub: ed.businessImpact.category, severity: 'info', tag: 'Analytical indicator' }));
         }
         if (ed.auditDuration != null) {
             cards.push(kpiCardHtml({ icon: 'clock', label: 'Audit Duration', value: ed.auditDuration, suffix: ' man-days' }));
@@ -966,10 +980,11 @@
         // (see compute()'s capaProgressVerified) — an inferred 0% would read as
         // an alarming figure the data doesn't actually support.
         if (ed.capaProgressVerified != null) {
-            cards.push(kpiCardHtml({ icon: 'capa', label: 'CAPA Progress', value: ed.capaProgressVerified, suffix: '%', sub: scoreInterpretationLabel(ed.capaProgressVerified), severity: scoreSeverity(ed.capaProgressVerified), deltaVal: dl.capaProgress, direction: 'higherBetter', deltaSuffix: 'pt', hasPrior }));
+            cards.push(kpiCardHtml({ icon: 'capa', label: 'CAPA Progress', value: ed.capaProgressVerified, suffix: '%', sub: scoreInterpretationLabel(ed.capaProgressVerified), severity: scoreSeverity(ed.capaProgressVerified), deltaVal: dl.capaProgress, direction: 'higherBetter', deltaSuffix: 'pt', hasPrior, tag: 'Analytical indicator' }));
         }
 
-        const kpis = `<div class="b4-kpi-grid">${cards.join('')}</div>`;
+        const kpis = `<div class="b4-kpi-grid" style="margin-bottom:var(--b4-s4);">${certCard}</div><div class="b4-kpi-grid">${cards.join('')}</div>`;
+        const indicatorFootnote = `<div class="b4-footnote" style="margin-top:var(--b4-s2);">Audit Grade, Maturity and percentage scores are Audit360 analytical indicators provided for management insight only. They do not represent an ISO certification score, grade, or certification decision.</div>`;
         const noPriorCaption = !hasPrior
             ? `<div class="b4-footnote" style="margin-top:var(--b4-s2);">First audit in cycle — trend comparison available from next audit.</div>`
             : '';
@@ -1002,7 +1017,7 @@
 
         // Certification recommendation is already carried by its KPI card above;
         // a standalone repeat line was spilling onto its own near-empty page.
-        return { bodyHtml: kpis + noPriorCaption + lists, charts: [] };
+        return { bodyHtml: kpis + indicatorFootnote + noPriorCaption + lists, charts: [] };
     }
 
     function buildMaturitySection(metrics) {

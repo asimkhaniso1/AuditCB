@@ -214,6 +214,79 @@
         };
     }
 
+    // ---- Address consistency check ----
+
+    // Common street-suffix normalizations so "123 Main Drive" and "123 Main Dr"
+    // don't false-positive as an inconsistency.
+    const STREET_SUFFIX_MAP = [
+        [/\bstreet\b/gi, 'st'],
+        [/\bdrive\b/gi, 'dr'],
+        [/\bavenue\b/gi, 'ave'],
+        [/\bboulevard\b/gi, 'blvd'],
+        [/\broad\b/gi, 'rd'],
+        [/\blane\b/gi, 'ln'],
+        [/\bhighway\b/gi, 'hwy'],
+        [/\bsuite\b/gi, 'ste'],
+        [/\bbuilding\b/gi, 'bldg'],
+        [/\bfloor\b/gi, 'fl'],
+        [/\bapartment\b/gi, 'apt'],
+        [/\bnorth\b/gi, 'n'],
+        [/\bsouth\b/gi, 's'],
+        [/\beast\b/gi, 'e'],
+        [/\bwest\b/gi, 'w']
+    ];
+
+    function normalizeAddressText(raw) {
+        let s = String(raw == null ? '' : raw).toLowerCase().trim();
+        if (!s) return '';
+        STREET_SUFFIX_MAP.forEach(([re, replacement]) => { s = s.replace(re, replacement); });
+        s = s.replace(/[.,#]/g, ' ');
+        s = s.replace(/\s+/g, ' ').trim();
+        return s;
+    }
+
+    /**
+     * Compare the client's master site address against any address-like strings
+     * recorded on the audit plan, report, and certificate. The client's primary
+     * site (client.sites[0]) is treated as the authoritative record — everything
+     * else is compared against it. Tolerant of trim/case/punctuation and common
+     * street-suffix abbreviations ("Drive" vs "Dr").
+     * @returns {Array<{field, valueA, valueB, message}>} empty when insufficient data
+     */
+    function checkAddressConsistency({ client, auditPlan, report, certificate } = {}) {
+        const issues = [];
+        const site = client && Array.isArray(client.sites) && client.sites[0];
+        if (!site) return issues;
+
+        const masterAddress = [site.address, site.city].filter(Boolean).join(', ');
+        const normMaster = normalizeAddressText(masterAddress);
+        if (!normMaster) return issues;
+
+        const candidates = [
+            { field: 'auditPlan.location', value: auditPlan && (auditPlan.location || auditPlan.siteAddress) },
+            { field: 'auditPlan.address', value: auditPlan && auditPlan.address },
+            { field: 'report.location', value: report && (report.location || report.siteAddress || report.auditLocation) },
+            { field: 'certificate.address', value: certificate && (certificate.address || certificate.siteAddress) }
+        ];
+
+        candidates.forEach(({ field, value }) => {
+            if (!value) return;
+            const normValue = normalizeAddressText(value);
+            if (!normValue) return;
+            // Substring match either direction tolerates partial address strings
+            // (e.g. a report location field that only stores the city).
+            if (normMaster.includes(normValue) || normValue.includes(normMaster)) return;
+            issues.push({
+                field,
+                valueA: masterAddress,
+                valueB: value,
+                message: `Address on ${field} ("${value}") does not match the master client site record ("${masterAddress}").`
+            });
+        });
+
+        return issues;
+    }
+
     // ---- Modal helper ----
 
     /**
@@ -293,6 +366,9 @@
         // UI helpers
         openFormModal,
         confirmAction,
+
+        // Master-data consistency
+        checkAddressConsistency,
 
         // State lookups
         findClient,

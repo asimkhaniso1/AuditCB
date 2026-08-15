@@ -382,6 +382,32 @@
         return ANNEX_SL[main] || `Clause ${main}`;
     }
 
+    /**
+     * Recover a real ISO clause reference from Stage 1 focus-point / mandatory
+     * surveillance-element text so a FOCUS.n or SURV checklist item — whose own
+     * `clause` is an internal pseudo-reference, not a standard clause — can still
+     * carry the actual criterion it addresses. Additive/non-breaking: callers get
+     * '' when nothing plausible is found and just skip displaying a criterion.
+     *
+     * @param {string} text
+     * @param {string} [standard] - e.g. 'ISO 9001:2015'. Annex SL / "9001-family"
+     *   standards share the clause 4-10 main-structure, so for those the first
+     *   token has to look like a main clause 4-10 (a bare "12.3" or "2.1" picked
+     *   up from a document number or date in the text is rejected). Without a
+     *   recognised family the first token found is accepted as-is.
+     * @returns {string} the first plausible clause token, or ''.
+     */
+    function deriveCriterionRef(text, standard) {
+        const matches = String(text || '').match(/\b(\d{1,2}(?:\.\d{1,2}){0,2})\b/g) || [];
+        if (!matches.length) return '';
+        const isAnnexSLFamily = /\b(9001|14001|45001|22000|27001|13485|20000|37001|50001)\b/.test(String(standard || '')) || !standard;
+        for (const token of matches) {
+            const main = parseInt(token.split('.')[0], 10);
+            if (!isAnnexSLFamily || (main >= 4 && main <= 10)) return token;
+        }
+        return '';
+    }
+
     function docRef(doc) {
         const bits = [doc.docNumber, doc.revision].filter(Boolean).join(' ');
         return bits ? `${doc.name} (${bits})` : doc.name;
@@ -540,7 +566,18 @@
             clauses.push({
                 mainClause: 'FOCUS',
                 title: 'Audit Focus — carried over from the Stage 1 document review',
-                subClauses: focus.map((text, i) => question(`FOCUS.${i + 1}`, 'Stage 1 finding', text))
+                // clause ('FOCUS.n') is an internal pseudo-reference; criterionRef
+                // carries the actual standard clause when one can be recovered from
+                // the focus-point text (criterionRef:'' when it can't) — see
+                // deriveCriterionRef(). criterionSource flags both cases so a
+                // consumer (execution-module-v2.js's checklist->NCR sync, and the
+                // report engine) knows to display criterionRef, not `clause`.
+                subClauses: focus.map((text, i) => {
+                    const item = question(`FOCUS.${i + 1}`, 'Stage 1 finding', text);
+                    item.criterionRef = deriveCriterionRef(text, o.standard);
+                    item.criterionSource = 'focus-carryover';
+                    return item;
+                })
             });
         }
 
@@ -548,8 +585,12 @@
             clauses.push({
                 mainClause: 'SURV',
                 title: 'Mandatory Surveillance Elements (ISO/IEC 17021-1 §9.6.2)',
-                subClauses: SURVEILLANCE_MANDATORY.map(([ref, label, text]) =>
-                    question(`9.6.2 (${ref})`, label, text))
+                subClauses: SURVEILLANCE_MANDATORY.map(([ref, label, text]) => {
+                    const item = question(`9.6.2 (${ref})`, label, text);
+                    item.criterionRef = deriveCriterionRef(text, o.standard);
+                    item.criterionSource = 'focus-carryover';
+                    return item;
+                })
             });
         }
 

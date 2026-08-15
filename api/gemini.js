@@ -67,12 +67,26 @@ export default async function handler(req, res) {
             const modelName = modelMap[requestedModel] || requestedModel;
             url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
+            // System-level guardrail applied to EVERY proxied call, regardless of
+            // caller. Belt-and-suspenders alongside any per-prompt instructions
+            // ai-service.js already includes — this is enforced server-side so it
+            // can't be dropped by a caller that forgets to add its own rules.
+            const GUARDRAIL_SYSTEM_INSTRUCTION = 'You assist certified-body auditors. Hard rules: '
+                + '(1) Never state, estimate, or imply financial figures, revenue, penalties, contract values, customer loss, or reputational damage unless the exact figure appears in the user-provided input. '
+                + '(2) Never assert certification decisions or recommendations — reproduce any provided recommendation wording verbatim. '
+                + '(3) Never describe a finding as recurring, repeated, persistent, or systemic unless prior-audit records in the input demonstrate it. '
+                + '(4) Never invent root causes, risk ratings, or maturity levels; where asked to draft such content, label it explicitly as a draft suggestion requiring auditor confirmation. '
+                + '(5) Prefer plain, objective audit language: requirement, objective evidence, evaluation, finding.';
+
             fetchOptions = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
+                    system_instruction: {
+                        parts: [{ text: GUARDRAIL_SYSTEM_INSTRUCTION }]
+                    },
                     contents: [{
                         parts: [{ text: prompt }]
                     }],

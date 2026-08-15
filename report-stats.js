@@ -141,6 +141,204 @@
         return true;
     }
 
+    // ─── Deterministic, audit-type-aware certification recommendation ──────────
+    // Never AI-generated. base sentence keyed off the audit type string, suffix
+    // keyed off NC severity. A surveillance audit must never read "Recommended
+    // for Certification" — only initial/Stage 2 audits grant certification.
+    function recommendationText(auditType, counts) {
+        const majorNC = (counts && Number(counts.majorNC)) || 0;
+        const minorNC = (counts && Number(counts.minorNC)) || 0;
+        const t = trim(auditType).toLowerCase();
+
+        let base;
+        if (/stage\s*1|stage1/.test(t)) {
+            base = 'Progression to Stage 2 is recommended';
+        } else if (/stage\s*2|stage2|initial/.test(t)) {
+            base = 'Recommended for certification';
+        } else if (/surveillance/.test(t)) {
+            base = 'Continued certification is recommended';
+        } else if (/re-?cert/.test(t)) {
+            base = 'Recertification is recommended';
+        } else {
+            base = 'Certification recommendation';
+        }
+
+        let suffix;
+        if (majorNC > 0) {
+            suffix = ' subject to satisfactory closure of the identified nonconformities, including verification of implemented corrective actions for major nonconformities.';
+        } else if (minorNC > 0) {
+            suffix = ' subject to satisfactory closure of applicable nonconformities.';
+        } else {
+            suffix = '.';
+        }
+        return base + suffix;
+    }
+
+    // ─── Certification-cycle programme — single computation for preview + export ──
+    // Anchors the 3-year cycle on the client's certificate (not the current audit
+    // date), overlays real historical audits for this client+standard so completed
+    // stages show their actual dates/types, and never fabricates Stage 1/2 dates
+    // when there is neither a certificate nor history to anchor on.
+    function buildProgramme(input) {
+        try {
+            return buildProgrammeInner(input || {});
+        } catch (_e) {
+            return { stages: [], anchored: 'audit-date-fallback', issues: ['Unable to compute certification programme.'] };
+        }
+    }
+
+    const STAGE_DEFS = [
+        { id: 's1', label: 'Stage 1', offset: 0, def: 'Readiness review — documentation, context, scope confirmation', typeTest: /stage\s*1|stage1/i },
+        { id: 's2', label: 'Stage 2 (Initial Certification)', offset: 0, def: 'Full system implementation audit', typeTest: /stage\s*2|stage2|initial/i },
+        { id: 'sv1', label: 'Surveillance 1', offset: 12, def: 'Key processes, use of marks, changes, previous findings follow-up', typeTest: /surveillance\s*1|sv1|1st\s*surveillance|first\s*surveillance/i },
+        { id: 'sv2', label: 'Surveillance 2', offset: 24, def: 'Key processes, use of marks, changes, previous findings follow-up', typeTest: /surveillance\s*2|sv2|2nd\s*surveillance|second\s*surveillance/i },
+        { id: 'recert', label: 'Recertification', offset: 36, def: 'Full system re-assessment over the certification cycle', typeTest: /re-?cert/i }
+    ];
+
+    function classifyAuditType(t) {
+        const s = trim(t).toLowerCase();
+        if (/stage\s*1|stage1/.test(s)) return 's1';
+        if (/stage\s*2|stage2|initial/.test(s)) return 's2';
+        if (/surveillance\s*1|sv1|1st\s*surveillance|first\s*surveillance/.test(s)) return 'sv1';
+        if (/surveillance\s*2|sv2|2nd\s*surveillance|second\s*surveillance/.test(s)) return 'sv2';
+        if (/re-?cert/.test(s)) return 'recert';
+        if (/surveillance/.test(s)) return 'sv1'; // generic "Surveillance" defaults to SV1
+        return 's2'; // default to Stage 2 / Initial
+    }
+
+    function parseDateSafe(v) {
+        if (!v) return null;
+        const dt = new Date(v);
+        return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    function buildProgrammeInner(input) {
+        const client = input.client || {};
+        const auditPlan = input.auditPlan || {};
+        const report = input.report || {};
+        const allReports = safeArr(input.allReports);
+
+        const standard = report.standard || auditPlan.standard || '';
+        const currentTypeStr = auditPlan.auditType || auditPlan.type || report.auditType || 'Initial';
+        let currentStageId = classifyAuditType(currentTypeStr);
+
+        const issues = [];
+
+        // Anchor: prefer the matching client certificate; else fall back to the
+        // current audit's own date (only used for the audit-date-fallback path).
+        const certs = safeArr(client.certificates);
+        const cert = certs.find((c) => trim(c.standard).toLowerCase() === trim(standard).toLowerCase()) || certs[0] || null;
+        const certStart = cert ? (parseDateSafe(cert.initialDate) || parseDateSafe(cert.issueDate)) : null;
+        const certExpiry = cert ? parseDateSafe(cert.expiryDate) : null;
+
+        // History: real audits for this client+standard, finalized/approved/published,
+        // mirroring the filter used by planning-module.js:2744-2780 (clientId+standard+status)
+        // without importing that module.
+        const clientId = report.clientId != null ? report.clientId : client.id;
+        const history = allReports.filter((r) => {
+            if (!r || String(r.id) === String(report.id)) return false;
+            if (clientId == null || r.clientId == null || String(r.clientId) !== String(clientId)) return false;
+            if (standard && trim(r.standard).toLowerCase() !== trim(standard).toLowerCase()) return false;
+            const status = trim(r.reportStatus || r.status).toLowerCase();
+            return status === 'final' || status === 'finalized' || status === 'approved' || status === 'published';
+        }).sort((a, b) => new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
+
+        const auditDateStr = report.date || auditPlan.startDate || auditPlan.date || null;
+        const auditDate = parseDateSafe(auditDateStr) || new Date();
+
+        let anchored;
+        let baseDate;
+        if (certStart) {
+            anchored = 'certificate';
+            baseDate = certStart;
+        } else if (history.length > 0) {
+            anchored = 'history';
+            baseDate = parseDateSafe(history[0].date || history[0].createdAt) || auditDate;
+        } else {
+            anchored = 'audit-date-fallback';
+            baseDate = auditDate;
+        }
+
+        // A generic "Surveillance" audit type carries no cycle-year. When a real
+        // anchor exists, slot the current audit into the surveillance visit nearest
+        // its own date (two years after initial certification = Surveillance 2).
+        if (currentStageId === 'sv1' && anchored !== 'audit-date-fallback'
+            && !/surveillance\s*1|sv1|1st\s*surveillance|first\s*surveillance/i.test(currentTypeStr)) {
+            const sv1Due = new Date(baseDate.getTime()); sv1Due.setMonth(sv1Due.getMonth() + 12);
+            const sv2Due = new Date(baseDate.getTime()); sv2Due.setMonth(sv2Due.getMonth() + 24);
+            if (Math.abs(auditDate - sv2Due) < Math.abs(auditDate - sv1Due)) currentStageId = 'sv2';
+        }
+        const currentStageIdx = STAGE_DEFS.findIndex((s) => s.id === currentStageId);
+
+        const fmt = (dt) => dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+        const monthYear = (offset) => { const dt = new Date(baseDate.getTime()); dt.setMonth(dt.getMonth() + offset); return fmt(dt); };
+        const recertTiming = certExpiry ? ('by ' + fmt(certExpiry)) : monthYear(36);
+
+        // Match history records to stage slots by their own audit type.
+        const historyByStage = {};
+        history.forEach((r) => {
+            const sid = classifyAuditType(r.auditType || (r.auditPlan && r.auditPlan.type));
+            if (!historyByStage[sid]) historyByStage[sid] = r;
+        });
+
+        const noAnchor = anchored === 'audit-date-fallback' && currentStageIdx > 0;
+        if (noAnchor) {
+            issues.push('No certificate or audit history on file; prior stage dates unavailable.');
+        }
+
+        const stages = STAGE_DEFS.map((s, i) => {
+            const isCurrent = s.id === currentStageId;
+            const histRec = historyByStage[s.id];
+            let timing, status, source;
+
+            if (isCurrent) {
+                timing = fmt(auditDate);
+                status = 'This audit';
+                source = 'current';
+            } else if (histRec) {
+                timing = fmt(parseDateSafe(histRec.date || histRec.createdAt) || auditDate);
+                status = 'Completed';
+                source = 'history';
+            } else if (i < currentStageIdx) {
+                // A stage prior to the current one with no matching history record.
+                if (noAnchor || (anchored === 'audit-date-fallback' && !certStart && history.length === 0)) {
+                    timing = '—';
+                    status = 'Unknown';
+                    source = 'unknown';
+                } else {
+                    timing = s.id === 'recert' ? recertTiming : monthYear(s.offset);
+                    status = 'Completed';
+                    source = anchored;
+                }
+            } else {
+                timing = s.id === 'recert' ? recertTiming : monthYear(s.offset);
+                status = 'Planned';
+                source = anchored;
+            }
+
+            return { id: s.id, label: s.label, timing, status, source, def: s.def };
+        });
+
+        // Chronology sanity checks.
+        const withDates = stages
+            .map((s, i) => ({ i, s, dt: parseDateSafe(s.timing !== '—' ? s.timing : null) }))
+            .filter((x) => x.dt);
+        for (let i = 1; i < withDates.length; i++) {
+            if (withDates[i].dt < withDates[i - 1].dt) {
+                issues.push('Stage dates are out of chronological order (' + withDates[i - 1].s.label + ' after ' + withDates[i].s.label + ').');
+            }
+        }
+        if (currentStageIdx >= 2 && certStart && auditDate < certStart) {
+            issues.push('Surveillance/recertification audit is dated before the certification start date.');
+        }
+        const currentCount = stages.filter((s) => s.status === 'This audit').length;
+        if (currentCount !== 1) {
+            issues.push('Current audit does not match exactly one programme stage — check the audit type against the certification cycle.');
+        }
+
+        return { stages, anchored, issues, anchorDate: baseDate ? baseDate.toISOString() : null };
+    }
+
     function safeMinimalDataset() {
         return {
             resultCounts: { conform: 0, majorNC: 0, minorNC: 0, na: 0, notAssessed: 0, pendingClassification: 0 },
@@ -437,14 +635,16 @@
         let auditStatus, statusColor, recommendation, recColor;
         if (resultCounts.majorNC > 0) {
             auditStatus = 'Non-Conformities Identified'; statusColor = 'bad';
-            recommendation = 'Conditional Recommendation — pending closure of major non-conformities'; recColor = 'bad';
+            recColor = 'bad';
         } else if (resultCounts.minorNC > 0 || resultCounts.pendingClassification > 0) {
             auditStatus = 'Minor Non-Conformities'; statusColor = 'warn';
-            recommendation = 'Recommended for Certification, subject to corrective action'; recColor = 'warn';
+            recColor = 'warn';
         } else {
             auditStatus = 'Conforming'; statusColor = 'good';
-            recommendation = 'Recommended for Certification'; recColor = 'good';
+            recColor = 'good';
         }
+        const auditTypeForRec = report.auditType || auditPlan.type || auditPlan.auditType || '';
+        recommendation = recommendationText(auditTypeForRec, { majorNC: resultCounts.majorNC, minorNC: resultCounts.minorNC });
 
         const methodologyNote = 'Coverage measures the share of applicable checklist items (excluding Not Applicable) that '
             + 'have been assessed. Conformity measures, of those assessed items, the share with no confirmed major or minor '
@@ -500,7 +700,14 @@
         };
     }
 
-    global.ReportStats = { build, version: 1 };
+    global.ReportStats = {
+        build,
+        version: 1,
+        normalizeDeptName,
+        UNASSIGNED_LABEL,
+        recommendationText,
+        buildProgramme
+    };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = global.ReportStats;

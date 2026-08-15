@@ -283,6 +283,10 @@
             text: text,
             caDueDate: raw.caDueDate || null,
             status: raw.status || raw.capaStatus || raw.verificationStatus || null,
+            // Auditor-entered risk assessment, when present — takes precedence
+            // over the derived likelihood/impact heuristics in scoreFinding().
+            riskLikelihood: (raw.riskLikelihood != null && raw.riskLikelihood !== '') ? Number(raw.riskLikelihood) : null,
+            riskImpact: (raw.riskImpact != null && raw.riskImpact !== '') ? Number(raw.riskImpact) : null,
             _raw: raw
         };
     }
@@ -426,6 +430,22 @@
 
     // ─── scoreFinding ───────────────────────────────────────────────────────
 
+    // Shared score/band/priority derivation from a likelihood/impact pair —
+    // used both for the initial (derived or assessed) score and for the
+    // post-link override in compute() when a linked CAPA record carries its
+    // own auditor-entered riskLikelihood/riskImpact.
+    function deriveRiskBand(likelihood, impact) {
+        var score = likelihood * impact;
+        var residualRisk = score <= 4 ? 'Low' : score <= 9 ? 'Medium' : score <= 15 ? 'High' : 'Critical';
+        var priority = residualRisk === 'Critical' ? 'P1' : residualRisk === 'High' ? 'P2' : residualRisk === 'Medium' ? 'P3' : 'P4';
+        return { score: score, residualRisk: residualRisk, priority: priority };
+    }
+
+    // A finding's own text documents multiple instances/areas itself (distinct
+    // from the broader systemicHints signal used for the likelihood bump below,
+    // which also fires on words like "no process" that don't imply multiplicity).
+    var MULTI_INSTANCE_TEXT = /(multiple|repeated|several|numerous|various)\s+(instances|records|areas|occurrences|cases|locations|departments|sites)/i;
+
     // scoreFinding only scores real major/minor non-conformities. Callers MUST
     // filter out null results (an observation/OFI/unclassified finding has no
     // business being on the risk heatmap or risk register).
@@ -439,21 +459,32 @@
         if (!isMajor && !isMinor) return null;
         var theme = classifyTheme(text, clause);
 
-        // Likelihood (1-5): base by severity, then adjust for systemic/recurrence wording.
-        var likelihood = isMajor ? 4 : 3;
+        // Auditor-entered risk assessment takes precedence over the derived
+        // heuristics below when present (1-5 on both axes).
+        var hasAssessed = finding.riskLikelihood != null && !isNaN(finding.riskLikelihood)
+            && finding.riskImpact != null && !isNaN(finding.riskImpact);
+
+        var likelihood, impact, riskSource;
         var systemicHints = /(multiple|repeated|recurring|no process|no procedure|not implemented|systemic|widespread|several instances)/i;
-        if (systemicHints.test(text)) likelihood = Math.min(5, likelihood + 1);
-        if (finding.isRepeat) likelihood = Math.min(5, likelihood + 1);
-        likelihood = Math.max(1, Math.min(5, likelihood));
+        if (hasAssessed) {
+            likelihood = Math.max(1, Math.min(5, Math.round(Number(finding.riskLikelihood))));
+            impact = Math.max(1, Math.min(5, Math.round(Number(finding.riskImpact))));
+            riskSource = 'assessed';
+        } else {
+            // Likelihood (1-5): base by severity, then adjust for systemic/recurrence wording.
+            likelihood = isMajor ? 4 : 3;
+            if (systemicHints.test(text)) likelihood = Math.min(5, likelihood + 1);
+            if (finding.isRepeat) likelihood = Math.min(5, likelihood + 1);
+            likelihood = Math.max(1, Math.min(5, likelihood));
 
-        // Impact (1-5): base by severity, adjusted by clause theme weight.
-        var impact = isMajor ? 4 : 2;
-        impact = Math.max(1, Math.min(5, impact + (theme.impactBoost || 0)));
-        if (isMajor && (theme.impactBoost || 0) >= 2) impact = 5;
+            // Impact (1-5): base by severity, adjusted by clause theme weight.
+            impact = isMajor ? 4 : 2;
+            impact = Math.max(1, Math.min(5, impact + (theme.impactBoost || 0)));
+            if (isMajor && (theme.impactBoost || 0) >= 2) impact = 5;
+            riskSource = 'derived';
+        }
 
-        var score = likelihood * impact;
-        var residualRisk = score <= 4 ? 'Low' : score <= 9 ? 'Medium' : score <= 15 ? 'High' : 'Critical';
-        var priority = residualRisk === 'Critical' ? 'P1' : residualRisk === 'High' ? 'P2' : residualRisk === 'Medium' ? 'P3' : 'P4';
+        var band = deriveRiskBand(likelihood, impact);
 
         // Business impacts
         var businessImpacts = [];
@@ -468,22 +499,29 @@
 
         // Root cause scaffold (draft templates — auditor-editable)
         var themeLabel = theme.theme;
+        // "Affecting multiple areas or records" is only claimed when this
+        // finding's own text documents multiple instances itself; whether its
+        // THEME is shared by other findings in this audit is decided later in
+        // compute() (scoreFinding only sees one finding at a time).
+        var selfMultiInstance = MULTI_INSTANCE_TEXT.test(text);
         var rootCause = {
             immediateCause: 'Non-conformance observed at clause ' + (clause || 'N/A') + ': ' + cleanFindingText(finding.text || finding.comment || 'requirement not fully met') + '.',
             rootCause: 'Working hypothesis: the organization\'s process for ' + themeLabel + ' is either not fully defined or not consistently applied in practice — pending confirmation by the client\'s own root-cause investigation.',
-            systemicCause: systemicHints.test(text)
-                ? 'Evidence points to a systemic gap in ' + themeLabel + ' affecting multiple areas or records, rather than a one-off lapse.'
-                : 'Current evidence points to an isolated lapse rather than a systemic breakdown, pending the client\'s own root-cause investigation.',
-            correctiveAction: 'Define or update the process governing ' + themeLabel + ', retrain the relevant personnel, and correct the identified instance(s) of non-conformance.',
-            preventiveAction: 'Introduce periodic internal verification (e.g. an internal audit checkpoint or management review item) for ' + themeLabel + ' to prevent recurrence.'
+            systemicCause: selfMultiInstance
+                ? 'Evidence points to a gap in ' + themeLabel + ' affecting multiple areas or records, rather than a one-off lapse.'
+                : 'Evidence indicates a gap in ' + themeLabel + '; extent to be confirmed by the auditee\'s investigation.',
+            correctiveAction: 'To be defined by the auditee\'s corrective action response for ' + themeLabel + '.',
+            preventiveAction: 'Preventive measures to be proposed by the auditee; effectiveness will be evaluated at a subsequent audit.'
         };
 
         return {
             likelihood: likelihood,
             impact: impact,
-            score: score,
-            residualRisk: residualRisk,
-            priority: priority,
+            score: band.score,
+            residualRisk: band.residualRisk,
+            priority: band.priority,
+            riskSource: riskSource,
+            theme: themeLabel,
             businessImpacts: businessImpacts,
             rootCause: rootCause
         };
@@ -557,6 +595,30 @@
             if (rec) {
                 f.capaRecord = rec;
                 if (rec.id != null) claimedRecordIds[String(rec.id)] = true;
+                // A linked CAPA register record's own auditor-entered risk
+                // assessment (if the finding itself didn't already carry one)
+                // takes precedence over the derived likelihood/impact.
+                if (f.riskSource !== 'assessed' && rec.riskLikelihood != null && rec.riskImpact != null
+                    && !isNaN(rec.riskLikelihood) && !isNaN(rec.riskImpact)) {
+                    f.likelihood = Math.max(1, Math.min(5, Math.round(Number(rec.riskLikelihood))));
+                    f.impact = Math.max(1, Math.min(5, Math.round(Number(rec.riskImpact))));
+                    var band = deriveRiskBand(f.likelihood, f.impact);
+                    f.score = band.score;
+                    f.residualRisk = band.residualRisk;
+                    f.priority = band.priority;
+                    f.riskSource = 'assessed';
+                }
+            }
+        });
+
+        // Upgrade the root-cause "systemic" narrative when this finding's theme
+        // is shared by more than one finding in this audit (scoreFinding() only
+        // sees one finding at a time, so cross-finding recurrence is decided here).
+        var themeCounts = {};
+        scoredFindings.forEach(function (f) { if (f.theme) themeCounts[f.theme] = (themeCounts[f.theme] || 0) + 1; });
+        scoredFindings.forEach(function (f) {
+            if (f.theme && themeCounts[f.theme] > 1 && f.rootCause && /extent to be confirmed/.test(f.rootCause.systemicCause)) {
+                f.rootCause.systemicCause = 'Evidence points to a gap in ' + f.theme + ' affecting multiple areas or records, rather than a one-off lapse.';
             }
         });
 
@@ -586,7 +648,9 @@
                 status: status,
                 riskOwner: (rec && rec.capaResponsible) || f.department || 'Process Owner (TBD)',
                 treatmentPlan: (rec && rec.correctiveAction) || f.rootCause.correctiveAction,
-                reviewDate: targetDate
+                reviewDate: targetDate,
+                riskSource: f.riskSource,
+                basis: f.riskSource === 'assessed' ? 'Assessed by auditor' : 'Derived (indicator)'
             };
         });
 
@@ -595,14 +659,21 @@
             return (priorityOrder[a.priority] - priorityOrder[b.priority]) || (b.score - a.score);
         }).map(function (f) {
             var dueDate = f.caDueDate || addDays(baseDate, /major/i.test(f.ncrType) ? 30 : 90);
+            var rec = f.capaRecord;
+            var hasRealAction = !!(rec && rec.correctiveAction);
+            var findingSummary = (f.clause ? 'Clause ' + f.clause + ' — ' : '') + cleanFindingText(f.text || 'Non-conformance identified', 100);
             return {
                 priority: f.priority,
-                action: f.rootCause.correctiveAction,
-                owner: f.department || 'Process Owner (TBD)',
+                action: hasRealAction ? rec.correctiveAction : ('To be defined by the auditee\'s corrective action response for: ' + findingSummary),
+                hasRealAction: hasRealAction,
+                owner: (rec && rec.capaResponsible) || f.department || 'Process Owner (TBD)',
                 dueDate: dueDate,
                 expectedCompletion: dueDate,
-                resources: 'Process owner time, training materials, documentation update',
-                expectedOutcome: 'Elimination of the identified non-conformance and reduction of residual risk to Low/Medium',
+                // Resources / expected outcome are the auditee's to define, not
+                // a fixed template — shown as '—' unless the CAPA register has
+                // real auditee-entered values linked to this finding.
+                resources: (rec && rec.resources) || '—',
+                expectedOutcome: (rec && rec.expectedOutcome) || '—',
                 status: deriveStatus(Object.assign({}, f, { caDueDate: dueDate }), baseDate),
                 businessImpact: f.businessImpacts.join(', ')
             };
@@ -645,12 +716,23 @@
                         daysOverdue: daysOverdue
                     });
                 }
+                // Prefer the CAPA register's own lifecycle-status label (e.g.
+                // "Awaiting Auditee Response") over the coarse Open/In-Progress
+                // bucket when available, so a pre-due-date item doesn't read as
+                // a flat, unexplained "Open"/0%.
+                var displayStatus = null;
+                try {
+                    if (global.NCRModule && typeof global.NCRModule.capaDisplayStatus === 'function') {
+                        displayStatus = global.NCRModule.capaDisplayStatus(rec) || null;
+                    }
+                } catch (_e) { /* defensive no-op */ }
                 return {
                     ref: 'CAPA-' + (rec.id != null ? rec.id : idx + 1),
                     clause: rec.clause || '',
                     text: rec.description || '',
                     priority: rec.severity || '',
                     status: status,
+                    displayStatus: displayStatus,
                     completion: completionPct(status)
                 };
             });
@@ -767,6 +849,14 @@
         return '<span class="b4-badge b4-badge--' + cls + '">' + sevSymbol(cls) + esc(p) + '</span>';
     }
 
+    // Distinguishes an auditor-assessed likelihood/impact from an
+    // Audit360-derived indicator, wherever a risk rating is shown next to a
+    // basis label (risk register).
+    function basisBadge(basis) {
+        var isAssessed = basis === 'Assessed by auditor';
+        return '<span class="b4-badge b4-badge--' + (isAssessed ? 'info' : 'neutral') + '">' + esc(basis) + '</span>';
+    }
+
     // Short, plain-language interpretation for a residual-risk band — drawn
     // directly from the existing Low/Medium/High/Critical bands (no invented
     // benchmarks), so a reader can see "Requires attention" / "Managed" next
@@ -784,6 +874,25 @@
         if (status === 'Overdue') return '<span class="b4-pill b4-pill-critical">✕ Overdue</span>';
         var cls = { Open: 'bad', 'In Progress': 'warn', Verified: 'info', Closed: 'good' }[status] || 'neutral';
         return '<span class="b4-badge b4-badge--' + cls + '">' + sevSymbol(cls) + esc(status) + '</span>';
+    }
+
+    // Badge for window.NCRModule.capaDisplayStatus()'s richer lifecycle labels
+    // (e.g. "Awaiting Auditee Response"), used in place of the coarse
+    // Open/In-Progress bucket wherever that richer status is available.
+    var CAPA_DISPLAY_SEVERITY = {
+        'Awaiting Auditee Response': 'neutral',
+        'Response Received': 'info',
+        'Under Auditor Review': 'info',
+        'Additional Evidence Required': 'warn',
+        'Accepted — Implementation Pending': 'warn',
+        'Effectiveness Review Pending': 'info',
+        'Closed': 'good',
+        'Overdue': 'bad'
+    };
+    function capaDisplayBadge(label) {
+        if (label === 'Overdue') return '<span class="b4-pill b4-pill-critical">✕ Overdue</span>';
+        var cls = CAPA_DISPLAY_SEVERITY[label] || 'neutral';
+        return '<span class="b4-badge b4-badge--' + cls + '">' + sevSymbol(cls) + esc(label) + '</span>';
     }
 
     function tagBadge(label) {
@@ -901,6 +1010,17 @@
         var r = compute(d);
         var out = [];
 
+        // No finding in this audit carries an auditor-entered risk assessment —
+        // every likelihood/impact number on the heat map and register below is
+        // an Audit360-derived indicator, not an audit conclusion. Surfaced
+        // prominently on both risk views so a reader never mistakes it for a
+        // formal risk assessment.
+        var allDerived = r.scoredFindings.length > 0 && r.scoredFindings.every(function (f) { return f.riskSource !== 'assessed'; });
+        var noAssessmentNote = allDerived
+            ? '<div class="b4-callout b4-callout--warn b4-mb-4">' + iconSafe('alert', { size: 12 })
+                + 'No formal risk assessment has been performed. Ratings shown are Audit360 analytical indicators derived from finding classification and text, provided for management insight only — they are not audit conclusions.</div>'
+            : '';
+
         // 1. RISK HEAT MAP — the visually dominant risk page. Trimmed to
         // Ref / Finding / L / I / Residual / Priority per the brief so it breathes.
         var findingsRows = r.scoredFindings.length
@@ -920,9 +1040,9 @@
             color: '#dc2626',
             charts: [],
             bodyHtml: r.scoredFindings.length
-                ? renderHeatmap(r.heatMatrix)
+                ? noAssessmentNote + renderHeatmap(r.heatMatrix)
                     + '<div class="b4-mt-6"><table class="b4-tbl"><thead><tr><th style="width:12%;">Ref</th><th style="width:44%;">Finding</th><th style="width:11%;text-align:center;">L</th><th style="width:11%;text-align:center;">I</th><th style="width:11%;text-align:center;">Residual</th><th style="width:11%;text-align:center;">Priority</th></tr></thead><tbody>' + findingsRows + '</tbody></table></div>'
-                : emptyState('Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.')
+                : emptyState('Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.')
         });
 
         // 2. BUSINESS IMPACT ANALYSIS
@@ -948,15 +1068,17 @@
                     + '</div>';
             }).join('') + '</div>'
             : '';
+        var impactMethodologyNote = '<div class="b4-callout b4-callout--info b4-mb-4">' + iconSafe('finding', { size: 12 })
+            + 'Theme classification is derived automatically from keywords in the finding text. It is an Audit360 analytical indicator for management insight only — it does not represent an assessed business or financial impact.</div>';
         out.push({
             key: 'business-impact',
-            name: 'BUSINESS IMPACT ANALYSIS',
-            desc: 'Findings categorized by business impact area',
+            name: 'FINDING IMPACT THEMES',
+            desc: 'Findings grouped by keyword-derived theme (analytical indicator, not an assessed impact)',
             color: '#4338ca',
             charts: [],
             bodyHtml: r.scoredFindings.length
-                ? impactSummary + '<div><table class="b4-tbl"><thead><tr><th style="width:10%;">Ref</th><th style="width:10%;">Clause</th><th style="width:34%;">Finding</th><th style="width:30%;">Impact Categories</th><th style="width:16%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + impactRows + '</tbody></table></div>'
-                : emptyState('No findings from this audit are assessed as carrying a material business impact at this time.')
+                ? impactMethodologyNote + impactSummary + '<div><table class="b4-tbl"><thead><tr><th style="width:10%;">Ref</th><th style="width:10%;">Clause</th><th style="width:34%;">Finding</th><th style="width:30%;">Impact Themes</th><th style="width:16%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + impactRows + '</tbody></table></div>'
+                : emptyState('No findings from this audit carry a keyword-derived impact theme at this time.')
         });
 
         // 3. ROOT CAUSE ANALYSIS — each finding as a vertical logical flow:
@@ -971,14 +1093,23 @@
         }
         var rcCards = r.scoredFindings.map(function (f) {
             var rec = f.capaRecord;
+            // Root cause is the auditee's to establish. Only a real
+            // auditee/auditor-recorded rootCause is shown as the Root Cause
+            // step; absent that, the step says so plainly, and the rule-
+            // generated hypothesis (if any) is shown separately, clearly
+            // labeled as a non-authoritative draft suggestion.
+            var hasRealRootCause = !!(rec && rec.rootCause);
             var hasReal = !!(rec && (rec.rootCause || rec.correctiveAction || rec.correction));
             var rc = f.rootCause;
             var immediateCause = (rec && rec.correction) || rc.immediateCause;
-            var rootCauseText = (rec && rec.rootCause) || rc.rootCause;
+            var rootCauseText = hasRealRootCause ? rec.rootCause : 'Awaiting auditee root cause analysis.';
             var correctiveActionText = (rec && rec.correctiveAction) || rc.correctiveAction;
             var provenance = hasReal
-                ? '<div class="b4-caption b4-mt-2">' + iconSafe('check', { size: 12 }) + 'Recorded by auditor' + (rec.raisedBy ? ' (' + esc(rec.raisedBy) + ')' : '') + '</div>'
-                : '<div class="b4-caption b4-mt-2">' + iconSafe('finding', { size: 12 }) + 'Working hypothesis (rule-generated draft) — auditor review required</div>';
+                ? '<div class="b4-caption b4-mt-2">' + iconSafe('check', { size: 12 }) + 'Recorded by auditee/auditor' + (rec.raisedBy ? ' (' + esc(rec.raisedBy) + ')' : '') + '</div>'
+                : '<div class="b4-caption b4-mt-2">' + iconSafe('finding', { size: 12 }) + 'Awaiting auditee response</div>';
+            var draftSuggestion = !hasRealRootCause
+                ? '<div class="b4-caption b4-mt-1" style="font-style:italic;">' + iconSafe('finding', { size: 12 }) + 'Audit360 draft suggestion (not an audit conclusion): ' + esc(rc.rootCause) + '</div>'
+                : '';
             // The rule-generated "immediate cause" is the finding text with a
             // prefix, so rendering it under its own heading printed the same
             // paragraph twice in every finding card. Only show this step when the
@@ -999,12 +1130,13 @@
                 + '</div>'
                 + chain
                 + provenance
+                + draftSuggestion
                 + '</div>';
         }).join('');
         out.push({
             key: 'root-cause',
-            name: 'ROOT CAUSE ANALYSIS',
-            desc: 'Rule-generated root cause scaffolding per finding (auditor-editable draft)',
+            name: 'CORRECTIVE ACTION RESPONSE STATUS',
+            desc: 'Auditee corrective-action response and root-cause status per finding (draft scaffolding shown separately from recorded auditee/auditor data)',
             color: '#7c3aed',
             charts: [],
             bodyHtml: r.scoredFindings.length ? rcCards : emptyState('No non-conformities were identified during this audit, so no root-cause investigation is required.')
@@ -1029,6 +1161,7 @@
                 + '<td style="text-align:center;">' + pipBar(row.likelihood) + '</td>'
                 + '<td style="text-align:center;">' + pipBar(row.impact) + '</td>'
                 + '<td style="text-align:center;">' + scoreBadge(row.score, row.residualRisk) + '</td>'
+                + '<td style="text-align:center;">' + basisBadge(row.basis) + '</td>'
                 + '<td>' + esc(row.riskOwner) + '</td>'
                 + '<td style="white-space:nowrap;">' + esc(row.reviewDate) + '</td>'
                 + '<td style="text-align:center;">' + statusBadge(row.status) + '</td>'
@@ -1047,8 +1180,8 @@
             color: '#be185d',
             charts: [],
             bodyHtml: r.riskRegister.length
-                ? '<div><table class="b4-tbl b4-tbl--compact"><thead><tr><th style="width:7%;">Ref</th><th style="width:25%;">Risk</th><th style="width:8%;text-align:center;">Likelihood</th><th style="width:8%;text-align:center;">Impact</th><th style="width:8%;text-align:center;">Risk Score</th><th style="width:12%;">Owner</th><th style="width:9%;">Target Date</th><th style="width:9%;text-align:center;">Status</th><th style="width:6%;text-align:center;">Priority</th><th style="width:9%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + registerRows + '</tbody></table></div>' + registerNotes
-                : emptyState('Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.')
+                ? noAssessmentNote + '<div><table class="b4-tbl b4-tbl--compact"><thead><tr><th style="width:7%;">Ref</th><th style="width:20%;">Risk</th><th style="width:7%;text-align:center;">Likelihood</th><th style="width:7%;text-align:center;">Impact</th><th style="width:7%;text-align:center;">Risk Score</th><th style="width:9%;text-align:center;">Basis</th><th style="width:11%;">Owner</th><th style="width:8%;">Target Date</th><th style="width:8%;text-align:center;">Status</th><th style="width:6%;text-align:center;">Priority</th><th style="width:9%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + registerRows + '</tbody></table></div>' + registerNotes
+                : emptyState('Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.')
         });
 
         // 5. MANAGEMENT ACTION PLAN — "Resources" / "Expected Outcome" are drawn
@@ -1064,8 +1197,11 @@
         var sharedResources = commonValue(r.actionPlan, 'resources');
         var sharedOutcome = commonValue(r.actionPlan, 'expectedOutcome');
         var actionRows = r.actionPlan.map(function (a) {
+            var provenance = a.hasRealAction
+                ? '<div class="b4-caption b4-mt-1">' + iconSafe('check', { size: 12 }) + 'Recorded by auditee/auditor</div>'
+                : '<div class="b4-caption b4-mt-1">' + iconSafe('finding', { size: 12 }) + 'Awaiting auditee response</div>';
             var tds = '<td style="text-align:center;">' + priorityBadge(a.priority) + '<div class="b4-caption">' + esc(priorityInterpretation(a.priority)) + '</div></td>'
-                + '<td>' + esc(a.action) + '</td>'
+                + '<td>' + esc(a.action) + provenance + '</td>'
                 + '<td>' + esc(a.owner) + '</td>'
                 + '<td style="white-space:nowrap;">' + esc(a.expectedCompletion) + '</td>';
             if (!sharedResources) tds += '<td>' + esc(a.resources) + '</td>';
@@ -1077,7 +1213,7 @@
         var actionHead = '<th>Priority</th><th>Action</th><th>Owner</th><th>Expected Completion</th>'
             + (sharedResources ? '' : '<th>Resources</th>')
             + (sharedOutcome ? '' : '<th>Expected Outcome</th>')
-            + '<th style="text-align:center;">Status</th><th>Business Impact</th>';
+            + '<th style="text-align:center;">Status</th><th>Impact Theme(s)</th>';
         var actionNotes = (sharedResources || sharedOutcome)
             ? '<div class="b4-callout b4-callout--info b4-mb-3">'
                 + (sharedResources ? '<div class="b4-caption"><strong>Resources (all items):</strong>&nbsp;' + esc(sharedResources) + '</div>' : '')
@@ -1086,8 +1222,8 @@
             : '';
         out.push({
             key: 'action-plan',
-            name: 'MANAGEMENT ACTION PLAN',
-            desc: 'Board-ready corrective action tracker, prioritized P1 (Critical) through P4',
+            name: 'AUDITEE CORRECTIVE ACTION PLAN (DRAFT SCAFFOLD)',
+            desc: 'Corrective action tracker, prioritized P1 (Critical) through P4 — the auditee owns and defines each corrective action; this is a scaffold pending their response',
             color: '#dc2626',
             charts: [],
             bodyHtml: r.actionPlan.length
@@ -1141,7 +1277,7 @@
                 + '<td>' + esc(it.clause || '') + '</td>'
                 + '<td>' + esc(cleanFindingText(it.text, 90)) + '</td>'
                 + '<td style="text-align:center;">' + freeBadge(it.priority) + '</td>'
-                + '<td style="text-align:center;">' + statusBadge(it.status) + '</td>'
+                + '<td style="text-align:center;">' + (it.displayStatus ? capaDisplayBadge(it.displayStatus) : statusBadge(it.status)) + '</td>'
                 + '<td style="text-align:center;white-space:nowrap;">' + esc(aging) + '</td>'
                 + lastCell + '</tr>';
         }).join('');
@@ -1183,10 +1319,10 @@
     function sectionsPreviewToggles() {
         return [
             { id: 'risk-heatmap', label: 'Risk Heat Map', icon: 'fa-solid fa-fire', color: '#dc2626' },
-            { id: 'business-impact', label: 'Business Impact', icon: 'fa-solid fa-briefcase', color: '#4338ca' },
-            { id: 'root-cause', label: 'Root Cause Analysis', icon: 'fa-solid fa-magnifying-glass', color: '#7c3aed' },
+            { id: 'business-impact', label: 'Impact Themes', icon: 'fa-solid fa-briefcase', color: '#4338ca' },
+            { id: 'root-cause', label: 'Corrective Action Status', icon: 'fa-solid fa-magnifying-glass', color: '#7c3aed' },
             { id: 'risk-register', label: 'Risk Register', icon: 'fa-solid fa-clipboard-list', color: '#be185d' },
-            { id: 'action-plan', label: 'Action Plan', icon: 'fa-solid fa-list-check', color: '#dc2626' },
+            { id: 'action-plan', label: 'Auditee Action Plan', icon: 'fa-solid fa-list-check', color: '#dc2626' },
             { id: 'capa-dashboard', label: 'CAPA Dashboard', icon: 'fa-solid fa-gauge-high', color: '#16a34a' }
         ];
     }
