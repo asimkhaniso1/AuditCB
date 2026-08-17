@@ -164,7 +164,7 @@
         const criterionRef = f.criterionRef || '';
         const isInternalPrefix = CRITERION_INTERNAL_RX.test(String(rawClause || ''));
         if (criterionRef) {
-            return { label: isInternalPrefix ? `${criterionRef} (internal ref ${rawClause})` : String(criterionRef), isInternal: false };
+            return { label: isInternalPrefix ? `${criterionRef} (${rawClause})` : String(criterionRef), isInternal: false };
         }
         if (isInternalPrefix) {
             return { label: `internal audit reference ${rawClause} (criterion to be assigned)`, isInternal: true };

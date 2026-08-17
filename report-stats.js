@@ -194,7 +194,7 @@
         if (criterionRef) {
             const isCarryover = clause && FOCUS_REF_RE.test(clause) && clause.toLowerCase() !== criterionRef.toLowerCase();
             return {
-                label: isCarryover ? (criterionRef + ' (internal ref ' + clause + ')') : criterionRef,
+                label: isCarryover ? (criterionRef + ' (' + clause + ')') : criterionRef,
                 isInternal: false,
                 real: criterionRef
             };

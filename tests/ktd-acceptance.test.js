@@ -189,7 +189,7 @@ describe('KTD surveillance acceptance', () => {
         expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2' }))
             .toEqual({ label: 'internal ref FOCUS.2', isInternal: true, real: null });
         expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2', criterionRef: '9.2' }))
-            .toEqual({ label: '9.2 (internal ref FOCUS.2)', isInternal: false, real: '9.2' });
+            .toEqual({ label: '9.2 (FOCUS.2)', isInternal: false, real: '9.2' });
         expect(window.ReportStats.formatCriterion({ clause: '7.1' }))
             .toEqual({ label: '7.1', isInternal: false, real: '7.1' });
         expect(window.ReportStats.formatCriterion({})).toEqual({ label: '', isInternal: false, real: null });

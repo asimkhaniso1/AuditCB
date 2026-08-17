@@ -78,7 +78,7 @@
         } catch (e) { /* noop */ }
         var clause = String((item && item.clause) || '').trim();
         var ref = String((item && item.criterionRef) || '').trim();
-        if (ref) return esc(ref + (clause && clause !== ref ? ' (internal ref ' + clause + ')' : ''));
+        if (ref) return esc(ref + (clause && clause !== ref ? ' (' + clause + ')' : ''));
         if (/^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i.test(clause)) return esc('internal ref ' + clause);
         return esc(clause || '—');
     }
