@@ -26,6 +26,176 @@ window.NCRSyncUtils = window.NCRSyncUtils || {};
 window.NCRSyncUtils.buildSourceKey = buildChecklistSourceKey;
 window.NCRSyncUtils.buildStableIdentity = buildChecklistStableIdentity;
 
+// ---------- Report Integrity "Set criterion" fix action — pure helpers ----------
+// Same reasoning as buildChecklistSourceKey/buildChecklistStableIdentity above:
+// top-level (not nested inside renderExecutionTab/saveChecklist) so they're
+// directly unit-testable. window.setFindingCriterion itself (the data-action
+// handler wired to the panel's "Set criterion" button) stays nested near
+// runReportIntegrityCheck, same as saveChecklist/createNCR/editNCR — it's DOM/
+// modal glue, not pure logic.
+
+/**
+ * Resolve a Report Integrity blocker's `ref` (see report-integrity.js's
+ * findingRef()) to the actual finding record in this report. Tiered,
+ * most-reliable match first — mirrors how report-integrity.js's own
+ * allNCRs() assembles its combined [checklist..., manual...] list, since
+ * that file exports only check()/checkById() and not allNCRs() itself.
+ *
+ * @param {Object} report
+ * @param {{index?:number, clause?:string, source?:string, checklistId?:*, itemIdx?:*}} ref
+ * @returns {{kind:'checklist'|'manual', item:Object, index:number}|null}
+ */
+function resolveFindingFromRef(report, ref) {
+    if (!report || !ref) return null;
+    const isRegisterSeverity = (t) => ['major', 'minor'].includes(String(t || '').toLowerCase());
+
+    // Tier 1: checklistId + itemIdx against report.checklistProgress — the
+    // most reliable, identity-based match (same fields the checklist->NCR
+    // sync keys off via buildChecklistStableIdentity above).
+    if (ref.checklistId != null && ref.checklistId !== '' && ref.itemIdx != null && ref.itemIdx !== '') {
+        const list = report.checklistProgress || [];
+        const idx = list.findIndex(p => p
+            && String(p.checklistId) === String(ref.checklistId)
+            && String(p.itemIdx) === String(ref.itemIdx));
+        if (idx !== -1) return { kind: 'checklist', item: list[idx], index: idx };
+    }
+
+    // Tier 2: by combined index. report-integrity.js's allNCRs() builds one
+    // array as [...majorMinorChecklistNCs, ...majorMinorManualNCRs] in that
+    // order, and `ref.index` is the position within that combined array —
+    // rebuild the same filter/order locally to translate it back.
+    if (typeof ref.index === 'number' && !isNaN(ref.index) && ref.index >= 0) {
+        const fromChecklist = (report.checklistProgress || [])
+            .map((p, i) => ({ p, i }))
+            .filter(({ p }) => p && p.status === 'nc' && isRegisterSeverity(p.ncrType));
+        if (ref.index < fromChecklist.length) {
+            const hit = fromChecklist[ref.index];
+            return { kind: 'checklist', item: hit.p, index: hit.i };
+        }
+        const manualIdx = ref.index - fromChecklist.length;
+        const fromManual = (report.ncrs || [])
+            .map((n, i) => ({ n, i }))
+            .filter(({ n }) => n && isRegisterSeverity(n.type || n.ncrType || n.severity));
+        if (manualIdx >= 0 && manualIdx < fromManual.length) {
+            const hit = fromManual[manualIdx];
+            return { kind: 'manual', item: hit.n, index: hit.i };
+        }
+    }
+
+    // Tier 3: by clause against the manual NCR register.
+    if (ref.clause) {
+        const list = report.ncrs || [];
+        const idx = list.findIndex(n => n && String(n.clause || '').trim() === String(ref.clause).trim());
+        if (idx !== -1) return { kind: 'manual', item: list[idx], index: idx };
+    }
+
+    return null;
+}
+window.NCRSyncUtils.resolveFindingFromRef = resolveFindingFromRef;
+
+// A clause-ref value the auditor typed into "Set criterion" is well-formed —
+// used only as a fallback when window.Validator.isClauseRef isn't available
+// (another agent is adding it to validation.js). Accepts plain numeric refs
+// ('9.2', '8.2.2'), Annex-letter refs ('A.8.13'), and a trailing lettered
+// sub-item ('9.6.2 (a)').
+const CLAUSE_REF_FALLBACK_RE = /^[A-Za-z]?\.?\d{1,2}(\.\d{1,3}){0,3}(\s*\([a-zA-Z0-9]+\))?$/;
+function isValidClauseRefFallback(value) {
+    return CLAUSE_REF_FALLBACK_RE.test(String(value || '').trim());
+}
+function isValidClauseRef(value) {
+    const v = String(value || '').trim();
+    if (!v) return false;
+    // Never accept an internal pseudo-tag, even if a Validator implementation
+    // would — this check exists specifically to keep FOCUS/SURV/ORG/DOC out of
+    // criterionRef. window.NCR_PSEUDO_CLAUSE_PATTERN is set once
+    // renderExecutionTab has run (see ~line 2340 below); the literal here is a
+    // defensive fallback so this stays correct even called before that.
+    const pseudoPattern = window.NCR_PSEUDO_CLAUSE_PATTERN || /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
+    if (pseudoPattern.test(v)) return false;
+    if (window.Validator && typeof window.Validator.isClauseRef === 'function') {
+        try { return !!window.Validator.isClauseRef(v); } catch (_e) { /* fall through to local fallback */ }
+    }
+    return isValidClauseRefFallback(v);
+}
+window.NCRSyncUtils.isValidClauseRef = isValidClauseRef;
+window.NCRSyncUtils.isValidClauseRefFallback = isValidClauseRefFallback;
+
+/**
+ * Write criterionRef/criterionSource:'auditor-assigned' onto a resolved
+ * finding (see resolveFindingFromRef) and, when it's checklist-sourced, onto
+ * the matching live NCR/CAPA register record (window.state.ncrs) too, so the
+ * register and the checklist item don't drift apart. Matches the register
+ * record via sourceChecklistId/sourceItemIdx when the checklist item has
+ * them, else falls back to clientId+clause. Does not itself talk to
+ * Supabase — callers persist through the normal saveChecklist()/persistNCR()
+ * paths afterward (see window.setFindingCriterion).
+ *
+ * @param {Object} report
+ * @param {{kind:'checklist'|'manual', item:Object, index:number}} resolved
+ * @param {string} value
+ */
+function applyCriterionToFinding(report, resolved, value) {
+    const item = resolved.item;
+    item.criterionRef = value;
+    item.criterionSource = 'auditor-assigned';
+
+    if (resolved.kind !== 'checklist') return; // a manual NCR IS the register record — nothing else to update
+    if (!window.state || !Array.isArray(window.state.ncrs)) return;
+
+    const auditId = report.planId != null ? String(report.planId) : null;
+    let match = null;
+    if (item.checklistId != null && item.itemIdx != null) {
+        match = window.state.ncrs.find(n => n
+            && String(n.sourceChecklistId) === String(item.checklistId)
+            && String(n.sourceItemIdx) === String(item.itemIdx)
+            && (!auditId || String(n.auditId || '') === auditId));
+    }
+    if (!match) {
+        const clientKey = report.clientId != null ? String(report.clientId) : null;
+        const clauseKey = String(item.clause || '').trim();
+        if (clientKey && clauseKey) {
+            match = window.state.ncrs.find(n => n
+                && String(n.clientId) === clientKey
+                && String(n.clause || '').trim() === clauseKey
+                && String(n.status || '').toLowerCase() !== 'withdrawn');
+        }
+    }
+    if (match) {
+        match.criterionRef = value;
+        match.criterionSource = 'auditor-assigned';
+        if (typeof persistNCR === 'function') persistNCR(match).catch(e => console.warn('NCR criterion persist error:', e));
+        else if (window.persistNCR) window.persistNCR(match).catch(e => console.warn('NCR criterion persist error:', e));
+    }
+}
+window.NCRSyncUtils.applyCriterionToFinding = applyCriterionToFinding;
+
+/**
+ * Other Major/Minor findings on this report (checklist or manual) sharing
+ * the same pseudo-clause as the one just fixed — repeated FOCUS.n/SURV items
+ * are common on a real checklist, so fixing them one at a time is tedious.
+ * Powers the "Set criterion" bulk-apply offer.
+ */
+function findSiblingFindingsByClause(report, resolved, clause) {
+    if (!clause) return [];
+    const isRegisterSeverity = (t) => ['major', 'minor'].includes(String(t || '').toLowerCase());
+    const clauseKey = String(clause).trim();
+    const out = [];
+    (report.checklistProgress || []).forEach((p, i) => {
+        if (!p || p.status !== 'nc' || !isRegisterSeverity(p.ncrType)) return;
+        if (String(p.clause || '').trim() !== clauseKey) return;
+        if (resolved.kind === 'checklist' && i === resolved.index) return;
+        out.push({ kind: 'checklist', item: p, index: i });
+    });
+    (report.ncrs || []).forEach((n, i) => {
+        if (!n || !isRegisterSeverity(n.type || n.ncrType || n.severity)) return;
+        if (String(n.clause || '').trim() !== clauseKey) return;
+        if (resolved.kind === 'manual' && i === resolved.index) return;
+        out.push({ kind: 'manual', item: n, index: i });
+    });
+    return out;
+}
+window.NCRSyncUtils.findSiblingFindingsByClause = findSiblingFindingsByClause;
+
 // eslint-disable-next-line no-unused-vars
 function renderExecutionTab(report, tabName, contextData = {}) {
     const tabContent = document.getElementById('tab-content');
@@ -656,11 +826,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     // Carried from the checklist item when present (FOCUS.n/SURV items
                     // store the real ISO clause here since their own `clause` is an
                     // internal pseudo-reference — see client-docs-bulk.js's question()).
-                    let criterionRef;
-                    let criterionSource;
+                    // The item's own value (e.g. set via window.setFindingCriterion)
+                    // takes precedence over the checklist template lookup below, same
+                    // reasoning as the checklist->NCR sync above.
+                    let criterionRef = item.criterionRef;
+                    let criterionSource = item.criterionSource;
                     const { assignedChecklists = [] } = contextData;
 
-                    if (item.checklistId && assignedChecklists.length > 0) {
+                    if (!criterionSource && item.checklistId && assignedChecklists.length > 0) {
                         const cl = assignedChecklists.find(c => String(c.id) === String(item.checklistId));
                         if (cl) {
                             if (cl.clauses && (String(item.itemIdx).includes('-'))) {
@@ -1765,6 +1938,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (prev && prev._aiGenerated && !item._aiGenerated) {
                     item._aiGenerated = prev._aiGenerated;
                 }
+                // Preserve criterionRef/criterionSource the same way. The DOM
+                // scrape above has no input field for these (they're set out of
+                // band — e.g. by window.setFindingCriterion, the Report Integrity
+                // panel's "Set criterion" fix action) so without carrying them
+                // forward here, the very next ordinary checklist save on this tab
+                // would silently wipe out an auditor's criterion assignment.
+                if (prev && prev.criterionRef && !item.criterionRef) {
+                    item.criterionRef = prev.criterionRef;
+                    item.criterionSource = prev.criterionSource;
+                }
             });
 
             report.checklistProgress = checklistData;
@@ -1935,9 +2118,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 // pseudo-reference (see client-docs-bulk.js's question()); the report
                 // engine displays criterionRef as the criterion when it's present.
                 let clauseText = item.clause || 'Checklist Item';
-                let criterionRef;
-                let criterionSource;
-                if (item.checklistId && assignedChecklists.length > 0) {
+                // The checklistProgress item's own criterionRef/criterionSource —
+                // e.g. set by window.setFindingCriterion (Report Integrity panel's
+                // "Set criterion" fix action, criterionSource:'auditor-assigned') —
+                // takes precedence over the checklist template lookup below. An
+                // auditor's explicit correction must not be silently overwritten by
+                // the template's original (possibly wrong) auto-derived suggestion
+                // the next time this sync runs.
+                let criterionRef = item.criterionRef;
+                let criterionSource = item.criterionSource;
+                if (!criterionSource && item.checklistId && assignedChecklists.length > 0) {
                     const cl = assignedChecklists.find(c => String(c.id) === String(item.checklistId));
                     if (cl && cl.clauses && String(item.itemIdx).includes('-')) {
                         const [mc, si] = String(item.itemIdx).split('-');
@@ -2851,6 +3041,26 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 ${allItems.map(it => {
         const sevKey = String((it && it.severity) || '').toLowerCase();
         const badgeColor = sevKey === 'blocker' ? '#dc2626' : sevKey === 'warning' ? '#d97706' : '#3b82f6';
+        // "Set criterion" fix action: only for the criterion blockers that
+        // carry a resolvable finding ref (B1 = placeholder clause with no
+        // criterionRef, B4 = no clause and no criterionRef at all — see
+        // report-integrity.js's checkB1FocusCriterion/checkB4MissingCriterion).
+        // Consumed defensively: no button when `ref` is absent, e.g. an older
+        // ReportIntegrity build that hasn't attached one yet.
+        const ref = it && it.ref;
+        const showSetCriterion = !!ref && ref.kind === 'finding' && /^(B1|B4)-/.test(String((it && it.id) || ''));
+        const fixBtn = showSetCriterion ? `
+                        <button type="button" class="btn btn-sm btn-outline-primary" style="margin-top: 0.45rem;"
+                            data-action="setFindingCriterion"
+                            data-report-id="${esc(String(reportId))}"
+                            data-finding-index="${ref.index != null ? esc(String(ref.index)) : ''}"
+                            data-finding-clause="${esc(String(ref.clause || ''))}"
+                            data-finding-source="${esc(String(ref.source || ''))}"
+                            data-checklist-id="${ref.checklistId != null ? esc(String(ref.checklistId)) : ''}"
+                            data-item-idx="${ref.itemIdx != null ? esc(String(ref.itemIdx)) : ''}"
+                            aria-label="Set criterion">
+                            <i class="fa-solid fa-wrench" style="margin-right: 0.3rem;"></i>Set criterion
+                        </button>` : '';
         return `
                     <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
                         <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; flex-wrap: wrap;">
@@ -2860,6 +3070,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <div style="font-size: 0.9rem; color: #1e293b; margin-bottom: 0.25rem;">${esc(it && it.message || '')}</div>
                         ${it && it.source ? `<div style="font-size: 0.75rem; color: #94a3b8;">Source: ${esc(it.source)}</div>` : ''}
                         ${it && it.suggestion ? `<div style="font-size: 0.8rem; color: #059669; margin-top: 0.25rem;"><i class="fa-solid fa-lightbulb" style="margin-right: 0.3rem;"></i>${esc(it.suggestion)}</div>` : ''}
+                        ${fixBtn}
                     </div>
                 `;
     }).join('')}
@@ -2880,6 +3091,121 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 finalizeBtn.title = '';
             }
         }
+    };
+
+    // ── "Set criterion" fix action (Report Integrity panel) ────────────────
+    // Lets an auditor resolve a B1/B4 criterion blocker directly from the
+    // Finalization tab instead of hunting through the Checklist/NCR tabs with
+    // no visible path to a fix. See window.setFindingCriterion below and its
+    // "Set criterion" button rendered in runReportIntegrityCheck above. The
+    // pure resolution/validation/persistence helpers themselves
+    // (resolveFindingFromRef, isValidClauseRef, applyCriterionToFinding) are
+    // top-level functions near the top of this file — same reasoning as
+    // buildChecklistSourceKey/buildChecklistStableIdentity above: they need
+    // to be callable in isolation from a unit test, not only after
+    // renderExecutionTab() has run.
+
+    /** Persist the current in-memory report state and refresh the panel. */
+    function persistAndRefreshIntegrity(reportId, message) {
+        if (typeof window.saveChecklist === 'function') window.saveChecklist(reportId);
+        if (typeof window.runReportIntegrityCheck === 'function') window.runReportIntegrityCheck(reportId);
+        if (message && typeof window.showNotification === 'function') window.showNotification(message, 'success');
+    }
+
+    /**
+     * "Set criterion" fix action for a Report Integrity B1/B4 blocker (data-
+     * action target — see the button rendered in runReportIntegrityCheck).
+     * Resolves the blocker's ref to the actual finding, opens the shared modal
+     * helper (window.DataService.openFormModal) pre-filled with a suggested
+     * clause, validates and persists the auditor's entry, and offers to bulk-
+     * apply the same criterion to sibling findings that share the same
+     * pseudo-clause.
+     * @param {HTMLElement} el - the clicked "Set criterion" button; its
+     *   data-report-id/data-finding-index/data-finding-clause/
+     *   data-finding-source/data-checklist-id/data-item-idx carry the ref.
+     */
+    window.setFindingCriterion = function (el) {
+        const ds = (el && el.dataset) || {};
+        const reportId = ds.reportId;
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) { window.showNotification('Report not found.', 'error'); return; }
+
+        const ref = {
+            index: ds.findingIndex !== undefined && ds.findingIndex !== '' ? parseInt(ds.findingIndex, 10) : undefined,
+            clause: ds.findingClause || '',
+            source: ds.findingSource || '',
+            checklistId: ds.checklistId || undefined,
+            itemIdx: ds.itemIdx || undefined
+        };
+
+        const resolved = resolveFindingFromRef(report, ref);
+        if (!resolved) {
+            window.showNotification('Could not locate this finding — it may have changed since the check last ran. Re-run the check and try again.', 'error');
+            return;
+        }
+
+        const finding = resolved.item;
+        const currentClause = finding.clause || ref.clause || '';
+        const requirementText = finding.requirement || finding.ncrDescription || finding.comment || finding.description || '';
+
+        // Pre-suggest: (1) existing criterionRef, (2) deriveCriterionRef() off
+        // the question text, (3) blank.
+        let suggested = '';
+        let isDerivedSuggestion = false;
+        if (finding.criterionRef && String(finding.criterionRef).trim()) {
+            suggested = finding.criterionRef;
+        } else if (window.ClientDocsBulk && typeof window.ClientDocsBulk.deriveCriterionRef === 'function') {
+            const text = [requirementText, finding.comment].filter(Boolean).join(' ');
+            const derived = window.ClientDocsBulk.deriveCriterionRef(text, report.standard);
+            if (derived) { suggested = derived; isDerivedSuggestion = true; }
+        }
+
+        const esc = window.UTILS.escapeHtml;
+        window.DataService.openFormModal('Set Criterion', `
+            <div class="form-group">
+                <label>Current clause reference</label>
+                <div style="padding: 0.5rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-family: monospace;">${esc(currentClause || '(none)')}</div>
+            </div>
+            <div class="form-group">
+                <label>Finding text</label>
+                <div style="padding: 0.5rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; max-height: 140px; overflow-y: auto; font-size: 0.85rem;">${esc(requirementText || '(no text recorded)')}</div>
+            </div>
+            <div class="form-group">
+                <label>Actual criterion (standard clause) <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="set-criterion-input" placeholder="e.g. 8.5.2" value="${esc(suggested)}">
+                <small id="set-criterion-warning" style="display:none; color: #dc2626; margin-top: 0.35rem;"></small>
+                ${isDerivedSuggestion ? '<small style="display:block; color: #b45309; margin-top: 0.35rem;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:0.25rem;"></i>Suggested from the question text — confirm or correct.</small>' : ''}
+            </div>
+        `, () => {
+            const input = document.getElementById('set-criterion-input');
+            const warning = document.getElementById('set-criterion-warning');
+            const value = Sanitizer.sanitizeText((input && input.value) || '').trim();
+
+            if (window.NCR_PSEUDO_CLAUSE_PATTERN.test(value)) {
+                if (warning) { warning.textContent = 'That looks like an internal checklist reference (FOCUS/SURV/ORG/DOC), not a real standard clause. Enter the actual clause being audited.'; warning.style.display = 'block'; }
+                return;
+            }
+            if (!isValidClauseRef(value)) {
+                if (warning) { warning.textContent = 'Enter a valid clause reference, e.g. "8.5.2" or "A.8.13".'; warning.style.display = 'block'; }
+                return;
+            }
+
+            applyCriterionToFinding(report, resolved, value);
+            const siblings = findSiblingFindingsByClause(report, resolved, currentClause);
+
+            window.closeModal();
+            persistAndRefreshIntegrity(reportId, 'Criterion set to "' + value + '".');
+
+            if (siblings.length && currentClause) {
+                window.DataService.confirmAction(
+                    siblings.length + ' other finding(s) on this report also use clause "' + currentClause + '". Apply criterion "' + value + '" to all of them too?',
+                    () => {
+                        siblings.forEach(s => applyCriterionToFinding(report, s, value));
+                        persistAndRefreshIntegrity(reportId, 'Applied "' + value + '" to ' + siblings.length + ' more finding(s).');
+                    }
+                );
+            }
+        });
     };
 
     // Export functions

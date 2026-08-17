@@ -177,3 +177,182 @@ describe('fetchNCRs preserves checklist-sync identity fields across a refetch', 
         expect(window.state.ncrs[0].sourceItemIdx).toBe('3');
     });
 });
+
+// Report Integrity panel's "Set criterion" fix action (execution-module-v2.js).
+// window.setFindingCriterion itself is DOM/modal glue that only attaches to
+// `window` once renderExecutionTab() has run (same reason saveChecklist isn't
+// directly testable above) — but its resolution/validation/persistence logic
+// is pulled out into top-level, pure functions on window.NCRSyncUtils
+// specifically so it doesn't have that problem. This suite covers those.
+describe('window.NCRSyncUtils.resolveFindingFromRef', () => {
+    beforeEach(() => {
+        loadModule('./execution-module-v2.js');
+    });
+
+    it('tier 1: matches by checklistId + itemIdx against report.checklistProgress', () => {
+        const report = {
+            checklistProgress: [
+                { checklistId: 'cl-1', itemIdx: 'ORG-0', status: 'nc', ncrType: 'major', clause: 'ORG' },
+                { checklistId: 'cl-1', itemIdx: 'ORG-1', status: 'nc', ncrType: 'minor', clause: 'ORG' }
+            ],
+            ncrs: []
+        };
+        const result = window.NCRSyncUtils.resolveFindingFromRef(report, { checklistId: 'cl-1', itemIdx: 'ORG-1' });
+        expect(result).toEqual({ kind: 'checklist', item: report.checklistProgress[1], index: 1 });
+    });
+
+    it('tier 2: falls back to the combined [checklist..., manual...] index when there is no checklistId/itemIdx', () => {
+        const report = {
+            checklistProgress: [
+                { status: 'nc', ncrType: 'major', clause: 'FOCUS.1' },
+                { status: 'conform', clause: 'FOCUS.2' }, // not NC — excluded from the combined list
+                { status: 'nc', ncrType: 'minor', clause: 'FOCUS.3' }
+            ],
+            ncrs: [
+                { type: 'Major', clause: '8.5.2' }
+            ]
+        };
+        // Combined order: [FOCUS.1 (idx0), FOCUS.3 (idx0->2)] then [manual ncr (idx0)]
+        const first = window.NCRSyncUtils.resolveFindingFromRef(report, { index: 0 });
+        expect(first).toEqual({ kind: 'checklist', item: report.checklistProgress[0], index: 0 });
+
+        const second = window.NCRSyncUtils.resolveFindingFromRef(report, { index: 1 });
+        expect(second).toEqual({ kind: 'checklist', item: report.checklistProgress[2], index: 2 });
+
+        const manual = window.NCRSyncUtils.resolveFindingFromRef(report, { index: 2 });
+        expect(manual).toEqual({ kind: 'manual', item: report.ncrs[0], index: 0 });
+    });
+
+    it('tier 3: falls back to matching clause against report.ncrs', () => {
+        const report = {
+            checklistProgress: [],
+            ncrs: [
+                { type: 'Minor', clause: 'FOCUS.4' },
+                { type: 'Major', clause: '9.2' }
+            ]
+        };
+        const result = window.NCRSyncUtils.resolveFindingFromRef(report, { clause: '9.2' });
+        expect(result).toEqual({ kind: 'manual', item: report.ncrs[1], index: 1 });
+    });
+
+    it('returns null when nothing matches', () => {
+        const report = { checklistProgress: [], ncrs: [] };
+        expect(window.NCRSyncUtils.resolveFindingFromRef(report, { clause: 'nowhere' })).toBeNull();
+        expect(window.NCRSyncUtils.resolveFindingFromRef(null, { clause: 'x' })).toBeNull();
+        expect(window.NCRSyncUtils.resolveFindingFromRef(report, null)).toBeNull();
+    });
+});
+
+describe('window.NCRSyncUtils.isValidClauseRef', () => {
+    beforeEach(() => {
+        loadModule('./execution-module-v2.js');
+        // Normally set once renderExecutionTab() has run — set directly here
+        // since this suite exercises isValidClauseRef in isolation.
+        window.NCR_PSEUDO_CLAUSE_PATTERN = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
+        delete window.Validator; // exercise the local fallback regex by default
+    });
+
+    it.each(['9.2', '8.2.2', 'A.8.13', '9.6.2 (a)'])('accepts %s', (value) => {
+        expect(window.NCRSyncUtils.isValidClauseRef(value)).toBe(true);
+    });
+
+    it.each(['FOCUS.2', 'SURV', 'ORG', 'DOC', 'focus.9', ''])('always rejects the pseudo-tag %s', (value) => {
+        expect(window.NCRSyncUtils.isValidClauseRef(value)).toBe(false);
+    });
+
+    it('rejects free text that is not clause-shaped', () => {
+        expect(window.NCRSyncUtils.isValidClauseRef('not a clause')).toBe(false);
+    });
+
+    it('prefers window.Validator.isClauseRef when present, but still rejects a pseudo-tag it would accept', () => {
+        window.Validator = { isClauseRef: () => true }; // a permissive stub
+        expect(window.NCRSyncUtils.isValidClauseRef('8.5.2')).toBe(true);
+        expect(window.NCRSyncUtils.isValidClauseRef('FOCUS.2')).toBe(false);
+    });
+
+    it('falls back to the local regex when window.Validator.isClauseRef throws', () => {
+        window.Validator = { isClauseRef: () => { throw new Error('boom'); } };
+        expect(window.NCRSyncUtils.isValidClauseRef('9.2')).toBe(true);
+    });
+});
+
+describe('window.NCRSyncUtils.applyCriterionToFinding + findSiblingFindingsByClause', () => {
+    beforeEach(() => {
+        window.state = { ncrs: [] };
+        loadModule('./execution-module-v2.js');
+    });
+
+    it('sets criterionRef/criterionSource:auditor-assigned on a checklist-sourced finding', () => {
+        const report = { id: 'rep-1', planId: 'plan-1', clientId: 'client-1', checklistProgress: [
+            { checklistId: 'cl-1', itemIdx: 'FOCUS-0', clause: 'FOCUS.2', status: 'nc', ncrType: 'major' }
+        ] };
+        const resolved = { kind: 'checklist', item: report.checklistProgress[0], index: 0 };
+
+        window.NCRSyncUtils.applyCriterionToFinding(report, resolved, '8.5.2');
+
+        expect(report.checklistProgress[0].criterionRef).toBe('8.5.2');
+        expect(report.checklistProgress[0].criterionSource).toBe('auditor-assigned');
+    });
+
+    it('also updates the matching window.state.ncrs register record by sourceChecklistId/sourceItemIdx', () => {
+        const report = { id: 'rep-1', planId: 'plan-1', clientId: 'client-1', checklistProgress: [
+            { checklistId: 'cl-1', itemIdx: 'FOCUS-0', clause: 'FOCUS.2', status: 'nc', ncrType: 'major' }
+        ] };
+        window.state.ncrs = [
+            { id: 'ncr-1', clientId: 'client-1', auditId: 'plan-1', clause: 'FOCUS.2', sourceChecklistId: 'cl-1', sourceItemIdx: 'FOCUS-0', status: 'Open' }
+        ];
+        const resolved = { kind: 'checklist', item: report.checklistProgress[0], index: 0 };
+
+        window.NCRSyncUtils.applyCriterionToFinding(report, resolved, '8.5.2');
+
+        expect(window.state.ncrs[0].criterionRef).toBe('8.5.2');
+        expect(window.state.ncrs[0].criterionSource).toBe('auditor-assigned');
+    });
+
+    it('falls back to clientId+clause when the register record has no stable identity', () => {
+        const report = { id: 'rep-1', planId: 'plan-1', clientId: 'client-1', checklistProgress: [
+            { checklistId: 'cl-1', itemIdx: 'FOCUS-0', clause: 'FOCUS.2', status: 'nc', ncrType: 'major' }
+        ] };
+        window.state.ncrs = [
+            { id: 'ncr-legacy', clientId: 'client-1', clause: 'FOCUS.2', status: 'Open' } // no sourceChecklistId/sourceItemIdx
+        ];
+        const resolved = { kind: 'checklist', item: report.checklistProgress[0], index: 0 };
+
+        window.NCRSyncUtils.applyCriterionToFinding(report, resolved, '8.5.2');
+
+        expect(window.state.ncrs[0].criterionRef).toBe('8.5.2');
+        expect(window.state.ncrs[0].criterionSource).toBe('auditor-assigned');
+    });
+
+    it('does not touch window.state.ncrs for a manual finding — the NCR record IS the finding', () => {
+        const report = { id: 'rep-1', clientId: 'client-1', checklistProgress: [], ncrs: [{ clause: 'FOCUS.2', type: 'Major' }] };
+        window.state.ncrs = [{ id: 'unrelated', clientId: 'client-1', clause: 'FOCUS.2', status: 'Open' }];
+        const resolved = { kind: 'manual', item: report.ncrs[0], index: 0 };
+
+        window.NCRSyncUtils.applyCriterionToFinding(report, resolved, '8.5.2');
+
+        expect(report.ncrs[0].criterionRef).toBe('8.5.2');
+        expect(window.state.ncrs[0].criterionRef).toBeUndefined();
+    });
+
+    it('findSiblingFindingsByClause finds other major/minor findings sharing the same pseudo-clause, excluding the one just fixed', () => {
+        const report = {
+            checklistProgress: [
+                { clause: 'FOCUS.2', status: 'nc', ncrType: 'major' },   // index 0 — the one just fixed
+                { clause: 'FOCUS.2', status: 'nc', ncrType: 'minor' },   // index 1 — sibling
+                { clause: 'FOCUS.2', status: 'conform' },                // not NC — excluded
+                { clause: 'FOCUS.8', status: 'nc', ncrType: 'major' }    // different clause — excluded
+            ],
+            ncrs: [
+                { clause: 'FOCUS.2', type: 'Minor' } // index 0 — sibling, manual register
+            ]
+        };
+        const resolved = { kind: 'checklist', item: report.checklistProgress[0], index: 0 };
+
+        const siblings = window.NCRSyncUtils.findSiblingFindingsByClause(report, resolved, 'FOCUS.2');
+
+        expect(siblings).toHaveLength(2);
+        expect(siblings).toContainEqual({ kind: 'checklist', item: report.checklistProgress[1], index: 1 });
+        expect(siblings).toContainEqual({ kind: 'manual', item: report.ncrs[0], index: 0 });
+    });
+});

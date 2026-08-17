@@ -402,6 +402,20 @@
     ];
 
     /**
+     * True when `standard` is one of the Annex SL / "9001-family" standards
+     * that share the clause 4-10 high-level structure (or when no standard is
+     * given, in which case there's nothing to contradict). Shared by
+     * deriveCriterionRef and by any caller that wants to gate a hardcoded
+     * Annex-SL clause fallback (e.g. '4.3') the same way — a standard outside
+     * this family should never be handed an invented 4-10 clause number.
+     * @param {string} [standard]
+     * @returns {boolean}
+     */
+    function isAnnexSLFamilyStandard(standard) {
+        return /\b(9001|14001|45001|22000|27001|13485|20000|37001|50001)\b/.test(String(standard || '')) || !standard;
+    }
+
+    /**
      * Recover a real ISO clause reference from Stage 1 focus-point / mandatory
      * surveillance-element text so a FOCUS.n or SURV checklist item — whose own
      * `clause` is an internal pseudo-reference, not a standard clause — can still
@@ -418,7 +432,7 @@
      */
     function deriveCriterionRef(text, standard) {
         const matches = String(text || '').match(/\b(\d{1,2}(?:\.\d{1,2}){0,2})\b/g) || [];
-        const isAnnexSLFamily = /\b(9001|14001|45001|22000|27001|13485|20000|37001|50001)\b/.test(String(standard || '')) || !standard;
+        const isAnnexSLFamily = isAnnexSLFamilyStandard(standard);
         if (matches.length) {
             for (const token of matches) {
                 const main = parseInt(token.split('.')[0], 10);
@@ -517,23 +531,56 @@
     /**
      * Items drawn from the organisation itself rather than its documents:
      * the processes it runs, the sites it runs them at, what it sells.
+     *
+     * @param {Object} client
+     * @param {string} auditType
+     * @param {string} [standard] - passed through to deriveCriterionRef() so
+     *   these ORG items carry a real criterionRef the same way FOCUS/SURV
+     *   items do (see buildClientChecklist). Optional/backward-compatible:
+     *   callers that omit it just get the un-family-restricted fallback in
+     *   deriveCriterionRef, same as passing no standard there directly.
      */
-    function orgContextQuestions(client, auditType) {
+    function orgContextQuestions(client, auditType, standard) {
         const out = [];
         const processes = (client.keyProcesses || []).filter(p => p && (p.name || typeof p === 'string'));
         const sites = (client.sites || []).filter(s => s && s.name);
         const goods = (client.goodsServices || []).filter(g => g && (g.name || typeof g === 'string'));
 
+        // ORG items never had a criterionRef before, which meant every one of
+        // them was permanently blocked by the Report Integrity validator (its
+        // `clause` is the 'ORG' pseudo-tag, and there was no criterionRef to
+        // fall back on). These are unambiguous questions, so most are mapped
+        // explicitly below rather than left to the generic keyword guesser;
+        // deriveCriterionRef still runs first and only the explicit clause is
+        // used as a fallback when it finds nothing better in the text. The
+        // hardcoded fallbacks below (4.3 / 8.4 / 8.1) are Annex-SL clause
+        // numbers, so — same rule deriveCriterionRef itself already applies —
+        // they only apply for standards in that family; a standard outside it
+        // gets whatever deriveCriterionRef found in the text, or '' rather
+        // than an invented 4-10 clause that may not even exist in it.
+        const annexSLFallback = isAnnexSLFamilyStandard(standard);
         if (goods.length) {
             const names = goods.slice(0, 12).map(g => g.name || g).join(', ');
-            out.push(question('ORG', 'Certified scope',
-                `Confirm the certified scope still matches what the organisation actually supplies: ${names}. Note any product or service added, withdrawn or changed since the last audit.`));
+            const text = `Confirm the certified scope still matches what the organisation actually supplies: ${names}. Note any product or service added, withdrawn or changed since the last audit.`;
+            const item = question('ORG', 'Certified scope', text);
+            // Certified scope confirmation -> 4.3 (scope of the management system).
+            item.criterionRef = deriveCriterionRef(text, standard) || (annexSLFallback ? '4.3' : '');
+            item.criterionSource = 'org-context';
+            out.push(item);
         }
 
         if (sites.length > 1) {
             sites.slice(0, 10).forEach(s => {
-                out.push(question('ORG', s.name,
-                    `Confirm the activities at ${s.name}${s.city ? ', ' + s.city : ''} fall within the certified scope and are covered by the sampling plan for this audit.`));
+                const text = `Confirm the activities at ${s.name}${s.city ? ', ' + s.city : ''} fall within the certified scope and are covered by the sampling plan for this audit.`;
+                const item = question('ORG', s.name, text);
+                // Site/activity confirmation -> 4.3. This question asks whether
+                // the site's activities fall *within the certified scope*, not
+                // how operations at that site are planned and controlled — it's
+                // a scope-boundary check, so 4.3 rather than 8.1 (which would fit
+                // a question about operational planning/control at the site).
+                item.criterionRef = deriveCriterionRef(text, standard) || (annexSLFallback ? '4.3' : '');
+                item.criterionSource = 'org-context';
+                out.push(item);
             });
         }
 
@@ -547,11 +594,19 @@
             const owner = p.owner ? `, owner ${p.owner}` : '';
             const label = p.category ? `${name} (${p.category})` : name;
             if (p.category === 'Outsourced') {
-                out.push(question('ORG', label,
-                    `${name} is performed by an external provider${owner}. Verify the controls applied to it, the criteria for selecting and monitoring the provider, and that responsibility for conformity is retained.`));
+                const text = `${name} is performed by an external provider${owner}. Verify the controls applied to it, the criteria for selecting and monitoring the provider, and that responsibility for conformity is retained.`;
+                const item = question('ORG', label, text);
+                // Externally provided process/outsourcing -> 8.4.
+                item.criterionRef = deriveCriterionRef(text, standard) || (annexSLFallback ? '8.4' : '');
+                item.criterionSource = 'org-context';
+                out.push(item);
             } else {
-                out.push(question('ORG', label,
-                    `Sample the ${name} process end to end${owner} — verify it runs as planned, the required records are produced, and its performance is monitored.`));
+                const text = `Sample the ${name} process end to end${owner} — verify it runs as planned, the required records are produced, and its performance is monitored.`;
+                const item = question('ORG', label, text);
+                // End-to-end process sampling -> 8.1 (operational planning and control).
+                item.criterionRef = deriveCriterionRef(text, standard) || (annexSLFallback ? '8.1' : '');
+                item.criterionSource = 'org-context';
+                out.push(item);
             }
         });
 
@@ -623,7 +678,7 @@
         }
 
         if (o.includeOrgContext) {
-            const orgQuestions = orgContextQuestions(client, auditType);
+            const orgQuestions = orgContextQuestions(client, auditType, o.standard);
             if (orgQuestions.length) {
                 clauses.push({
                     mainClause: 'ORG',
@@ -702,11 +757,23 @@
             clauses.push({
                 mainClause: 'DOC',
                 title: 'Other Documented Information Supplied by the Client',
-                subClauses: unmapped.map(d => question(
-                    'DOC',
-                    d.name,
-                    `Review ${docRef(d)} and confirm its status, control and relevance to the certified scope.`
-                ))
+                // DOC items previously carried no criterionRef either, blocking
+                // finalization the same way ORG items did. deriveCriterionRef
+                // runs first in case the document's own name/content resolves to
+                // something more specific; 7.5 (control of documented
+                // information) is a defensible default because that's genuinely
+                // what "review this document's status, control and relevance"
+                // is asking about — but 7.5 is an Annex-SL clause number, so
+                // (same rule as the ORG items above) it only fills in for
+                // Annex-SL-family standards; otherwise leave it to whatever
+                // deriveCriterionRef found in the text, or ''.
+                subClauses: unmapped.map(d => {
+                    const text = `Review ${docRef(d)} and confirm its status, control and relevance to the certified scope.`;
+                    const item = question('DOC', d.name, text);
+                    item.criterionRef = deriveCriterionRef(text, o.standard) || (isAnnexSLFamilyStandard(o.standard) ? '7.5' : '');
+                    item.criterionSource = 'unmapped-doc';
+                    return item;
+                })
             });
         }
 
@@ -2479,7 +2546,8 @@
         // Exposed so the Report Integrity panel can pre-suggest a real clause
         // when an auditor maps a legacy FOCUS/SURV finding to its criterion —
         // one keyword map, not a second copy living in the UI layer.
-        deriveCriterionRef
+        deriveCriterionRef,
+        isAnnexSLFamilyStandard
     };
 
     window.ClientDocsBulk = ClientDocsBulk;

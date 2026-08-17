@@ -755,6 +755,89 @@ describe('ClientDocsBulk', () => {
         });
     });
 
+    // Report Integrity blocks any Major/Minor finding whose clause is a
+    // pseudo-tag (FOCUS/SURV/ORG/DOC) with no criterionRef — before this fix,
+    // ORG and DOC items never set one, so every ORG/DOC-sourced finding was
+    // permanently unfixable. See client-docs-bulk.js's orgContextQuestions()
+    // and the DOC unmapped-documents block in buildClientChecklist().
+    describe('criterionRef on ORG/DOC items — closing the finalize-blocking hole', () => {
+        const client = {
+            id: 'c1', name: 'KTD Select', standard: 'ISO 9001:2015',
+            sites: [{ name: 'Head Office', city: 'Karachi' }, { name: 'Plant 2', city: 'Lahore' }],
+            goodsServices: [{ name: 'Wire Harnesses', category: 'Product' }],
+            keyProcesses: [
+                { name: 'Assembly', category: 'Core', owner: 'Production Manager' },
+                // Deliberately NOT named "Calibration" — that name collides with
+                // deriveCriterionRef's own keyword fallback (-> 7.1.5) and would
+                // mask the explicit 8.4 mapping under test below.
+                { name: 'Freight Forwarding', category: 'Outsourced' }
+            ]
+        };
+        const docs = [
+            { name: 'Control of Documented Information', docNumber: 'QSP-7.5', revision: 'Rev 2', category: 'Quality Procedures', linkedClauses: '7.5' }
+        ];
+
+        it('maps the certified-scope ORG item to 4.3', () => {
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance' });
+            const scope = cl.clauses.find(c => c.mainClause === 'ORG').subClauses[0];
+            expect(scope.clause).toBe('ORG'); // pseudo-tag section grouping is unchanged
+            expect(scope.criterionRef).toBe('4.3');
+            expect(scope.criterionSource).toBe('org-context');
+        });
+
+        it('maps a per-site ORG item to 4.3', () => {
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance' });
+            const site = cl.clauses.find(c => c.mainClause === 'ORG').subClauses.find(s => s.title === 'Plant 2');
+            expect(site.criterionRef).toBe('4.3');
+            expect(site.criterionSource).toBe('org-context');
+        });
+
+        it('maps an outsourced-process ORG item to 8.4', () => {
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance' });
+            const outsourced = cl.clauses.find(c => c.mainClause === 'ORG').subClauses.find(s => /Freight Forwarding/.test(s.title));
+            expect(outsourced.criterionRef).toBe('8.4');
+            expect(outsourced.criterionSource).toBe('org-context');
+        });
+
+        it('maps an end-to-end sampled process ORG item to 8.1', () => {
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance' });
+            const core = cl.clauses.find(c => c.mainClause === 'ORG').subClauses.find(s => /Assembly/.test(s.title));
+            expect(core.criterionRef).toBe('8.1');
+            expect(core.criterionSource).toBe('org-context');
+        });
+
+        it('maps an unmapped DOC item to 7.5 by default', () => {
+            const unmapped = [{ name: 'Miscellaneous Notice', category: 'Other' }]; // no linkedClauses
+            const cl = B.buildClientChecklist(client, unmapped, { auditType: 'surveillance' });
+            const docSection = cl.clauses.find(c => c.mainClause === 'DOC');
+            expect(docSection).toBeTruthy();
+            expect(docSection.subClauses[0].clause).toBe('DOC');
+            expect(docSection.subClauses[0].criterionRef).toBe('7.5');
+            expect(docSection.subClauses[0].criterionSource).toBe('unmapped-doc');
+        });
+
+        it('still prefers a clause found in the text over the explicit ORG/DOC default', () => {
+            const clientWithClause = {
+                ...client,
+                goodsServices: [{ name: 'Assemblies certified under clause 8.2 of the manual' }]
+            };
+            const cl = B.buildClientChecklist(clientWithClause, docs, { auditType: 'surveillance' });
+            const scope = cl.clauses.find(c => c.mainClause === 'ORG').subClauses[0];
+            expect(scope.criterionRef).toBe('8.2');
+        });
+
+        it('does not invent an Annex-SL clause number for a non-Annex-SL-family standard', () => {
+            // opts.standard (not client.standard) is what deriveCriterionRef sees —
+            // matches how the real caller (createChecklist) invokes this.
+            const unmapped = [{ name: 'Miscellaneous Notice', category: 'Other' }];
+            const cl = B.buildClientChecklist(client, unmapped, { auditType: 'surveillance', standard: 'ISO/IEC 17021-1:2015' });
+            const scope = cl.clauses.find(c => c.mainClause === 'ORG').subClauses[0];
+            const docSection = cl.clauses.find(c => c.mainClause === 'DOC');
+            expect(scope.criterionRef).toBe('');
+            expect(docSection.subClauses[0].criterionRef).toBe('');
+        });
+    });
+
     describe('checklist length budget', () => {
         const client = {
             id: 'c1', name: 'KTD Select', standard: 'ISO 9001:2015', employees: 40,
