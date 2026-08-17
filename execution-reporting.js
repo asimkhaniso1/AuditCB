@@ -3413,11 +3413,17 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // annex content, not part of the formal certification report — running header
         // stays static ('AUDIT REPORT') per-page switching is impractical with the
         // thead/tfoot repeating-header approach, so the label lives here instead.
+        // Sections that always open a fresh page. Kept deliberately small —
+        // everything else flows, so the report doesn't waste half-empty pages.
+        // The executive summary is the report's front page after the contents
+        // page and must not share a page with the revision-history block.
+        const SECTION_STARTS_PAGE = { 'exec-summary': true };
         const renderModSections = function (arr, annexLabel) {
             return arr.map(function (s) {
                 if (!secMapRef.map[s.key]) return '';
                 const eyebrow = annexLabel ? '<div style="font-size:0.62rem;letter-spacing:0.08em;color:#cbd5e1;text-transform:uppercase;margin-bottom:2px;">Annex ' + annexLabel + '</div>' : '';
-                return '<div id="sec-' + s.key + '" class="sh" style="border-left-color:' + s.color + ';flex-direction:column;align-items:flex-start;gap:2px;">' + eyebrow + '<div style="display:flex;align-items:center;gap:12px;width:100%;">' + secMapRef.badge(s.key) + s.name + '</div></div><div class="sb">' + s.bodyHtml + '</div>';
+                const breakCls = SECTION_STARTS_PAGE[s.key] ? ' page-break' : '';
+                return '<div id="sec-' + s.key + '" class="sh' + breakCls + '" style="border-left-color:' + s.color + ';flex-direction:column;align-items:flex-start;gap:2px;">' + eyebrow + '<div style="display:flex;align-items:center;gap:12px;width:100%;">' + secMapRef.badge(s.key) + s.name + '</div></div><div class="sb">' + s.bodyHtml + '</div>';
             }).join('');
         };
         // Section category colors: subtle audience-based coding instead of a
@@ -3709,7 +3715,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // Formal report front matter — only the exec-summary module (formal group)
             + renderModSections(modFormalFront)
             // SECTION: AUDIT INFORMATION
-            + (secMap['audit-info'] ? '<div id="sec-audit-info" class="sh page-break" style="border-left-color:#1d4ed8;">' + sBadge('audit-info') + 'AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
+            + (secMap['audit-info'] ? '<div id="sec-audit-info" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('audit-info') + 'AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
                 + '<tr><td>Client Name</td><td><strong>' + d.report.client + '</strong></td></tr>'
                 + '<tr><td>Industry</td><td>' + (d.client.industry || '—') + '</td></tr>'
                 + '<tr><td>Certification Scope</td><td>' + (d.client.certificationScope || '—') + '</td></tr>'
