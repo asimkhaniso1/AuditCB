@@ -342,6 +342,143 @@ function getClauseTitleFromNumber(clauseNum) {
     return isoClauseTitles[clauseNum] || `Clause ${clauseNum}`;
 }
 
+// ============================================
+// CHECKLIST CLAUSE VALIDATION (shared by manual builder + both CSV paths)
+// ============================================
+// Findings inherit `clause` from their checklist item, and the Report
+// Integrity validator blocks finalization when a finding's clause is a
+// placeholder/checklist tag rather than a real standard clause. Root-causing
+// that here: checklist authoring now requires a real clause per item.
+
+// Defensive wrapper around window.Validator.isClauseRef — falls back to a
+// local copy of the same pattern if validation.js hasn't loaded yet.
+function isValidClauseRef(value) {
+    if (window.Validator && typeof window.Validator.isClauseRef === 'function') {
+        return window.Validator.isClauseRef(value);
+    }
+    const v = (value === null || value === undefined) ? '' : String(value).trim();
+    if (!v) return false;
+    if (/^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i.test(v)) return false;
+    return /^[A-Za-z]?\.?\d+(?:\.\d+)*(?:\s*\([a-zA-Z0-9]+\))?$/.test(v);
+}
+window.isValidClauseRef = isValidClauseRef;
+
+/**
+ * Pure row-validation helper shared by the manual checklist editor and both
+ * CSV import paths. Given an array of { rowNumber, clause, requirement }
+ * (rowNumber is whatever the caller wants echoed back — a table row index,
+ * or a CSV line number), returns:
+ *   { accepted: [{ mClause, mTitle, clause, requirement }],
+ *     rejected: [{ rowNumber, clause, requirement, reason }] }
+ *
+ * Rows where both clause and requirement are blank are treated as empty
+ * filler rows and silently ignored (neither accepted nor rejected). Every
+ * other row must have BOTH a valid standard clause reference AND
+ * requirement text to be accepted; otherwise it is rejected with a reason.
+ *
+ * Exposed on window so it is directly testable from the repo's eval-based
+ * test harness (see tests/checklist-module.test.js).
+ */
+function validateChecklistRows(rows) {
+    const accepted = [];
+    const rejected = [];
+
+    (rows || []).forEach((row, i) => {
+        const clause = ((row && row.clause) || '').toString().trim();
+        const requirement = ((row && row.requirement) || '').toString().trim();
+        const rowNumber = (row && row.rowNumber != null) ? row.rowNumber : (i + 1);
+
+        if (!clause && !requirement) return; // blank filler row — ignore
+
+        const clauseOk = isValidClauseRef(clause);
+
+        if (clauseOk && requirement) {
+            const clauseParts = clause.split('.');
+            const mClause = clauseParts[0] || '';
+            const mTitle = getClauseTitleFromNumber(mClause);
+            accepted.push({ mClause, mTitle, clause, requirement });
+            return;
+        }
+
+        let reason;
+        if (!clause) {
+            reason = 'missing standard clause';
+        } else if (!clauseOk) {
+            reason = 'invalid clause — internal tags like FOCUS/SURV/ORG/DOC are not valid criteria';
+        } else {
+            reason = 'missing requirement text';
+        }
+        rejected.push({ rowNumber, clause, requirement, reason });
+    });
+
+    return { accepted, rejected };
+}
+window.validateChecklistRows = validateChecklistRows;
+
+// Builds "ref — title" clause options for the given standard from
+// window.AuditFrameworks, for use as a <datalist> free-text picker.
+// Degrades to an empty list (plain input) when AuditFrameworks is
+// unavailable or the standard text doesn't match a known framework.
+function getClauseOptionsForStandard(standardText) {
+    if (!window.AuditFrameworks || typeof window.AuditFrameworks.requirementSourcesFor !== 'function') return [];
+    try {
+        const sources = window.AuditFrameworks.requirementSourcesFor({ standard: standardText }, null) || [];
+        const seen = new Set();
+        const options = [];
+        sources.forEach(src => {
+            (src.items || []).forEach(it => {
+                if (!it || !it.ref || seen.has(it.ref)) return;
+                seen.add(it.ref);
+                options.push({ ref: it.ref, title: it.title || '' });
+            });
+        });
+        return options;
+    } catch (_e) {
+        return [];
+    }
+}
+
+// Rebuilds the shared clause <datalist> for the currently selected standard.
+// Wired via data-action-change on #checklist-standard (CSP-safe — no inline
+// handlers); also called once on initial editor render.
+function refreshChecklistClauseDatalist(target) {
+    const datalist = document.getElementById('checklist-clause-options');
+    if (!datalist) return;
+    const standardSelect = document.getElementById('checklist-standard');
+    const standardText = (target && target.value != null) ? target.value : (standardSelect ? standardSelect.value : '');
+    const options = getClauseOptionsForStandard(standardText);
+    datalist.innerHTML = options.map(o =>
+        `<option value="${window.UTILS.escapeHtml(o.ref)}">${window.UTILS.escapeHtml(o.ref + ' — ' + o.title)}</option>`
+    ).join('');
+}
+window.refreshChecklistClauseDatalist = refreshChecklistClauseDatalist;
+
+// Attaches blur/input listeners to clause inputs to mark invalid values with
+// the codebase's existing .input-error class (defined globally in
+// sanitization.js) as the user leaves the field. Idempotent — safe to call
+// repeatedly after rows are added/removed/imported.
+function attachClauseValidationListeners() {
+    document.querySelectorAll('#checklist-items-body .item-clause').forEach(input => {
+        if (input.dataset.clauseValidationBound) return;
+        input.dataset.clauseValidationBound = 'true';
+
+        input.addEventListener('blur', () => {
+            const value = input.value.trim();
+            if (!value) {
+                input.classList.remove('input-error');
+                return; // may still be an empty filler row — save-time validation handles it
+            }
+            input.classList.toggle('input-error', !isValidClauseRef(value));
+        });
+
+        input.addEventListener('input', () => {
+            if (!input.classList.contains('input-error')) return;
+            const value = input.value.trim();
+            if (!value || isValidClauseRef(value)) input.classList.remove('input-error');
+        });
+    });
+}
+
 // Download CSV template for bulk checklist upload
 function downloadChecklistTemplate() {
     const template = `Clause,Requirement
@@ -488,28 +625,37 @@ function openImportChecklistModal() {
         const reader = new FileReader();
         reader.onload = async function (event) {
             const text = event.target.result;
-            const lines = text.split(/\r\n|\n/).filter(l => l.trim());
+            const lines = text.split(/\r\n|\n/);
 
-            const rawRows = [];
+            // Track literal CSV line numbers (1-based) for accurate skip
+            // reporting; only the first non-blank line can be a header.
+            const parsedRows = [];
+            let sawFirstDataLine = false;
             lines.forEach((line, idx) => {
-                // Skip header row
-                if (idx === 0 && (line.toLowerCase().includes('clause') || line.toLowerCase().includes('requirement'))) {
-                    return;
+                if (!line.trim()) return;
+                const rowNumber = idx + 1;
+
+                if (!sawFirstDataLine) {
+                    sawFirstDataLine = true;
+                    if (line.toLowerCase().includes('clause') || line.toLowerCase().includes('requirement')) {
+                        return; // header row
+                    }
                 }
 
                 const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(p => p.trim().replace(/^"|"$/g, ''));
-                if (parts.length >= 2) {
-                    const clause = parts[0];
-                    const requirement = parts[1];
-                    const clauseParts = clause.split('.');
-                    const mClause = clauseParts[0] || '';
-                    const mTitle = getClauseTitleFromNumber(mClause);
-                    rawRows.push({ mClause, mTitle, clause, requirement });
-                }
+                if (parts.length < 2) return;
+                const clause = parts[0];
+                const requirement = parts[1];
+                parsedRows.push({ rowNumber, clause, requirement });
             });
 
+            const { accepted: rawRows, rejected } = window.validateChecklistRows(parsedRows);
+
             if (rawRows.length === 0) {
-                window.showNotification('No valid items found in the CSV file', 'error');
+                const why = rejected.length > 0
+                    ? ` Skipped ${rejected.length} row(s) — CSV line(s) ${rejected.map(r => r.rowNumber).join(', ')}: enter a standard clause (e.g. 9.2) and requirement text; internal tags like FOCUS/SURV/ORG/DOC are not valid criteria.`
+                    : '';
+                window.showNotification('No valid items found in the CSV file.' + why, 'error');
                 if (modalSave) { modalSave.textContent = 'Import Checklist'; modalSave.disabled = false; }
                 return;
             }
@@ -562,7 +708,10 @@ function openImportChecklistModal() {
             renderChecklistLibrary();
 
             const statusMsg = cloudUrl ? 'uploaded to cloud' : 'saved locally';
-            window.showNotification(`Imported checklist "${name}" with ${rawRows.length} items (${statusMsg})`, 'success');
+            const skippedMsg = rejected.length > 0
+                ? ` Skipped ${rejected.length} row(s) — CSV line(s) ${rejected.map(r => r.rowNumber).join(', ')}: missing/invalid standard clause or requirement.`
+                : '';
+            window.showNotification(`Imported checklist "${name}" with ${rawRows.length} items (${statusMsg}).${skippedMsg}`, rejected.length > 0 ? 'warning' : 'success');
         };
         reader.readAsText(file);
     });
@@ -641,59 +790,82 @@ function setupCSVUpload() {
             const lines = text.split(/\r\n|\n/);
             const tbody = document.getElementById('checklist-items-body');
 
-            let addedCount = 0;
-            lines.forEach(line => {
+            // Parse every non-blank line, tracking its literal CSV line number
+            // (1-based) so validation failures can be reported precisely.
+            const parsedRows = [];
+            lines.forEach((line, idx) => {
                 if (!line.trim()) return;
+                const rowNumber = idx + 1;
 
                 // Split by comma, handling potential quotes (simplified)
                 const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(p => p.trim().replace(/^"|"$/g, ''));
+                if (parts.length < 2) return;
 
-                if (parts.length >= 2) {
-                    let mainClause = '', mainTitle = '', clause, requirement;
+                let mainClause = '', mainTitle = '', clause, requirement;
 
-                    if (parts.length >= 4) {
-                        // Full Hierarchical Format: MainClause, Title, SubClause, Requirement
-                        mainClause = parts[0];
-                        mainTitle = parts[1];
-                        clause = parts[2];
-                        requirement = parts[3];
-                    } else {
-                        // Simple 2-Column Format: Clause, Requirement
-                        // Auto-extract main clause from sub-clause number
-                        clause = parts[0];
-                        requirement = parts[1];
+                if (parts.length >= 4) {
+                    // Full Hierarchical Format: MainClause, Title, SubClause, Requirement
+                    mainClause = parts[0];
+                    mainTitle = parts[1];
+                    clause = parts[2];
+                    requirement = parts[3];
+                } else {
+                    // Simple 2-Column Format: Clause, Requirement
+                    // Auto-extract main clause from sub-clause number
+                    clause = parts[0];
+                    requirement = parts[1];
 
-                        // Extract main clause from clause number (e.g., "4.1" → "4", "A.5" → "A", "6.1.2" → "6")
-                        const clauseParts = clause.split('.');
-                        if (clauseParts.length > 0) {
-                            mainClause = clauseParts[0].trim();
-                            // Auto-generate title based on ISO standard structure
-                            mainTitle = getClauseTitleFromNumber(mainClause);
-                        }
-                    }
-
-                    // Basic header detection validation
-                    if ((clause || requirement) && clause.toLowerCase() !== 'clause' && mainClause.toLowerCase() !== 'main clause') {
-                        const newRow = document.createElement('tr');
-                        newRow.className = 'checklist-item-row';
-                        newRow.draggable = true;
-                        newRow.innerHTML = `
-                            <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
-                            <td><input type="text" class="form-control item-main-clause" value="${window.UTILS.escapeHtml(mainClause)}" style="margin: 0;"></td>
-                            <td><input type="text" class="form-control item-main-title" value="${window.UTILS.escapeHtml(mainTitle)}" style="margin: 0;"></td>
-                            <td><input type="text" class="form-control item-clause" value="${window.UTILS.escapeHtml(clause)}" style="margin: 0;"></td>
-                            <td><input type="text" class="form-control item-requirement" value="${window.UTILS.escapeHtml(requirement)}" style="margin: 0;"></td>
-                            <td><button type="button" class="btn btn-sm btn-danger remove-item-row" aria-label="Close"><i class="fa-solid fa-times"></i></button></td>
-                        `;
-                        tbody.appendChild(newRow);
-                        addedCount++;
+                    // Extract main clause from clause number (e.g., "4.1" → "4", "A.5" → "A", "6.1.2" → "6")
+                    const clauseParts = clause.split('.');
+                    if (clauseParts.length > 0) {
+                        mainClause = clauseParts[0].trim();
+                        // Auto-generate title based on ISO standard structure
+                        mainTitle = getClauseTitleFromNumber(mainClause);
                     }
                 }
+
+                // Basic header detection validation — skip silently, not an error
+                if (!clause && !requirement) return;
+                if (clause.toLowerCase() === 'clause' || mainClause.toLowerCase() === 'main clause') return;
+
+                parsedRows.push({ rowNumber, mainClause, mainTitle, clause, requirement });
+            });
+
+            const { rejected } = window.validateChecklistRows(parsedRows);
+            const rejectedByRow = new Map(rejected.map(r => [r.rowNumber, r]));
+
+            let addedCount = 0;
+            parsedRows.forEach(row => {
+                if (rejectedByRow.has(row.rowNumber)) return;
+
+                const newRow = document.createElement('tr');
+                newRow.className = 'checklist-item-row';
+                newRow.draggable = true;
+                newRow.innerHTML = `
+                    <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
+                    <td><input type="text" class="form-control item-main-clause" value="${window.UTILS.escapeHtml(row.mainClause)}" style="margin: 0;"></td>
+                    <td><input type="text" class="form-control item-main-title" value="${window.UTILS.escapeHtml(row.mainTitle)}" style="margin: 0;"></td>
+                    <td><input type="text" class="form-control item-clause" list="checklist-clause-options" value="${window.UTILS.escapeHtml(row.clause)}" style="margin: 0;"></td>
+                    <td><input type="text" class="form-control item-requirement" value="${window.UTILS.escapeHtml(row.requirement)}" style="margin: 0;"></td>
+                    <td><button type="button" class="btn btn-sm btn-danger remove-item-row" aria-label="Close"><i class="fa-solid fa-times"></i></button></td>
+                `;
+                tbody.appendChild(newRow);
+                addedCount++;
             });
 
             attachRemoveRowListeners();
             attachDragReorderListeners();
-            if (addedCount > 0) {
+            attachClauseValidationListeners();
+
+            if (rejected.length > 0) {
+                const lineList = rejected.map(r => r.rowNumber).join(', ');
+                const detail = `Skipped ${rejected.length} row(s) — CSV line(s) ${lineList}: enter a standard clause (e.g. 9.2) and requirement text; internal tags like FOCUS/SURV/ORG/DOC are not valid criteria.`;
+                if (addedCount > 0) {
+                    window.showNotification(`Imported ${addedCount} item(s) from CSV. ${detail}`, 'warning');
+                } else {
+                    window.showNotification(`No items imported. ${detail}`, 'error');
+                }
+            } else if (addedCount > 0) {
                 window.showNotification(`Imported ${addedCount} items from CSV`);
             } else {
                 window.showNotification('No valid items found in CSV', 'warning');
@@ -766,7 +938,7 @@ function renderChecklistEditor(checklistId) {
                         </div>
                         <div class="form-group">
                             <label>Standard</label>
-                            <select class="form-control" id="checklist-standard">
+                            <select class="form-control" id="checklist-standard" data-action-change="refreshChecklistClauseDatalist">
                                 ${standards.map(s => `<option value="${window.UTILS.escapeHtml(s)}" ${checklist?.standard === s ? 'selected' : ''}>${window.UTILS.escapeHtml(s)}</option>`).join('')}
                             </select>
                         </div>
@@ -831,26 +1003,27 @@ function renderChecklistEditor(checklistId) {
                                 ${existingItems.length > 0 ? existingItems.map(item => `
                                     <tr class="checklist-item-row" draggable="true">
                                         <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
-                                        <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" value="${window.UTILS.escapeHtml(item.clause || '')}" style="margin: 0;"></td>
+                                        <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" list="checklist-clause-options" value="${window.UTILS.escapeHtml(item.clause || '')}" placeholder="9.2" style="margin: 0;"></td>
                                         <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" value="${window.UTILS.escapeHtml(item.requirement || '')}" style="margin: 0;"></td>
                                         <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row" aria-label="Close"><i class="fa-solid fa-times"></i></button></td>
                                     </tr>
                                 `).join('') : `
                                     <tr class="checklist-item-row" draggable="true">
                                         <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
-                                        <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
+                                        <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" list="checklist-clause-options" placeholder="9.2" style="margin: 0;"></td>
                                         <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" placeholder="Requirement..." style="margin: 0;"></td>
                                         <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row" aria-label="Close"><i class="fa-solid fa-times"></i></button></td>
                                     </tr>
                                 `}
                             </tbody>
                         </table>
+                        <datalist id="checklist-clause-options"></datalist>
                     </div>
 
                     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
                         <small style="color: var(--text-secondary);">
                             <i class="fa-solid fa-info-circle" style="margin-right: 0.25rem;"></i>
-                            Enter Clause # (e.g., 4.1) and Requirement - sections are auto-generated based on main clause numbers.
+                            Enter a real standard Clause # (e.g., 9.2) and Requirement - sections are auto-generated based on main clause numbers. Start typing in the Clause field for suggestions from the selected standard.
                         </small>
                     </div>
                 </div>
@@ -868,6 +1041,7 @@ function renderChecklistEditor(checklistId) {
     contentArea.innerHTML = html;
     setupCSVUpload();
     attachChecklistEditorListeners(checklistId);
+    refreshChecklistClauseDatalist();
 }
 
 function attachChecklistEditorListeners(checklistId) {
@@ -881,18 +1055,20 @@ function attachChecklistEditorListeners(checklistId) {
         newRow.draggable = true;
         newRow.innerHTML = `
             <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
-            <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
+            <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" list="checklist-clause-options" placeholder="9.2" style="margin: 0;"></td>
             <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
             <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row" aria-label="Close"><i class="fa-solid fa-times"></i></button></td>
         `;
         tbody.appendChild(newRow);
         attachRemoveRowListeners();
         attachDragReorderListeners();
+        attachClauseValidationListeners();
         newRow.querySelector('.item-clause')?.focus();
     });
 
     attachRemoveRowListeners();
     attachDragReorderListeners();
+    attachClauseValidationListeners();
 
     // Save handler
     document.getElementById('save-checklist-btn')?.addEventListener('click', () => {
@@ -924,23 +1100,40 @@ function saveChecklistFromEditor(checklistId) {
         return;
     }
 
-    // Collect items
-    const rawRows = [];
-    document.querySelectorAll('.checklist-item-row').forEach(row => {
+    // Collect items — clause is required and must be a real standard clause
+    // reference (not a placeholder/pseudo tag), since findings inherit
+    // `clause` from the checklist item that raised them.
+    const inputRows = [];
+    document.querySelectorAll('.checklist-item-row').forEach((row, idx) => {
         const clauseInput = row.querySelector('.item-clause');
         const reqInput = row.querySelector('.item-requirement');
         if (!clauseInput || !reqInput) return;
 
-        const clause = clauseInput.value.trim();
-        const requirement = reqInput.value.trim();
-
-        if (clause || requirement) {
-            const clauseParts = clause.split('.');
-            const mClause = clauseParts[0] || '';
-            const mTitle = getClauseTitleFromNumber(mClause);
-            rawRows.push({ mClause, mTitle, clause, requirement });
-        }
+        inputRows.push({
+            rowNumber: idx + 1,
+            clause: clauseInput.value.trim(),
+            requirement: reqInput.value.trim(),
+            clauseInput
+        });
     });
+
+    const { accepted: rawRows, rejected } = window.validateChecklistRows(inputRows);
+
+    // Mark rows with a clause problem for inline feedback; clear the rest
+    inputRows.forEach(r => {
+        const problem = rejected.find(x => x.rowNumber === r.rowNumber);
+        const isClauseProblem = !!problem && problem.reason !== 'missing requirement text';
+        if (r.clauseInput) r.clauseInput.classList.toggle('input-error', isClauseProblem);
+    });
+
+    if (rejected.length > 0) {
+        const rowList = rejected.map(r => `Row ${r.rowNumber}`).join(', ');
+        window.showNotification(
+            `${rowList}: enter a standard clause (e.g. 9.2) and requirement text — internal tags like FOCUS/SURV/ORG/DOC are not valid criteria.`,
+            'error'
+        );
+        return;
+    }
 
     if (rawRows.length === 0) {
         window.showNotification('Please add at least one checklist item', 'error');

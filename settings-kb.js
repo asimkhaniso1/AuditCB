@@ -20,6 +20,22 @@ if (!window.state.knowledgeBase) {
 // the data-id attribute is always a string. Compare loosely on both sides.
 const _idEq = (a, b) => String(a) === String(b);
 
+// Defensive check that a clause looks like a real standard clause reference
+// (not empty, not an internal FOCUS/SURV/ORG/DOC pseudo tag, not free
+// prose). Prefers the canonical window.Validator.isClauseRef; falls back to
+// a local copy of the same pattern if validation.js hasn't loaded yet.
+// Used to keep AI-extracted checklist items from ever carrying a clause the
+// Report Integrity validator would reject at finalization.
+function _isValidClauseRef(value) {
+    if (window.Validator && typeof window.Validator.isClauseRef === 'function') {
+        return window.Validator.isClauseRef(value);
+    }
+    const v = (value === null || value === undefined) ? '' : String(value).trim();
+    if (!v) return false;
+    if (/^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i.test(v)) return false;
+    return /^[A-Za-z]?\.?\d+(?:\.\d+)*(?:\s*\([a-zA-Z0-9]+\))?$/.test(v);
+}
+
 // eslint-disable-next-line no-unused-vars
 function getKnowledgeBaseHTML() {
     const kb = window.state.knowledgeBase;
@@ -1038,10 +1054,14 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
             }
 
             if (batchClauses && batchClauses.length > 0) {
-                // Filter out clauses 1-3 (non-requirement sections in ISO standards)
+                // Filter out clauses 1-3 (non-requirement sections in ISO standards),
+                // and defensively drop any entry whose "clause" isn't a real standard
+                // clause reference (empty, pseudo tag, or prose) — the checklist
+                // questions built from these below must never carry a bad clause.
                 batchClauses = batchClauses.filter(c => {
                     const clauseNum = parseFloat(c.clause);
-                    return isNaN(clauseNum) || clauseNum >= 4;
+                    const auditableSection = isNaN(clauseNum) || clauseNum >= 4;
+                    return auditableSection && _isValidClauseRef(c.clause);
                 });
                 allClauses = allClauses.concat(batchClauses);
                 batchClauses.forEach(c => {
@@ -1759,10 +1779,22 @@ window.createChecklistFromKB = async function (docId) {
 
     const clauseGroups = {};
     // Filter out clauses 1-3 (non-requirement sections in ISO standards)
-    const auditableItems = doc.generatedChecklist.filter(item => {
+    const auditableItemsRaw = doc.generatedChecklist.filter(item => {
         const clauseNum = parseFloat(item.clause);
         return isNaN(clauseNum) || clauseNum >= 4;
     });
+    // Defensive re-check (belt-and-braces alongside the extraction-time
+    // filter above): never write a non-conforming clause into a checklist
+    // item, even for older doc.generatedChecklist data saved before that
+    // extraction-time filter existed.
+    const auditableItems = auditableItemsRaw.filter(item => _isValidClauseRef(item.clause));
+    const skippedForClause = auditableItemsRaw.length - auditableItems.length;
+    if (skippedForClause > 0 && window.showNotification) {
+        window.showNotification(
+            `Skipped ${skippedForClause} checklist item(s) with a missing/invalid standard clause.`,
+            'warning'
+        );
+    }
     auditableItems.forEach(item => {
         const parts = item.clause.split('.');
         let mainNum, subNum;

@@ -81,6 +81,48 @@ const Validator = {
     },
 
     /**
+     * Canonical pseudo-clause tag pattern — identifies internal tracking
+     * references (FOCUS/SURV/ORG/DOC tags) that are sometimes typed into a
+     * "clause" field but are NOT real standard clause references.
+     * This is the canonical copy; it is currently duplicated locally as
+     * NCR_PSEUDO_CLAUSE_PATTERN in execution-module-v2.js and as
+     * FOCUS_CLAUSE_RE in report-integrity.js (not changed by this module —
+     * those files may adopt Validator.PSEUDO_CLAUSE_RE in a future pass).
+     */
+    PSEUDO_CLAUSE_RE: /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i,
+
+    /**
+     * Shape of a real standard clause reference, e.g. '4.1', '9.2', '8.2.2',
+     * '10.3.1', 'A.8.13', '9.6.2 (a)' (ISO/IEC 17021-1 style lettered
+     * sub-item suffix). Intentionally permissive about which standard —
+     * just requires the "clause-shaped" structure (optional single-letter
+     * annex prefix + dotted numeric path + optional lettered suffix).
+     */
+    CLAUSE_REF_RE: /^[A-Za-z]?\.?\d+(?:\.\d+)*(?:\s*\([a-zA-Z0-9]+\))?$/,
+
+    /**
+     * True when value looks like a real standard clause reference: not
+     * empty, not an internal pseudo tag (FOCUS/SURV/ORG/DOC), and not free
+     * prose. False for anything else, including non-string/nullish input.
+     */
+    isClauseRef: (value) => {
+        const v = (value === null || value === undefined) ? '' : String(value).trim();
+        if (!v) return false;
+        if (Validator.PSEUDO_CLAUSE_RE.test(v)) return false;
+        return Validator.CLAUSE_REF_RE.test(v);
+    },
+
+    /**
+     * Validate a clause reference field (e.g. checklist item "Clause #")
+     */
+    clauseRef: (value, fieldName = 'Clause') => {
+        if (!Validator.isClauseRef(value)) {
+            return { valid: false, error: `${fieldName} must be a real standard clause reference (e.g. 9.2, 8.2.2, A.8.13) — internal tags like FOCUS/SURV/ORG/DOC are not valid criteria` };
+        }
+        return { valid: true };
+    },
+
+    /**
      * Validate string length
      */
     length: (value, min, max, fieldName = 'Field') => {
@@ -198,6 +240,9 @@ const Validator = {
                         break;
                     case 'isoStandard':
                         result = Validator.isoStandard(value, fieldName);
+                        break;
+                    case 'clauseRef':
+                        result = Validator.clauseRef(value, fieldName);
                         break;
                     case 'length':
                         result = Validator.length(value, params.min, params.max, fieldName);

@@ -117,6 +117,83 @@ describe('Validator', () => {
         });
     });
 
+    describe('PSEUDO_CLAUSE_RE', () => {
+        it('matches internal pseudo-clause tags', () => {
+            expect(window.Validator.PSEUDO_CLAUSE_RE.test('FOCUS.2')).toBe(true);
+            expect(window.Validator.PSEUDO_CLAUSE_RE.test('SURV 1')).toBe(true);
+            expect(window.Validator.PSEUDO_CLAUSE_RE.test('ORG.3')).toBe(true);
+            expect(window.Validator.PSEUDO_CLAUSE_RE.test('DOC')).toBe(true);
+            expect(window.Validator.PSEUDO_CLAUSE_RE.test('focus.1')).toBe(true);
+        });
+
+        it('does not match real clause references', () => {
+            expect(window.Validator.PSEUDO_CLAUSE_RE.test('9.2')).toBe(false);
+            expect(window.Validator.PSEUDO_CLAUSE_RE.test('A.8.13')).toBe(false);
+        });
+    });
+
+    describe('isClauseRef', () => {
+        it('accepts real standard clause references', () => {
+            expect(window.Validator.isClauseRef('4.1')).toBe(true);
+            expect(window.Validator.isClauseRef('9.2')).toBe(true);
+            expect(window.Validator.isClauseRef('8.2.2')).toBe(true);
+            expect(window.Validator.isClauseRef('10.3.1')).toBe(true);
+            expect(window.Validator.isClauseRef('A.8.13')).toBe(true);
+            expect(window.Validator.isClauseRef('9.6.2 (a)')).toBe(true);
+        });
+
+        it('accepts a bare top-level clause number', () => {
+            expect(window.Validator.isClauseRef('4')).toBe(true);
+            expect(window.Validator.isClauseRef('10')).toBe(true);
+        });
+
+        it('rejects empty / nullish values', () => {
+            expect(window.Validator.isClauseRef('')).toBe(false);
+            expect(window.Validator.isClauseRef('   ')).toBe(false);
+            expect(window.Validator.isClauseRef(null)).toBe(false);
+            expect(window.Validator.isClauseRef(undefined)).toBe(false);
+        });
+
+        it('rejects internal pseudo-clause tags', () => {
+            expect(window.Validator.isClauseRef('FOCUS.2')).toBe(false);
+            expect(window.Validator.isClauseRef('SURV.1')).toBe(false);
+            expect(window.Validator.isClauseRef('ORG.3')).toBe(false);
+            expect(window.Validator.isClauseRef('DOC.1')).toBe(false);
+            expect(window.Validator.isClauseRef('doc')).toBe(false);
+        });
+
+        it('rejects free prose', () => {
+            expect(window.Validator.isClauseRef('Has the organization determined its context?')).toBe(false);
+            expect(window.Validator.isClauseRef('See policy manual')).toBe(false);
+            expect(window.Validator.isClauseRef('Clause 4.1')).toBe(false);
+        });
+
+        it('trims whitespace before checking', () => {
+            expect(window.Validator.isClauseRef('  9.2  ')).toBe(true);
+        });
+    });
+
+    describe('clauseRef rule', () => {
+        it('returns valid:true for real clause refs', () => {
+            expect(window.Validator.clauseRef('9.2').valid).toBe(true);
+        });
+
+        it('returns valid:false with a helpful message for pseudo tags', () => {
+            const result = window.Validator.clauseRef('FOCUS.2');
+            expect(result.valid).toBe(false);
+            expect(result.error).toMatch(/FOCUS|SURV|ORG|DOC/);
+        });
+
+        it('is usable via validateForm as rule "clauseRef"', () => {
+            const result = window.Validator.validateForm(
+                { clause: 'ORG.1' },
+                { clause: [{ rule: 'clauseRef' }] }
+            );
+            expect(result.valid).toBe(false);
+            expect(result.errors.clause).toBeDefined();
+        });
+    });
+
     describe('validateForm', () => {
         it('should validate multiple fields', () => {
             const formData = { name: 'John', email: 'john@test.com' };
