@@ -896,45 +896,57 @@ function renderCertificationCycleWidget(client) {
 
         const issueDate = new Date(activeCert.initialDate || activeCert.currentIssue);
         const rawExpiry = activeCert.expiryDate ? new Date(activeCert.expiryDate) : null;
-        const cycleEnd = computeCertCycleEnd(issueDate, rawExpiry);
-        const surv1 = new Date(issueDate); surv1.setFullYear(surv1.getFullYear() + 1);
-        const surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
-        const recertAudit = new Date(cycleEnd);
-        recertAudit.setDate(recertAudit.getDate() - 60);
-
         const today = new Date();
-        let currentStage = "Initial Certification";
-        let nextAudit = surv1;
-        let progress = 0;
 
-        if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; progress = 33; }
-        if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; progress = 66; }
-        if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = cycleEnd; progress = 90; }
-        if (today > cycleEnd) { currentStage = "Expired"; nextAudit = null; progress = 100; }
+        // Stage completion comes from ReportStats.cycleState — the same engine
+        // that builds the report's Audit Programme — so a stage ticks because
+        // its audit was FINALIZED, not because the calendar rolled past a due
+        // date, and this widget can never contradict the issued report. The
+        // local date projection below survives only as a fallback for when
+        // report-stats.js has not loaded.
+        const cs = (window.ReportStats && typeof window.ReportStats.cycleState === 'function')
+            ? window.ReportStats.cycleState({
+                client: client,
+                standard: std,
+                certificate: activeCert,
+                allReports: (window.state && window.state.auditReports) || [],
+                allPlans: (window.state && window.state.auditPlans) || []
+            })
+            : null;
 
-        // Prefer real audit history over pure date math: a finalized
-        // Surveillance visit within the last 12 months means the cycle has
-        // already advanced — don't show "Recertification Due" purely because
-        // today is past a stale/odd cert-date combination's recert window.
-        const recentAudit = findRecentFinalizedAudit(client.id, std);
-        if (recentAudit && currentStage === "Recertification Due") {
-            const auditedType = String(recentAudit.auditType || recentAudit.type || '').toLowerCase();
-            const wasRecert = /re-?cert/.test(auditedType);
-            if (!wasRecert) {
-                // A recent Surveillance (or unspecified) visit happened, but the
-                // recert audit itself hasn't — the cycle is still awaiting it,
-                // not "due" as if nothing has happened recently.
-                currentStage = "Surveillance 2";
-                nextAudit = recertAudit;
-                progress = 66;
+        let cycleEnd, surv1, surv2, recertAudit, currentStage, nextAudit, progress;
+        let s1Done, s2Done, recertDone, expired;
+        if (cs) {
+            cycleEnd = cs.cycleEnd; surv1 = cs.surv1Due; surv2 = cs.surv2Due; recertAudit = cs.recertDue;
+            currentStage = cs.stage; progress = cs.progress;
+            nextAudit = cs.nextAudit ? cs.nextAudit.date : null;
+            s1Done = cs.completed.s1; s2Done = cs.completed.s2; recertDone = cs.completed.recert;
+            expired = cs.expired;
+        } else {
+            cycleEnd = computeCertCycleEnd(issueDate, rawExpiry);
+            surv1 = new Date(issueDate); surv1.setFullYear(surv1.getFullYear() + 1);
+            surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
+            recertAudit = new Date(cycleEnd); recertAudit.setDate(recertAudit.getDate() - 60);
+            currentStage = "Initial Certification"; nextAudit = surv1; progress = 0;
+            if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; progress = 33; }
+            if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; progress = 66; }
+            if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = cycleEnd; progress = 90; }
+            if (today > cycleEnd) { currentStage = "Expired"; nextAudit = null; progress = 100; }
+            const recentAudit = findRecentFinalizedAudit(client.id, std);
+            if (recentAudit && currentStage === "Recertification Due"
+                && !/re-?cert/.test(String(recentAudit.auditType || recentAudit.type || '').toLowerCase())) {
+                currentStage = "Surveillance 2"; nextAudit = recertAudit; progress = 66;
             }
+            s1Done = today > surv1; s2Done = today > surv2; recertDone = false;
+            expired = today > cycleEnd;
         }
 
+        const nextAuditLabel = (cs && cs.nextAudit && cs.nextAudit.source === 'scheduled') ? 'Next Audit (scheduled)' : 'Next Audit';
         const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
         const isUrgent = daysToNext > 0 && daysToNext <= 60;
 
         return `
-            <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, ${today > cycleEnd ? '#fee2e2' : '#f0f9ff'} 0%, ${today > cycleEnd ? '#fecaca' : '#e0f2fe'} 100%); border-left: 4px solid ${today > cycleEnd ? '#dc2626' : '#3b82f6'};">
+            <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, ${expired ? '#fee2e2' : '#f0f9ff'} 0%, ${expired ? '#fecaca' : '#e0f2fe'} 100%); border-left: 4px solid ${expired ? '#dc2626' : '#3b82f6'};">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                     <div style="flex: 1;">
                         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
@@ -947,7 +959,7 @@ function renderCertificationCycleWidget(client) {
                         
                         <!-- Progress Bar -->
                         <div style="background: rgba(255,255,255,0.6); border-radius: 8px; height: 8px; overflow: hidden; margin-bottom: 0.75rem;">
-                            <div style="background: ${today > cycleEnd ? '#dc2626' : progress >= 66 ? '#f59e0b' : '#3b82f6'}; height: 100%; width: ${progress}%; transition: width 0.3s ease;"></div>
+                            <div style="background: ${expired ? '#dc2626' : progress >= 66 ? '#f59e0b' : '#3b82f6'}; height: 100%; width: ${progress}%; transition: width 0.3s ease;"></div>
                         </div>
 
                         <!-- Current Stage Info -->
@@ -958,7 +970,7 @@ function renderCertificationCycleWidget(client) {
                             </div>
                             ${nextAudit ? `
                             <div>
-                                <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Next Audit</div>
+                                <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">${nextAuditLabel}</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: ${isUrgent ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">
                                     ${window.UTILS.formatDate(nextAudit)}
                                     ${isUrgent ? `<span style="font-size: 0.75rem; color: #dc2626; margin-left: 0.5rem;">(${daysToNext} days!)</span>` : ''}
@@ -968,7 +980,7 @@ function renderCertificationCycleWidget(client) {
                             ` : ''}
                             <div>
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Expiry Date</div>
-                                <div style="font-size: 1.1rem; font-weight: 600; color: ${today > cycleEnd ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(cycleEnd)}</div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: ${expired ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(cycleEnd)}</div>
                                 ${rawExpiry && rawExpiry.getTime() !== cycleEnd.getTime() ? `<div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem;">3-yr cycle end • annual cert on file expires ${window.UTILS.formatDate(rawExpiry)}</div>` : ''}
                             </div>
                         </div>
@@ -980,19 +992,19 @@ function renderCertificationCycleWidget(client) {
                             <div style="width: 32px; height: 32px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">✓</div>
                             <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">Cert</div>
                         </div>
-                        <div style="width: 20px; height: 2px; background: ${today > surv1 ? '#10b981' : '#cbd5e1'};"></div>
-                        <div style="text-align: center;">
-                            <div style="width: 32px; height: 32px; background: ${today > surv1 ? '#10b981' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">${today > surv1 ? '✓' : '1'}</div>
+                        <div style="width: 20px; height: 2px; background: ${s1Done ? '#10b981' : '#cbd5e1'};"></div>
+                        <div style="text-align: center;" title="${s1Done ? 'Surveillance 1 audit finalized' : 'Surveillance 1 not yet finalized'}">
+                            <div style="width: 32px; height: 32px; background: ${s1Done ? '#10b981' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">${s1Done ? '✓' : '1'}</div>
                             <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">S1</div>
                         </div>
-                        <div style="width: 20px; height: 2px; background: ${today > surv2 ? '#10b981' : '#cbd5e1'};"></div>
-                        <div style="text-align: center;">
-                            <div style="width: 32px; height: 32px; background: ${today > surv2 ? '#10b981' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">${today > surv2 ? '✓' : '2'}</div>
+                        <div style="width: 20px; height: 2px; background: ${s2Done ? '#10b981' : '#cbd5e1'};"></div>
+                        <div style="text-align: center;" title="${s2Done ? 'Surveillance 2 audit finalized' : 'Surveillance 2 not yet finalized'}">
+                            <div style="width: 32px; height: 32px; background: ${s2Done ? '#10b981' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">${s2Done ? '✓' : '2'}</div>
                             <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">S2</div>
                         </div>
-                        <div style="width: 20px; height: 2px; background: ${today > recertAudit ? '#f59e0b' : '#cbd5e1'};"></div>
-                        <div style="text-align: center;">
-                            <div style="width: 32px; height: 32px; background: ${today > recertAudit ? '#f59e0b' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">↻</div>
+                        <div style="width: 20px; height: 2px; background: ${recertDone ? '#10b981' : s2Done ? '#f59e0b' : '#cbd5e1'};"></div>
+                        <div style="text-align: center;" title="${recertDone ? 'Recertification audit finalized' : s2Done ? 'Recertification due' : 'Recertification not yet due'}">
+                            <div style="width: 32px; height: 32px; background: ${recertDone ? '#10b981' : s2Done ? '#f59e0b' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">${recertDone ? '✓' : '↻'}</div>
                             <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">Re</div>
                         </div>
                     </div>
@@ -1050,24 +1062,43 @@ function renderAuditCycleTimeline(client) {
     const today = new Date();
     let currentStage = "Initial Certification";
     let nextAudit = surv1;
-    if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; }
-    if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; }
-    if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = cycleEnd; }
-    if (today > cycleEnd) { currentStage = "Expired"; nextAudit = null; }
 
-    // Prefer real audit history over pure date math (see
-    // renderCertificationCycleWidget's identical guard for the rationale).
-    const recentAudit = findRecentFinalizedAudit(client.id, latestCert.standard);
-    if (recentAudit && currentStage === "Recertification Due") {
-        const auditedType = String(recentAudit.auditType || recentAudit.type || '').toLowerCase();
-        const wasRecert = /re-?cert/.test(auditedType);
-        if (!wasRecert) {
+    // Same finalized-history-driven cycle state as the overview widget and the
+    // report's Audit Programme (see renderCertificationCycleWidget).
+    const cs = (window.ReportStats && typeof window.ReportStats.cycleState === 'function')
+        ? window.ReportStats.cycleState({
+            client: client,
+            standard: latestCert.standard,
+            certificate: latestCert,
+            allReports: (window.state && window.state.auditReports) || [],
+            allPlans: (window.state && window.state.auditPlans) || []
+        })
+        : null;
+
+    if (cs) {
+        currentStage = cs.stage;
+        nextAudit = cs.nextAudit ? cs.nextAudit.date : null;
+    } else {
+        if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; }
+        if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; }
+        if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = cycleEnd; }
+        if (today > cycleEnd) { currentStage = "Expired"; nextAudit = null; }
+        const recentAudit = findRecentFinalizedAudit(client.id, latestCert.standard);
+        if (recentAudit && currentStage === "Recertification Due"
+            && !/re-?cert/.test(String(recentAudit.auditType || recentAudit.type || '').toLowerCase())) {
             currentStage = "Surveillance 2";
             nextAudit = recertAudit;
         }
     }
 
     const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
+
+    // Milestone completion — finalized audits, not calendar dates (fallback to
+    // the calendar only when cycleState is unavailable).
+    const s1Done = cs ? cs.completed.s1 : today > surv1;
+    const s2Done = cs ? cs.completed.s2 : today > surv2;
+    const recertDone = cs ? cs.completed.recert : today > recertAudit;
+    const cycleExpired = cs ? cs.expired : today > cycleEnd;
 
     return `
         <div class="fade-in">
@@ -1119,28 +1150,28 @@ function renderAuditCycleTimeline(client) {
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
-                        <div style="width: 40px; height: 40px; background: ${new Date() > surv1 ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
+                        <div style="width: 40px; height: 40px; background: ${s1Done ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Surv 1</div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(surv1)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">Year 1</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
-                        <div style="width: 40px; height: 40px; background: ${new Date() > surv2 ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
+                        <div style="width: 40px; height: 40px; background: ${s2Done ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Surv 2</div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(surv2)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">Year 2</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
-                        <div style="width: 40px; height: 40px; background: ${new Date() > recertAudit ? '#10b981' : '#f59e0b'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-sync"></i></div>
+                        <div style="width: 40px; height: 40px; background: ${recertDone ? '#10b981' : '#f59e0b'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-sync"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Recert Audit</div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(recertAudit)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">60 days before</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
-                        <div style="width: 40px; height: 40px; background: ${new Date() > cycleEnd ? '#dc2626' : '#94a3b8'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-hourglass-end"></i></div>
+                        <div style="width: 40px; height: 40px; background: ${cycleExpired ? '#dc2626' : '#94a3b8'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-hourglass-end"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Expiry</div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(cycleEnd)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">Year 3</div>

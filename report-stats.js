@@ -282,6 +282,22 @@
         return isNaN(dt.getTime()) ? null : dt;
     }
 
+    function addMonths(date, months) {
+        const dt = new Date(date.getTime());
+        dt.setMonth(dt.getMonth() + months);
+        return dt;
+    }
+
+    // The one cycle-end rule, shared by buildProgramme (report) and cycleState
+    // (dashboard widget). Many certificates on file are ANNUAL re-issues within
+    // a 3-year cycle (expiry = currentIssue + ~364 days, an app convention), so
+    // a recorded expiry is only the true cycle end when it lands at least 30
+    // months after the cycle anchor; otherwise the cycle ends anchor + 36 months.
+    function cycleEndFrom(anchor, expiry) {
+        if (!expiry) return addMonths(anchor, 36);
+        return expiry.getTime() >= addMonths(anchor, 30).getTime() ? expiry : addMonths(anchor, 36);
+    }
+
     function buildProgrammeInner(input) {
         const client = input.client || {};
         const auditPlan = input.auditPlan || {};
@@ -364,20 +380,7 @@
         // cycle end only when it is at least 30 months after the cycle anchor
         // (initialDate/issueDate); otherwise the cert is annual-issue and the
         // real cycle end is anchor + 36 months.
-        let recertDate;
-        if (certExpiry) {
-            const cycleAnchor = certStart || baseDate;
-            const thirtyMonthsOut = new Date(cycleAnchor.getTime());
-            thirtyMonthsOut.setMonth(thirtyMonthsOut.getMonth() + 30);
-            if (certExpiry.getTime() >= thirtyMonthsOut.getTime()) {
-                recertDate = certExpiry; // genuine 3-year cert
-            } else {
-                recertDate = new Date(cycleAnchor.getTime());
-                recertDate.setMonth(recertDate.getMonth() + 36); // annual-issue semantics
-            }
-        } else {
-            recertDate = offsetDate(36);
-        }
+        const recertDate = certExpiry ? cycleEndFrom(certStart || baseDate, certExpiry) : offsetDate(36);
         const recertTiming = certExpiry ? ('by ' + fmt(recertDate)) : monthYear(36);
 
         // Match history records to stage slots by their own audit type.
@@ -487,6 +490,133 @@
         }
 
         return { stages, anchored, issues, anchorDate: baseDate ? baseDate.toISOString() : null, nextAudit };
+    }
+
+    // ─── Certification-cycle state for dashboards ───────────────────────────
+    // Answers "where is this client in their 3-year cycle right now" from the
+    // SAME facts the report programme uses: the certificate anchor plus the
+    // client's finalized audit history. A stage is complete because an audit
+    // for it was finalized — not because the calendar passed its due date — so
+    // publishing a surveillance report advances the widget immediately, and a
+    // visit that never happened never silently counts as done. Falls back to a
+    // pure calendar projection only when there is no finalized history at all.
+    //
+    // Returns null when there is no usable certificate (caller keeps its own
+    // "no cycle started" empty state).
+    function cycleState(input) {
+        try {
+            return cycleStateInner(input || {});
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    function cycleStateInner(input) {
+        const client = input.client || {};
+        const standard = trim(input.standard);
+        const allReports = safeArr(input.allReports);
+        const allPlans = safeArr(input.allPlans);
+        const today = parseDateSafe(input.today) || new Date();
+
+        const certs = safeArr(client.certificates);
+        const cert = input.certificate
+            || (standard ? certs.find((c) => trim(c.standard).toLowerCase() === standard.toLowerCase()) : null)
+            || certs[0] || null;
+        if (!cert) return null;
+
+        const anchor = parseDateSafe(cert.initialDate) || parseDateSafe(cert.issueDate) || parseDateSafe(cert.currentIssue);
+        if (!anchor) return null;
+
+        const rawExpiry = parseDateSafe(cert.expiryDate);
+        const cycleEnd = cycleEndFrom(anchor, rawExpiry);
+        const surv1Due = addMonths(anchor, 12);
+        const surv2Due = addMonths(anchor, 24);
+        const recertDue = new Date(cycleEnd.getTime());
+        recertDue.setDate(recertDue.getDate() - 60); // recert visit precedes cycle end
+
+        // Finalized audits belonging to THIS cycle, oldest first. The window
+        // opens 60 days before the anchor so the initial-certification audit
+        // that produced the certificate still counts as in-cycle.
+        const clientId = client.id;
+        const windowStart = new Date(anchor.getTime());
+        windowStart.setDate(windowStart.getDate() - 60);
+        const history = allReports.filter((r) => {
+            if (!r) return false;
+            if (clientId != null && r.clientId != null && String(r.clientId) !== String(clientId)) return false;
+            if (standard && trim(r.standard) && trim(r.standard).toLowerCase() !== standard.toLowerCase()) return false;
+            const st = trim(r.reportStatus || r.status).toLowerCase();
+            if (st !== 'final' && st !== 'finalized' && st !== 'approved' && st !== 'published') return false;
+            const d = parseDateSafe(r.date || r.createdAt);
+            return !!d && d >= windowStart && d <= today;
+        }).sort((a, b) => (parseDateSafe(a.date || a.createdAt) - parseDateSafe(b.date || b.createdAt)));
+
+        // Slot each finalized surveillance visit. An explicitly numbered type
+        // wins; a generic "Surveillance" is slotted by which due date it sits
+        // closest to (mirroring buildProgramme), and a later visit can never
+        // regress to an earlier slot than one already completed.
+        let surveillancesDone = 0;
+        let recertDone = false;
+        history.forEach((r) => {
+            const typeStr = trim(r.auditType || r.type);
+            const sid = classifyAuditType(typeStr);
+            if (sid === 'recert') { recertDone = true; return; }
+            if (sid === 's1' || sid === 's2') return; // stage 1 / initial certification audit
+            let slot = sid === 'sv2' ? 2 : (/surveillance\s*1|sv1|1st|first/i.test(typeStr) ? 1 : 0);
+            if (!slot) {
+                const d = parseDateSafe(r.date || r.createdAt);
+                slot = Math.abs(d - surv2Due) < Math.abs(d - surv1Due) ? 2 : 1;
+            }
+            surveillancesDone = Math.min(2, Math.max(surveillancesDone, Math.max(slot, surveillancesDone + 1)));
+        });
+
+        const completed = { certification: true, s1: surveillancesDone >= 1, s2: surveillancesDone >= 2, recert: recertDone };
+        const hasHistory = history.length > 0;
+
+        let stage, dueDate, progress;
+        if (recertDone) {
+            stage = 'Recertification completed'; dueDate = null; progress = 100;
+        } else if (surveillancesDone >= 2) {
+            stage = 'Surveillance 2 completed'; dueDate = recertDue; progress = 90;
+        } else if (surveillancesDone === 1) {
+            stage = 'Surveillance 1 completed'; dueDate = surv2Due; progress = 66;
+        } else if (hasHistory) {
+            stage = 'Certified'; dueDate = surv1Due; progress = 33;
+        } else {
+            // No finalized history — project from the calendar, preserving the
+            // long-standing "stage = last milestone passed, next = the one
+            // after it" reading of this widget.
+            stage = 'Initial certification'; dueDate = surv1Due; progress = 0;
+            if (today > surv1Due) { stage = 'Surveillance 1 period'; dueDate = surv2Due; progress = 33; }
+            if (today > surv2Due) { stage = 'Surveillance 2 period'; dueDate = recertDue; progress = 66; }
+            if (today > recertDue) { stage = 'Recertification due'; dueDate = cycleEnd; progress = 90; }
+        }
+        if (!recertDone && today > cycleEnd) { stage = 'Certificate expired'; dueDate = null; progress = 100; }
+
+        // A real scheduled plan always beats a computed due date.
+        let nextAudit = dueDate ? { date: dueDate, source: 'calendar', label: stage } : null;
+        const scheduled = allPlans.filter((p) => {
+            if (!p) return false;
+            if (clientId != null && p.clientId != null && String(p.clientId) !== String(clientId)) return false;
+            if (standard && trim(p.standard) && trim(p.standard).toLowerCase() !== standard.toLowerCase()) return false;
+            const st = trim(p.status).toLowerCase();
+            if (st === 'completed' || st === 'cancelled') return false;
+            const d = parseDateSafe(p.startDate || p.date);
+            return !!d && d >= today;
+        }).sort((a, b) => (parseDateSafe(a.startDate || a.date) - parseDateSafe(b.startDate || b.date)))[0];
+        if (scheduled) {
+            nextAudit = {
+                date: parseDateSafe(scheduled.startDate || scheduled.date),
+                source: 'scheduled',
+                label: trim(scheduled.auditType || scheduled.type) || 'Scheduled audit'
+            };
+        }
+
+        return {
+            anchor, cycleEnd, rawExpiry, surv1Due, surv2Due, recertDue,
+            completed, surveillancesDone, recertDone, hasHistory,
+            stage, progress, nextAudit,
+            expired: !recertDone && today > cycleEnd
+        };
     }
 
     function safeMinimalDataset() {
@@ -874,6 +1004,7 @@
         UNASSIGNED_LABEL,
         recommendationText,
         buildProgramme,
+        cycleState,
         formatCriterion,
         cleanEvidenceText
     };

@@ -184,6 +184,82 @@ describe('KTD surveillance acceptance', () => {
         expect(clean).toEqual([]); // "Dr" vs "Drive" normalized, same city
     });
 
+    // Cycle state drives the dashboard widget's stage ticks. A stage is
+    // complete because its audit was FINALIZED — publishing the report is what
+    // advances the cycle, not the calendar rolling past a due date.
+    describe('ReportStats.cycleState', () => {
+        const ANNUAL_CERT_CLIENT = () => ({
+            id: 'ktd-1', name: 'KTD Select',
+            certificates: [{ standard: 'ISO 9001:2015', initialDate: '2024-08-21', currentIssue: '2025-08-21', expiryDate: '2026-08-20' }]
+        });
+        const sv2Report = (status) => ({
+            id: 'rep-sv2', clientId: 'ktd-1', standard: 'ISO 9001:2015',
+            date: '2026-08-14', auditType: 'Surveillance', reportStatus: status
+        });
+        const args = (reports) => ({
+            client: ANNUAL_CERT_CLIENT(), standard: 'ISO 9001:2015',
+            allReports: reports, allPlans: [], today: '2026-08-17'
+        });
+
+        it('an unpublished surveillance report leaves S2 un-ticked', () => {
+            const cs = window.ReportStats.cycleState(args([sv2Report('draft')]));
+            expect(cs.completed.s2).toBe(false);
+            expect(cs.hasHistory).toBe(false);
+        });
+
+        it('publishing the surveillance report ticks S1 and S2 and moves the stage on', () => {
+            const cs = window.ReportStats.cycleState(args([sv2Report('final')]));
+            // Dated a year after SV1 was due, so it slots as the SECOND
+            // surveillance — matching how buildProgramme slots the same record.
+            expect(cs.surveillancesDone).toBe(2);
+            expect(cs.completed.s1).toBe(true);
+            expect(cs.completed.s2).toBe(true);
+            expect(cs.completed.recert).toBe(false);
+            expect(cs.stage).toBe('Surveillance 2 completed');
+            // Annual cert expiry (Aug 2026) is NOT the cycle end — recert is
+            // driven by the true 3-year cycle end (Aug 2027).
+            expect(cs.cycleEnd.getFullYear()).toBe(2027);
+            expect(cs.nextAudit.date.getFullYear()).toBe(2027);
+        });
+
+        it('a finalized recertification audit ticks the recert milestone', () => {
+            const recert = { id: 'rep-re', clientId: 'ktd-1', standard: 'ISO 9001:2015', date: '2027-06-10', auditType: 'Recertification', reportStatus: 'final' };
+            const base = { client: ANNUAL_CERT_CLIENT(), standard: 'ISO 9001:2015', allReports: [sv2Report('final'), recert], allPlans: [] };
+
+            // Not yet performed on 2026-08-17 — a future-dated record must not
+            // tick a milestone that hasn't happened.
+            const before = window.ReportStats.cycleState(Object.assign({}, base, { today: '2026-08-17' }));
+            expect(before.completed.recert).toBe(false);
+
+            const after = window.ReportStats.cycleState(Object.assign({}, base, { today: '2027-06-20' }));
+            expect(after.completed.recert).toBe(true);
+            expect(after.stage).toBe('Recertification completed');
+        });
+
+        it('a scheduled plan outranks the computed due date for the next audit', () => {
+            const cs = window.ReportStats.cycleState({
+                client: ANNUAL_CERT_CLIENT(), standard: 'ISO 9001:2015',
+                allReports: [sv2Report('final')],
+                allPlans: [{ id: 'p1', clientId: 'ktd-1', standard: 'ISO 9001:2015', startDate: '2027-05-03', auditType: 'Recertification', status: 'Scheduled' }],
+                today: '2026-08-17'
+            });
+            expect(cs.nextAudit.source).toBe('scheduled');
+            expect(cs.nextAudit.date.toISOString().slice(0, 10)).toBe('2027-05-03');
+        });
+
+        it('another client\'s finalized audit never advances this client\'s cycle', () => {
+            const cs = window.ReportStats.cycleState(args([
+                { id: 'other', clientId: 'pc-conn', standard: 'ISO 9001:2015', date: '2026-08-14', auditType: 'Surveillance', reportStatus: 'final' }
+            ]));
+            expect(cs.completed.s1).toBe(false);
+            expect(cs.hasHistory).toBe(false);
+        });
+
+        it('returns null when the client has no usable certificate', () => {
+            expect(window.ReportStats.cycleState({ client: { id: 'x', name: 'No Cert' }, standard: 'ISO 9001:2015', allReports: [] })).toBe(null);
+        });
+    });
+
     // Item 10 — certificate's own recorded site (sitesCovered[] snapshot from
     // client.sites at issuance) is compared too, not just the audit plan/report.
     it('certificate sitesCovered address is checked against the master site record', () => {
