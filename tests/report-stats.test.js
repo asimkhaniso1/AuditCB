@@ -127,4 +127,69 @@ describe('ReportStats.build', () => {
         expect(d2).toHaveProperty('reconciliation');
         expect(Array.isArray(d2.reconciliation)).toBe(true);
     });
+
+    it('methodologyNote is always populated with the exact required wording', () => {
+        const populated = window.ReportStats.build({ report: {}, hydratedProgress: [item({ status: 'conform' })] });
+        const EXACT = 'Audit Coverage = items assessed ÷ applicable checklist items (N/A excluded). '
+            + 'Conformity indicator = assessed items without nonconformity ÷ assessed items; observations and OFIs '
+            + 'do not reduce it. Analytical indicators only — not certification scores.';
+        expect(populated.methodologyNote).toBe(EXACT);
+
+        // Still populated (non-empty) even on the malformed/empty-input fallback path.
+        const empty = window.ReportStats.build({});
+        expect(typeof empty.methodologyNote).toBe('string');
+        expect(empty.methodologyNote.length).toBeGreaterThan(0);
+    });
+
+    it('exposes coverageInputs/conformityInputs so renderers can show "N of M items"', () => {
+        const hydratedProgress = [
+            item({ status: 'conform' }),
+            item({ status: 'conform' }),
+            item({ status: 'nc', ncrType: 'major' }),
+            item({ status: 'na' })
+        ];
+        const d = window.ReportStats.build({ report: {}, hydratedProgress });
+        // applicable = 3 (4 total - 1 N/A); assessed = 3 (2 conform + 1 major)
+        expect(d.coverageInputs).toEqual({ assessed: 3, applicable: 3 });
+        // conforming = 2 (assessed 3 - 1 major)
+        expect(d.conformityInputs).toEqual({ conforming: 2, assessed: 3 });
+    });
+});
+
+describe('ReportStats.cleanEvidenceText', () => {
+    it('trims and collapses internal whitespace', () => {
+        expect(window.ReportStats.cleanEvidenceText('  two   spaces\n\tand a tab  ')).toBe('Two spaces and a tab.');
+    });
+
+    it('uppercases only the first letter, never the rest of the text', () => {
+        expect(window.ReportStats.cleanEvidenceText('internal audit programme IA-2026 reviewed'))
+            .toBe('Internal audit programme IA-2026 reviewed.');
+    });
+
+    it('adds a terminal period to a fragment ending in a letter or digit', () => {
+        expect(window.ReportStats.cleanEvidenceText('calibration record overdue since May')).toBe('Calibration record overdue since May.');
+        expect(window.ReportStats.cleanEvidenceText('record CAL-114')).toBe('Record CAL-114.');
+    });
+
+    it('does not double up a terminal period, or add one after other punctuation', () => {
+        expect(window.ReportStats.cleanEvidenceText('already ends properly.')).toBe('Already ends properly.');
+        expect(window.ReportStats.cleanEvidenceText('a quoted phrase"')).toBe('A quoted phrase"');
+        expect(window.ReportStats.cleanEvidenceText('a parenthetical (note)')).toBe('A parenthetical (note)');
+    });
+
+    it('un-double-encodes stray HTML entities textually, without touching real content', () => {
+        expect(window.ReportStats.cleanEvidenceText('Records &amp;amp; logs reviewed')).toBe('Records &amp; logs reviewed.');
+        expect(window.ReportStats.cleanEvidenceText('a &amp;lt;tag&amp;gt; in the text')).toBe('A &lt;tag&gt; in the text.');
+    });
+
+    it('never rewords, rephrases or corrects spelling — mechanical only', () => {
+        expect(window.ReportStats.cleanEvidenceText('teh recieved documnet was reviewd')).toBe('Teh recieved documnet was reviewd.');
+    });
+
+    it('handles empty/null input without throwing', () => {
+        expect(window.ReportStats.cleanEvidenceText('')).toBe('');
+        expect(window.ReportStats.cleanEvidenceText(null)).toBe('');
+        expect(window.ReportStats.cleanEvidenceText(undefined)).toBe('');
+        expect(window.ReportStats.cleanEvidenceText('   ')).toBe('');
+    });
 });

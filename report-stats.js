@@ -111,6 +111,29 @@
         return text;
     }
 
+    // ─── Mechanical evidence-text normalizer ────────────────────────────────
+    // Trim / collapse whitespace / capitalize the first letter / add a missing
+    // terminal period / un-double-encode stray HTML entities. Deliberately
+    // mechanical only — never rewords, rephrases, or corrects spelling; the
+    // auditor's actual words are never altered, only their formatting.
+    function cleanEvidenceText(raw) {
+        let text = String(raw == null ? '' : raw);
+        // Un-double-encode stray entities, e.g. '&amp;amp;' -> '&amp;',
+        // '&amp;lt;' -> '&lt;' — textual substitution only, not a full HTML decode.
+        text = text.replace(/&amp;(#\w+;|[a-zA-Z]+;)/g, '&$1');
+        // Collapse internal whitespace/newlines to single spaces, trim ends.
+        text = text.replace(/\s+/g, ' ').trim();
+        if (!text) return text;
+        // Capitalize only the first character — spelling/casing of every other
+        // character is left exactly as the auditor wrote it.
+        text = text.charAt(0).toUpperCase() + text.slice(1);
+        // A sentence fragment left hanging on a letter/digit gets a terminal
+        // period; text already ending in punctuation (. ! ? ; : ) " etc.) is
+        // left alone.
+        if (/[A-Za-z0-9]$/.test(text)) text += '.';
+        return text;
+    }
+
     function daysBetween(a, b) {
         const da = new Date(a), db = new Date(b);
         if (isNaN(da.getTime()) || isNaN(db.getTime())) return null;
@@ -180,29 +203,45 @@
     // definition of "what do we show for this finding's criterion" so every
     // consumer (execution-reporting.js's displayCriterion, report-executive.js's
     // narrative generation, CAPA/NCR renders) agrees. Pure, never throws.
-    //   - criterionRef present            -> real clause leads the label;
-    //                                        real = criterionRef.
-    //   - no criterionRef, clause looks   -> unresolved internal reference;
-    //     like FOCUS/SURV/ORG/DOC            isInternal = true, real = null.
-    //   - otherwise                       -> clause is already a real/plain
-    //                                        reference; used as-is.
+    //
+    // Contract: formatCriterion(finding, opts) -> {label, isInternal, real, internalRef}
+    //   - criterionRef present              -> real clause is the label by
+    //                                          default; real = criterionRef.
+    //                                          If the finding's `clause` is an
+    //                                          internal FOCUS/SURV/ORG/DOC tag
+    //                                          that differs from criterionRef
+    //                                          (a resolved Stage 1 carryover),
+    //                                          internalRef carries that tag.
+    //                                          opts.showInternal:true restores
+    //                                          the 'real (internalRef)' label
+    //                                          for internal/CAPA-style contexts.
+    //   - no criterionRef, clause looks     -> unresolved internal reference;
+    //     like FOCUS/SURV/ORG/DOC              isInternal = true, real = null,
+    //                                          label = 'internal ref FOCUS.x'
+    //                                          (opts.showInternal has no effect
+    //                                          here — nothing more to restore).
+    //   - otherwise                         -> clause is already a real/plain
+    //                                          reference; used as-is.
     const FOCUS_REF_RE = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
-    function formatCriterion(finding) {
+    function formatCriterion(finding, opts) {
         const f = finding || {};
+        const showInternal = !!(opts && opts.showInternal);
         const clause = trim(f.clause);
         const criterionRef = trim(f.criterionRef);
         if (criterionRef) {
             const isCarryover = clause && FOCUS_REF_RE.test(clause) && clause.toLowerCase() !== criterionRef.toLowerCase();
+            const internalRef = isCarryover ? clause : null;
             return {
-                label: isCarryover ? (criterionRef + ' (' + clause + ')') : criterionRef,
+                label: (showInternal && internalRef) ? (criterionRef + ' (' + internalRef + ')') : criterionRef,
                 isInternal: false,
-                real: criterionRef
+                real: criterionRef,
+                internalRef
             };
         }
         if (clause && FOCUS_REF_RE.test(clause)) {
-            return { label: 'internal ref ' + clause, isInternal: true, real: null };
+            return { label: 'internal ref ' + clause, isInternal: true, real: null, internalRef: null };
         }
-        return { label: clause, isInternal: false, real: clause || null };
+        return { label: clause, isInternal: false, real: clause || null, internalRef: null };
     }
 
     // ─── Certification-cycle programme — single computation for preview + export ──
@@ -292,12 +331,23 @@
 
         // A generic "Surveillance" audit type carries no cycle-year. When a real
         // anchor exists, slot the current audit into the surveillance visit nearest
-        // its own date (two years after initial certification = Surveillance 2).
+        // its own date (two years after initial certification = Surveillance 2) —
+        // UNLESS real audit history already contains a prior Surveillance for this
+        // client+standard, in which case the current generic-Surveillance audit
+        // must slot AFTER it (Surveillance 2) regardless of date proximity. A
+        // second surveillance visit can land close to its own 12-month-post-SV1
+        // due date too, and naive date-proximity alone would misclassify it back
+        // as Surveillance 1.
+        const hasPriorSv1History = history.some((r) => r && classifyAuditType(r.auditType || (r.auditPlan && r.auditPlan.type)) === 'sv1');
         if (currentStageId === 'sv1' && anchored !== 'audit-date-fallback'
             && !/surveillance\s*1|sv1|1st\s*surveillance|first\s*surveillance/i.test(currentTypeStr)) {
-            const sv1Due = new Date(baseDate.getTime()); sv1Due.setMonth(sv1Due.getMonth() + 12);
-            const sv2Due = new Date(baseDate.getTime()); sv2Due.setMonth(sv2Due.getMonth() + 24);
-            if (Math.abs(auditDate - sv2Due) < Math.abs(auditDate - sv1Due)) currentStageId = 'sv2';
+            if (hasPriorSv1History) {
+                currentStageId = 'sv2';
+            } else {
+                const sv1Due = new Date(baseDate.getTime()); sv1Due.setMonth(sv1Due.getMonth() + 12);
+                const sv2Due = new Date(baseDate.getTime()); sv2Due.setMonth(sv2Due.getMonth() + 24);
+                if (Math.abs(auditDate - sv2Due) < Math.abs(auditDate - sv1Due)) currentStageId = 'sv2';
+            }
         }
         const currentStageIdx = STAGE_DEFS.findIndex((s) => s.id === currentStageId);
 
@@ -387,12 +437,14 @@
 
         // nextAudit: the first stage strictly after the current one with a valid,
         // future-dated timing. null (with the issue above present) when the
-        // programme cannot substantiate a next audit date.
+        // programme cannot substantiate a next audit date. Carries a machine-
+        // readable `date` (ISO string) alongside label/timing so consumers never
+        // need to re-parse the display `timing` string themselves.
         let nextAudit = null;
         for (let i = currentStageIdx + 1; i < stages.length; i++) {
             const dt = rawDates[stages[i].id];
             if (dt && !isNaN(dt.getTime()) && dt.getTime() > auditDate.getTime()) {
-                nextAudit = stages[i];
+                nextAudit = Object.assign({}, stages[i], { date: dt.toISOString() });
                 break;
             }
         }
@@ -424,6 +476,8 @@
             totals: { totalItems: 0, applicable: 0, assessed: 0 },
             coveragePct: null,
             conformityPct: null,
+            coverageInputs: { assessed: 0, applicable: 0 },
+            conformityInputs: { conforming: 0, assessed: 0 },
             uniqueFindings: [],
             clauseRefsAffected: 0,
             advisoryItems: [],
@@ -530,9 +584,14 @@
             + resultCounts.pendingClassification + advisories.total;
 
         const coveragePct = applicable > 0 ? pct(assessed, applicable) : null;
-        const conformityPct = assessed > 0
-            ? pct(assessed - resultCounts.majorNC - resultCounts.minorNC - resultCounts.pendingClassification, assessed)
-            : null;
+        const conformingAssessed = assessed - resultCounts.majorNC - resultCounts.minorNC - resultCounts.pendingClassification;
+        const conformityPct = assessed > 0 ? pct(conformingAssessed, assessed) : null;
+
+        // Raw inputs behind each percentage, exposed so renderers can show
+        // "N of M items" alongside the percentage without recomputing it from
+        // resultCounts/totals themselves.
+        const coverageInputs = { assessed, applicable };
+        const conformityInputs = { conforming: conformingAssessed, assessed };
 
         // ── Pass 2: unique findings (majors/minors/pending) with register/manual merge ──
         const win = auditWindow(report, auditPlan);
@@ -732,11 +791,11 @@
         const auditTypeForRec = report.auditType || auditPlan.type || auditPlan.auditType || '';
         recommendation = recommendationText(auditTypeForRec, { majorNC: resultCounts.majorNC, minorNC: resultCounts.minorNC });
 
-        const methodologyNote = 'Coverage measures the share of applicable checklist items (excluding Not Applicable) that '
-            + 'have been assessed. Conformity measures, of those assessed items, the share with no confirmed major or minor '
-            + 'non-conformity — advisory items (observations and opportunities for improvement) are treated as conforming '
-            + 'with comment and do not reduce the conformity score, while unclassified "nc" items are counted against '
-            + 'conformity pending classification.';
+        // Always populated (never conditional) — exact wording per spec, shown
+        // next to the coverage/conformity figures in every consumer.
+        const methodologyNote = 'Audit Coverage = items assessed ÷ applicable checklist items (N/A excluded). '
+            + 'Conformity indicator = assessed items without nonconformity ÷ assessed items; observations and OFIs '
+            + 'do not reduce it. Analytical indicators only — not certification scores.';
 
         // ── Reconciliation checks ──
         const reconciliation = [];
@@ -771,6 +830,8 @@
             totals: { totalItems, applicable, assessed },
             coveragePct,
             conformityPct,
+            coverageInputs,
+            conformityInputs,
             uniqueFindings,
             clauseRefsAffected,
             advisoryItems,
@@ -793,7 +854,8 @@
         UNASSIGNED_LABEL,
         recommendationText,
         buildProgramme,
-        formatCriterion
+        formatCriterion,
+        cleanEvidenceText
     };
 
     if (typeof module !== 'undefined' && module.exports) {

@@ -487,6 +487,22 @@
             if (global.DataService && typeof global.DataService.checkAddressConsistency === 'function') {
                 const issues = global.DataService.checkAddressConsistency({ client, auditPlan, report, certificate }) || [];
                 issues.forEach((iss, idx) => {
+                    // A full city-level mismatch (the audit plan location doesn't
+                    // reference the master site's city at all) is a distinct,
+                    // more severe warning than a generic address-format drift —
+                    // kept out of the plain W5-N sequence and carrying all three
+                    // recorded values (site master / plan / report).
+                    if (iss.code === 'city_mismatch') {
+                        results.warnings.push(item(
+                            'W5c-' + idx,
+                            'warning',
+                            'client-data',
+                            iss.message || `City-level address mismatch detected for field "${iss.field}".`,
+                            'DataService.checkAddressConsistency',
+                            `Confirm the correct audit site: site master "${iss.siteMaster}" vs audit plan "${iss.plan}" vs report "${iss.report || '(not recorded)'}".`
+                        ));
+                        return;
+                    }
                     results.warnings.push(item(
                         'W5-' + idx,
                         'warning',

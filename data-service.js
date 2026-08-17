@@ -251,7 +251,25 @@
      * site (client.sites[0]) is treated as the authoritative record — everything
      * else is compared against it. Tolerant of trim/case/punctuation and common
      * street-suffix abbreviations ("Drive" vs "Dr").
-     * @returns {Array<{field, valueA, valueB, message}>} empty when insufficient data
+     *
+     * Certificates (see certifications-module.js) carry no dedicated
+     * address/location field of their own — the closest recorded site data is
+     * the `sitesCovered[]` snapshot captured from client.sites at issuance time
+     * (each entry has the same {address, city, ...} shape as a client site).
+     * `certificate.address`/`certificate.siteAddress` are also honored for any
+     * legacy/manually-entered records that do carry them directly. When a
+     * certificate has neither, client.sites[0] alone remains authoritative —
+     * there is nothing certificate-side to compare.
+     *
+     * A full CITY-level mismatch between the audit plan location and the site
+     * master (the plan's location string doesn't reference the master's city
+     * at all — not just a street-format difference like "Dr" vs "Drive") is
+     * reported as its own distinct issue (`code: 'city_mismatch'`) carrying all
+     * three recorded values (site master / plan / report), in place of the
+     * generic per-field issue for that candidate.
+     *
+     * @returns {Array<{field, valueA, valueB, message, code?, siteMaster?, plan?, report?}>}
+     *   empty when insufficient data
      */
     function checkAddressConsistency({ client, auditPlan, report, certificate } = {}) {
         const issues = [];
@@ -261,12 +279,19 @@
         const masterAddress = [site.address, site.city].filter(Boolean).join(', ');
         const normMaster = normalizeAddressText(masterAddress);
         if (!normMaster) return issues;
+        const normMasterCity = normalizeAddressText(site.city);
+
+        const reportLocationValue = report && (report.location || report.siteAddress || report.auditLocation);
+
+        const certSite = certificate && Array.isArray(certificate.sitesCovered) && certificate.sitesCovered[0];
+        const certSiteValue = certSite ? [certSite.address, certSite.city].filter(Boolean).join(', ') : null;
 
         const candidates = [
             { field: 'auditPlan.location', value: auditPlan && (auditPlan.location || auditPlan.siteAddress) },
             { field: 'auditPlan.address', value: auditPlan && auditPlan.address },
-            { field: 'report.location', value: report && (report.location || report.siteAddress || report.auditLocation) },
-            { field: 'certificate.address', value: certificate && (certificate.address || certificate.siteAddress) }
+            { field: 'report.location', value: reportLocationValue },
+            { field: 'certificate.address', value: certificate && (certificate.address || certificate.siteAddress) },
+            { field: 'certificate.sitesCovered', value: certSiteValue }
         ];
 
         candidates.forEach(({ field, value }) => {
@@ -276,6 +301,21 @@
             // Substring match either direction tolerates partial address strings
             // (e.g. a report location field that only stores the city).
             if (normMaster.includes(normValue) || normValue.includes(normMaster)) return;
+
+            if (field === 'auditPlan.location' && normMasterCity && !normValue.includes(normMasterCity)) {
+                issues.push({
+                    field,
+                    code: 'city_mismatch',
+                    valueA: masterAddress,
+                    valueB: value,
+                    siteMaster: masterAddress,
+                    plan: value,
+                    report: reportLocationValue || null,
+                    message: `City-level address mismatch: the master client site record places this client in "${site.city}", but the audit plan location does not reference that city. Site master: "${masterAddress}" · Audit plan: "${value}" · Report: "${reportLocationValue || '(not recorded)'}".`
+                });
+                return;
+            }
+
             issues.push({
                 field,
                 valueA: masterAddress,

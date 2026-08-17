@@ -30,6 +30,48 @@
     };
     window._fmtRemark = fmtRemark;
 
+    // Mechanical evidence-text normalization for Evidence Index / Evidence Pack
+    // cells — trim, collapse whitespace, sentence-case the first letter, ensure
+    // terminal punctuation. Unlike fmtRemark above, this NEVER rewrites content
+    // (no typo/brand-casing fixes) — it exists purely so raw evidence notes read
+    // as finished sentences without altering what the auditor recorded.
+    // ReportStats.cleanEvidenceText (shared canonical source, when present) wins;
+    // this is the local fallback consumed defensively when it is not yet loaded.
+    const cleanEvidenceTextLocal = (raw) => {
+        if (raw == null) return '';
+        let s = String(raw).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+        if (!s) return '';
+        s = s.charAt(0).toUpperCase() + s.slice(1);
+        if (!/[.!?]$/.test(s)) s += '.';
+        return s;
+    };
+    const cleanEvidenceText = (raw) => {
+        if (window.ReportStats && typeof window.ReportStats.cleanEvidenceText === 'function') {
+            try { return window.ReportStats.cleanEvidenceText(raw); } catch (_e) { /* fall through to local */ }
+        }
+        return cleanEvidenceTextLocal(raw);
+    };
+    window._cleanEvidenceText = cleanEvidenceText;
+
+    // ─── Methodology default text, branched by audit method (release item 5) ──
+    // planning-module.js's Method select (`plan.auditMethod`, field id
+    // plan-audit-method) yields exactly 'On-site' | 'Remote' | 'Hybrid' — there
+    // is no separate remote/onsite boolean or auditMode field. This only supplies
+    // the DEFAULT paragraph used when the auditor has left the free-text
+    // auditPlan.auditMethodology blank; an absent/unrecognized auditMethod value
+    // falls through to the caller's existing generic text, unchanged. Deterministic
+    // templates only — no AI involved.
+    const METHODOLOGY_DEFAULT_TEXT = {
+        'on-site': '• Risk-based sampling of processes, records, and documentation\n• In-person interviews with management and operational personnel at all levels\n• Physical presence on-site, including a facility tour and direct observation of activities and work environment\n• On-site review of documented information and objective evidence\n• Verification of corrective actions from previous audits',
+        'remote': '• Risk-based sampling of processes, records, and documentation\n• Remote interviews with management and operational personnel via video conferencing\n• Screen-shared, real-time review of records and documented information\n• Remote observation of activities and objective evidence where practicable, conducted per IAF MD4\n• Verification of corrective actions from previous audits',
+        'hybrid': '• Risk-based sampling of processes, records, and documentation\n• A combination of in-person and remote (video-conferenced) interviews with management and operational personnel\n• On-site facility tour and direct observation of activities, supplemented by remote screen-shared review of records, conducted per IAF MD4\n• Review of documented information and objective evidence, gathered both on-site and remotely\n• Verification of corrective actions from previous audits'
+    };
+    const methodologyDefaultText = (auditPlan) => {
+        const method = (auditPlan && auditPlan.auditMethod) ? String(auditPlan.auditMethod).trim().toLowerCase() : '';
+        return METHODOLOGY_DEFAULT_TEXT[method] || null; // null → caller keeps its existing generic fallback
+    };
+    window._methodologyDefaultText = methodologyDefaultText;
+
     // ─── Criterion display for findings (#7) ───────────────────────────────────
     // Checklist items carried over from a Stage 1 FOCUS item (or other internal
     // tracking refs like SURV./ORG./DOC.) use an internal reference in `clause`
@@ -59,22 +101,92 @@
         const isInternal = fc ? fc.isInternal : INTERNAL_REF_PREFIX_RE.test(clause);
 
         if (!isInternal) {
-            // fc.label already carries the internal ref in parentheses, e.g. "9.2 (FOCUS.2)".
+            // fc.label is the real clause only (no internal-ref parenthetical) by
+            // default — ReportStats.formatCriterion only surfaces the internal ref
+            // when called with {showInternal:true}, which no client-facing row does.
             return esc(fc ? fc.label : clause);
         }
+        // Both flags below render as a block with explicit white-space:normal +
+        // overflow-wrap so they stay wrap-safe even inside a parent <td> that sets
+        // white-space:nowrap for the common short-clause case (e.g. "9.2") — an
+        // un-overridden nowrap span here overflowed narrow (10%) Clause columns
+        // and painted over the adjacent ISO Requirement text in the printed PDF.
         if (isFinding) {
-            return '<span style="color:#b91c1c;font-weight:700;" title="Criterion not assigned — internal tracking reference only">Criterion not assigned — internal ref ' + esc(clause) + '</span>';
+            return '<span style="color:#b91c1c;font-weight:700;display:block;white-space:normal;overflow-wrap:break-word;line-height:1.3;" title="Criterion not assigned — internal tracking reference only">Criterion not assigned<br><span style="font-weight:600;font-size:0.85em;">(' + esc(clause) + ')</span></span>';
         }
-        return '<span style="color:#64748b;font-style:italic;" title="Internal Stage 1 tracking reference — not a finding">Internal focus item ' + esc(clause) + ' (Stage 1 carryover)</span>';
+        return '<span style="color:#64748b;font-style:italic;display:block;white-space:normal;overflow-wrap:break-word;line-height:1.3;" title="Internal Stage 1 tracking reference — not a finding">Internal focus item<br><span style="font-style:normal;font-weight:600;font-size:0.85em;">' + esc(clause) + ' (Stage 1 carryover)</span></span>';
     };
     window._displayCriterion = displayCriterion;
+
+    // ─── Adaptive table — omit columns that are empty across every row (release
+    // item 7) ──────────────────────────────────────────────────────────────────
+    // headers: [{label, thStyle?, tdStyle?}] in column order. bodyRows:
+    // [{rowStyle?, cells:[cellHtml, ...]}] — cells align 1:1 with headers. A
+    // column is dropped only when EVERY row's cell (tags stripped) reduces to a
+    // blank/dash/"Not recorded"/"N/A" placeholder — never on a per-row basis. Width
+    // is rebalanced evenly across surviving columns; all other cell/header styling
+    // passed in is preserved unchanged. Returns {theadHtml, bodyHtml, keptCount}
+    // so the caller keeps its own <table>/<tbody> wrapper and outer styling.
+    const ADAPTIVE_EMPTY_CELL_TEXT = new Set(['—', '-', '', 'not recorded', 'none', 'n/a', 'na']);
+    const isAdaptiveEmptyCell = (html) => {
+        const text = String(html == null ? '' : html).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().toLowerCase();
+        return ADAPTIVE_EMPTY_CELL_TEXT.has(text);
+    };
+    const buildAdaptiveTable = (headers, bodyRows) => {
+        const colCount = headers.length;
+        let keep = headers.map(function (_, c) {
+            return !bodyRows.every(function (r) { return isAdaptiveEmptyCell(r.cells[c]); });
+        });
+        // Never drop every column, and never touch layout when there are no rows to judge by.
+        if (bodyRows.length === 0 || keep.every(function (k) { return !k; })) {
+            keep = headers.map(function () { return true; });
+        }
+        const kept = headers.filter(function (_, c) { return keep[c]; });
+        const evenPct = (100 / kept.length).toFixed(2) + '%';
+        const theadHtml = '<tr>' + kept.map(function (h) {
+            return '<th style="width:' + evenPct + ';' + (h.thStyle || '') + '">' + h.label + '</th>';
+        }).join('') + '</tr>';
+        const bodyHtml = bodyRows.map(function (r) {
+            const cells = r.cells.filter(function (_, c) { return keep[c]; });
+            return '<tr' + (r.rowStyle ? ' style="' + r.rowStyle + '"' : '') + '>'
+                + cells.map(function (cellHtml, i) { return '<td style="' + (kept[i].tdStyle || 'padding:8px 12px;') + '">' + cellHtml + '</td>'; }).join('')
+                + '</tr>';
+        }).join('');
+        return { theadHtml: theadHtml, bodyHtml: bodyHtml, keptCount: kept.length, colCount: colCount };
+    };
+    window._buildAdaptiveTable = buildAdaptiveTable;
+
+    // ─── Canonical report identifier (release item 9) ──────────────────────────
+    // The same value must appear everywhere a report ref/ID is printed: cover
+    // "Report ID", the document-control block's "Document ID"/"Doc ID", and the
+    // Evidence Pack / closing-page "Report Ref"/"Doc Ref" (those were pulling the
+    // audit PLAN's reference via window.UTILS.getPlanRef instead of a report-
+    // specific ref, while the cover/footer used an unrelated 'RPT-'+id scheme —
+    // two different values for what reads as one identifier). Reuses getPlanRef's
+    // existing {initials}-{year}-{seq} composition, swapping its 'PLN-' prefix
+    // for 'AR-' (Audit Report), rather than inventing a new numbering scheme.
+    // Falls back to the pre-existing 'RPT-' + id-prefix convention (also used by
+    // the QR verify-card payload above) only when no plan is linked.
+    // NOTE: does not touch "Plan Reference" fields (audit-info table, Annexure A)
+    // — those are genuinely about the audit plan, not this report document.
+    const reportRef = (d) => {
+        if (d && d.auditPlan && window.UTILS && typeof window.UTILS.getPlanRef === 'function') {
+            const planRef = window.UTILS.getPlanRef(d.auditPlan);
+            if (planRef) return planRef.replace(/^PLN-/, 'AR-');
+        }
+        return 'RPT-' + String((d && d.report && d.report.id) || '').substring(0, 8);
+    };
+    window._reportRef = reportRef;
 
     // Formal criterion cell for CAPA / NCR-register style tables (Corrective
     // Action Requirements, NCR Register) — these list confirmed NCs only, so
     // always finding context. Leads with the real clause in the accreditation-
-    // formal style "ISO 9001:2015 — Clause 9.2", with the internal tracking
-    // reference (if any) as secondary text; an unresolved internal ref keeps
-    // the same alarm wording as displayCriterion's finding-context branch.
+    // formal style "ISO 9001:2015 — Clause 9.2". Client-facing: the internal
+    // tracking reference is never shown here, even when one exists on the
+    // finding — internal refs are reserved for the Audit Trails "Internal
+    // focus items" list and the two non-finding/finding fallback labels below.
+    // An unresolved internal ref (no real clause resolved) keeps the same
+    // alarm wording as displayCriterion's finding-context branch.
     const formalCriterionCell = (finding, standard) => {
         const esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml : (s) => String(s == null ? '' : s);
         if (!finding) return '';
@@ -84,14 +196,12 @@
         const clause = finding.clause || '';
         const isInternal = fc ? fc.isInternal : INTERNAL_REF_PREFIX_RE.test(clause);
         if (isInternal) {
-            return '<span style="color:#b91c1c;font-weight:700;" title="Criterion not assigned — internal tracking reference only">Criterion not assigned — internal ref ' + esc(clause) + '</span>';
+            // Wrap-safe/compact — see the matching note in displayCriterion above.
+            return '<span style="color:#b91c1c;font-weight:700;display:block;white-space:normal;overflow-wrap:break-word;line-height:1.3;" title="Criterion not assigned — internal tracking reference only">Criterion not assigned<br><span style="font-weight:600;font-size:0.85em;">(' + esc(clause) + ')</span></span>';
         }
         const real = fc ? fc.real : clause;
         const stdPrefix = standard ? esc(standard) + ' — ' : '';
-        const internalRef = (clause && INTERNAL_REF_PREFIX_RE.test(clause) && clause !== real)
-            ? ' <span style="font-size:0.85em;color:#94a3b8;">(' + esc(clause) + ')</span>'
-            : '';
-        return '<div>' + stdPrefix + 'Clause ' + esc(real) + internalRef + '</div>';
+        return '<div>' + stdPrefix + 'Clause ' + esc(real) + '</div>';
     };
     window._formalCriterionCell = formalCriterionCell;
 
@@ -123,6 +233,19 @@
         }];
     };
     window._getRevisionRows = getRevisionRows;
+
+    // Whether the report has REAL revision-history entries to show (release item
+    // 6) — true only for report.revisionHistory or report.issueLog rows actually
+    // recorded. getRevisionRows() above synthesizes a single "Rev 0 / Draft"
+    // placeholder row so its own return value is never empty; that placeholder
+    // must not by itself force the Document Revision History block to render —
+    // it stays suppressed until the report has been through its first issue.
+    const hasActualRevisionHistory = (report) => {
+        if (!report) return false;
+        return (Array.isArray(report.revisionHistory) && report.revisionHistory.length > 0)
+            || (Array.isArray(report.issueLog) && report.issueLog.length > 0);
+    };
+    window._hasActualRevisionHistory = hasActualRevisionHistory;
 
     // Deprecated: version no longer bumps on export. Kept as a harmless no-op in case
     // any other module still calls it. Versioning now lives in ai-service.js
@@ -598,7 +721,7 @@
             standard: report.standard || '',
             type: report.auditType || auditPlan?.auditType || 'Initial',
             dates: datesText,
-            ref: 'RPT-' + String(report.id || '').substring(0, 8),
+            ref: reportRef({ auditPlan, report }),
             status: auditStatus,
             statusColor,
             major: majorNC,
@@ -919,7 +1042,7 @@
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Report ID</div>
-                                <div style="font-size:1rem;color:#1e293b;font-weight:600;font-family:monospace;">#${d.report.id.substring(0, 10)}</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;font-family:monospace;">${reportRef(d)}</div>
                             </div>
                             ${d.auditPlan?.team && d.auditPlan.team.length > 1 ? `
                             <div style="grid-column:span 2;">
@@ -938,7 +1061,7 @@
                     <div style="position:absolute;bottom:2rem;left:2.5rem;right:2.5rem;border-top:2px solid #e2e8f0;padding-top:1.5rem;">
                         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;font-size:0.8rem;color:#64748b;">
                             <div>
-                                <strong style="color:#1e293b;">Document ID:</strong> RPT-${d.report.id.substring(0, 8)}
+                                <strong style="color:#1e293b;">Document ID:</strong> ${reportRef(d)}
                             </div>
                             <div style="text-align:center;">
                                 <strong style="color:#1e293b;">Status:</strong> ${d.report.recommendation || 'Draft'}
@@ -947,6 +1070,7 @@
                                 <strong style="color:#1e293b;">Classification:</strong> Confidential
                             </div>
                         </div>
+                        ${window._hasActualRevisionHistory(d.report) ? `
                         <div style="margin-top:1rem;">
                             <div style="font-size:0.75rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">Document Revision History</div>
                             <table style="width:100%;font-size:0.75rem;border-collapse:collapse;">
@@ -955,7 +1079,7 @@
                                     ${window._getRevisionRows(d.report, d.today).map(r => `<tr><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.ver}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.date}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.author}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.desc}</td></tr>`).join('')}
                                 </tbody>
                             </table>
-                        </div>
+                        </div>` : ''}
                         <div style="margin-top:0.75rem;padding:0.75rem;background:#fef3c7;border-radius:6px;text-align:center;font-size:0.75rem;color:#92400e;">
                             <i class="fa-solid fa-lock" style="margin-right:0.25rem;"></i>
                             <strong>Confidential Document</strong> — For authorized use only. This report is the property of ${d.cbName || 'the Certification Body'}.
@@ -1043,7 +1167,7 @@
                             </div>
                             <div>
                                 <h4 style="margin:0 0 0.75rem;font-size:0.9rem;color:#0d9488;"><i class="fa-solid fa-microscope" style="margin-right:0.4rem;"></i>Audit Methodology</h4>
-                                <div id="rp-methodology" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${d.auditPlan?.auditMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel at all levels\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence\n• Verification of corrective actions from previous audits'}</div>
+                                <div id="rp-methodology" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${d.auditPlan?.auditMethodology || methodologyDefaultText(d.auditPlan) || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel at all levels\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence\n• Verification of corrective actions from previous audits'}</div>
                             </div>
                         </div>
                     </div>
@@ -1087,13 +1211,16 @@
                                     <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">per ISO 17021-1</div>
                                 </div>
                                 
-                                <!-- Conformity (analytical indicator, not a maturity rating) -->
+                                <!-- Coverage, not Conformity — Conformity % is reserved for the Analytics
+                                     Dashboard annex (see PDF export), so this exec-summary tile only ever
+                                     shows Coverage, which is fine in a formal context as long as it always
+                                     carries its one-line definition (release item 3 support). -->
                                 <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid #8b5cf6;">
-                                    <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Conformity</div>
+                                    <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Coverage</div>
                                     <div style="font-size:1.8rem;font-weight:800;color:#8b5cf6;">
-                                        ${d.stats.conformityPct === null || d.stats.conformityPct === undefined ? '—' : d.stats.conformityPct + '%'}
+                                        ${d.stats.coveragePct === null || d.stats.coveragePct === undefined ? '—' : d.stats.coveragePct + '%'}
                                     </div>
-                                    <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">(analytical indicator)</div>
+                                    <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">items assessed ÷ applicable items, excl. N/A</div>
                                 </div>
                             </div>
                             
@@ -1687,7 +1814,7 @@
                 <!-- 7: NCRs -->
                 <div class="rp-sec" id="sec-ncrs">
                     <div class="rp-sec-hdr" style="border-left-color:#ea580c;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">8</span>NCR REGISTER (${d.report.ncrs.length})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
-                    <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#dc2626' : '#f59e0b') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:0.85rem;"><div><strong>' + (ncr.type || '') + '</strong> — ' + formalCriterionCell(ncr, d.report.standard || d.auditPlan?.standard || '') + '</div><span style="color:#64748b;font-size:0.8rem;white-space:nowrap;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + (ncr.description || '') + '</div></div>').join('')}</div>
+                    <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#dc2626' : '#f59e0b') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:0.85rem;"><div><strong>' + (ncr.type || '') + '</strong> — ' + formalCriterionCell(ncr, d.report.standard || d.auditPlan?.standard || '') + '</div><span style="color:#64748b;font-size:0.8rem;white-space:nowrap;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + fmtRemark(ncr.description) + '</div></div>').join('')}</div>
                 </div>` : ''}
                 <!-- Corrective Action Requirements -->
                 ${(d.stats.ncCount) > 0 ? `
@@ -2463,7 +2590,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     const clause = displayCriterion(item, false);
                     const title = item.kbMatch ? item.kbMatch.title : '';
                     const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-                    return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:10px 14px;font-weight:700;">' + clause + '</td><td style="padding:10px 14px;">' + (title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req) + '</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">' + (item.comment || '<span style="color:#94a3b8;">No remarks</span>') + renderEvThumbs(item) + '</td></tr>';
+                    return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:10px 14px;font-weight:700;">' + clause + '</td><td style="padding:10px 14px;">' + (title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req) + '</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks</span>') + renderEvThumbs(item) + '</td></tr>';
                 }).join('') || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No conformance evidence recorded</td></tr>';
             }
 
@@ -2583,7 +2710,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
     // were removed from the main report to keep its size bounded. Same report reference/EV ids
     // as the main report's Evidence Index table, so the two documents cross-reference cleanly.
     // ============================================
-    window.exportEvidencePack = function (reportId) {
+    window.exportEvidencePack = function (_reportId) {
         const d = window._reportPreviewData;
         if (!d) { window.showNotification && window.showNotification('Open the report preview first.', 'warning'); return; }
         const evIdx = (d.report._evidenceIndexBuilt || []);
@@ -2597,7 +2724,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const dt = new Date(v);
             return isNaN(dt.getTime()) ? 'Not recorded' : dt.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         };
-        const planRef = d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : (d.report.id || reportId || '');
+        // "Report Ref" on the Evidence Pack must match the main report's canonical
+        // ref, not the audit plan's — this was previously pulling getPlanRef
+        // directly (a different value from the cover/footer's Report ID).
+        const planRef = reportRef(d);
         const cbName = (d.cbSettings && d.cbSettings.cbName) || '';
         const standard = d.report.standard || (d.auditPlan && d.auditPlan.standard) || 'ISO Standard';
 
@@ -2606,7 +2736,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div class="ep-card-hdr"><span class="ep-id">' + esc(ev.evId) + '</span><span class="ep-ref">Report Ref: ' + esc(planRef) + '</span></div>'
                 + '<img src="' + ev.image + '" class="ep-img" alt="Evidence ' + esc(ev.evId) + '">'
                 + '<table class="ep-meta">'
-                +   '<tr><td>Description</td><td>' + esc((ev.comment || '').toString().replace(/<[^>]*>/g, '').trim() || 'Not recorded') + '</td></tr>'
+                +   '<tr><td>Description</td><td>' + esc(cleanEvidenceText(ev.comment) || 'Not recorded') + '</td></tr>'
                 +   '<tr><td>Clause / Requirement</td><td>' + esc(ev.clause || 'Not recorded') + '</td></tr>'
                 +   '<tr><td>Related Finding</td><td>' + esc(ev.findingRef || 'Not recorded') + '</td></tr>'
                 +   '<tr><td>Department / Site</td><td>' + esc(ev.dept || 'Not recorded') + '</td></tr>'
@@ -2872,7 +3002,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const fsEntry = d.report.findingStatus && d.report.findingStatus[fsKey2];
             const fsLabelMap = { open: 'Open', corrected_during_audit: 'Corrected During Audit', verified: 'Verified', pending_verification: 'Pending Verification', closed: 'Closed', escalated: 'Escalated' };
             const fsBadge = fsEntry && fsEntry.status ? '<div style="margin-top:6px;"><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:0.7rem;font-weight:700;background:#eef2ff;color:#3730a3;">Status: ' + (fsLabelMap[fsEntry.status] || fsEntry.status) + '</span></div>' : '';
-            return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + sevBg + ';color:' + sevFg + ';">' + sev + '</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + fsBadge + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + sevBg + ';color:' + sevFg + ';">' + sev + '</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + fsBadge + '</td></tr>';
         }).join('');
 
         // OBS rows for PDF (Observations only)
@@ -2880,7 +3010,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return '<tr style="background:' + (idx % 2 ? '#f5f3ff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f5f3ff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
         // OFI rows for PDF (Opportunities for Improvement only)
@@ -2888,7 +3018,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return '<tr style="background:' + (idx % 2 ? '#f0fbff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f0fbff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
         // Conformance rows for PDF (items with comments or evidence)
@@ -2896,7 +3026,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const clause = displayCriterion(item, false);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
         // Build clause/area performance analysis
@@ -2967,7 +3097,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // Real clauses and internal FOCUS/SURV/ORG/DOC tracking refs are tracked
         // and displayed separately — mixing them in one list misrepresents the
         // internal refs as if they were standard clauses.
-        const auditTrailsRowsHtml = (function () {
+        const auditTrailsBodyRows = (function () {
             const groups = {};
             const order = [];
             (d.hydratedProgress || []).forEach(function (item) {
@@ -3020,14 +3150,17 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 if (clausesSorted.length) clausesTxt += '<div>Clauses: ' + window.UTILS.escapeHtml(clausesSorted.join(', ')) + '</div>';
                 if (internalTxt) clausesTxt += '<div style="color:#64748b;font-size:0.85em;' + (clausesSorted.length ? 'margin-top:2px;' : '') + '">Internal focus items: ' + window.UTILS.escapeHtml(internalTxt) + '</div>';
                 if (!clausesTxt) clausesTxt = '—';
-                return '<tr style="background:' + (idx % 2 ? '#fafbfc' : 'white') + ';">'
-                    + '<td style="padding:11px 14px;font-weight:700;">' + window.UTILS.escapeHtml(dept) + '</td>'
-                    + '<td style="padding:11px 14px;color:#334155;">' + personnelTxt + '</td>'
-                    + '<td style="padding:11px 14px;color:#334155;">' + clausesTxt + '</td>'
-                    + '<td style="padding:11px 14px;text-align:center;">' + g.count + '</td>'
-                    + '<td style="padding:11px 14px;text-align:center;"><span style="display:inline-block;white-space:nowrap;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;' + worstStyle[g.worst] + '">' + worstLabel[g.worst] + '</span></td>'
-                    + '</tr>';
-            }).join('');
+                return {
+                    rowStyle: 'background:' + (idx % 2 ? '#fafbfc' : 'white') + ';',
+                    cells: [
+                        window.UTILS.escapeHtml(dept),
+                        personnelTxt,
+                        clausesTxt,
+                        String(g.count),
+                        '<span style="display:inline-block;white-space:nowrap;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;' + worstStyle[g.worst] + '">' + worstLabel[g.worst] + '</span>'
+                    ]
+                };
+            });
         })();
 
         // Audit trail as a chronological timeline — the sequence of areas covered,
@@ -3141,7 +3274,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             { key: 'summary',      name: 'AUDIT SUMMARY &amp; OPENING MEETING', desc: 'Audit narrative, opening meeting record and positive observations', color: '#059669', present: en['summary'] !== false },
             { key: 'charts',       name: 'ANALYTICS DASHBOARD',                desc: 'Compliance charts, KPIs and clause-based breakdown',    color: '#7c3aed', present: en['charts'] !== false },
             { key: 'conformance',  name: 'CONFORMANCE VERIFICATION',           desc: 'Verified conforming items with supporting evidence',    color: '#10b981', present: en['conformance'] !== false && !!conformRowsHtml },
-            { key: 'audit-trails', name: 'AUDIT TRAILS',                       desc: 'Areas sampled, personnel interviewed and clauses covered', color: '#0ea5e9', present: en['audit-trails'] !== false && !!auditTrailsRowsHtml },
+            { key: 'audit-trails', name: 'AUDIT TRAILS',                       desc: 'Areas sampled, personnel interviewed and clauses covered', color: '#0ea5e9', present: en['audit-trails'] !== false && auditTrailsBodyRows.length > 0 },
             { key: 'prev-findings',name: 'PREVIOUS FINDINGS STATUS',           desc: 'Follow-up status of findings from previous audit',      color: '#6366f1', present: en['prev-findings'] !== false && isSurveillanceOrRecert },
             { key: 'obs',          name: 'OBSERVATIONS',                       desc: 'Audit observations noted during assessment',            color: '#7c3aed', present: !!obsOnlyRowsHtml },
             { key: 'ofi',          name: 'OPPORTUNITIES FOR IMPROVEMENT',      desc: 'Opportunities for improvement identified',              color: '#f59e0b', present: !!(ofiOnlyRowsHtml || editedOfi) },
@@ -3237,11 +3370,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<table style="width:100%;border-collapse:collapse;">'
                 + row('Audit Type', esc(plan.auditType || plan.type || report.auditType || 'Initial'))
                 + row('Standard', esc(report.standard || plan.standard || '—'))
-                + row('Scope', esc(client.certificationScope || '—'))
+                + row('Scope', esc(report.scope || plan.scope || client.certificationScope || '—'))
                 + row('Sites / Locations', esc(sites))
                 + row('Audit Dates', esc((report.date || '—') + (report.endDate ? ' — ' + report.endDate : '')))
                 + row('Audit Team', esc(team))
                 + row('Major NC / Minor NC / Observations / OFI', (stats.majorNC || 0) + ' / ' + (stats.minorNC || 0) + ' / ' + (stats.observationCount || 0) + ' / ' + (stats.ofiCount || 0))
+                + (stats.coveragePct != null ? row('Audit Coverage', esc(stats.coveragePct + '%'
+                    + (rs.coverageInputs ? ' (' + rs.coverageInputs.assessed + ' of ' + rs.coverageInputs.applicable + ' applicable items assessed; N/A excluded)' : ''))) : '')
                 + row('Previous NC Status', prevStatus)
                 + row('Recommendation', esc(recommendation))
                 + '</table></div>';
@@ -3485,7 +3620,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // Everything printable lives in one table so the header/footer rows repeat
             // per page and reserve their own space in flow (see .rpt-running above).
             + '<table class="rpt-running"><thead><tr><td>'
-            + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">Audit360 &mdash; ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '</div></div>'
+            + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">Audit360 &mdash; ' + reportRef(d) + '</div></div>'
             + '</td></tr></thead><tfoot><tr><td>'
             + '<div class="rpt-ftr"><div class="rpt-ftr-left">Confidential &mdash; ' + (d.report.reportStatus === 'draft' ? 'Draft' : 'Final') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">Generated by Audit360</div></div>'
             + '</td></tr></tfoot><tbody><tr><td>'
@@ -3516,13 +3651,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (d.client.industry ? '<div style="font-size:1rem;color:#64748b;margin-top:6px;">' + d.client.industry + '</div>' : '') + '</div>'
             + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:480px;text-align:left;margin-top:50px;">'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Report Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">#' + d.report.id.substring(0, 8) + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + reportRef(d) + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || '—') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
             + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
             + '</div>'
             + '<div style="position:absolute;bottom:50px;left:50px;right:50px;border-top:2px solid #cbd5e1;padding-top:16px;">'
-            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;"><span><strong>Doc ID:</strong> RPT-' + d.report.id.substring(0, 8) + '</span><span><strong>Status:</strong> ' + ((d.report.reportStatus === 'final') ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
+            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;"><span><strong>Doc ID:</strong> ' + reportRef(d) + '</span><span><strong>Status:</strong> ' + ((d.report.reportStatus === 'final') ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
             + '</div>'
             + '</div>'
             // TABLE OF CONTENTS — formal report first, then each enabled annex under
@@ -3547,7 +3682,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const annexHeading = function (label, title) {
                     return '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;break-inside:avoid;">Annex ' + label + ' — ' + title + '</div>';
                 };
-                const revisionHistoryBlock = '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #e2e8f0;break-inside:avoid;page-break-inside:avoid;">'
+                // Only renders when the report has real revision entries (release item 6) —
+                // getRevisionRows() synthesizes a placeholder "Rev 0 / Draft" row so its
+                // return is never empty, but that placeholder alone must not force this
+                // block onto the page before the report's first issue.
+                const revisionHistoryBlock = !hasActualRevisionHistory(d.report) ? '' : '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #e2e8f0;break-inside:avoid;page-break-inside:avoid;">'
                     + '<div style="font-size:0.66rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Document Revision History</div>'
                     + '<table style="width:100%;font-size:0.66rem;border-collapse:collapse;"><thead><tr style="background:#f1f5f9;"><th style="padding:4px 8px;text-align:left;">Ver</th><th style="padding:4px 8px;text-align:left;">Date</th><th style="padding:4px 8px;text-align:left;">Author</th><th style="padding:4px 8px;text-align:left;">Description</th></tr></thead><tbody>'
                     + revisionRows.map(r => '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.ver + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.date + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.author + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.desc + '</td></tr>').join('')
@@ -3616,7 +3755,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">'
                 + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Objectives</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system') + '</div></div>'
                 + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#1d4ed8;">Audit Criteria</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedCriteria || '• ' + standard + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records') + '</div></div>'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedMethodology || methodologyDefaultText(d.auditPlan) || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence') + '</div></div>'
                 + '</div></div>' : '')
             // SECTION: EXECUTIVE SUMMARY
             + (secMap['summary'] ? '<div id="sec-summary" class="sh" style="border-left-color:#059669;">' + sBadge('summary') + 'AUDIT SUMMARY &amp; OPENING MEETING</div><div class="sb">'
@@ -3635,7 +3774,20 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: AUDIT TRAILS
             + (secMap['audit-trails'] ? '<div id="sec-audit-trails" class="sh" style="border-left-color:#0ea5e9;">' + sBadge('audit-trails') + 'AUDIT TRAILS</div><div class="sb">'
                 + (auditTrailTimelineHtml ? '<div style="margin-bottom:22px;">' + auditTrailTimelineHtml + '</div>' : '')
-                + '<table class="f-tbl"><thead><tr><th style="width:18%;">Area / Process</th><th style="width:27%;">Personnel Interviewed</th><th style="width:21%;">Clauses Covered</th><th style="width:12%;text-align:center;">Items Sampled</th><th style="width:22%;text-align:center;">Result</th></tr></thead><tbody>' + auditTrailsRowsHtml + '</tbody></table></div>' : '')
+                + (function () {
+                    // Personnel Interviewed / Clauses Covered are the columns most likely to be
+                    // "Not recorded"/"—" across every area — buildAdaptiveTable drops whichever
+                    // is empty for all rows (Area, Items Sampled and Result always stay).
+                    const atTable = buildAdaptiveTable([
+                        { label: 'Area / Process', tdStyle: 'padding:11px 14px;font-weight:700;' },
+                        { label: 'Personnel Interviewed', tdStyle: 'padding:11px 14px;color:#334155;' },
+                        { label: 'Clauses Covered', tdStyle: 'padding:11px 14px;color:#334155;' },
+                        { label: 'Items Sampled', thStyle: 'text-align:center;', tdStyle: 'padding:11px 14px;text-align:center;' },
+                        { label: 'Result', thStyle: 'text-align:center;', tdStyle: 'padding:11px 14px;text-align:center;' }
+                    ], auditTrailsBodyRows);
+                    return '<table class="f-tbl"><thead>' + atTable.theadHtml + '</thead><tbody>' + atTable.bodyHtml + '</tbody></table>';
+                })()
+                + '</div>' : '')
             // SECTION: PREVIOUS FINDINGS STATUS
             + (secMap['prev-findings'] ? '<div id="sec-prev-findings" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('prev-findings') + 'PREVIOUS FINDINGS STATUS</div><div class="sb">'
                 + (prevFindingsRowsHtml
@@ -3770,23 +3922,39 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     return isNaN(dt.getTime()) ? 'Not recorded' : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                 };
                 const esc = window.UTILS && window.UTILS.escapeHtml ? window.UTILS.escapeHtml : function (s) { return String(s == null ? '' : s); };
-                const rows = evIdx.map(function (ev, idx) {
-                    const desc = (ev.comment || '').toString().replace(/<[^>]*>/g, '').trim();
-                    const descExcerpt = desc ? (desc.slice(0, 90) + (desc.length > 90 ? '…' : '')) : 'Not recorded';
+                // Department / Finding Ref / Captured are frequently blank on evidence
+                // captured outside a checklist item — buildAdaptiveTable drops whichever
+                // of those (never EV ID/Description/Clause) is empty on every exhibit.
+                const evTdStyle = 'padding:8px 12px;';
+                const evHeaders = [
+                    { label: 'EV ID', tdStyle: evTdStyle + 'font-weight:700;white-space:nowrap;' },
+                    { label: 'Description', tdStyle: evTdStyle },
+                    { label: 'Clause', tdStyle: evTdStyle },
+                    { label: 'Department', tdStyle: evTdStyle },
+                    { label: 'Finding Ref', tdStyle: evTdStyle },
+                    { label: 'Captured', tdStyle: evTdStyle }
+                ];
+                const evBodyRows = evIdx.map(function (ev, idx) {
+                    const desc = cleanEvidenceText(ev.comment);
+                    const descExcerpt = desc ? (desc.length > 90 ? desc.slice(0, 90).trim() + '…' : desc) : 'Not recorded';
                     // Evidence Index is a traceability listing, not a findings table —
                     // an unresolved internal ref here is a neutral fact, not an alarm.
                     const clauseCell = ev.clause ? displayCriterion(ev, false) : 'Not recorded';
-                    return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';">'
-                        + '<td style="padding:8px 12px;font-weight:700;white-space:nowrap;">' + esc(ev.evId) + '</td>'
-                        + '<td style="padding:8px 12px;">' + esc(descExcerpt) + '</td>'
-                        + '<td style="padding:8px 12px;">' + clauseCell + '</td>'
-                        + '<td style="padding:8px 12px;">' + esc(ev.dept || 'Not recorded') + '</td>'
-                        + '<td style="padding:8px 12px;">' + esc(ev.findingRef || 'Not recorded') + '</td>'
-                        + '<td style="padding:8px 12px;">' + esc(fmtWhen(ev.capturedAt)) + (ev.location ? ' · ' + esc(String(ev.location).slice(0, 30)) : '') + '</td>'
-                        + '</tr>';
-                }).join('');
+                    return {
+                        rowStyle: 'background:' + (idx % 2 ? '#f8fafc' : 'white') + ';',
+                        cells: [
+                            esc(ev.evId),
+                            esc(descExcerpt),
+                            clauseCell,
+                            esc(ev.dept || 'Not recorded'),
+                            esc(ev.findingRef || 'Not recorded'),
+                            esc(fmtWhen(ev.capturedAt)) + (ev.location ? ' · ' + esc(String(ev.location).slice(0, 30)) : '')
+                        ]
+                    };
+                });
+                const evTable = buildAdaptiveTable(evHeaders, evBodyRows);
                 return '<div id="sec-evidence" class="sh" style="border-left-color:#c2410c;">' + sBadge('evidence') + (secMap['evidence'] ? secMap['evidence'].name : 'EVIDENCE INDEX') + '</div><div class="sb">'
-                    + '<table class="f-tbl"><thead><tr><th>EV ID</th><th>Description</th><th>Clause</th><th>Department</th><th>Finding Ref</th><th>Captured</th></tr></thead><tbody>' + rows + '</tbody></table>'
+                    + '<table class="f-tbl"><thead>' + evTable.theadHtml + '</thead><tbody>' + evTable.bodyHtml + '</tbody></table>'
                     + '<div style="margin-top:14px;font-size:0.82rem;color:#64748b;text-align:center;font-style:italic;">' + evIdx.length + ' evidence exhibit(s) indexed. Full evidence images are issued separately in the Evidence Pack (same report reference).</div>'
                     + '</div>';
             })()
@@ -3832,7 +4000,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     + '</table>'
                     + (d.qrCodeUrl ? '<img src="' + d.qrCodeUrl + '" alt="Verification QR" style="width:84px;height:84px;margin-bottom:12px;">' + '<div style="font-size:0.68rem;color:#94a3b8;margin-bottom:26px;">Scan to verify this report</div>' : '')
                     + '<div style="font-size:0.85rem;color:#475569;max-width:440px;line-height:1.6;">Thank you for the professional cooperation extended to the audit team. This report has been prepared in accordance with ' + standard + ' requirements; distribution is limited to authorized recipients listed herein.</div>'
-                    + '<div style="margin-top:26px;font-size:0.72rem;color:#94a3b8;">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + ' · Issue Date: ' + d.today + '</div>'
+                    + '<div style="margin-top:26px;font-size:0.72rem;color:#94a3b8;">Doc Ref: ' + reportRef(d) + ' · Issue Date: ' + d.today + '</div>'
                     + '</div>';
             })();
 

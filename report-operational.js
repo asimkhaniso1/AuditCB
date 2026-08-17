@@ -115,6 +115,33 @@
         return t === 'minor' || t === 'observation' || t === 'ofi';
     }
 
+    // ── Empty-column suppression ───────────────────────────────────────────
+    // When every row of a rendered column is a "nothing recorded" placeholder
+    // ('—', '', 'Not recorded', 'N/A'), the column carries no information and
+    // is dropped entirely (header + every cell) rather than printed as a wall
+    // of dashes. Styling is otherwise untouched — this only removes whole
+    // <th>/<td> pairs from tables built via column definitions.
+    var EMPTY_CELL_VALUES = ['—', '', 'Not recorded', 'N/A'];
+    function isEmptyCellHtml(html) {
+        var text = String(html == null ? '' : html).replace(/<[^>]*>/g, '').trim();
+        return EMPTY_CELL_VALUES.indexOf(text) !== -1;
+    }
+    // cols: [{ header: '<th>...</th>', cell: fn(row) -> '<td>...</td>' }]
+    // rows: data rows passed to each cell fn. Returns the filtered <thead>
+    // cells and <tbody> rows as ready-to-splice HTML strings.
+    function buildSuppressedTable(cols, rows) {
+        var cellsByRow = rows.map(function (r) { return cols.map(function (c) { return c.cell(r); }); });
+        var keep = cols.map(function (_, i) {
+            if (!rows.length) return true; // nothing to judge emptiness against — keep all columns
+            return cellsByRow.some(function (rowCells) { return !isEmptyCellHtml(rowCells[i]); });
+        });
+        var theadHtml = cols.filter(function (_, i) { return keep[i]; }).map(function (c) { return c.header; }).join('');
+        var rowsHtml = cellsByRow.map(function (rowCells) {
+            return '<tr>' + rowCells.filter(function (_, i) { return keep[i]; }).join('') + '</tr>';
+        }).join('');
+        return { theadHtml: theadHtml, rowsHtml: rowsHtml, colCount: keep.filter(Boolean).length };
+    }
+
     // ── SECTION 1: AUDIT COVERAGE MATRIX ──────────────────────────────────────
     function buildCoverageSection(d) {
         var items = Array.isArray(d.hydratedProgress) ? d.hydratedProgress : [];
@@ -155,51 +182,52 @@
         });
         if (!deptKeys.length) return '';
 
-        var rows = deptKeys.map(function (key) {
-            var r = byDept[key];
-            var resultLabel = r.resultOverride || (r.audited === 0 ? 'Not Audited' : (r.majors > 0 ? 'Major NC Raised' : (r.minorObs > 0 ? 'Minor NC / Obs' : 'Conforming')));
-            var sev = r.audited === 0 ? 'neutral' : (r.majors > 0 ? 'bad' : (r.minorObs > 0 ? 'warn' : 'good'));
-            var sevSym = sev === 'good' ? '✓ ' : sev === 'warn' ? '! ' : sev === 'bad' ? '✕ ' : '';
-            return '<tr>'
-                + '<td style="font-weight:600;">' + esc(r.process) + '</td>'
-                + '<td style="text-align:center;">' + r.applicable + '/' + r.total + '</td>'
-                + '<td style="text-align:center;">' + r.audited + '</td>'
-                + '<td style="text-align:center;">' + r.sampled + '</td>'
-                + '<td style="text-align:center;">' + r.evidenceRefs + '</td>'
-                + '<td style="text-align:center;"><span class="b4-badge b4-badge--' + sev + '">' + sevSym + esc(resultLabel) + '</span></td>'
-                + '</tr>';
-        }).join('');
+        var rowData = deptKeys.map(function (key) { return byDept[key]; });
+        var cols = [
+            { header: '<th style="width:26%;">Process / Department</th>', cell: function (r) { return '<td style="font-weight:600;">' + esc(r.process) + '</td>'; } },
+            { header: '<th style="width:16%;text-align:center;">Items Applicable</th>', cell: function (r) { return '<td style="text-align:center;">' + r.applicable + '/' + r.total + '</td>'; } },
+            { header: '<th style="width:14%;text-align:center;">Audited</th>', cell: function (r) { return '<td style="text-align:center;">' + r.audited + '</td>'; } },
+            { header: '<th style="width:14%;text-align:center;">Sampled</th>', cell: function (r) { return '<td style="text-align:center;">' + r.sampled + '</td>'; } },
+            { header: '<th style="width:12%;text-align:center;">Evidence</th>', cell: function (r) { return '<td style="text-align:center;">' + r.evidenceRefs + '</td>'; } },
+            {
+                header: '<th style="width:18%;text-align:center;">Result</th>',
+                cell: function (r) {
+                    var resultLabel = r.resultOverride || (r.audited === 0 ? 'Not Audited' : (r.majors > 0 ? 'Major NC Raised' : (r.minorObs > 0 ? 'Minor NC / Obs' : 'Conforming')));
+                    var sev = r.audited === 0 ? 'neutral' : (r.majors > 0 ? 'bad' : (r.minorObs > 0 ? 'warn' : 'good'));
+                    var sevSym = sev === 'good' ? '✓ ' : sev === 'warn' ? '! ' : sev === 'bad' ? '✕ ' : '';
+                    return '<td style="text-align:center;"><span class="b4-badge b4-badge--' + sev + '">' + sevSym + esc(resultLabel) + '</span></td>';
+                }
+            }
+        ];
+        var table = buildSuppressedTable(cols, rowData);
 
-        return '<div><table class="b4-tbl"><thead><tr>'
-            + '<th style="width:26%;">Process / Department</th>'
-            + '<th style="width:16%;text-align:center;">Items Applicable</th>'
-            + '<th style="width:14%;text-align:center;">Audited</th>'
-            + '<th style="width:14%;text-align:center;">Sampled</th>'
-            + '<th style="width:12%;text-align:center;">Evidence</th>'
-            + '<th style="width:18%;text-align:center;">Result</th>'
-            + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        return '<div><table class="b4-tbl"><thead><tr>' + table.theadHtml + '</tr></thead><tbody>' + table.rowsHtml + '</tbody></table></div>'
             + '<div class="b4-caption" style="margin-top:var(--b4-s2, 8px);">Coverage derived from checklist activity recorded during the audit'
             + (stored.length ? '; merged with recorded coverage entries where available.' : '.') + '</div>';
     }
 
     // ── SECTION 2: AUDIT ATTENDANCE REGISTER ──────────────────────────────────
+    var ATTENDEE_COLS = [
+        { header: '<th>Name</th>', cell: function (a) { return '<td>' + esc(a.name) + '</td>'; } },
+        { header: '<th>Role</th>', cell: function (a) { return '<td>' + esc(a.role || '—') + '</td>'; } },
+        { header: '<th>Organization</th>', cell: function (a) { return '<td>' + esc(a.organization || '—') + '</td>'; } }
+    ];
     function meetingBlock(label, meeting, iconName) {
         if (!meeting) return { html: '', attendees: [] };
         var attendees = coerceAttendees(meeting.attendees);
         var notes = meeting.notes || meeting.summary || '';
         if (!meeting.date && attendees.length === 0 && !notes) return { html: '', attendees: [] };
 
+        var table = buildSuppressedTable(ATTENDEE_COLS, attendees);
         var attRows = attendees.length
-            ? attendees.map(function (a) {
-                return '<tr><td>' + esc(a.name) + '</td><td>' + esc(a.role || '—') + '</td><td>' + esc(a.organization || '—') + '</td></tr>';
-            }).join('')
-            : '<tr><td colspan="3" style="text-align:center;color:var(--b4-muted,#64748b);">No attendees recorded</td></tr>';
+            ? table.rowsHtml
+            : '<tr><td colspan="' + ATTENDEE_COLS.length + '" style="text-align:center;color:var(--b4-muted,#64748b);">No attendees recorded</td></tr>';
 
         var html = '<div class="b4-card" style="break-inside:avoid;">'
             + '<div class="b4-card-heading">' + iconSafe(iconName, { size: 14 }) + ' ' + esc(label) + '</div>'
             + '<div class="b4-caption" style="margin-bottom:var(--b4-s2, 8px);">Date: <strong>' + esc(fmtDate(meeting.date)) + '</strong>'
             + (meeting.time ? ' &middot; Time: <strong>' + esc(meeting.time) + '</strong>' : '') + '</div>'
-            + '<table class="b4-tbl b4-tbl--compact"><thead><tr><th>Name</th><th>Role</th><th>Organization</th></tr></thead><tbody>' + attRows + '</tbody></table>'
+            + '<table class="b4-tbl b4-tbl--compact"><thead><tr>' + table.theadHtml + '</tr></thead><tbody>' + attRows + '</tbody></table>'
             + (notes ? '<div class="b4-callout b4-callout--info" style="margin-top:var(--b4-s2, 8px);">' + esc(notes) + '</div>' : '')
             + '</div>';
         return { html: html, attendees: attendees };
@@ -216,14 +244,15 @@
             var byName = {};
             opening.attendees.forEach(function (a) { byName[a.name] = byName[a.name] || { name: a.name, opening: false, closing: false }; byName[a.name].opening = true; });
             closing.attendees.forEach(function (a) { byName[a.name] = byName[a.name] || { name: a.name, opening: false, closing: false }; byName[a.name].closing = true; });
-            var matrixRows = Object.keys(byName).sort().map(function (n) {
-                var r = byName[n];
-                return '<tr><td>' + esc(n) + '</td>'
-                    + '<td style="text-align:center;">' + (r.opening ? '<span class="b4-badge b4-badge--good">✓ Present</span>' : '<span class="b4-caption">—</span>') + '</td>'
-                    + '<td style="text-align:center;">' + (r.closing ? '<span class="b4-badge b4-badge--good">✓ Present</span>' : '<span class="b4-caption">—</span>') + '</td></tr>';
-            }).join('');
+            var matrixCols = [
+                { header: '<th>Name</th>', cell: function (r) { return '<td>' + esc(r.name) + '</td>'; } },
+                { header: '<th style="text-align:center;">Opening Meeting</th>', cell: function (r) { return '<td style="text-align:center;">' + (r.opening ? '<span class="b4-badge b4-badge--good">✓ Present</span>' : '<span class="b4-caption">—</span>') + '</td>'; } },
+                { header: '<th style="text-align:center;">Closing Meeting</th>', cell: function (r) { return '<td style="text-align:center;">' + (r.closing ? '<span class="b4-badge b4-badge--good">✓ Present</span>' : '<span class="b4-caption">—</span>') + '</td>'; } }
+            ];
+            var matrixRowData = Object.keys(byName).sort().map(function (n) { return byName[n]; });
+            var matrixTable = buildSuppressedTable(matrixCols, matrixRowData);
             out += '<div class="b4-mt-5" style="margin-top:var(--b4-s5, 20px);"><div class="b4-card-heading">' + iconSafe('check', { size: 14 }) + ' Combined Presence Matrix</div>'
-                + '<table class="b4-tbl b4-tbl--compact"><thead><tr><th>Name</th><th style="text-align:center;">Opening Meeting</th><th style="text-align:center;">Closing Meeting</th></tr></thead><tbody>' + matrixRows + '</tbody></table></div>';
+                + '<table class="b4-tbl b4-tbl--compact"><thead><tr>' + matrixTable.theadHtml + '</tr></thead><tbody>' + matrixTable.rowsHtml + '</tbody></table></div>';
         }
         return out;
     }

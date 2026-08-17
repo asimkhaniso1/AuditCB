@@ -158,28 +158,36 @@
     // ------------------------------------------------------------------
     const CRITERION_INTERNAL_RX = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
 
-    function formatCriterionFallback(finding) {
+    // Default label is the real clause ONLY (e.g. "9.2") — no "(FOCUS.2)"
+    // parenthetical. The internal working reference (when one exists) is
+    // exposed separately as `.internalRef` and only folded into the label
+    // when the caller explicitly asks via opts:{showInternal:true}. Matches
+    // the window.ReportStats.formatCriterion(finding, opts) contract.
+    function formatCriterionFallback(finding, opts) {
         const f = finding || {};
         const rawClause = (f.clause != null ? f.clause : (f.kbMatch && f.kbMatch.clause)) || '';
         const criterionRef = f.criterionRef || '';
         const isInternalPrefix = CRITERION_INTERNAL_RX.test(String(rawClause || ''));
+        const internalRef = isInternalPrefix ? rawClause : null;
+        const showInternal = !!(opts && opts.showInternal);
         if (criterionRef) {
-            return { label: isInternalPrefix ? `${criterionRef} (${rawClause})` : String(criterionRef), isInternal: false };
+            const label = (showInternal && internalRef) ? `${criterionRef} (${internalRef})` : String(criterionRef);
+            return { label, isInternal: false, internalRef };
         }
         if (isInternalPrefix) {
-            return { label: `internal audit reference ${rawClause} (criterion to be assigned)`, isInternal: true };
+            return { label: `internal audit reference ${rawClause} (criterion to be assigned)`, isInternal: true, internalRef };
         }
-        return { label: rawClause || 'the applicable clause', isInternal: false };
+        return { label: rawClause || 'the applicable clause', isInternal: false, internalRef: null };
     }
 
-    function formatCriterion(finding) {
+    function formatCriterion(finding, opts) {
         try {
             if (window.ReportStats && typeof window.ReportStats.formatCriterion === 'function') {
-                const r = window.ReportStats.formatCriterion(finding);
+                const r = window.ReportStats.formatCriterion(finding, opts);
                 if (r && r.label) return r;
             }
         } catch (_e) { /* fall through to local fallback */ }
-        return formatCriterionFallback(finding);
+        return formatCriterionFallback(finding, opts);
     }
 
     // Full narrative-ready phrase for a finding's clause/criterion, safe to
@@ -230,7 +238,7 @@ Voice rules (strict):
 - Report counts and evidence-based statements only. Never characterize the management system's overall "health", "soundness", "resilience", or "maturity" in subjective terms, and never render a one-line verdict.
 - Banned words — do not use any of these anywhere, in any form, alone or combined with another word: "soundness", "fundamental", "health", "resilience", "verdict", "certifiable". Also banned phrases: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of", "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "in conclusion", "moving forward". Banned: any sentence that could be pasted into a different company's report unchanged.
 - Use plain audit language: requirement -> objective evidence -> evaluation -> finding. State only what the audit evidence supports.
-- EVERY paragraph-level field (businessImpact, risks, forwardOutlook) MUST contain at least one concrete quantified reference — a count, a clause, or a named department — pulled from the data below. A sentence with no number, clause, or department name is not acceptable.
+- EVERY paragraph-level field (businessImpact, risks, forwardOutlook) MUST contain at least one concrete quantified reference — a clause or a named department, pulled from the data below. A sentence with no clause or department name is not acceptable. Do NOT restate the total counts of major/minor non-conformities, conformities, observations, or opportunities for improvement in these three fields — those totals already appear once in the Overall Conclusion elsewhere in the report; cite the specific clause(s)/department(s) instead.
 - Never write the word "Clause" immediately before an internal audit working reference (anything starting with FOCUS, SURV, ORG, or DOC) — those are not final ISO clause citations. Reuse clause/reference text exactly as it already appears in the Non-Conformity Detail list below; never re-derive or reformat a clause reference yourself.
 - Never state or estimate financial figures, revenue, penalties, customer loss, cost, contract exposure, or reputational damage. Consequences may reference ONLY certification-process outcomes — e.g. closure timelines, certification decision status, or the scope of verification at the next audit — never business, commercial, or financial outcomes.
 - Never claim a finding is "recurring", "repeated", "systemic", or a "pattern" — recurrence can only be stated if the data below explicitly identifies that the same clause failed in a prior audit. If no prior-audit data is provided, describe multiple related findings only by count or as a concentration within this audit, never as a trend across audits.
@@ -261,9 +269,9 @@ Write a JSON object with these fields (plain text, NO markdown symbols like ** o
   "strengths": ["up to 3 short bullet strings, each a genuinely distinct key strength, cite departments/clauses — never a department or clause that also appears in the Non-Conformity Detail list above"],
   "findings": ["up to 3 short bullet strings, each a genuinely distinct key finding, cite departments/clauses — do not repeat the same theme worded differently"],
   "concerns": ["0 to 3 short bullet strings, each a genuinely distinct concern for management beyond what 'findings' already covers, framed only in certification-process terms (closure timelines, verification scope) — never financial or commercial terms; return an empty array if there is nothing genuinely distinct to add"],
-  "businessImpact": "1-2 sentence statement on the certification-process implications of the findings with at least one number/clause/department (e.g. effect on closure timeline or scope of the next audit) — never a financial, revenue, or commercial figure",
-  "risks": "1-2 sentence forward-looking risk statement with at least one number/clause/department — certification-process consequences only (e.g. what could delay closure or affect the scope of verification at the next audit); never revenue, cost, penalties, or customer/business impact",
-  "forwardOutlook": "1-2 sentence statement on forward readiness/confidence heading into the next audit stage, citing at least one number/clause/department"
+  "businessImpact": "1-2 sentence statement on the certification-process implications of the findings, grounded in a specific clause or department rather than repeating the major/minor/conforming totals (those totals already appear in the Overall Conclusion above) — never a financial, revenue, or commercial figure",
+  "risks": "1-2 sentence forward-looking risk statement grounded in a specific clause or department — certification-process consequences only (e.g. what could delay closure or affect the scope of verification at the next audit); never revenue, cost, penalties, or customer/business impact; do not repeat the finding totals already stated elsewhere",
+  "forwardOutlook": "1-2 sentence statement on forward readiness/confidence heading into the next audit stage, grounded in scope/method/context (which clauses or departments the next audit will need to verify) rather than repeating the major/minor finding totals already shown in the Overall Conclusion above"
 }
 Return ONLY the raw JSON object, no markdown fences.`;
     }
@@ -285,58 +293,57 @@ Return ONLY the raw JSON object, no markdown fences.`;
         if (!findings.length) findings.push('No significant departmental weaknesses identified in this audit cycle.');
 
         // Genuinely distinct concerns only — no filler placeholder pushed here.
-        // An empty array is the honest answer when there is nothing beyond
-        // what "findings" already covers; the render layer hides the card.
+        // Raw major/minor NC counts are NOT genuinely distinct: they already
+        // appear in the Overall Conclusion, Key Findings, and Corrective
+        // Action Requirements rows above, so restating them here would be the
+        // exact repetition this list exists to avoid. The one signal this
+        // deterministic path can honestly add beyond those counts is an
+        // evidence-coverage gap, which is independent information. An empty
+        // array is the honest answer otherwise; the render layer hides the card.
+        const intel = computeEvidenceIntel(d);
         const concerns = [];
-        if (stats.majorNC > 0) concerns.push(`${stats.majorNC} major non-conformity(ies) present a certification risk requiring immediate corrective action.`);
-        if (stats.minorNC > 2) concerns.push(`Multiple minor nonconformities (${stats.minorNC}) were identified across processes; collectively they warrant a review of the underlying controls.`);
+        if (intel.missingEvidence.length > 0 && intel.coveragePct < 70) {
+            concerns.push(`Objective-evidence coverage across applicable items is ${intel.coveragePct}%; ${intel.missingEvidence.length} finding(s) currently lack supporting evidence.`);
+        }
 
         return {
             strengths,
             findings,
             concerns,
             businessImpact: stats.majorNC > 0
-                ? `Unresolved major findings (${stats.majorNC}) put the certification decision and closure timeline at risk; each week of delay extends the scope of verification required at the next audit stage.`
+                ? `Unresolved major findings put the certification decision and closure timeline at risk.`
                 : `Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.`,
             risks: stats.majorNC > 0
                 ? 'Failure to close major non-conformities within the required timeframe may delay or jeopardize certification issuance.'
                 : 'Continued monitoring of minor findings and observations is advised to prevent them from compounding into a broader pattern of control gaps.',
             forwardOutlook: stats.majorNC > 0
-                ? `Certification remains achievable on the current timeline if the ${stats.majorNC} major finding(s) above are closed within the corrective-action window; the audit team has moderate confidence in readiness pending that closure.`
+                ? `Certification remains achievable on the current timeline provided the major finding(s) identified above are closed within the corrective-action window; the audit team has moderate confidence in readiness pending that closure.`
                 : conformPct >= 80
                     ? `The management system is on a stable trajectory toward the next audit stage; the audit team has high confidence in continued conformity if current controls are sustained.`
                     : `The management system is progressing toward the maturity expected at the next audit stage; sustained attention to the findings above will support continued readiness.`
         };
     }
 
-    function renderExecSummaryHtml(data, glance, brief) {
+    // Renders the exec-summary bodyHtml. Deliberately does NOT repeat the
+    // coverage/major/minor counts already shown in the engine-side facts
+    // table and in the Audit Outcome Summary's Overall Conclusion row —
+    // those are the single source of truth for the raw numbers; this layer
+    // adds distinct narrative context (process impact, forward risk, genuine
+    // concerns) rather than a second tally of the same figures. Business
+    // impact and forward-looking risk are two angles on the same underlying
+    // fact, so they share one card/heading instead of two — same two
+    // sentences, half the card chrome.
+    function renderExecSummaryHtml(data, brief) {
         const list = (arr) => safeArr(arr).map(x => `<li>${esc(x)}</li>`).join('') || `<li class="b4-muted-item">None identified.</li>`;
-        const g = glance || {};
         const briefHtml = brief ? renderAuditOutcomeSummary(brief) : '';
         const showConcerns = hasGenuineContent(data.concerns);
 
         return `
 ${briefHtml}
-<div class="b4-glance-strip">
-  <div class="b4-glance-item">
-    <div class="b4-eyebrow">Audit Coverage</div>
-    <div class="b4-glance-value">${g.coveragePct != null ? g.coveragePct + '%' : '—'}</div>
-  </div>
-  <div class="b4-glance-item">
-    <div class="b4-eyebrow">Findings</div>
-    <div class="b4-glance-value">${g.majorNC || 0}<span class="b4-glance-unit">MAJOR</span> &nbsp;/&nbsp; ${g.minorNC || 0}<span class="b4-glance-unit">MINOR</span></div>
-  </div>
-</div>
-
-<div class="b4-grid-2" style="margin:var(--b4-s5) 0;">
-  <div class="b4-card b4-callout b4-callout--info">
-    <div class="b4-eyebrow">${icon('shield')} Business Impact</div>
-    <p class="b4-body" style="margin:0;">${esc(data.businessImpact || '')}</p>
-  </div>
-  <div class="b4-card b4-callout b4-callout--warn">
-    <div class="b4-eyebrow">${icon('alert')} Forward-Looking Risk</div>
-    <p class="b4-body" style="margin:0;">${esc(data.risks || '')}</p>
-  </div>
+<div class="b4-card b4-callout b4-callout--info" style="margin:var(--b4-s5) 0;">
+  <div class="b4-eyebrow">${icon('shield')} Certification-Process Impact &amp; Risk</div>
+  <p class="b4-body" style="margin:0 0 6px;">${esc(data.businessImpact || '')}</p>
+  <p class="b4-body" style="margin:0;">${esc(data.risks || '')}</p>
 </div>
 
 ${showConcerns ? `
@@ -383,16 +390,6 @@ ${data.forwardOutlook ? `
         return Math.round((assessed / all.length) * 100);
     }
 
-    function buildGlance(d) {
-        const stats = getStats(d);
-        const coveragePct = computeCoveragePct(d);
-        return {
-            coveragePct,
-            majorNC: stats.majorNC || 0,
-            minorNC: stats.minorNC || 0
-        };
-    }
-
     // Dedupe near-identical bullets (same leading theme worded differently) and cap list length.
     function dedupeCap(arr, max) {
         const out = [];
@@ -424,38 +421,27 @@ ${data.forwardOutlook ? `
     // verdict or recommendation is generated for this block.
     // ------------------------------------------------------------------
 
-    // Next audit-programme milestone, derived from the current audit type and
-    // the report date (or an explicit next-audit date on d.auditPlan, if present).
-    // Returns null (row omitted) when there isn't enough data to derive it honestly.
-    function computeNextMilestone(d) {
-        const report = (d && d.report) || {};
-        const auditPlan = (d && d.auditPlan) || {};
-        const type = String(report.auditType || auditPlan.type || auditPlan.auditType || '').toLowerCase();
-        const baseDateStr = report.endDate || report.date;
-        if (!baseDateStr) return null;
-        const baseDate = new Date(baseDateStr);
-        if (isNaN(baseDate.getTime())) return null;
-
-        let stage = null, monthsOffset = 12;
-        if (/stage\s*1/.test(type)) { stage = 'Stage 2 Audit'; monthsOffset = 1; }
-        else if (/stage\s*2/.test(type)) { stage = 'Surveillance Audit 1'; monthsOffset = 12; }
-        else if (/surveillance\s*2/.test(type)) { stage = 'Recertification Audit'; monthsOffset = 12; }
-        else if (/surveillance/.test(type)) { stage = 'Surveillance Audit 2'; monthsOffset = 12; }
-        else if (/recert/.test(type)) { stage = 'Surveillance Audit 1 (new cycle)'; monthsOffset = 12; }
-        else return null;
-
-        let nextDate = null;
-        const explicit = auditPlan.nextAuditDate || auditPlan.nextDate || auditPlan.surveillanceDate || auditPlan.nextSurveillanceDate;
-        if (explicit) {
-            const dd = new Date(explicit);
-            if (!isNaN(dd.getTime())) nextDate = dd;
-        }
-        if (!nextDate) {
-            nextDate = new Date(baseDate.getTime());
-            nextDate.setMonth(nextDate.getMonth() + monthsOffset);
-        }
-        if (isNaN(nextDate.getTime())) return null;
-        return { stage, date: nextDate.toISOString().slice(0, 10) };
+    // Next audit-programme milestone — sourced exclusively from the shared
+    // window.ReportStats.buildProgramme() computation (same source execution-
+    // reporting.js's closing page reads from), never from local date
+    // arithmetic off report.endDate/report.date + a fixed offset. Returns the
+    // standard "To be scheduled..." copy whenever buildProgramme is
+    // unavailable or cannot substantiate a next-audit date, exactly mirroring
+    // the fallback used at the report's closing page.
+    function computeNextAuditText(d) {
+        try {
+            if (window.ReportStats && typeof window.ReportStats.buildProgramme === 'function') {
+                const programme = window.ReportStats.buildProgramme({
+                    client: (d && d.client) || {},
+                    auditPlan: (d && d.auditPlan) || {},
+                    report: (d && d.report) || {},
+                    allReports: (window.state && window.state.auditReports) || []
+                });
+                const na = programme && programme.nextAudit;
+                if (na && na.label && na.timing) return `${na.label} — ${na.timing}`;
+            }
+        } catch (_e) { /* fall through to defensive fallback */ }
+        return 'To be scheduled in accordance with the certification programme';
     }
 
     function truncate(s, max) {
@@ -467,6 +453,10 @@ ${data.forwardOutlook ? `
     // followed by the certification recommendation verbatim. Never AI-authored
     // — guarantees the recommendation shown here always matches stats.recommendation
     // exactly and never drifts into subjective "health"/"verdict" language.
+    // NOTE: the certification recommendation is deliberately NOT appended here
+    // — it is printed exactly once, in the dedicated "Certification
+    // Recommendation" row below, so this sentence stays a pure counts/coverage
+    // statement with no risk of the recommendation text appearing twice.
     function buildFactualConclusion(d, stats) {
         const total = stats.totalItems || stats.applicableCount || 0;
         const conform = stats.conformCount || 0;
@@ -488,8 +478,7 @@ ${data.forwardOutlook ? `
         if (coveragePct != null && coveragePct < 100) {
             sentence += ` Objective-evidence coverage across assessed items was ${coveragePct}%.`;
         }
-        const recommendation = String(stats.recommendation || '').trim();
-        return recommendation ? `${sentence} ${recommendation}` : sentence;
+        return sentence;
     }
 
     // Deterministic corrective-action sentence — never phrased as an absolute
@@ -526,8 +515,7 @@ ${data.forwardOutlook ? `
 
         const recommendation = stats.recommendation || 'Certification decision pending.';
 
-        const milestone = computeNextMilestone(d);
-        const nextAudit = milestone ? `${milestone.stage} — ${milestone.date}` : '—';
+        const nextAudit = computeNextAuditText(d);
 
         return { conclusion, strengths, findings, previousFindingsStatus, correctiveAction, recommendation, nextAudit };
     }
@@ -605,7 +593,7 @@ ${data.forwardOutlook ? `
         const fallback = fallbackExecSummaryData(d);
         if (!window.AI_SERVICE || typeof window.AI_SERVICE.callProxyAPI !== 'function') {
             const capped = capExecSummaryLists(fallback);
-            return { html: renderExecSummaryHtml(capped, buildGlance(d), buildAuditOutcomeSummary(d, capped)) };
+            return { html: renderExecSummaryHtml(capped, buildAuditOutcomeSummary(d, capped)) };
         }
         try {
             const prompt = buildExecSummaryPrompt(d);
@@ -615,11 +603,11 @@ ${data.forwardOutlook ? `
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
             if (Array.isArray(parsed.strengths)) parsed.strengths = filterStrengthsAgainstNCs(d, parsed.strengths);
             const merged = capExecSummaryLists(Object.assign({}, fallback, parsed));
-            return { html: renderExecSummaryHtml(merged, buildGlance(d), buildAuditOutcomeSummary(d, merged)) };
+            return { html: renderExecSummaryHtml(merged, buildAuditOutcomeSummary(d, merged)) };
         } catch (err) {
             console.warn('[ReportExecutive] generateExecutiveSummary AI failed, using fallback:', err);
             const capped = capExecSummaryLists(fallback);
-            return { html: renderExecSummaryHtml(capped, buildGlance(d), buildAuditOutcomeSummary(d, capped)) };
+            return { html: renderExecSummaryHtml(capped, buildAuditOutcomeSummary(d, capped)) };
         }
     }
 
@@ -1126,7 +1114,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
 
         const summaryHtml = (cached && cached.summary && cached.summary.html) || (function () {
             const capped = capExecSummaryLists(fallbackExecSummaryData(d));
-            return renderExecSummaryHtml(capped, buildGlance(d), buildAuditOutcomeSummary(d, capped));
+            return renderExecSummaryHtml(capped, buildAuditOutcomeSummary(d, capped));
         })();
         const insightsHtml = (cached && cached.insights && cached.insights.html) || renderInsightsHtml(fallbackInsights(d));
 
@@ -1667,36 +1655,6 @@ Answer:`;
   }
 }
 
-/* ---------- "At a glance" strip (top-of-section executive readout) ---------- */
-.b4-glance-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--b4-s4);
-  border: 1px solid var(--b4-line);
-  border-radius: 8px;
-  background: var(--b4-surface);
-  padding: var(--b4-s4) var(--b4-s5);
-}
-.b4-glance-item { min-width: 0; }
-.b4-glance-value {
-  font-family: var(--b4-font);
-  font-size: 15pt;
-  font-weight: var(--b4-fw-bold);
-  color: var(--b4-navy);
-  line-height: 1.25;
-  white-space: normal;
-  overflow-wrap: break-word;
-}
-.b4-glance-value--sm { font-size: var(--b4-fs-subhead); font-weight: var(--b4-fw-bold); }
-.b4-glance-value--b4-good, .b4-glance-value--good { color: var(--b4-good); }
-.b4-glance-value--b4-warn, .b4-glance-value--warn { color: var(--b4-warn); }
-.b4-glance-value--b4-bad,  .b4-glance-value--bad  { color: var(--b4-bad); }
-.b4-glance-unit { font-size: var(--b4-fs-footnote); font-weight: var(--b4-fw-bold); color: var(--b4-muted); margin-left: 2px; letter-spacing: 0.04em; }
-
-@media print {
-  .b4-glance-strip { grid-template-columns: repeat(4, 1fr); break-inside: avoid; }
-}
-
 /* Print tables: nine columns on a 180mm page left the prose columns squeezed to
    their minimum, wrapping "Define or update the process..." one word per line
    and running rows down the page. Uppercase headers with 0.07em letter-spacing
@@ -1887,7 +1845,7 @@ Answer:`;
 h1, h2, h3, h4, .b4-page-title, .b4-section-title, .b4-card-heading, .b4-highlight-title, .b4-timeline-item-title {
   break-after: avoid;
 }
-.b4-kpi-grid, .b4-grid-2, .b4-grid-3, .b4-grid-4, .b4-glance-strip {
+.b4-kpi-grid, .b4-grid-2, .b4-grid-3, .b4-grid-4 {
   break-inside: avoid;
 }
 @media print {

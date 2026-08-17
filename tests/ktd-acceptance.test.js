@@ -71,6 +71,39 @@ describe('KTD surveillance acceptance', () => {
         expect(byId.sv1.timing).toBe('Aug 2025');
         expect(byId.sv2.status).toBe('This audit');          // 2 years post-cert = SV2
         expect(p.stages.filter((s) => s.status === 'This audit')).toHaveLength(1);
+        // nextAudit exposes a machine-readable ISO date alongside label/timing.
+        expect(p.nextAudit).toBeTruthy();
+        expect(p.nextAudit.id).toBe('recert');
+        expect(p.nextAudit.date).toBe(new Date('2027-08-19').toISOString());
+    });
+
+    // Stabilization pass — prior-SV-history slotting (defect a): once real
+    // history already records a Surveillance 1 for this client+standard, a
+    // current generic-"Surveillance" audit must slot as SV2 EVEN WHEN its own
+    // date sits closer to the SV1 due date than the SV2 due date — history
+    // outranks naive date-proximity.
+    it('a prior recorded surveillance in history forces the current generic-Surveillance audit to SV2, overriding date proximity', () => {
+        const client = {
+            id: 'ktd-1', name: 'KTD Select',
+            certificates: [{ standard: 'ISO 9001:2015', issueDate: '2024-01-01', expiryDate: '2027-01-01' }]
+        };
+        const allReports = [{
+            id: 'rep-prev', clientId: 'ktd-1', standard: 'ISO 9001:2015',
+            date: '2025-01-10', auditType: 'Surveillance', reportStatus: 'final',
+            checklistProgress: [], ncrs: []
+        }];
+        // 2025-02-15 is only ~5 weeks after the SV1 due date (2025-01-01) and
+        // ~10.5 months before the SV2 due date (2026-01-01) — naive date
+        // proximity alone would misclassify this as SV1 again.
+        const report = { id: 'rep-ktd', planId: 'plan-ktd', clientId: 'ktd-1', date: '2025-02-15', auditType: 'Surveillance', standard: 'ISO 9001:2015' };
+        const auditPlan = { id: 'plan-ktd', clientId: 'ktd-1', auditType: 'Surveillance', standard: 'ISO 9001:2015', startDate: '2025-02-15' };
+
+        const p = window.ReportStats.buildProgramme({ client, auditPlan, report, allReports });
+        const byId = Object.fromEntries(p.stages.map((s) => [s.id, s]));
+
+        expect(byId.sv1.status).toBe('Completed');   // matched to the real history record
+        expect(byId.sv2.status).toBe('This audit');  // forced past SV1 by history, not proximity
+        expect(p.stages.filter((s) => s.status === 'This audit')).toHaveLength(1);
     });
 
     it('programme never fabricates prior-stage dates without an anchor', () => {
@@ -151,6 +184,50 @@ describe('KTD surveillance acceptance', () => {
         expect(clean).toEqual([]); // "Dr" vs "Drive" normalized, same city
     });
 
+    // Item 10 — certificate's own recorded site (sitesCovered[] snapshot from
+    // client.sites at issuance) is compared too, not just the audit plan/report.
+    it('certificate sitesCovered address is checked against the master site record', () => {
+        const issues = window.DataService.checkAddressConsistency({
+            client: KTD_CLIENT(),
+            auditPlan: {}, report: {},
+            certificate: { standard: 'ISO 9001:2015', sitesCovered: [{ address: '99 Wrong Street', city: 'Nowhereville' }] }
+        });
+        expect(issues.some((i) => i.field === 'certificate.sitesCovered')).toBe(true);
+
+        const clean = window.DataService.checkAddressConsistency({
+            client: KTD_CLIENT(),
+            auditPlan: {}, report: {},
+            certificate: { standard: 'ISO 9001:2015', sitesCovered: [{ address: '306 Camars Drive', city: 'Warminster' }] }
+        });
+        expect(clean).toEqual([]);
+    });
+
+    // Item 10 — a full city-level mismatch on the audit plan is elevated to a
+    // distinct warning (code city_mismatch) carrying all three values, not just
+    // folded into the generic per-field W5 warning.
+    it('a city-level plan/master mismatch is a distinct issue carrying site master, plan and report values', () => {
+        const issues = window.DataService.checkAddressConsistency({
+            client: KTD_CLIENT(),
+            auditPlan: { location: '10 Different Road, Warwick, PA' },
+            report: { location: '10 Different Road, Warwick, PA' },
+            certificate: null
+        });
+        const cityIssue = issues.find((i) => i.code === 'city_mismatch');
+        expect(cityIssue).toBeTruthy();
+        expect(cityIssue.siteMaster).toContain('Warminster');
+        expect(cityIssue.plan).toBe('10 Different Road, Warwick, PA');
+        expect(cityIssue.report).toBe('10 Different Road, Warwick, PA');
+        // Not also duplicated as a generic (uncoded) issue for the same field.
+        expect(issues.filter((i) => i.field === 'auditPlan.location')).toHaveLength(1);
+
+        const result = window.ReportIntegrity.check({
+            report: { id: 'r1', clientId: 'ktd-1', client: 'KTD Select', location: '10 Different Road, Warwick, PA' },
+            auditPlan: Object.assign({}, KTD_PLAN(), { location: '10 Different Road, Warwick, PA' }),
+            client: KTD_CLIENT()
+        });
+        expect(result.warnings.some((w) => w.id.startsWith('W5c-'))).toBe(true);
+    });
+
     // 25.7 — "General" is not a department label anywhere in the shared normalizer
     it('department normalization never yields "General"', () => {
         expect(window.ReportStats.normalizeDeptName('General')).toBe('Unassigned / Cross-functional');
@@ -185,14 +262,23 @@ describe('KTD surveillance acceptance', () => {
     });
 
     // formatCriterion — single source of truth for real-vs-internal criterion display.
+    // Default label is the real clause ONLY (no FOCUS/SURV/ORG/DOC parenthetical);
+    // opts.showInternal restores the 'real (internalRef)' label for internal/CAPA
+    // contexts that still want the carryover tag visible.
     it('formatCriterion resolves internal refs, resolved criteria and plain clauses', () => {
         expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2' }))
-            .toEqual({ label: 'internal ref FOCUS.2', isInternal: true, real: null });
+            .toEqual({ label: 'internal ref FOCUS.2', isInternal: true, real: null, internalRef: null });
         expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2', criterionRef: '9.2' }))
-            .toEqual({ label: '9.2 (FOCUS.2)', isInternal: false, real: '9.2' });
+            .toEqual({ label: '9.2', isInternal: false, real: '9.2', internalRef: 'FOCUS.2' });
+        expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2', criterionRef: '9.2' }, { showInternal: true }))
+            .toEqual({ label: '9.2 (FOCUS.2)', isInternal: false, real: '9.2', internalRef: 'FOCUS.2' });
         expect(window.ReportStats.formatCriterion({ clause: '7.1' }))
-            .toEqual({ label: '7.1', isInternal: false, real: '7.1' });
-        expect(window.ReportStats.formatCriterion({})).toEqual({ label: '', isInternal: false, real: null });
+            .toEqual({ label: '7.1', isInternal: false, real: '7.1', internalRef: null });
+        expect(window.ReportStats.formatCriterion({}))
+            .toEqual({ label: '', isInternal: false, real: null, internalRef: null });
+        // showInternal has no effect on an unresolved internal ref — nothing to restore.
+        expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2' }, { showInternal: true }))
+            .toEqual({ label: 'internal ref FOCUS.2', isInternal: true, real: null, internalRef: null });
     });
 
     // Banned secondary-verdict language in formal narrative → blocked.

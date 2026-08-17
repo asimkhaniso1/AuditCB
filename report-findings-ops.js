@@ -52,6 +52,33 @@
         return '';
     }
 
+    // ─── Empty-column suppression ───────────────────────────────────────────
+    // When every row of a rendered column is a "nothing recorded" placeholder
+    // ('—', '', 'Not recorded', 'N/A'), the column carries no information and
+    // is dropped entirely (header + every cell) rather than printed as a wall
+    // of dashes. Styling is otherwise untouched — this only removes whole
+    // <th>/<td> pairs from tables built via column definitions.
+    var EMPTY_CELL_VALUES = ['—', '', 'Not recorded', 'N/A'];
+    function isEmptyCellHtml(html) {
+        var text = String(html == null ? '' : html).replace(/<[^>]*>/g, '').trim();
+        return EMPTY_CELL_VALUES.indexOf(text) !== -1;
+    }
+    // cols: [{ header: '<th>...</th>', cell: fn(row) -> '<td>...</td>' }]
+    // rows: data rows passed to each cell fn. Returns the filtered <thead>
+    // cells and <tbody> rows as ready-to-splice HTML strings.
+    function buildSuppressedTable(cols, rows) {
+        var cellsByRow = rows.map(function (r) { return cols.map(function (c) { return c.cell(r); }); });
+        var keep = cols.map(function (_, i) {
+            if (!rows.length) return true; // nothing to judge emptiness against — keep all columns
+            return cellsByRow.some(function (rowCells) { return !isEmptyCellHtml(rowCells[i]); });
+        });
+        var theadHtml = cols.filter(function (_, i) { return keep[i]; }).map(function (c) { return c.header; }).join('');
+        var rowsHtml = cellsByRow.map(function (rowCells) {
+            return '<tr style="break-inside:avoid;">' + rowCells.filter(function (_, i) { return keep[i]; }).join('') + '</tr>';
+        }).join('');
+        return { theadHtml: theadHtml, rowsHtml: rowsHtml, colCount: keep.filter(Boolean).length };
+    }
+
     function truncate(s, maxLen) {
         var t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
         if (!maxLen || t.length <= maxLen) return t;
@@ -70,6 +97,8 @@
 
     // Criterion-safe clause display — an internal FOCUS/SURV/ORG/DOC reference
     // must never be presented as the finding's clause in a formal table.
+    // Default label is the real clause only (e.g. "9.2") — no FOCUS/SURV/ORG/DOC
+    // parenthetical. See ReportStats.formatCriterion() contract.
     function criterionCell(item) {
         try {
             if (global.ReportStats && typeof global.ReportStats.formatCriterion === 'function') {
@@ -78,7 +107,7 @@
         } catch (e) { /* noop */ }
         var clause = String((item && item.clause) || '').trim();
         var ref = String((item && item.criterionRef) || '').trim();
-        if (ref) return esc(ref + (clause && clause !== ref ? ' (' + clause + ')' : ''));
+        if (ref) return esc(ref);
         if (/^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i.test(clause)) return esc('internal ref ' + clause);
         return esc(clause || '—');
     }
@@ -377,7 +406,9 @@
         var counts = {};
         Object.keys(LIFECYCLE_LABELS).forEach(function (k) { counts[k] = 0; });
 
-        var rows = findings.map(function (item, i) {
+        // Pass 1: derive each finding's lifecycle row info and tally the
+        // distribution-bar counts (unaffected by column suppression below).
+        var rowInfo = findings.map(function (item, i) {
             var ref = 'F-' + String(i + 1).padStart(2, '0');
             var key = String(item.clause || '') + '|' + String(item.department || '');
             var status = deriveLifecycleStatus(d, item, capaIndex, key);
@@ -387,16 +418,19 @@
             var isPending = String(item.ncrType || '').toLowerCase() === 'pending_classification';
             var severity = isPending ? 'Pending Classification' : (item.ncrType || '—');
 
-            return '<tr style="break-inside:avoid;">'
-                + '<td style="font-weight:700;">' + esc(ref) + '</td>'
-                + '<td>' + criterionCell(item) + '</td>'
-                + '<td>' + esc(item.department || '—') + '</td>'
-                + '<td style="text-align:center;">' + badge(severity, ncrTypeSeverity(severity)) + '</td>'
-                + '<td style="text-align:center;">' + badge(LIFECYCLE_LABELS[status] || status, LIFECYCLE_SEVERITY[status] || 'neutral') + '</td>'
-                + '<td>' + esc(capa && capa.id != null ? String(capa.id) : '—') + '</td>'
-                + '<td>' + fmtDate(item.caDueDate || (capa && capa.dueDate)) + '</td>'
-                + '</tr>';
-        }).join('');
+            return { item: item, ref: ref, status: status, capa: capa, severity: severity };
+        });
+
+        var lifecycleCols = [
+            { header: '<th>Ref</th>', cell: function (r) { return '<td style="font-weight:700;">' + esc(r.ref) + '</td>'; } },
+            { header: '<th>Clause</th>', cell: function (r) { return '<td>' + criterionCell(r.item) + '</td>'; } },
+            { header: '<th>Dept</th>', cell: function (r) { return '<td>' + esc(r.item.department || '—') + '</td>'; } },
+            { header: '<th style="text-align:center;">Severity</th>', cell: function (r) { return '<td style="text-align:center;">' + badge(r.severity, ncrTypeSeverity(r.severity)) + '</td>'; } },
+            { header: '<th style="text-align:center;">Status</th>', cell: function (r) { return '<td style="text-align:center;">' + badge(LIFECYCLE_LABELS[r.status] || r.status, LIFECYCLE_SEVERITY[r.status] || 'neutral') + '</td>'; } },
+            { header: '<th>CAPA Ref</th>', cell: function (r) { return '<td>' + esc(r.capa && r.capa.id != null ? String(r.capa.id) : '—') + '</td>'; } },
+            { header: '<th>Due Date</th>', cell: function (r) { return '<td>' + fmtDate(r.item.caDueDate || (r.capa && r.capa.dueDate)) + '</td>'; } }
+        ];
+        var table = buildSuppressedTable(lifecycleCols, rowInfo);
 
         var total = findings.length;
         var barSegments = Object.keys(LIFECYCLE_LABELS).map(function (k) {
@@ -411,8 +445,8 @@
 
         return distBar
             + '<table class="b4-tbl">'
-            + '<thead><tr><th>Ref</th><th>Clause</th><th>Dept</th><th style="text-align:center;">Severity</th><th style="text-align:center;">Status</th><th>CAPA Ref</th><th>Due Date</th></tr></thead>'
-            + '<tbody>' + rows + '</tbody>'
+            + '<thead><tr>' + table.theadHtml + '</tr></thead>'
+            + '<tbody>' + table.rowsHtml + '</tbody>'
             + '</table>';
     }
 
@@ -438,7 +472,7 @@
         var capaIndex = buildCapaIndex(d);
         var hasEvidenceMeta = typeof global._evidenceMeta !== 'undefined' && global._evidenceMeta;
 
-        var rows = items.map(function (item, i) {
+        var rowInfo = items.map(function (item, i) {
             var ref = 'F-' + String(i + 1).padStart(2, '0');
             var isPending = String(item.ncrType || '').toLowerCase() === 'pending_classification';
             // _evidenceMeta is keyed by the checklist item's uniqueId (NOT the
@@ -460,21 +494,24 @@
             var capa = bestCapaFor(capaIndex, item.clause);
             var source = (item.kbMatch && item.kbMatch.sourceLabel) || 'ISO Clause';
 
-            return '<tr style="break-inside:avoid;">'
-                + '<td style="font-weight:700;">' + esc(ref) + (isPending ? ' ' + badge('Pending Classification', 'info') : '') + '</td>'
-                + '<td>' + criterionCell(item) + '</td>'
-                + '<td>' + esc(truncate(item.requirement, 90) || '—') + '</td>'
-                + '<td>' + esc(item.department || '—') + '</td>'
-                + '<td>' + evidenceCell + '</td>'
-                + '<td>' + esc(truncate(item.comment, 80) || '—') + '</td>'
-                + '<td>' + esc(capa && capa.id != null ? String(capa.id) : '—') + '</td>'
-                + '<td>' + esc(source) + '</td>'
-                + '</tr>';
-        }).join('');
+            return { item: item, ref: ref, isPending: isPending, evidenceCell: evidenceCell, capa: capa, source: source };
+        });
+
+        var evidenceCols = [
+            { header: '<th>Ref</th>', cell: function (r) { return '<td style="font-weight:700;">' + esc(r.ref) + (r.isPending ? ' ' + badge('Pending Classification', 'info') : '') + '</td>'; } },
+            { header: '<th>Clause</th>', cell: function (r) { return '<td>' + criterionCell(r.item) + '</td>'; } },
+            { header: '<th>Requirement</th>', cell: function (r) { return '<td>' + esc(truncate(r.item.requirement, 90) || '—') + '</td>'; } },
+            { header: '<th>Dept</th>', cell: function (r) { return '<td>' + esc(r.item.department || '—') + '</td>'; } },
+            { header: '<th>Evidence</th>', cell: function (r) { return '<td>' + r.evidenceCell + '</td>'; } },
+            { header: '<th>Auditor Note</th>', cell: function (r) { return '<td>' + esc(truncate(r.item.comment, 80) || '—') + '</td>'; } },
+            { header: '<th>CAPA ID</th>', cell: function (r) { return '<td>' + esc(r.capa && r.capa.id != null ? String(r.capa.id) : '—') + '</td>'; } },
+            { header: '<th>Source</th>', cell: function (r) { return '<td>' + esc(r.source) + '</td>'; } }
+        ];
+        var table = buildSuppressedTable(evidenceCols, rowInfo);
 
         return '<table class="b4-tbl">'
-            + '<thead><tr><th>Ref</th><th>Clause</th><th>Requirement</th><th>Dept</th><th>Evidence</th><th>Auditor Note</th><th>CAPA ID</th><th>Source</th></tr></thead>'
-            + '<tbody>' + rows + '</tbody>'
+            + '<thead><tr>' + table.theadHtml + '</tr></thead>'
+            + '<tbody>' + table.rowsHtml + '</tbody>'
             + '</table>';
     }
 
