@@ -320,7 +320,7 @@ Return ONLY the raw JSON object, no markdown fences.`;
                 ? `Certification remains achievable on the current timeline provided the major finding(s) identified above are closed within the corrective-action window; the audit team has moderate confidence in readiness pending that closure.`
                 : conformPct >= 80
                     ? `The management system is on a stable trajectory toward the next audit stage; the audit team has high confidence in continued conformity if current controls are sustained.`
-                    : `The management system is progressing toward the maturity expected at the next audit stage; sustained attention to the findings above will support continued readiness.`
+                    : `Closure of the findings above, verified at the next audit, is what the certification programme requires from this point.`
         };
     }
 
@@ -915,7 +915,7 @@ ${intel.missingEvidence.length ? `
         }
 
         const improvements = [];
-        deptEntries.filter(([, v]) => v.total > 0 && v.nc === 0).slice(0, 4).forEach(([name]) => improvements.push(`${name} showed full conformity — a positive indicator of process maturity.`));
+        deptEntries.filter(([, v]) => v.total > 0 && v.nc === 0).slice(0, 4).forEach(([name]) => improvements.push(`${name} showed full conformity across the items sampled in this audit.`));
         if (stats.conformCount > 0) improvements.push(`${stats.conformCount} item(s) confirmed conforming, supporting baseline system effectiveness.`);
         if (!improvements.length) improvements.push('No specific positive improvements identified in this cycle.');
 
