@@ -7,6 +7,24 @@
 // normalizeStdName, extractClauseNum, lookupKBRequirement, resolveChecklistClause,
 // resolveStandardName are all available via window.KB_HELPERS.*
 
+// ---------- Checklist -> NCR sync identity helpers (single source of truth) ----------
+// Pure, top-level (unlike the checklist-sync closure itself, which only exists
+// inside saveChecklist's per-invocation scope and so isn't callable in
+// isolation) so the key-building logic is directly unit-testable and so
+// there's exactly one definition of "what identifies this checklist item"
+// shared by the dedupe matchers below.
+function buildChecklistSourceKey(reportId, item) {
+    return `exec-${reportId}-${(item && item.checklistId) || 'custom'}-${item && item.itemIdx}`;
+}
+function buildChecklistStableIdentity(item) {
+    return {
+        sourceChecklistId: (item && item.checklistId != null) ? String(item.checklistId) : null,
+        sourceItemIdx: (item && item.itemIdx != null) ? String(item.itemIdx) : null
+    };
+}
+window.NCRSyncUtils = window.NCRSyncUtils || {};
+window.NCRSyncUtils.buildSourceKey = buildChecklistSourceKey;
+window.NCRSyncUtils.buildStableIdentity = buildChecklistStableIdentity;
 
 // eslint-disable-next-line no-unused-vars
 function renderExecutionTab(report, tabName, contextData = {}) {
@@ -1901,8 +1919,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             ncItems.forEach(item => {
                 // Build stable key to prevent duplicates
-                const sourceKey = `exec-${reportId}-${item.checklistId || 'custom'}-${item.itemIdx}`;
+                const sourceKey = buildChecklistSourceKey(reportId, item);
                 activeSourceKeys.add(sourceKey);
+                // Stable source identity, stored on the NCR record itself (separate
+                // from _sourceKey, which also embeds reportId) so a finding can be
+                // re-matched by "same checklist item" alone — independent of both
+                // the report id and the finding's description text.
+                const { sourceChecklistId, sourceItemIdx } = buildChecklistStableIdentity(item);
 
                 // Resolve clause text (and any criterionRef/criterionSource the
                 // checklist item carries) up front — sameFinding()'s dedupe match
@@ -1928,17 +1951,30 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     }
                 }
 
-                // Check if already synced.
+                // Check if already synced. Three tiers, most-reliable first:
                 //
-                // _sourceKey embeds checklistId and itemIdx, both of which change
-                // when a checklist is rebuilt or its questions are re-indexed —
-                // which minted a second NCR for a finding that already had one and
-                // put duplicate rows in the CAPA register. Fall back to matching
-                // the same audit + clause + finding text, and adopt that record by
-                // re-pointing its _sourceKey, so the audit trail keeps one record
-                // per finding across checklist changes.
+                //  1. _sourceKey exact match — same report, same checklist item.
+                //  2. STABLE IDENTITY match — same audit + same source checklist
+                //     item (sourceChecklistId/sourceItemIdx stored on the record),
+                //     independent of description text. checklistId/itemIdx change
+                //     when a checklist is rebuilt or re-indexed, but NOT when a
+                //     finding's wording is later AI-polished — so this tier is what
+                //     keeps a polished re-sync from minting a duplicate NCR: the
+                //     old description-based fallback below fails once the wording
+                //     no longer matches character-for-character.
+                //  3. Legacy fallback — client/audit + clause + finding text, for
+                //     records synced before sourceChecklistId/sourceItemIdx were
+                //     tracked (no stable identity to match on).
                 const findingKey = (item.ncrDescription || item.comment || '')
                     .toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 180);
+                const stableIdentityMatch = (n) => {
+                    if (!n || n._sourceKey === sourceKey) return false;
+                    if (String(n.auditId || '') !== String(report.planId || '')) return false;
+                    if (String(n.status || '').toLowerCase() === 'withdrawn') return false;
+                    if (n.sourceChecklistId == null && n.sourceItemIdx == null) return false;
+                    return String(n.sourceChecklistId) === String(sourceChecklistId)
+                        && String(n.sourceItemIdx) === String(sourceItemIdx);
+                };
                 const sameFinding = (n) => {
                     if (!n || n._sourceKey === sourceKey) return false;
                     if (String(n.auditId || '') !== String(report.planId || '')) return false;
@@ -1948,15 +1984,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     return !!findingKey && d === findingKey;
                 };
                 let existing = window.state.ncrs.find(n => n._sourceKey === sourceKey);
+                if (!existing) existing = window.state.ncrs.find(stableIdentityMatch);
                 if (!existing) {
                     const adopted = window.state.ncrs.find(sameFinding);
                     if (adopted) {
                         adopted._sourceKey = sourceKey;   // re-point to the current checklist
-                        persist(adopted);
                         existing = adopted;
                     }
                 }
                 if (existing) {
+                    // Backfill/refresh stable identity on every match so future
+                    // re-syncs — including after further AI-polish edits — can match
+                    // on identity alone rather than falling back to description text.
+                    existing._sourceKey = sourceKey;
+                    existing.sourceChecklistId = sourceChecklistId;
+                    existing.sourceItemIdx = sourceItemIdx;
                     // Legacy records created by the old buggy behavior (severity was
                     // Observation/OFI) are no longer valid register entries — withdraw
                     // them and create a fresh Major/Minor record instead.
@@ -1994,6 +2036,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 // Create new NCR record
                 const ncrRecord = {
                     _sourceKey: sourceKey,
+                    sourceChecklistId: sourceChecklistId,
+                    sourceItemIdx: sourceItemIdx,
                     clientId: resolvedClientId,
                     clientName: report.client || '',
                     auditId: report.planId || null,          // FK → audit_plans(id)

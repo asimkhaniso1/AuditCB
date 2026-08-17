@@ -800,19 +800,68 @@ window.switchClientOverviewTab = function (element, tabId, clientId) {
     }
 };
 
+// ─── Certification-cycle helpers (shared by the card + timeline widgets) ───
+// Many certificates on file are ANNUAL re-issues within a 3-year cycle
+// (expiry = currentIssue + ~364 days, an app convention) — not a genuine
+// 3-year expiry. Treating that annual expiryDate as the cycle end made this
+// widget show "Recertification Due" / an imminent "Expiry" every single year
+// instead of only once every three. The recorded expiryDate is trusted as the
+// true cycle end only when it's at least 30 months after the cycle's own
+// issue date; otherwise the real cycle end is issueDate + 3 years. Mirrors
+// report-stats.js buildProgramme's identical rule so this widget and the
+// report programme never disagree about when the 3-year cycle actually ends.
+function computeCertCycleEnd(issueDate, expiryDate) {
+    if (!expiryDate || isNaN(expiryDate.getTime())) {
+        const exp = new Date(issueDate);
+        exp.setFullYear(exp.getFullYear() + 3);
+        return exp;
+    }
+    const thirtyMonthsOut = new Date(issueDate);
+    thirtyMonthsOut.setMonth(thirtyMonthsOut.getMonth() + 30);
+    if (expiryDate.getTime() >= thirtyMonthsOut.getTime()) return expiryDate; // genuine 3-year cert
+    const cycleEnd = new Date(issueDate);
+    cycleEnd.setMonth(cycleEnd.getMonth() + 36); // annual-issue semantics
+    return cycleEnd;
+}
+
+// Prefer real, finalized audit history over pure calendar math where it's
+// cheap to check: a finalized Surveillance/Recertification audit for this
+// client+standard within the last 12 months means the cycle has clearly
+// already advanced — a stale/odd cert-date combination must never override
+// that with a false "Recertification Due" alarm about a visit that already
+// happened.
+function findRecentFinalizedAudit(clientId, standard) {
+    const reports = (window.state && window.state.auditReports) || [];
+    const now = new Date();
+    let latest = null;
+    let latestDate = null;
+    reports.forEach((r) => {
+        if (!r || r.status !== 'Finalized') return;
+        if (String(r.clientId) !== String(clientId)) return;
+        if (standard && String(r.standard || '').trim().toLowerCase() !== String(standard).trim().toLowerCase()) return;
+        const d = new Date(r.date || r.createdAt);
+        if (isNaN(d.getTime())) return;
+        const daysAgo = (now - d) / (1000 * 60 * 60 * 24);
+        if (daysAgo < 0 || daysAgo > 365) return; // not within the last 12 months
+        if (!latestDate || d > latestDate) { latest = r; latestDate = d; }
+    });
+    return latest;
+}
+
 // Compact Certification Cycle Widget for Overview Dashboard
 // Render Timeline Widget for EACH active standard
 //
 // NOTE ON "DISAGREEING" WITH THE AUDIT PLANS TABLE: this widget's stage and
 // progress % are a pure calendar projection — they answer "where should this
 // client be in their 3-year cycle today", computed only from the active
-// certificate's issue/expiry dates (surv1/surv2/expiry below). They never
-// read plan.status or report.status. The Audit Plans table (renderClientPlans)
-// answers a different question — "what is the actual recorded state of each
-// audit" — via window.DataService.isPlanCompleted/getPlanCompletionStats. The
-// two are expected to diverge when audits run early/late or are still in
-// progress; that gap is exactly what should make this widget's "urgent/red"
-// styling meaningful. Do not collapse them into one derived value.
+// certificate's issue/expiry dates (surv1/surv2/cycleEnd below) plus recent
+// finalized audit history. They never read plan.status. The Audit Plans
+// table (renderClientPlans) answers a different question — "what is the
+// actual recorded state of each audit" — via
+// window.DataService.isPlanCompleted/getPlanCompletionStats. The two are
+// expected to diverge when audits run early/late or are still in progress;
+// that gap is exactly what should make this widget's "urgent/red" styling
+// meaningful. Do not collapse them into one derived value.
 function renderCertificationCycleWidget(client) {
     const certs = client.certificates || [];
     const standards = [...new Set(certs.map(c => c.standard).filter(Boolean))];
@@ -846,14 +895,11 @@ function renderCertificationCycleWidget(client) {
         if (!activeCert || (!activeCert.initialDate && !activeCert.currentIssue)) return '';
 
         const issueDate = new Date(activeCert.initialDate || activeCert.currentIssue);
+        const rawExpiry = activeCert.expiryDate ? new Date(activeCert.expiryDate) : null;
+        const cycleEnd = computeCertCycleEnd(issueDate, rawExpiry);
         const surv1 = new Date(issueDate); surv1.setFullYear(surv1.getFullYear() + 1);
         const surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
-        const expiry = activeCert.expiryDate ? new Date(activeCert.expiryDate) : (() => {
-            const exp = new Date(issueDate);
-            exp.setFullYear(exp.getFullYear() + 3);
-            return exp;
-        })();
-        const recertAudit = new Date(expiry);
+        const recertAudit = new Date(cycleEnd);
         recertAudit.setDate(recertAudit.getDate() - 60);
 
         const today = new Date();
@@ -863,14 +909,32 @@ function renderCertificationCycleWidget(client) {
 
         if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; progress = 33; }
         if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; progress = 66; }
-        if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = expiry; progress = 90; }
-        if (today > expiry) { currentStage = "Expired"; nextAudit = null; progress = 100; }
+        if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = cycleEnd; progress = 90; }
+        if (today > cycleEnd) { currentStage = "Expired"; nextAudit = null; progress = 100; }
+
+        // Prefer real audit history over pure date math: a finalized
+        // Surveillance visit within the last 12 months means the cycle has
+        // already advanced — don't show "Recertification Due" purely because
+        // today is past a stale/odd cert-date combination's recert window.
+        const recentAudit = findRecentFinalizedAudit(client.id, std);
+        if (recentAudit && currentStage === "Recertification Due") {
+            const auditedType = String(recentAudit.auditType || recentAudit.type || '').toLowerCase();
+            const wasRecert = /re-?cert/.test(auditedType);
+            if (!wasRecert) {
+                // A recent Surveillance (or unspecified) visit happened, but the
+                // recert audit itself hasn't — the cycle is still awaiting it,
+                // not "due" as if nothing has happened recently.
+                currentStage = "Surveillance 2";
+                nextAudit = recertAudit;
+                progress = 66;
+            }
+        }
 
         const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
         const isUrgent = daysToNext > 0 && daysToNext <= 60;
 
         return `
-            <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, ${today > expiry ? '#fee2e2' : '#f0f9ff'} 0%, ${today > expiry ? '#fecaca' : '#e0f2fe'} 100%); border-left: 4px solid ${today > expiry ? '#dc2626' : '#3b82f6'};">
+            <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, ${today > cycleEnd ? '#fee2e2' : '#f0f9ff'} 0%, ${today > cycleEnd ? '#fecaca' : '#e0f2fe'} 100%); border-left: 4px solid ${today > cycleEnd ? '#dc2626' : '#3b82f6'};">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                     <div style="flex: 1;">
                         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
@@ -883,9 +947,9 @@ function renderCertificationCycleWidget(client) {
                         
                         <!-- Progress Bar -->
                         <div style="background: rgba(255,255,255,0.6); border-radius: 8px; height: 8px; overflow: hidden; margin-bottom: 0.75rem;">
-                            <div style="background: ${today > expiry ? '#dc2626' : progress >= 66 ? '#f59e0b' : '#3b82f6'}; height: 100%; width: ${progress}%; transition: width 0.3s ease;"></div>
+                            <div style="background: ${today > cycleEnd ? '#dc2626' : progress >= 66 ? '#f59e0b' : '#3b82f6'}; height: 100%; width: ${progress}%; transition: width 0.3s ease;"></div>
                         </div>
-                        
+
                         <!-- Current Stage Info -->
                         <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
                             <div>
@@ -904,7 +968,8 @@ function renderCertificationCycleWidget(client) {
                             ` : ''}
                             <div>
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Expiry Date</div>
-                                <div style="font-size: 1.1rem; font-weight: 600; color: ${today > expiry ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(expiry)}</div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: ${today > cycleEnd ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(cycleEnd)}</div>
+                                ${rawExpiry && rawExpiry.getTime() !== cycleEnd.getTime() ? `<div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem;">3-yr cycle end • annual cert on file expires ${window.UTILS.formatDate(rawExpiry)}</div>` : ''}
                             </div>
                         </div>
                     </div>
@@ -971,24 +1036,36 @@ function renderAuditCycleTimeline(client) {
     const surv1 = new Date(issueDate); surv1.setFullYear(surv1.getFullYear() + 1);
     const surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
 
-    // Calculate expiry date (3 years from issue)
-    const expiry = latestCert.expiryDate ? new Date(latestCert.expiryDate) : (() => {
-        const exp = new Date(issueDate);
-        exp.setFullYear(exp.getFullYear() + 3);
-        return exp;
-    })();
+    // cycleEnd: the recorded expiryDate is only trusted as the true 3-year
+    // cycle end when it's at least 30 months after issueDate — many certs on
+    // file are ANNUAL re-issues (expiry = currentIssue + ~364 days), whose
+    // real cycle end is issueDate + 3 years. See computeCertCycleEnd() above.
+    const rawExpiry = latestCert.expiryDate ? new Date(latestCert.expiryDate) : null;
+    const cycleEnd = computeCertCycleEnd(issueDate, rawExpiry);
 
-    // Recertification audit should occur 60 days BEFORE expiry
-    const recertAudit = new Date(expiry);
-    recertAudit.setDate(recertAudit.getDate() - 60); // 60 days before expiry
+    // Recertification audit should occur 60 days BEFORE the cycle end
+    const recertAudit = new Date(cycleEnd);
+    recertAudit.setDate(recertAudit.getDate() - 60); // 60 days before cycle end
 
     const today = new Date();
     let currentStage = "Initial Certification";
     let nextAudit = surv1;
     if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; }
     if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; }
-    if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = expiry; }
-    if (today > expiry) { currentStage = "Expired"; nextAudit = null; }
+    if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = cycleEnd; }
+    if (today > cycleEnd) { currentStage = "Expired"; nextAudit = null; }
+
+    // Prefer real audit history over pure date math (see
+    // renderCertificationCycleWidget's identical guard for the rationale).
+    const recentAudit = findRecentFinalizedAudit(client.id, latestCert.standard);
+    if (recentAudit && currentStage === "Recertification Due") {
+        const auditedType = String(recentAudit.auditType || recentAudit.type || '').toLowerCase();
+        const wasRecert = /re-?cert/.test(auditedType);
+        if (!wasRecert) {
+            currentStage = "Surveillance 2";
+            nextAudit = recertAudit;
+        }
+    }
 
     const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
 
@@ -1017,8 +1094,9 @@ function renderAuditCycleTimeline(client) {
                 </div>
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">
                     <i class="fa-solid fa-hourglass-half" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${window.UTILS.formatDate(expiry)}</p>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${window.UTILS.formatDate(cycleEnd)}</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Cycle Expiry Date</p>
+                    ${rawExpiry && rawExpiry.getTime() !== cycleEnd.getTime() ? `<p style="font-size: 0.7rem; color: var(--text-secondary); margin: 0.15rem 0 0 0;">Annual cert on file expires ${window.UTILS.formatDate(rawExpiry)}</p>` : ''}
                 </div>
             </div>
 
@@ -1062,9 +1140,9 @@ function renderAuditCycleTimeline(client) {
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
-                        <div style="width: 40px; height: 40px; background: ${new Date() > expiry ? '#dc2626' : '#94a3b8'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-hourglass-end"></i></div>
+                        <div style="width: 40px; height: 40px; background: ${new Date() > cycleEnd ? '#dc2626' : '#94a3b8'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-hourglass-end"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Expiry</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(expiry)}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(cycleEnd)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">Year 3</div>
                     </div>
                 </div>

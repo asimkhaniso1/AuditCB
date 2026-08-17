@@ -239,9 +239,12 @@ describe('KTD surveillance acceptance', () => {
     // a certificate whose 364-day expiry lands on/before the current audit date
     // must be flagged, its stage relabeled, nextAudit skip it, and the validator block.
     it('a certificate expiring on/before the current audit date is flagged, not silently printed', () => {
+        // Genuine 3-year cert (expiry >= anchor+30mo) so the annual-issue cycleEnd
+        // rule doesn't mask this as a routine annual re-issue date — this cert is
+        // truly overdue for recertification.
         const client = {
             id: 'ktd-1', name: 'KTD Select',
-            certificates: [{ standard: 'ISO 9001:2015', issueDate: '2025-08-15', expiryDate: '2026-08-14' }]
+            certificates: [{ standard: 'ISO 9001:2015', issueDate: '2023-08-15', expiryDate: '2026-08-14' }]
         };
         const auditPlan = { id: 'plan-ktd', clientId: 'ktd-1', auditType: 'Surveillance', standard: 'ISO 9001:2015', startDate: '2026-08-17' };
         const report = { id: 'rep-ktd', planId: 'plan-ktd', clientId: 'ktd-1', date: '2026-08-17', auditType: 'Surveillance', standard: 'ISO 9001:2015' };
@@ -259,6 +262,29 @@ describe('KTD surveillance acceptance', () => {
         const result = window.ReportIntegrity.check({ report, auditPlan, client });
         expect(result.status).toBe('BLOCKED');
         expect(result.blockers.some((b) => b.id === 'B9' || b.id.startsWith('B2'))).toBe(true);
+    });
+
+    // Defect 1 stabilization — annual-issue certificates (expiry = anchor + ~364
+    // days, an app convention) must NOT be treated as the true 3-year cycle end.
+    // Real KTD Select data: initialDate 2024-08-21, currentIssue/expiry
+    // 2026-08-20 (an annual re-issue), surveillance audit dated 2026-08-14 —
+    // the true cycle end is initialDate + 3 years (Aug 2027), not Aug 2026.
+    it('an annual-issue certificate (expiry < anchor+30mo) computes cycleEnd as anchor+36 months, not the annual expiry', () => {
+        const client = {
+            id: 'ktd-1', name: 'KTD Select',
+            certificates: [{ standard: 'ISO 9001:2015', initialDate: '2024-08-21', expiryDate: '2026-08-20' }]
+        };
+        const auditPlan = { id: 'plan-ktd', clientId: 'ktd-1', auditType: 'Surveillance', standard: 'ISO 9001:2015', startDate: '2026-08-14' };
+        const report = { id: 'rep-ktd', planId: 'plan-ktd', clientId: 'ktd-1', date: '2026-08-14', auditType: 'Surveillance', standard: 'ISO 9001:2015' };
+
+        const p = window.ReportStats.buildProgramme({ client, auditPlan, report, allReports: [] });
+        const byId = Object.fromEntries(p.stages.map((s) => [s.id, s]));
+
+        expect(byId.recert.timing).toBe('by Aug 2027'); // NOT 'by Aug 2026' (the annual re-issue date)
+        expect(p.issues).toEqual([]); // no chronology issue — the true cycle end is a year out
+        expect(p.nextAudit).toBeTruthy();
+        expect(p.nextAudit.id).toBe('recert');
+        expect(p.nextAudit.date).toBe(new Date('2027-08-21').toISOString());
     });
 
     // formatCriterion — single source of truth for real-vs-internal criterion display.

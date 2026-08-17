@@ -119,6 +119,49 @@ function isWithdrawnNCR(n) {
 window.isWithdrawnNCR = isWithdrawnNCR;
 
 // --------------------------------------------
+// CLAUSE / CRITERION DISPLAY (register tables)
+// Internal pseudo-clauses (FOCUS.n/SURV.n/ORG/DOC — Stage 1 carryover
+// references, never real ISO clauses) must never be printed to the register
+// as if they were a real clause. Routes through window.ReportStats.
+// formatCriterion — the single source of truth the report engine itself
+// uses — when it's loaded, with a local regex fallback for pages where it
+// isn't. showInternal:true keeps the internal tag visible alongside a
+// resolved real clause (e.g. '9.2 (FOCUS.2)'), which is useful in this
+// internal/CAPA-facing register even though report-facing views hide it.
+// --------------------------------------------
+const NCR_FOCUS_REF_RE = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
+function resolveClauseDisplay(rec) {
+    const r = rec || {};
+    if (window.ReportStats && typeof window.ReportStats.formatCriterion === 'function') {
+        const info = window.ReportStats.formatCriterion(r, { showInternal: true });
+        if (info.isInternal) {
+            return { text: (r.clause || info.label || '') + ' — criterion pending', pending: true };
+        }
+        return { text: info.label, pending: false };
+    }
+    // Local fallback when ReportStats isn't loaded on this page.
+    const clause = String(r.clause || '').trim();
+    const criterionRef = String(r.criterionRef || '').trim();
+    if (criterionRef) {
+        const isCarryover = clause && NCR_FOCUS_REF_RE.test(clause) && clause.toLowerCase() !== criterionRef.toLowerCase();
+        return { text: isCarryover ? `${criterionRef} (${clause})` : criterionRef, pending: false };
+    }
+    if (clause && NCR_FOCUS_REF_RE.test(clause)) {
+        return { text: clause + ' — criterion pending', pending: true };
+    }
+    return { text: clause || '-', pending: false };
+}
+// <td> markup for the register's Clause column.
+function renderClauseCell(rec) {
+    const d = resolveClauseDisplay(rec);
+    if (d.pending) {
+        return `<span class="badge bg-gray" style="opacity: 0.75; font-style: italic;" title="No resolved ISO clause on file for this internal reference">${window.UTILS.escapeHtml(d.text)}</span>`;
+    }
+    return `<span class="badge bg-gray">${window.UTILS.escapeHtml(d.text)}</span>`;
+}
+window.NCRModule.resolveClauseDisplay = resolveClauseDisplay;
+
+// --------------------------------------------
 // SHARED CONTRACT: capaDisplayStatus / isOverdue
 // The single source for "is this record overdue" and for mapping the
 // internal 13-state carStatus/status lifecycle onto the auditor-facing
@@ -307,6 +350,48 @@ window.reconcileDuplicateNCRs = function (opts) {
     return { groups: dupGroups, superseded: dryRun ? details.length : superseded, kept: kept, details: details };
 };
 
+/**
+ * Find suspected duplicate NCR/CAPA records WITHOUT modifying anything —
+ * read-only surfacing for a future cleanup UI. Records are never withdrawn or
+ * altered here; use window.reconcileDuplicateNCRs() to actually supersede them,
+ * or withdraw individual records by hand (Withdrawn status is the existing
+ * supersede convention: set status/carStatus to 'Withdrawn' and optionally
+ * point _supersededBy at the record being kept).
+ *
+ * Grouped by clientId + auditId + clause + severity — a narrower key than
+ * reconcileDuplicateNCRs' client+clause+description (which is scoped to
+ * assume same-audit dupes are already merged at mint time). This finder
+ * intentionally keys ON auditId too and ignores description wording, so it
+ * also catches near-identical records within the SAME audit engagement whose
+ * descriptions drifted (e.g. reworded by AI-polish before the checklist-sync
+ * stable-identity fix) and would otherwise dodge a text-exact match.
+ *
+ * @returns {Array<{clientId:*, auditId:*, clause:string, severity:string, records:Array}>}
+ */
+function findDuplicateNCRs() {
+    const all = (window.state && window.state.ncrs) || [];
+    const norm = (v) => String(v == null ? '' : v).toLowerCase().replace(/\s+/g, ' ').trim();
+
+    const groups = new Map();
+    all.forEach((n) => {
+        if (!n || isWithdrawnNCR(n) || n._supersededBy) return;
+        if (n.clientId == null || n.auditId == null || !n.clause) return; // nothing reliable to group on
+        const key = [String(n.clientId), String(n.auditId), norm(n.clause), norm(n.severity)].join('||');
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(n);
+    });
+
+    const result = [];
+    groups.forEach((records, key) => {
+        if (records.length < 2) return;
+        const [clientId, auditId, clause, severity] = key.split('||');
+        result.push({ clientId, auditId, clause, severity, records });
+    });
+    return result;
+}
+window.NCRModule.findDuplicateNCRs = findDuplicateNCRs;
+window.findDuplicateNCRs = findDuplicateNCRs;
+
 // --------------------------------------------
 // DATA SYNCHRONIZATION (Supabase)
 // --------------------------------------------
@@ -362,6 +447,14 @@ window.fetchNCRs = async function () {
                 criterionSource: row.criterion_source,
                 riskLikelihood: row.risk_likelihood,
                 riskImpact: row.risk_impact,
+                // sourceChecklistId/sourceItemIdx (execution-module-v2.js's checklist
+                // sync dedupe identity) have no DB column yet — same "awaiting
+                // migration" situation criterionRef/criterionSource were in before
+                // ADD_NCR_CRITERION_AND_RISK_FIELDS.sql landed. row.source_checklist_id
+                // is simply undefined until that migration exists, so the merge below
+                // always falls back to the local value within the session.
+                sourceChecklistId: row.source_checklist_id != null ? row.source_checklist_id : null,
+                sourceItemIdx: row.source_item_idx != null ? row.source_item_idx : null,
                 evidence: row.evidence || []
             };
             const prev = prevById.get(String(row.id));
@@ -370,6 +463,20 @@ window.fetchNCRs = async function () {
                 if (mapped.criterionSource == null && prev.criterionSource !== undefined) mapped.criterionSource = prev.criterionSource;
                 if (mapped.riskLikelihood == null && prev.riskLikelihood !== undefined) mapped.riskLikelihood = prev.riskLikelihood;
                 if (mapped.riskImpact == null && prev.riskImpact !== undefined) mapped.riskImpact = prev.riskImpact;
+                if (mapped.sourceChecklistId == null && prev.sourceChecklistId != null) mapped.sourceChecklistId = prev.sourceChecklistId;
+                if (mapped.sourceItemIdx == null && prev.sourceItemIdx != null) mapped.sourceItemIdx = prev.sourceItemIdx;
+                // _sourceKey (execution-module-v2.js's checklist-sync dedupe key) has
+                // NO db column at all and was previously dropped on every single
+                // refetch — persistNCR() calls fetchNCRs() after every create/update,
+                // which used to rebuild window.state.ncrs purely from `mapped` here,
+                // silently erasing _sourceKey from EVERY record on the very first
+                // save. The next checklist sync would then find no _sourceKey match
+                // for ANY record and fall through to the fragile exact-text
+                // description match — which breaks as soon as a finding's wording
+                // changes even slightly (AI-polish or a manual edit) — minting a
+                // fresh duplicate NCR. Preserving it locally the same way as the
+                // fields above closes that hole.
+                if (prev._sourceKey) mapped._sourceKey = prev._sourceKey;
             }
             return mapped;
         });
@@ -502,6 +609,22 @@ function renderNCRCAPAModule(clientId) {
         window.contentArea.innerHTML = '<div style="text-align:center; padding: 2rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading NCRs...</div>';
         // Fetch and re-render
         window.fetchNCRs().then(() => {
+            // Guard against a stale/late-resolving fetch clobbering whatever the
+            // user is now actually looking at. Two renders can race: e.g. the
+            // global "NCR & CAPA" view (clientId undefined) kicks off a fetch,
+            // then the user quickly navigates into a client workspace (which sets
+            // ncrContextClientId and starts its OWN fetch) before the first fetch
+            // resolves — the global fetch's callback would otherwise fire last,
+            // reset ncrContextClientId back to null, and silently replace the
+            // client-scoped table with the unfiltered, all-clients register. It
+            // can also fire after the user has since moved to an unrelated tab
+            // (e.g. Plans & Audits) within the SAME client, blowing away that
+            // page's content with the NCR table — so check both the client
+            // context AND that the ncr-capa route is still the active view.
+            const sameClientContext = String(window.state.ncrContextClientId || '') === String(clientId || '');
+            const expectedHash = clientId ? `client/${clientId}/ncr-capa` : 'ncr-capa';
+            const stillOnNCRRoute = (window.location.hash || '').replace(/^#/, '').split('?')[0] === expectedHash;
+            if (!sameClientContext || !stillOnNCRRoute) return;
             // After fetch completes, render the module
             renderNCRCAPAModuleContent(clientId);
         });
@@ -677,7 +800,7 @@ function renderNCRTable(ncrs) {
                                 </span>
                             </td>
                             <td>${window.UTILS.escapeHtml(ncr.clientName || 'N/A')}</td>
-                            <td><span class="badge bg-gray">${window.UTILS.escapeHtml(ncr.clause || '-')}</span></td>
+                            <td>${renderClauseCell(ncr)}</td>
                             <td>
                                 <span class="badge" style="background: ${ncr.severity === 'Major' ? '#dc2626' : ncr.severity === 'Minor' ? '#f59e0b' : '#3b82f6'}; color: white;">
                                     ${ncr.severity}
@@ -805,6 +928,7 @@ function getOFIOBSHTML() {
             findings.push({
                 type: t === 'ofi' ? 'OFI' : 'OBS',
                 clause: clauseText,
+                criterionRef: item.criterionRef || null,
                 description: item.ncrDescription || item.comment || reqText || '',
                 client: report.client || '',
                 auditDate: report.date || '',
@@ -822,6 +946,7 @@ function getOFIOBSHTML() {
             findings.push({
                 type: t === 'ofi' ? 'OFI' : 'OBS',
                 clause: f.clause || '',
+                criterionRef: f.criterionRef || null,
                 description: f.description || '',
                 client: report.client || '',
                 auditDate: report.date || '',
@@ -885,7 +1010,7 @@ function getOFIOBSHTML() {
                                         ${f.type}
                                     </span>
                                 </td>
-                                <td><span class="badge bg-gray">${window.UTILS.escapeHtml(f.clause || '-')}</span></td>
+                                <td>${renderClauseCell(f)}</td>
                                 <td style="max-width: 350px;">${window.UTILS.escapeHtml(f.description || '-')}</td>
                                 <td>${window.UTILS.escapeHtml(f.client)}</td>
                                 <td>${window.UTILS.formatDate(f.auditDate)}</td>
@@ -1639,7 +1764,7 @@ window.printNCRRegister = function () {
                             <td>NCR-${String(n.id).padStart(3, '0')}</td>
                             <td>${n.clientName || '-'}</td>
                             <td>${n.standard || '-'}</td>
-                            <td>${n.clause || '-'}</td>
+                            <td>${resolveClauseDisplay(n).text}</td>
                             <td>${n.severity}</td>
                             <td>${n.description}</td>
                             <td>${n.status}</td>

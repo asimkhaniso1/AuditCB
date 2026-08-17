@@ -354,11 +354,31 @@
         const fmt = (dt) => dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
         const offsetDate = (offset) => { const dt = new Date(baseDate.getTime()); dt.setMonth(dt.getMonth() + offset); return dt; };
         const monthYear = (offset) => fmt(offsetDate(offset));
-        // recertDate is the precise anchor (certificate expiry when known) used for
-        // chronology comparisons; recertTiming is its display string. Kept separate
-        // so month/year formatting never masks a same-month chronology conflict.
-        const recertDate = certExpiry || offsetDate(36);
-        const recertTiming = certExpiry ? ('by ' + fmt(certExpiry)) : monthYear(36);
+        // recertDate is the precise anchor used for chronology comparisons;
+        // recertTiming is its display string. Kept separate so month/year
+        // formatting never masks a same-month chronology conflict.
+        //
+        // cycleEnd rule: many certificates on file are ANNUAL re-issues within a
+        // 3-year cycle (expiry = currentIssue + ~364 days, an app convention) —
+        // not a genuine 3-year expiry. Treat the recorded expiryDate as the true
+        // cycle end only when it is at least 30 months after the cycle anchor
+        // (initialDate/issueDate); otherwise the cert is annual-issue and the
+        // real cycle end is anchor + 36 months.
+        let recertDate;
+        if (certExpiry) {
+            const cycleAnchor = certStart || baseDate;
+            const thirtyMonthsOut = new Date(cycleAnchor.getTime());
+            thirtyMonthsOut.setMonth(thirtyMonthsOut.getMonth() + 30);
+            if (certExpiry.getTime() >= thirtyMonthsOut.getTime()) {
+                recertDate = certExpiry; // genuine 3-year cert
+            } else {
+                recertDate = new Date(cycleAnchor.getTime());
+                recertDate.setMonth(recertDate.getMonth() + 36); // annual-issue semantics
+            }
+        } else {
+            recertDate = offsetDate(36);
+        }
+        const recertTiming = certExpiry ? ('by ' + fmt(recertDate)) : monthYear(36);
 
         // Match history records to stage slots by their own audit type.
         const historyByStage = {};
