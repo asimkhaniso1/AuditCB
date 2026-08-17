@@ -171,7 +171,25 @@
     // ---- Convenience: find entity in state ----
 
     function findClient(clientId) {
+        if (clientId == null) return undefined;
         return (window.state.clients || []).find(c => String(c.id) === String(clientId));
+    }
+
+    // Resolve the client a report belongs to, using every identifier the report
+    // and its plan carry. A plain `clients.find(c => c.id === report.clientId)`
+    // silently yields undefined for reports saved without a clientId — and an
+    // unresolved client has no certificates, which made the integrity validator
+    // report "no certificate on file" for clients that plainly have one.
+    function resolveReportClient(report, auditPlan) {
+        if (!report && !auditPlan) return undefined;
+        const clients = (window.state && window.state.clients) || [];
+        const ids = [report && report.clientId, auditPlan && auditPlan.clientId].filter(v => v != null);
+        const byId = clients.find(c => ids.some(id => String(c.id) === String(id)));
+        if (byId) return byId;
+        const names = [report && report.client, report && report.clientName,
+            auditPlan && auditPlan.client, auditPlan && auditPlan.clientName]
+            .map(v => String(v == null ? '' : v).trim().toLowerCase()).filter(Boolean);
+        return clients.find(c => names.includes(String(c.name || '').trim().toLowerCase()));
     }
 
     function findAuditReport(reportId) {
@@ -412,6 +430,7 @@
 
         // State lookups
         findClient,
+        resolveReportClient,
         findAuditReport,
         findAuditPlan,
 

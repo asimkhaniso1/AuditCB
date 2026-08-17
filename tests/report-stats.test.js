@@ -177,9 +177,17 @@ describe('ReportStats.cleanEvidenceText', () => {
         expect(window.ReportStats.cleanEvidenceText('a parenthetical (note)')).toBe('A parenthetical (note)');
     });
 
-    it('un-double-encodes stray HTML entities textually, without touching real content', () => {
-        expect(window.ReportStats.cleanEvidenceText('Records &amp;amp; logs reviewed')).toBe('Records &amp; logs reviewed.');
-        expect(window.ReportStats.cleanEvidenceText('a &amp;lt;tag&amp;gt; in the text')).toBe('A &lt;tag&gt; in the text.');
+    // Entities in stored text came from an HTML round-trip, never from the
+    // auditor's keyboard. Decoding them to plain characters is the point: the
+    // renderer escapes once afterwards, so leaving them encoded double-escapes
+    // and prints literally (the KTD report showed "Share Point in Place &amp;
+    // Quickbooks"). Both single- and double-encoded forms decode to the
+    // character the auditor actually typed.
+    it('decodes stored HTML entities so they cannot be escaped twice at render', () => {
+        expect(window.ReportStats.cleanEvidenceText('Records &amp;amp; logs reviewed')).toBe('Records & logs reviewed.');
+        expect(window.ReportStats.cleanEvidenceText('Share Point in Place &amp; Quickbooks used')).toBe('Share Point in Place & Quickbooks used.');
+        expect(window.ReportStats.cleanEvidenceText('a &amp;lt;tag&amp;gt; in the text')).toBe('A <tag> in the text.');
+        expect(window.ReportStats.cleanEvidenceText('quoted &quot;value&quot; seen')).toBe('Quoted "value" seen.');
     });
 
     it('never rewords, rephrases or corrects spelling — mechanical only', () => {

@@ -62,6 +62,19 @@
         /fundamental soundness/i
     ];
 
+    // Broad maturity / consultancy register in a FORMAL narrative. These are a
+    // warning, not a blocker: unlike a second certification verdict they are
+    // wording rather than a competing conclusion, and they typically survive in
+    // narrative text drafted before the AI guardrails existed — the auditor
+    // should reword or regenerate, not be locked out of issuing.
+    const MATURITY_LANGUAGE = [
+        /foundational (level|integrity|soundness)/i,
+        /enhanced maturity|maturity (level|journey)/i,
+        /strategic (integration|alignment|value)/i,
+        /operational (resilience|friction)/i,
+        /process degradation/i
+    ];
+
     // Observation items (advisory, not major/minor) — kept separate from
     // allNCRs() which is major/minor only, for the pseudo-criterion warning.
     function allObservations(report) {
@@ -345,6 +358,60 @@
                 'report.' + key,
                 'Remove the informal verdict language; the only certification decision is the deterministic recommendation sentence.'
             ));
+        });
+    }
+
+    // W10 — maturity/consultancy register in a formal narrative.
+    function checkW10MaturityLanguage(report, results) {
+        const narrative = narrativeFields(report);
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            const hit = MATURITY_LANGUAGE.find((re) => re.test(text));
+            if (!hit) return;
+            const phrase = (text.match(hit) || [''])[0];
+            results.warnings.push(item(
+                'W10-' + key,
+                'warning',
+                'narrative',
+                `Narrative (${key}) uses broad maturity/consultancy wording ("${phrase}") rather than evidence-based audit language.`,
+                'report.' + key,
+                'Reword to state what the evidence showed, or regenerate the narrative — maturity commentary belongs in the analytics annex.'
+            ));
+        });
+    }
+
+    // W11 — a narrative naming a city that is not the client's master site.
+    // The header pulls the address from master data, so a stale city surviving
+    // in drafted prose contradicts the report's own Audit Location.
+    function checkW11NarrativeLocation(report, client, results) {
+        const site = client && Array.isArray(client.sites) && client.sites[0];
+        const masterCity = trim(site && site.city);
+        if (!masterCity) return;
+        const narrative = narrativeFields(report);
+        // Only look at "in <City>" / "at <City>" style mentions followed by a
+        // state/country or sentence end, so ordinary prose isn't scanned for
+        // every capitalised word.
+        const cityMention = /\b(?:in|at)\s+([A-Z][A-Za-z.-]+(?:\s[A-Z][A-Za-z.-]+)?)\s*,\s*[A-Z]{2}\b/g;
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            let m;
+            const seen = {};
+            while ((m = cityMention.exec(text)) !== null) {
+                const found = trim(m[1]);
+                if (!found || seen[found.toLowerCase()]) continue;
+                seen[found.toLowerCase()] = true;
+                if (found.toLowerCase() === masterCity.toLowerCase()) continue;
+                results.warnings.push(item(
+                    'W11-' + key,
+                    'warning',
+                    'narrative',
+                    `Narrative (${key}) places the audit in "${found}", but the client's master site record is in "${masterCity}".`,
+                    'report.' + key + ' vs client.sites[0].city',
+                    'Correct the narrative (or the site master record) so the report does not contradict its own Audit Location.'
+                ));
+            }
         });
     }
 
@@ -660,6 +727,8 @@
         try { checkW6UnreviewedAIContent(report, results); } catch (_e) { /* skip */ }
         try { checkW7ObservationPseudoCriterion(report, results); } catch (_e) { /* skip */ }
         try { checkW9LowCoverage(stats, results); } catch (_e) { /* skip */ }
+        try { checkW10MaturityLanguage(report, results); } catch (_e) { /* skip */ }
+        try { checkW11NarrativeLocation(report, client, results); } catch (_e) { /* skip */ }
 
         try { checkInformation(report, results); } catch (_e) { /* skip */ }
 

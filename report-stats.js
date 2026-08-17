@@ -121,6 +121,19 @@
         // Un-double-encode stray entities, e.g. '&amp;amp;' -> '&amp;',
         // '&amp;lt;' -> '&lt;' — textual substitution only, not a full HTML decode.
         text = text.replace(/&amp;(#\w+;|[a-zA-Z]+;)/g, '&$1');
+        // Auditors type plain characters; an entity sitting in stored text got
+        // there from an HTML round-trip. Left encoded it is escaped AGAIN at
+        // render time and prints literally as "&amp;" (seen in the KTD report:
+        // "Share Point in Place &amp; Quickbooks"). Decode the handful of entities
+        // that occur in practice — the renderer escapes once afterwards, so the
+        // output stays safe.
+        text = text
+            .replace(/&(amp|#38);/gi, '&')
+            .replace(/&(lt|#60);/gi, '<')
+            .replace(/&(gt|#62);/gi, '>')
+            .replace(/&(quot|#34);/gi, '"')
+            .replace(/&(#39|apos|rsquo|#8217);/gi, "'")
+            .replace(/&nbsp;/gi, ' ');
         // Collapse internal whitespace/newlines to single spaces, trim ends.
         text = text.replace(/\s+/g, ' ').trim();
         if (!text) return text;

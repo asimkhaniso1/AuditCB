@@ -15,6 +15,17 @@
         let s = String(t);
         if (!s.trim()) return '';
         s = s.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ');
+        // An HTML entity in stored auditor text came from an HTML round-trip,
+        // never from the auditor's keyboard. Left encoded it gets escaped again
+        // downstream and prints literally ("Share Point in Place &amp; Quickbooks").
+        // Decode here; the renderer escapes once afterwards, so output stays safe.
+        s = s.replace(/&amp;(#\w+|[a-zA-Z]+);/g, '&$1;')
+            .replace(/&(amp|#38);/gi, '&')
+            .replace(/&(lt|#60);/gi, '<')
+            .replace(/&(gt|#62);/gi, '>')
+            .replace(/&(quot|#34);/gi, '"')
+            .replace(/&(#39|apos|rsquo|#8217);/gi, "'")
+            .replace(/&nbsp;/gi, ' ');
         s = s.replace(/\bscreen[\s-]?short(s?)\b/gi, (_m, p) => 'screenshot' + (p || ''));
         s = s.replace(/\bscreen[\s-]?shot(s?)\b/gi, (_m, p) => 'screenshot' + (p || ''));
         s = s.replace(/\bservice[\s-]?now\b/gi, 'ServiceNow');
@@ -3725,7 +3736,19 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<tr><td>Audit Dates</td><td>' + (d.report.date || '—') + (d.report.endDate ? ' → ' + d.report.endDate : '') + '</td></tr>'
                 + '<tr><td>Lead Auditor</td><td>' + (d.report.leadAuditor || '—') + '</td></tr>'
                 + '<tr><td>Audit Method</td><td>' + (d.auditPlan?.auditMethod || 'On-site') + '</td></tr>'
-                + (function () { var s = (d.client.sites && d.client.sites[0]) || {}; var addr = [d.client.address || s.address, d.client.city || s.city, d.client.province, d.client.country || s.country].filter(Boolean).join(', ') || '—'; return '<tr><td>Audit Location</td><td>' + addr + '</td></tr>'; })()
+                + (function () {
+                    var s = (d.client.sites && d.client.sites[0]) || {};
+                    // Master-data values are hand-entered and frequently carry a
+                    // trailing comma or stray whitespace; joining them raw printed
+                    // "306 Camars Drive,, Warminster". Trim separators off each part
+                    // and drop duplicates before joining.
+                    var parts = [d.client.address || s.address, d.client.city || s.city, d.client.province || s.province, d.client.country || s.country]
+                        .map(function (p) { return String(p == null ? '' : p).replace(/[\s,]+$/, '').replace(/^[\s,]+/, '').trim(); })
+                        .filter(Boolean);
+                    var seen = {};
+                    var addr = parts.filter(function (p) { var k = p.toLowerCase(); if (seen[k]) return false; seen[k] = true; return true; }).join(', ') || '—';
+                    return '<tr><td>Audit Location</td><td>' + addr + '</td></tr>';
+                })()
                 + '<tr><td>Plan Reference</td><td>' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'Not Linked') + '</td></tr>'
                 + '</table>'
                 + (d.client.goodsServices && d.client.goodsServices.length > 0 ? '<div style="margin-top:10px;font-size:0.85rem;color:#334155;"><strong>Goods & Services:</strong> ' + d.client.goodsServices.map(g => g.name + (g.category ? ' (' + g.category + ')' : '')).join(', ') + '</div>' : '')

@@ -966,6 +966,25 @@ function _djb2Hash(str) {
     }
     return (h >>> 0).toString(16);
 }
+// Resolve a report's client by every identifier the report and its plan carry.
+// Matching on report.clientId alone silently returned undefined for reports
+// saved without one — and a client that resolves to undefined has no
+// certificates, which made the integrity validator report "no certificate on
+// file" for a client that plainly has one. Delegates to DataService so there is
+// one resolver; the inline fallback keeps this working if DataService is absent.
+function _resolveClientForReport(report, plan) {
+    try {
+        if (window.DataService && typeof window.DataService.resolveReportClient === 'function') {
+            return window.DataService.resolveReportClient(report, plan);
+        }
+    } catch (_e) { /* fall through */ }
+    const clients = (window.state && window.state.clients) || [];
+    const ids = [report && report.clientId, plan && plan.clientId].filter(v => v != null);
+    return clients.find(c => ids.some(id => String(c.id) === String(id)))
+        || clients.find(c => String(c.name || '').trim().toLowerCase()
+            === String((report && report.client) || '').trim().toLowerCase());
+}
+
 window._reportContentHash = function (report, statsSummary) {
     try {
         const findings = (report.checklistProgress || [])
@@ -979,7 +998,7 @@ window._reportContentHash = function (report, statsSummary) {
         let clientName = report.client || '';
         let primarySiteAddress = '';
         try {
-            const client = (window.state && window.state.clients || []).find(c => String(c.id) === String(report.clientId));
+            const client = _resolveClientForReport(report, null);
             if (client) {
                 clientName = client.name || clientName;
                 const site = Array.isArray(client.sites) && client.sites[0];
@@ -1055,7 +1074,7 @@ window.finalizeAndPublish = function (reportId) {
     try {
         if (window.ReportStats && typeof window.ReportStats.build === 'function') {
             const hydratedProgress = report.checklistProgress || [];
-            const client = (window.state && window.state.clients || []).find(c => String(c.id) === String(report.clientId));
+            const client = _resolveClientForReport(report, plan);
             rs = window.ReportStats.build({ report, hydratedProgress, auditPlan: plan, client });
         }
     } catch (e) { console.error('ReportStats.build failed during finalize gate:', e); }
@@ -1089,7 +1108,7 @@ window.finalizeAndPublish = function (reportId) {
     let integrityResult = null;
     try {
         if (window.ReportIntegrity && typeof window.ReportIntegrity.check === 'function') {
-            const client = (window.state && window.state.clients || []).find(c => String(c.id) === String(report.clientId));
+            const client = _resolveClientForReport(report, plan);
             integrityResult = window.ReportIntegrity.check({ report, auditPlan: plan, client, stats: rs });
         }
     } catch (e) { console.error('ReportIntegrity.check failed during finalize gate:', e); }

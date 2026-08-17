@@ -233,6 +233,31 @@ describe('KTD surveillance acceptance', () => {
             expect(certIssue).toEqual([]);
         });
 
+        // Narrative drafted before the AI guardrails can still carry stale facts
+        // and consultancy register — warn, don't block (it is wording, not a
+        // competing certification conclusion).
+        it('W10 warns on maturity/consultancy wording in a formal narrative', () => {
+            const report = base({ comment: 'Programme not fully implemented as scheduled.' });
+            report.executiveSummary = 'The QMS demonstrates a foundational level of implementation and avenues for enhanced maturity and strategic integration.';
+            const result = window.ReportIntegrity.check({ report, auditPlan: KTD_PLAN(), client: KTD_CLIENT() });
+            expect(result.warnings.some((w) => w.id.startsWith('W10-'))).toBe(true);
+            expect(result.blockers.some((b) => b.id.startsWith('B6p'))).toBe(false); // warning, not blocker
+        });
+
+        it('W11 warns when the narrative names a city other than the master site', () => {
+            const report = base({ comment: 'Programme not fully implemented as scheduled.' });
+            report.executiveSummary = 'A Surveillance Audit was conducted at the Head Office in Warwick, PA.';
+            const result = window.ReportIntegrity.check({ report, auditPlan: KTD_PLAN(), client: KTD_CLIENT() });
+            const w11 = result.warnings.find((w) => w.id.startsWith('W11-'));
+            expect(w11).toBeTruthy();
+            expect(w11.message).toContain('Warwick');
+            expect(w11.message).toContain('Warminster');
+
+            report.executiveSummary = 'A Surveillance Audit was conducted at the Head Office in Warminster, PA.';
+            const clean = window.ReportIntegrity.check({ report, auditPlan: KTD_PLAN(), client: KTD_CLIENT() });
+            expect(clean.warnings.some((w) => w.id.startsWith('W11-'))).toBe(false);
+        });
+
         it('criterion blockers carry a ref so the UI can offer a direct fix', () => {
             const report = base({ clause: 'FOCUS.2', criterionRef: '', checklistId: 'cl-1', itemIdx: 4, comment: 'Programme not fully implemented as scheduled.' });
             const b1 = window.ReportIntegrity.check({ report, auditPlan: KTD_PLAN(), client: KTD_CLIENT() })
