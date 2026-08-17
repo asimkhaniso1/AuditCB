@@ -174,6 +174,37 @@
         return base + suffix;
     }
 
+    // ─── Single-source criterion formatter ─────────────────────────────────────
+    // Internal tracking references (FOCUS.n / SURV.n / ORG / DOC — Stage 1
+    // carryover pseudo-clauses, never real standard clauses) need one shared
+    // definition of "what do we show for this finding's criterion" so every
+    // consumer (execution-reporting.js's displayCriterion, report-executive.js's
+    // narrative generation, CAPA/NCR renders) agrees. Pure, never throws.
+    //   - criterionRef present            -> real clause leads the label;
+    //                                        real = criterionRef.
+    //   - no criterionRef, clause looks   -> unresolved internal reference;
+    //     like FOCUS/SURV/ORG/DOC            isInternal = true, real = null.
+    //   - otherwise                       -> clause is already a real/plain
+    //                                        reference; used as-is.
+    const FOCUS_REF_RE = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
+    function formatCriterion(finding) {
+        const f = finding || {};
+        const clause = trim(f.clause);
+        const criterionRef = trim(f.criterionRef);
+        if (criterionRef) {
+            const isCarryover = clause && FOCUS_REF_RE.test(clause) && clause.toLowerCase() !== criterionRef.toLowerCase();
+            return {
+                label: isCarryover ? (criterionRef + ' (internal ref ' + clause + ')') : criterionRef,
+                isInternal: false,
+                real: criterionRef
+            };
+        }
+        if (clause && FOCUS_REF_RE.test(clause)) {
+            return { label: 'internal ref ' + clause, isInternal: true, real: null };
+        }
+        return { label: clause, isInternal: false, real: clause || null };
+    }
+
     // ─── Certification-cycle programme — single computation for preview + export ──
     // Anchors the 3-year cycle on the client's certificate (not the current audit
     // date), overlays real historical audits for this client+standard so completed
@@ -183,7 +214,7 @@
         try {
             return buildProgrammeInner(input || {});
         } catch (_e) {
-            return { stages: [], anchored: 'audit-date-fallback', issues: ['Unable to compute certification programme.'] };
+            return { stages: [], anchored: 'audit-date-fallback', issues: ['Unable to compute certification programme.'], nextAudit: null };
         }
     }
 
@@ -271,7 +302,12 @@
         const currentStageIdx = STAGE_DEFS.findIndex((s) => s.id === currentStageId);
 
         const fmt = (dt) => dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-        const monthYear = (offset) => { const dt = new Date(baseDate.getTime()); dt.setMonth(dt.getMonth() + offset); return fmt(dt); };
+        const offsetDate = (offset) => { const dt = new Date(baseDate.getTime()); dt.setMonth(dt.getMonth() + offset); return dt; };
+        const monthYear = (offset) => fmt(offsetDate(offset));
+        // recertDate is the precise anchor (certificate expiry when known) used for
+        // chronology comparisons; recertTiming is its display string. Kept separate
+        // so month/year formatting never masks a same-month chronology conflict.
+        const recertDate = certExpiry || offsetDate(36);
         const recertTiming = certExpiry ? ('by ' + fmt(certExpiry)) : monthYear(36);
 
         // Match history records to stage slots by their own audit type.
@@ -281,22 +317,34 @@
             if (!historyByStage[sid]) historyByStage[sid] = r;
         });
 
-        const noAnchor = anchored === 'audit-date-fallback' && currentStageIdx > 0;
+        // Only flag missing anchor data from Surveillance onward (idx >= 2): a
+        // Stage 1 or Stage 2/Initial audit legitimately has no certificate or
+        // prior history yet — that's the normal case for a brand-new client, not
+        // a data-integrity problem. Surveillance/recertification audits, by
+        // contrast, are only ever scheduled against an existing certificate, so
+        // having neither one on file there is a genuine gap worth flagging.
+        const noAnchor = anchored === 'audit-date-fallback' && currentStageIdx > 1;
         if (noAnchor) {
             issues.push('No certificate or audit history on file; prior stage dates unavailable.');
         }
 
+        // rawDates[stageId] holds the precise Date behind each stage's display
+        // `timing` string (or null when genuinely unknown) — used below for
+        // chronology comparisons that must not be fooled by month/year rounding.
+        const rawDates = {};
         const stages = STAGE_DEFS.map((s, i) => {
             const isCurrent = s.id === currentStageId;
             const histRec = historyByStage[s.id];
-            let timing, status, source;
+            let timing, status, source, rawDate;
 
             if (isCurrent) {
                 timing = fmt(auditDate);
                 status = 'This audit';
                 source = 'current';
+                rawDate = auditDate;
             } else if (histRec) {
-                timing = fmt(parseDateSafe(histRec.date || histRec.createdAt) || auditDate);
+                rawDate = parseDateSafe(histRec.date || histRec.createdAt) || auditDate;
+                timing = fmt(rawDate);
                 status = 'Completed';
                 source = 'history';
             } else if (i < currentStageIdx) {
@@ -305,19 +353,49 @@
                     timing = '—';
                     status = 'Unknown';
                     source = 'unknown';
+                    rawDate = null;
                 } else {
+                    rawDate = s.id === 'recert' ? recertDate : offsetDate(s.offset);
                     timing = s.id === 'recert' ? recertTiming : monthYear(s.offset);
                     status = 'Completed';
                     source = anchored;
                 }
             } else {
+                rawDate = s.id === 'recert' ? recertDate : offsetDate(s.offset);
                 timing = s.id === 'recert' ? recertTiming : monthYear(s.offset);
                 status = 'Planned';
                 source = anchored;
             }
 
+            rawDates[s.id] = rawDate;
             return { id: s.id, label: s.label, timing, status, source, def: s.def };
         });
+
+        // Chronology rule: a stage still awaiting its visit ('Planned') whose
+        // computed date lands on or before the current audit date is an
+        // impossible/unreliable programme (e.g. a certificate expiry that falls
+        // before or during the audit that is meant to keep it alive). Flag it and
+        // relabel the stage rather than silently inventing a different date.
+        stages.forEach((s) => {
+            if (s.status !== 'Planned') return;
+            const dt = rawDates[s.id];
+            if (dt && !isNaN(dt.getTime()) && dt.getTime() <= auditDate.getTime()) {
+                issues.push('Next required audit/recertification (' + s.label + ' — ' + s.timing + ') is not after the current audit date — the certification programme or certificate expiry needs correction.');
+                s.status = 'Requires scheduling';
+            }
+        });
+
+        // nextAudit: the first stage strictly after the current one with a valid,
+        // future-dated timing. null (with the issue above present) when the
+        // programme cannot substantiate a next audit date.
+        let nextAudit = null;
+        for (let i = currentStageIdx + 1; i < stages.length; i++) {
+            const dt = rawDates[stages[i].id];
+            if (dt && !isNaN(dt.getTime()) && dt.getTime() > auditDate.getTime()) {
+                nextAudit = stages[i];
+                break;
+            }
+        }
 
         // Chronology sanity checks.
         const withDates = stages
@@ -336,7 +414,7 @@
             issues.push('Current audit does not match exactly one programme stage — check the audit type against the certification cycle.');
         }
 
-        return { stages, anchored, issues, anchorDate: baseDate ? baseDate.toISOString() : null };
+        return { stages, anchored, issues, anchorDate: baseDate ? baseDate.toISOString() : null, nextAudit };
     }
 
     function safeMinimalDataset() {
@@ -535,6 +613,12 @@
             return {
                 key: buildFindingKey(item, idx),
                 clause,
+                // Carried through so any consumer (CAPA/NCR register renders,
+                // narrative generation) can resolve the real standard clause via
+                // ReportStats.formatCriterion() instead of printing `clause` raw —
+                // `clause` alone can be an internal FOCUS/SURV/ORG/DOC reference.
+                criterionRef: item.criterionRef || null,
+                criterionSource: item.criterionSource || null,
                 department: dept,
                 severity: severityFromBucket(bucket),
                 statement: cleanText(item.requirement || item.description || '', 120),
@@ -563,6 +647,8 @@
             findingsPre.push({
                 key: `manual|${clause}|${dept}|${i}`,
                 clause,
+                criterionRef: n.criterionRef || null,
+                criterionSource: n.criterionSource || null,
                 department: dept,
                 severity: sev,
                 statement: cleanText(n.description || n.comment || '', 120),
@@ -706,7 +792,8 @@
         normalizeDeptName,
         UNASSIGNED_LABEL,
         recommendationText,
-        buildProgramme
+        buildProgramme,
+        formatCriterion
     };
 
     if (typeof module !== 'undefined' && module.exports) {

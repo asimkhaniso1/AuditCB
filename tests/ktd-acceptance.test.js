@@ -157,6 +157,57 @@ describe('KTD surveillance acceptance', () => {
         expect(window.ReportStats.normalizeDeptName('')).toBe('Unassigned / Cross-functional');
         expect(window.ReportStats.normalizeDeptName('Production')).toBe('Production');
     });
+
+    // Stabilization pass — impossible certification-programme chronology (defect a):
+    // a certificate whose 364-day expiry lands on/before the current audit date
+    // must be flagged, its stage relabeled, nextAudit skip it, and the validator block.
+    it('a certificate expiring on/before the current audit date is flagged, not silently printed', () => {
+        const client = {
+            id: 'ktd-1', name: 'KTD Select',
+            certificates: [{ standard: 'ISO 9001:2015', issueDate: '2025-08-15', expiryDate: '2026-08-14' }]
+        };
+        const auditPlan = { id: 'plan-ktd', clientId: 'ktd-1', auditType: 'Surveillance', standard: 'ISO 9001:2015', startDate: '2026-08-17' };
+        const report = { id: 'rep-ktd', planId: 'plan-ktd', clientId: 'ktd-1', date: '2026-08-17', auditType: 'Surveillance', standard: 'ISO 9001:2015' };
+
+        const p = window.ReportStats.buildProgramme({ client, auditPlan, report, allReports: [] });
+        const recert = p.stages.find((s) => s.id === 'recert');
+
+        expect(recert.status).toBe('Requires scheduling'); // not silently left as "Planned"
+        expect(p.issues.some((i) => /not after the current audit date/i.test(i))).toBe(true);
+        // nextAudit must never be the broken recert stage, or any date <= the audit date.
+        if (p.nextAudit) {
+            expect(p.nextAudit.id).not.toBe('recert');
+        }
+
+        const result = window.ReportIntegrity.check({ report, auditPlan, client });
+        expect(result.status).toBe('BLOCKED');
+        expect(result.blockers.some((b) => b.id === 'B9' || b.id.startsWith('B2'))).toBe(true);
+    });
+
+    // formatCriterion — single source of truth for real-vs-internal criterion display.
+    it('formatCriterion resolves internal refs, resolved criteria and plain clauses', () => {
+        expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2' }))
+            .toEqual({ label: 'internal ref FOCUS.2', isInternal: true, real: null });
+        expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2', criterionRef: '9.2' }))
+            .toEqual({ label: '9.2 (internal ref FOCUS.2)', isInternal: false, real: '9.2' });
+        expect(window.ReportStats.formatCriterion({ clause: '7.1' }))
+            .toEqual({ label: '7.1', isInternal: false, real: '7.1' });
+        expect(window.ReportStats.formatCriterion({})).toEqual({ label: '', isInternal: false, real: null });
+    });
+
+    // Banned secondary-verdict language in formal narrative → blocked.
+    it('"Certifiable with targeted fixes" in the executive summary is blocked', () => {
+        const report = {
+            id: 'rep-verdict', clientId: 'ktd-1', client: 'KTD Select',
+            date: '2026-08-12', auditType: 'Surveillance', standard: 'ISO 9001:2015',
+            executiveSummary: 'The organization is Certifiable with targeted fixes to two minor findings.',
+            conclusion: 'Continued certification is recommended subject to satisfactory closure of applicable nonconformities.',
+            checklistProgress: [], ncrs: []
+        };
+        const result = window.ReportIntegrity.check({ report, auditPlan: KTD_PLAN(), client: KTD_CLIENT() });
+        expect(result.status).toBe('BLOCKED');
+        expect(result.blockers.some((b) => b.id.startsWith('B6p'))).toBe(true);
+    });
 });
 
 // 25.11/25.14/25.15 — source-level hygiene: banned generators removed for good

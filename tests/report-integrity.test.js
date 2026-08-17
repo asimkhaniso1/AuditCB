@@ -84,6 +84,8 @@ describe('ReportIntegrity.check', () => {
 
     it('W3: a finding with department "General" produces a warning, not a blocker', () => {
         const report = baseReport({
+            standard: 'ISO 9001:2015',
+            conclusion: 'Continued conformity is confirmed, subject to satisfactory closure of the minor nonconformity raised.',
             checklistProgress: [
                 {
                     status: 'nc',
@@ -106,7 +108,9 @@ describe('ReportIntegrity.check', () => {
 
     it('zero-issue happy path returns READY FOR AUDITOR REVIEW with no blockers or warnings', () => {
         const report = baseReport({
+            standard: 'ISO 9001:2015',
             executiveSummary: 'The management system was found to be well-implemented and effective.',
+            conclusion: 'Recommended for certification.',
             checklistProgress: [
                 { status: 'conform', clause: '8.5.2', department: 'Production' }
             ]

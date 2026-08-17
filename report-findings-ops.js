@@ -68,6 +68,21 @@
         return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     }
 
+    // Criterion-safe clause display — an internal FOCUS/SURV/ORG/DOC reference
+    // must never be presented as the finding's clause in a formal table.
+    function criterionCell(item) {
+        try {
+            if (global.ReportStats && typeof global.ReportStats.formatCriterion === 'function') {
+                return esc(global.ReportStats.formatCriterion(item).label || '—');
+            }
+        } catch (e) { /* noop */ }
+        var clause = String((item && item.clause) || '').trim();
+        var ref = String((item && item.criterionRef) || '').trim();
+        if (ref) return esc(ref + (clause && clause !== ref ? ' (internal ref ' + clause + ')' : ''));
+        if (/^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i.test(clause)) return esc('internal ref ' + clause);
+        return esc(clause || '—');
+    }
+
     // ─── Local CAPA join (replicates report-risk.js linkedCapaRecords) ────────
     // Primary match: register entry's auditId === this report's audit plan id.
     // Secondary match: same clientId + clause matches a finding clause in this
@@ -374,7 +389,7 @@
 
             return '<tr style="break-inside:avoid;">'
                 + '<td style="font-weight:700;">' + esc(ref) + '</td>'
-                + '<td>' + esc(item.clause || '—') + '</td>'
+                + '<td>' + criterionCell(item) + '</td>'
                 + '<td>' + esc(item.department || '—') + '</td>'
                 + '<td style="text-align:center;">' + badge(severity, ncrTypeSeverity(severity)) + '</td>'
                 + '<td style="text-align:center;">' + badge(LIFECYCLE_LABELS[status] || status, LIFECYCLE_SEVERITY[status] || 'neutral') + '</td>'
@@ -447,7 +462,7 @@
 
             return '<tr style="break-inside:avoid;">'
                 + '<td style="font-weight:700;">' + esc(ref) + (isPending ? ' ' + badge('Pending Classification', 'info') : '') + '</td>'
-                + '<td>' + esc(item.clause || '—') + '</td>'
+                + '<td>' + criterionCell(item) + '</td>'
                 + '<td>' + esc(truncate(item.requirement, 90) || '—') + '</td>'
                 + '<td>' + esc(item.department || '—') + '</td>'
                 + '<td>' + evidenceCell + '</td>'
@@ -497,7 +512,7 @@
         var partA = '<h4 class="b4-subhead">PART A — NONCONFORMITY</h4>'
             + '<table class="b4-tbl" style="margin-bottom:var(--b4-s4);">'
             + '<tbody>'
-            + '<tr><td style="font-weight:700;width:160px;">Clause</td><td>' + esc(item.clause || '—') + '</td></tr>'
+            + '<tr><td style="font-weight:700;width:160px;">Criterion</td><td>' + criterionCell(item) + '</td></tr>'
             + '<tr><td style="font-weight:700;">Requirement</td><td>' + esc(item.requirement || '—') + '</td></tr>'
             + '<tr><td style="font-weight:700;">Statement of Nonconformity</td><td>' + esc(item.comment || '—') + '</td></tr>'
             + '<tr><td style="font-weight:700;">Objective Evidence</td><td>' + esc((safeArr(item.evidenceImages).length || item.evidenceImage) ? (safeArr(item.evidenceImages).length || 1) + ' evidence item(s) attached (see Evidence Traceability section)' : 'See auditor notes') + '</td></tr>'

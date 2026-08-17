@@ -38,23 +38,66 @@
     // show that instead. Otherwise, an internal ref with no resolved clause is a
     // visible reporting gap — flagged so it cannot pass unnoticed (the integrity
     // validator, report-integrity.js, blocks finalization on this).
+    //
+    // Classification (real-vs-internal) is delegated to the single shared source,
+    // ReportStats.formatCriterion(), so every report module agrees on it. What
+    // stays local here is presentation: the alarm-red "Criterion not assigned"
+    // wording is reserved for finding contexts (NC rows, and OBS/OFI rows shown
+    // as findings); conforming checklist rows, plain listings and the Evidence
+    // Index get a neutral "Internal focus item … (Stage 1 carryover)" label
+    // instead — an unresolved internal ref there is expected, not alarming.
     const INTERNAL_REF_PREFIX_RE = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
-    const displayCriterion = (finding) => {
+    const displayCriterion = (finding, isFinding) => {
         const esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml : (s) => String(s == null ? '' : s);
         if (!finding) return '';
-        if (finding.criterionRef) {
+        if (isFinding == null) isFinding = true; // default: existing call sites are finding rows
+
+        const fc = (window.ReportStats && typeof window.ReportStats.formatCriterion === 'function')
+            ? window.ReportStats.formatCriterion(finding)
+            : null;
+        const clause = finding.clause || '';
+        const isInternal = fc ? fc.isInternal : INTERNAL_REF_PREFIX_RE.test(clause);
+
+        if (!isInternal) {
+            const label = fc ? fc.label : clause;
             const suffix = finding.criterionSource === 'focus-carryover'
                 ? ' <span style="font-size:0.72em;color:#94a3b8;font-style:italic;">(from Stage 1 focus item)</span>'
                 : '';
-            return esc(finding.criterionRef) + suffix;
+            return esc(label) + suffix;
         }
-        const clause = finding.clause || '';
-        if (INTERNAL_REF_PREFIX_RE.test(clause)) {
+        if (isFinding) {
             return '<span style="color:#b91c1c;font-weight:700;" title="Criterion not assigned — internal tracking reference only">Criterion not assigned — internal ref ' + esc(clause) + '</span>';
         }
-        return esc(clause);
+        return '<span style="color:#64748b;font-style:italic;" title="Internal Stage 1 tracking reference — not a finding">Internal focus item ' + esc(clause) + ' (Stage 1 carryover)</span>';
     };
     window._displayCriterion = displayCriterion;
+
+    // Formal criterion cell for CAPA / NCR-register style tables (Corrective
+    // Action Requirements, NCR Register) — these list confirmed NCs only, so
+    // always finding context. Leads with the real clause in the accreditation-
+    // formal style "ISO 9001:2015 — Clause 9.2", with the internal tracking
+    // reference (if any) as secondary text; an unresolved internal ref keeps
+    // the same alarm wording as displayCriterion's finding-context branch.
+    const formalCriterionCell = (finding, standard) => {
+        const esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml : (s) => String(s == null ? '' : s);
+        if (!finding) return '';
+        const fc = (window.ReportStats && typeof window.ReportStats.formatCriterion === 'function')
+            ? window.ReportStats.formatCriterion(finding)
+            : null;
+        const clause = finding.clause || '';
+        const isInternal = fc ? fc.isInternal : INTERNAL_REF_PREFIX_RE.test(clause);
+        if (isInternal) {
+            return '<span style="color:#b91c1c;font-weight:700;" title="Criterion not assigned — internal tracking reference only">Criterion not assigned — internal ref ' + esc(clause) + '</span>';
+        }
+        const real = fc ? fc.real : clause;
+        const stdPrefix = standard ? esc(standard) + ' — ' : '';
+        let html = '<div>' + stdPrefix + 'Clause ' + esc(real) + '</div>';
+        if (clause && INTERNAL_REF_PREFIX_RE.test(clause) && clause !== real) {
+            html += '<div style="font-size:0.72em;color:#94a3b8;margin-top:2px;">Internal Reference: ' + esc(clause) + '</div>';
+        }
+        return html;
+    };
+    window._formalCriterionCell = formalCriterionCell;
 
     // Build the list of revision-history rows to render on the cover page.
     // Does NOT mutate the report — pure read helper used by both the preview modal and PDF export.
@@ -709,7 +752,7 @@
         const EDIT_ID_BY_STAGE = { s1: 'rp-prog-s1', s2: 'rp-prog-s2', sv1: 'rp-prog-sv1', sv2: 'rp-prog-sv2', recert: 'rp-prog-recert' };
         const pvProgramme = (window.ReportStats && typeof window.ReportStats.buildProgramme === 'function')
             ? window.ReportStats.buildProgramme({ client: d.client, auditPlan: d.auditPlan, report: d.report, allReports: (window.state && window.state.auditReports) || [] })
-            : { stages: [], anchored: 'audit-date-fallback', issues: ['Certification programme module unavailable.'], anchorDate: null };
+            : { stages: [], anchored: 'audit-date-fallback', issues: ['Certification programme module unavailable.'], anchorDate: null, nextAudit: null };
         const pvProgrammeStages = pvProgramme.stages.map((s) => Object.assign({}, s, { editId: EDIT_ID_BY_STAGE[s.id] || ('rp-prog-' + s.id) }));
         const programmeAnchorCaption = (programme) => {
             const dt = programme.anchorDate ? new Date(programme.anchorDate) : null;
@@ -775,7 +818,7 @@
 
         // Conformance rows (items with comments or evidence)
         const conformRows = d.hydratedProgress.filter(i => i.status === 'conform').map((item, idx) => {
-            const clause = displayCriterion(item);
+            const clause = displayCriterion(item, false);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             return `<tr style="background:${idx % 2 ? '#f0fdf4' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
@@ -962,8 +1005,8 @@
                             <thead><tr style="background:#f0f9ff;"><th style="padding:7px 12px;text-align:left;">Audit Stage</th><th style="padding:7px 12px;text-align:left;">Planned Timing</th><th style="padding:7px 12px;text-align:left;">Focus & Scope</th><th style="padding:7px 12px;text-align:center;">Status</th></tr></thead>
                             <tbody>
                             ${pvProgrammeStages.map(s => {
-        const statusBg = s.status === 'Completed' ? '#dcfce7' : (s.status === 'This audit' ? '#dbeafe' : (s.status === 'Unknown' ? '#fef3c7' : '#f1f5f9'));
-        const statusFg = s.status === 'Completed' ? '#166534' : (s.status === 'This audit' ? '#1d4ed8' : (s.status === 'Unknown' ? '#92400e' : '#64748b'));
+        const statusBg = s.status === 'Completed' ? '#dcfce7' : (s.status === 'This audit' ? '#dbeafe' : ((s.status === 'Unknown' || s.status === 'Requires scheduling') ? '#fef3c7' : '#f1f5f9'));
+        const statusFg = s.status === 'Completed' ? '#166534' : (s.status === 'This audit' ? '#1d4ed8' : ((s.status === 'Unknown' || s.status === 'Requires scheduling') ? '#92400e' : '#64748b'));
         return `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:7px 12px;font-weight:600;">${s.label}</td><td style="padding:7px 12px;">${s.timing}</td><td style="padding:7px 12px;"><div id="${s.editId}" class="rp-edit" contenteditable="true">${s.def}</div></td><td style="padding:7px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:${statusBg};color:${statusFg};">${s.status}</span></td></tr>`;
     }).join('')}
                             </tbody>
@@ -1648,7 +1691,7 @@
                 <!-- 7: NCRs -->
                 <div class="rp-sec" id="sec-ncrs">
                     <div class="rp-sec-hdr" style="border-left-color:#ea580c;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">8</span>NCR REGISTER (${d.report.ncrs.length})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
-                    <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#dc2626' : '#f59e0b') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:0.85rem;"><strong>' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.8rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + (ncr.description || '') + '</div></div>').join('')}</div>
+                    <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#dc2626' : '#f59e0b') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:0.85rem;"><div><strong>' + (ncr.type || '') + '</strong> — ' + formalCriterionCell(ncr, d.report.standard || d.auditPlan?.standard || '') + '</div><span style="color:#64748b;font-size:0.8rem;white-space:nowrap;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + (ncr.description || '') + '</div></div>').join('')}</div>
                 </div>` : ''}
                 <!-- Corrective Action Requirements -->
                 ${(d.stats.ncCount) > 0 ? `
@@ -1668,6 +1711,8 @@
                             .map(f => ({
                                 ref: f.id,
                                 clause: f.clause || '',
+                                criterionRef: f.criterionRef || null,
+                                criterionSource: f.criterionSource || null,
                                 type: f.severity || 'Minor',
                                 desc: f.comment || f.statement || '',
                                 dueDate: f.caDueDate || dueFromType(f.severity)
@@ -1679,19 +1724,24 @@
                         allNCs = [...ncItems.map((item, i) => ({
                             ref: 'NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1),
                             clause: item.clauseRef || item.clause || item.id,
+                            criterionRef: item.criterionRef || null,
+                            criterionSource: item.criterionSource || null,
                             type: item.ncrType || item.severity || 'Minor',
                             desc: item.ncrDescription || item.comment || item.requirement || '',
                             dueDate: item.caDueDate || dueFromType(item.ncrType)
                         })), ...ncrItems.map((ncr, i) => ({
                             ref: 'NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1),
                             clause: ncr.clause || '',
+                            criterionRef: ncr.criterionRef || null,
+                            criterionSource: ncr.criterionSource || null,
                             type: ncr.type || 'Minor',
                             desc: ncr.description || '',
                             dueDate: ncr.caDueDate || dueFromType(ncr.type)
                         }))];
                     }
                     if (allNCs.length === 0) return '<tr><td colspan="6" style="padding:20px;text-align:center;color:#94a3b8;">No corrective actions required</td></tr>';
-                    return allNCs.map(nc => '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;font-family:monospace;color:#be185d;">' + nc.ref + '</td><td style="padding:10px 14px;">' + nc.clause + '</td><td style="padding:10px 14px;"><span style="padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;' + ((nc.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + nc.type + '</span></td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Root cause analysis and corrective action required for: ' + (nc.desc || '').substring(0, 120) + '</td><td style="padding:10px 14px;font-weight:600;color:#be185d;">' + nc.dueDate + '</td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Document review & follow-up audit</td></tr>').join('');
+                    const carStandard = d.report.standard || d.auditPlan?.standard || '';
+                    return allNCs.map(nc => '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;font-family:monospace;color:#be185d;">' + nc.ref + '</td><td style="padding:10px 14px;">' + formalCriterionCell(nc, carStandard) + '</td><td style="padding:10px 14px;"><span style="padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;' + ((nc.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + nc.type + '</span></td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Root cause analysis and corrective action required for: ' + (nc.desc || '').substring(0, 120) + '</td><td style="padding:10px 14px;font-weight:600;color:#be185d;">' + nc.dueDate + '</td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Document review & follow-up audit</td></tr>').join('');
                 })()}</tbody>
                         </table>
                         <div style="margin-top:1rem;padding:0.75rem;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><i class="fa-solid fa-clock" style="margin-right:0.4rem;"></i><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>
@@ -2395,7 +2445,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             if (findingsBody && d.hydratedProgress) {
                 const items = d.hydratedProgress.filter(i => i.status !== 'pending');
                 findingsBody.innerHTML = items.map((item, idx) => {
-                    const clause = displayCriterion(item);
+                    const clause = displayCriterion(item, item.status === 'nc');
                     const sevRaw = item.status === 'nc' ? (item.ncrType || 'NC') : item.status === 'observation' ? 'OBS' : 'OK';
                     const sev = sevRaw;
                     const sevLc = String(sevRaw).toLowerCase();
@@ -2414,7 +2464,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 };
                 const conformItems = d.hydratedProgress.filter(i => i.status === 'conform');
                 conformSec.innerHTML = conformItems.map((item, idx) => {
-                    const clause = displayCriterion(item);
+                    const clause = displayCriterion(item, false);
                     const title = item.kbMatch ? item.kbMatch.title : '';
                     const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
                     return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:10px 14px;font-weight:700;">' + clause + '</td><td style="padding:10px 14px;">' + (title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req) + '</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">' + (item.comment || '<span style="color:#94a3b8;">No remarks</span>') + renderEvThumbs(item) + '</td></tr>';
@@ -2847,7 +2897,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
 
         // Conformance rows for PDF (items with comments or evidence)
         const conformRowsHtml = d.hydratedProgress.filter(i => i.status === 'conform' && (i.comment || i.evidenceImage || (i.evidenceImages && i.evidenceImages.length))).map((item, idx) => {
-            const clause = displayCriterion(item);
+            const clause = displayCriterion(item, false);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
@@ -2884,9 +2934,43 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // Serialize area stats for chart script
         let areaChartData = JSON.stringify({ keys: areaSortedKeys, names: areaSortedKeys.map(function (k) { return clauseAreaNames[k]; }), conform: areaSortedKeys.map(function (k) { return areaStats[k].conform; }), nc: areaSortedKeys.map(function (k) { return areaStats[k].major + areaStats[k].minor; }), obs: areaSortedKeys.map(function (k) { return areaStats[k].obs; }), ofi: areaSortedKeys.map(function (k) { return areaStats[k].ofi; }) });
 
+        // Fold a set of internal tracking refs (FOCUS.1, FOCUS.2, … ORG, DOC) into
+        // a compact display string, collapsing consecutive numeric runs per prefix
+        // — e.g. {FOCUS.1..FOCUS.8, ORG, DOC} -> "FOCUS.1–FOCUS.8, ORG, DOC".
+        // Reusable across any Annex-SL-style standard; not tied to a clause set.
+        const foldInternalRefs = function (refs) {
+            const byPrefix = {};
+            const bare = [];
+            refs.forEach(function (r) {
+                const m = /^(FOCUS|SURV|ORG|DOC)(?:[.\s](\d+))?$/i.exec(String(r || '').trim());
+                if (!m) { bare.push(String(r || '').trim()); return; }
+                const prefix = m[1].toUpperCase();
+                if (m[2] == null) { bare.push(prefix); return; }
+                (byPrefix[prefix] = byPrefix[prefix] || []).push(parseInt(m[2], 10));
+            });
+            const parts = [];
+            Object.keys(byPrefix).sort().forEach(function (prefix) {
+                const nums = Array.from(new Set(byPrefix[prefix])).sort(function (a, b) { return a - b; });
+                let i = 0;
+                const runs = [];
+                while (i < nums.length) {
+                    let j = i;
+                    while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j++;
+                    runs.push(i === j ? (prefix + '.' + nums[i]) : (prefix + '.' + nums[i] + '–' + prefix + '.' + nums[j]));
+                    i = j + 1;
+                }
+                parts.push(runs.join(', '));
+            });
+            const bareUnique = Array.from(new Set(bare)).filter(Boolean).sort();
+            return parts.concat(bareUnique).join(', ');
+        };
+
         // ─── AUDIT TRAILS: checklist items grouped by department/area ────
         // Shows, per department, which personnel were interviewed, which clauses were
         // sampled there, how many items were checked, and the worst outcome found.
+        // Real clauses and internal FOCUS/SURV/ORG/DOC tracking refs are tracked
+        // and displayed separately — mixing them in one list misrepresents the
+        // internal refs as if they were standard clauses.
         const auditTrailsRowsHtml = (function () {
             const groups = {};
             const order = [];
@@ -2894,11 +2978,19 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const dept = (window.ReportStats && window.ReportStats.normalizeDeptName)
                     ? window.ReportStats.normalizeDeptName(item.department)
                     : ((item.department && String(item.department).trim()) || 'Unassigned / Cross-functional');
-                if (!groups[dept]) { groups[dept] = { personnel: new Set(), clauses: new Set(), count: 0, worst: 'conform' }; order.push(dept); }
+                if (!groups[dept]) { groups[dept] = { personnel: new Set(), clauses: new Set(), internalRefs: new Set(), count: 0, worst: 'conform' }; order.push(dept); }
                 const g = groups[dept];
                 if (item.personnel) String(item.personnel).split(/[,;]/).map(function (p) { return p.trim(); }).filter(Boolean).forEach(function (p) { g.personnel.add(p); });
-                const clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || item.clause;
-                if (clause) g.clauses.add(String(clause));
+                const rawClause = (item.kbMatch ? item.kbMatch.clause : item.clause) || item.clause;
+                if (rawClause) {
+                    if (item.criterionRef) {
+                        g.clauses.add(String(item.criterionRef));
+                    } else if (INTERNAL_REF_PREFIX_RE.test(String(rawClause))) {
+                        g.internalRefs.add(String(rawClause));
+                    } else {
+                        g.clauses.add(String(rawClause));
+                    }
+                }
                 g.count++;
                 // Worst-status ranking: major NC > minor NC > observation > conforming
                 const rank = { major: 3, minor: 2, observation: 1, conform: 0 };
@@ -2927,7 +3019,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     return parseFloat(a) - parseFloat(b) || a.localeCompare(b);
                 });
                 const personnelTxt = g.personnel.size ? Array.from(g.personnel).join(', ') : '<span style="color:#94a3b8;">Not recorded</span>';
-                const clausesTxt = clausesSorted.length ? clausesSorted.join(', ') : '—';
+                const internalTxt = foldInternalRefs(Array.from(g.internalRefs));
+                let clausesTxt = '';
+                if (clausesSorted.length) clausesTxt += '<div>Clauses: ' + window.UTILS.escapeHtml(clausesSorted.join(', ')) + '</div>';
+                if (internalTxt) clausesTxt += '<div style="color:#64748b;font-size:0.85em;' + (clausesSorted.length ? 'margin-top:2px;' : '') + '">Internal focus items: ' + window.UTILS.escapeHtml(internalTxt) + '</div>';
+                if (!clausesTxt) clausesTxt = '—';
                 return '<tr style="background:' + (idx % 2 ? '#fafbfc' : 'white') + ';">'
                     + '<td style="padding:11px 14px;font-weight:700;">' + window.UTILS.escapeHtml(dept) + '</td>'
                     + '<td style="padding:11px 14px;color:#334155;">' + personnelTxt + '</td>'
@@ -3019,11 +3115,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const EDIT_ID_BY_STAGE_EXPORT = { s1: 'rp-prog-s1', s2: 'rp-prog-s2', sv1: 'rp-prog-sv1', sv2: 'rp-prog-sv2', recert: 'rp-prog-recert' };
         const auditProgramme = (window.ReportStats && typeof window.ReportStats.buildProgramme === 'function')
             ? window.ReportStats.buildProgramme({ client: d.client, auditPlan: d.auditPlan, report: d.report, allReports: (window.state && window.state.auditReports) || [] })
-            : { stages: [], anchored: 'audit-date-fallback', issues: ['Certification programme module unavailable.'], anchorDate: null };
+            : { stages: [], anchored: 'audit-date-fallback', issues: ['Certification programme module unavailable.'], anchorDate: null, nextAudit: null };
         const programmeStages = auditProgramme.stages.map(function (s) {
             return Object.assign({}, s, { editId: EDIT_ID_BY_STAGE_EXPORT[s.id] || ('rp-prog-' + s.id) });
         });
-        const auditStageBase = programmeStages.findIndex(function (s) { return s.status === 'This audit'; });
         const programmeAnchorCaptionExport = function (programme) {
             const dt = programme.anchorDate ? new Date(programme.anchorDate) : null;
             const fmtDate = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('en-GB') : '';
@@ -3431,14 +3526,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
             + '</div>'
             + '<div style="position:absolute;bottom:50px;left:50px;right:50px;border-top:2px solid #cbd5e1;padding-top:16px;">'
-            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;margin-bottom:10px;"><span><strong>Doc ID:</strong> RPT-' + d.report.id.substring(0, 8) + '</span><span><strong>Status:</strong> ' + ((d.report.reportStatus === 'final') ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
-            + '<div style="font-size:0.68rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Document Revision History</div>'
-            + '<table style="width:100%;font-size:0.68rem;border-collapse:collapse;"><thead><tr style="background:#f1f5f9;"><th style="padding:4px 8px;text-align:left;">Ver</th><th style="padding:4px 8px;text-align:left;">Date</th><th style="padding:4px 8px;text-align:left;">Author</th><th style="padding:4px 8px;text-align:left;">Description</th></tr></thead><tbody>'
-            + revisionRows.map(r => '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.ver + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.date + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.author + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.desc + '</td></tr>').join('')
-            + '</tbody></table></div>'
+            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;"><span><strong>Doc ID:</strong> RPT-' + d.report.id.substring(0, 8) + '</span><span><strong>Status:</strong> ' + ((d.report.reportStatus === 'final') ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
+            + '</div>'
             + '</div>'
             // TABLE OF CONTENTS — formal report first, then each enabled annex under
             // its own heading, driven by the same secMap numbering used in the body.
+            // Document Revision History is folded in here as a compact block (rather
+            // than its own page-break in the cover's footer) — on its own it was
+            // landing on an almost-empty page in the exported PDF.
             + (function () {
                 const tocLink = function (s) {
                     const num = secMap[s.key].num;
@@ -3456,6 +3551,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const annexHeading = function (label, title) {
                     return '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;break-inside:avoid;">Annex ' + label + ' — ' + title + '</div>';
                 };
+                const revisionHistoryBlock = '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #e2e8f0;break-inside:avoid;page-break-inside:avoid;">'
+                    + '<div style="font-size:0.66rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Document Revision History</div>'
+                    + '<table style="width:100%;font-size:0.66rem;border-collapse:collapse;"><thead><tr style="background:#f1f5f9;"><th style="padding:4px 8px;text-align:left;">Ver</th><th style="padding:4px 8px;text-align:left;">Date</th><th style="padding:4px 8px;text-align:left;">Author</th><th style="padding:4px 8px;text-align:left;">Description</th></tr></thead><tbody>'
+                    + revisionRows.map(r => '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.ver + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.date + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.author + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.desc + '</td></tr>').join('')
+                    + '</tbody></table></div>';
                 return '<div class="toc page-break"><div class="toc-title">Contents</div>'
                     + '<div class="toc-sub">' + d.report.client + ' — ' + standard + '</div>'
                     + '<div class="toc-line"></div>'
@@ -3466,7 +3566,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     + (capaTocItems.length ? annexHeading('C', 'Corrective Action Forms') + capaTocItems.join('') : '')
                     + '</div>'
                     + '<div style="margin-top:14px;padding-top:8px;border-top:1px solid #f1f5f9;text-align:right;font-size:0.68rem;color:#94a3b8;">'
-                    + totalCount + ' sections</div></div>';
+                    + totalCount + ' sections</div>'
+                    + revisionHistoryBlock
+                    + '</div>';
             })()
             + '<div class="content">'
             // Formal report front matter — only the exec-summary module (formal group)
@@ -3496,8 +3598,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + programmeStages.map(function (s) {
                     const editedMap = { 'rp-prog-s1': editedProgS1, 'rp-prog-s2': editedProgS2, 'rp-prog-sv1': editedProgSv1, 'rp-prog-sv2': editedProgSv2, 'rp-prog-recert': editedProgRecert };
                     const editedTxt = editedMap[s.editId] || s.def;
-                    const statusBg = s.status === 'Completed' ? '#ecfdf5' : (s.status === 'This audit' ? '#eff6ff' : (s.status === 'Unknown' ? '#fffbeb' : '#f1f5f9'));
-                    const statusFg = s.status === 'Completed' ? '#15803d' : (s.status === 'This audit' ? '#1d4ed8' : (s.status === 'Unknown' ? '#92400e' : '#64748b'));
+                    const statusBg = s.status === 'Completed' ? '#ecfdf5' : (s.status === 'This audit' ? '#eff6ff' : ((s.status === 'Unknown' || s.status === 'Requires scheduling') ? '#fffbeb' : '#f1f5f9'));
+                    const statusFg = s.status === 'Completed' ? '#15803d' : (s.status === 'This audit' ? '#1d4ed8' : ((s.status === 'Unknown' || s.status === 'Requires scheduling') ? '#92400e' : '#64748b'));
                     return '<tr><td style="font-weight:700;">' + s.label + '</td><td>' + s.timing + '</td><td>' + editedTxt + '</td><td style="text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">' + s.status + '</span></td></tr>';
                 }).join('')
                 + '</tbody></table></div>' : '')
@@ -3555,7 +3657,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: FINDING DETAILS
             + (secMap['findings'] ? '<div id="sec-findings" class="sh page-break" style="background:#fef2f2;border-left-color:#b91c1c;">' + sBadge('findings') + 'FINDING DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:30%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No findings recorded.</td></tr>') + '</tbody></table></div>' : '')
             // SECTION: NCR REGISTER
-            + (secMap['ncrs'] ? '<div id="sec-ncrs" class="sh page-break" style="background:#fff7ed;border-left-color:#b91c1c;">' + sBadge('ncrs') + 'NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#b91c1c' : '#b45309') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + (ncr.evidenceImageThumb || ncr.evidenceImage) + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
+            + (secMap['ncrs'] ? '<div id="sec-ncrs" class="sh page-break" style="background:#fff7ed;border-left-color:#b91c1c;">' + sBadge('ncrs') + 'NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#b91c1c' : '#b45309') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div style="font-size:0.95rem;"><strong>' + (ncr.type || '') + '</strong> — ' + formalCriterionCell(ncr, standard) + '</div><span style="color:#64748b;font-size:0.82rem;white-space:nowrap;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + (ncr.evidenceImageThumb || ncr.evidenceImage) + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
 
             // SECTION: CORRECTIVE ACTION REQUIREMENTS
             + (secMap['corrective'] ? '<div id="sec-corrective" class="sh page-break" style="background:#f8fafc;border-left-color:#be185d;">' + sBadge('corrective') + 'CORRECTIVE ACTION REQUIREMENTS</div><div class="sb">'
@@ -3566,7 +3668,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     // here so regenerating the PDF does not shift due dates. Fall back to computing
                     // from today only for legacy records that predate persistence.
                     var fallbackDue = function (typ) { var due = new Date(); due.setDate(due.getDate() + ((typ || '').toLowerCase() === 'major' ? 30 : 90)); return due.toISOString().split('T')[0]; };
-                    var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typRaw = (item.ncrType || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : typRaw === 'minor' ? 'Minor' : 'Minor †'; var dueStr = item.caDueDate || fallbackDue(item.ncrType); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + (item.clauseRef || item.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typRaw = (ncr.type || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : (ncr.type || 'Minor'); var dueStr = ncr.caDueDate || fallbackDue(ncr.type); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
+                    var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typRaw = (item.ncrType || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : typRaw === 'minor' ? 'Minor' : 'Minor †'; var dueStr = item.caDueDate || fallbackDue(item.ncrType); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + formalCriterionCell({ clause: item.clauseRef || item.clause || '', criterionRef: item.criterionRef || null, criterionSource: item.criterionSource || null }, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typRaw = (ncr.type || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : (ncr.type || 'Minor'); var dueStr = ncr.caDueDate || fallbackDue(ncr.type); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + formalCriterionCell(ncr, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
                 + '</tbody></table>'
                 + '<div style="margin-top:12px;padding:10px;background:#f1f5f9;border-radius:8px;font-size:0.82rem;color:#475569;"><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>'
                 + '</div>' : '')
@@ -3675,7 +3777,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const rows = evIdx.map(function (ev, idx) {
                     const desc = (ev.comment || '').toString().replace(/<[^>]*>/g, '').trim();
                     const descExcerpt = desc ? (desc.slice(0, 90) + (desc.length > 90 ? '…' : '')) : 'Not recorded';
-                    const clauseCell = ev.clause ? displayCriterion(ev) : 'Not recorded';
+                    // Evidence Index is a traceability listing, not a findings table —
+                    // an unresolved internal ref here is a neutral fact, not an alarm.
+                    const clauseCell = ev.clause ? displayCriterion(ev, false) : 'Not recorded';
                     return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';">'
                         + '<td style="padding:8px 12px;font-weight:700;white-space:nowrap;">' + esc(ev.evId) + '</td>'
                         + '<td style="padding:8px 12px;">' + esc(descExcerpt) + '</td>'
@@ -3699,13 +3803,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // CLOSING PAGE — the report ends confidently, board-presentation style.
             + (function () {
                 const nextStage = (function () {
-                    // Read directly from the shared programme computation — the stage
-                    // immediately after "This audit" — instead of a second, independent
-                    // offset table that could silently drift from the Audit Programme section.
-                    if (typeof auditStageBase !== 'number' || auditStageBase < 0 || auditStageBase >= programmeStages.length - 1) return null;
-                    const next = programmeStages[auditStageBase + 1];
-                    if (!next) return null;
-                    return next.label + ' — ' + next.timing;
+                    // Read directly from the shared programme computation's nextAudit —
+                    // the first stage strictly after "This audit" with a date that is
+                    // actually after the current audit date. A 'Planned' stage whose date
+                    // has collapsed onto/before the current audit (e.g. a certificate
+                    // expiry inside the audit month) is never printed as if it were valid;
+                    // buildProgramme relabels it 'Requires scheduling' and nextAudit skips it.
+                    const na = auditProgramme && auditProgramme.nextAudit;
+                    if (na && na.label && na.timing) return na.label + ' — ' + na.timing;
+                    return 'To be scheduled in accordance with the certification programme';
                 })();
                 const row = function (label, value) {
                     return value ? '<tr><td style="padding:9px 14px;color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;font-weight:500;width:40%;">' + label + '</td><td style="padding:9px 14px;color:#0f2a43;font-weight:500;font-size:0.9rem;">' + value + '</td></tr>' : '';

@@ -7,7 +7,7 @@
 // CONTRACT / USAGE (for the integrating session):
 //   window.ReportExecutive.prepare(d)                 -> async, runs AI calls once & caches results keyed by d.report.id
 //   window.ReportExecutive.sections(d)                 -> sync, returns [{key,name,desc,color,bodyHtml,charts}] for:
-//                                                            'exec-summary'   EXECUTIVE SUMMARY (BOARD EDITION)
+//                                                            'exec-summary'   EXECUTIVE SUMMARY (leads with an Audit Outcome Summary block)
 //                                                            'evidence-intel' EVIDENCE INTELLIGENCE
 //                                                            'exec-insights'  EXECUTIVE INSIGHTS
 //   window.ReportExecutive.sectionsPreviewToggles()     -> [{id,label,icon,color}] matching the app's existing
@@ -149,7 +149,66 @@
     const clauseTitle = (item) => cleanFindingText((item.kbMatch && item.kbMatch.title) ? item.kbMatch.title : '', 90);
 
     // ------------------------------------------------------------------
-    // 1. EXECUTIVE SUMMARY (BOARD EDITION)
+    // Criterion / department safety helpers — prevent "Clause FOCUS.x" and
+    // "(General)" from ever reaching printed narrative text. Prefer the
+    // canonical window.ReportStats helpers when present (shared source of
+    // truth being introduced alongside this module); fall back to an
+    // equivalent local implementation otherwise so this module never depends
+    // on load order.
+    // ------------------------------------------------------------------
+    const CRITERION_INTERNAL_RX = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
+
+    function formatCriterionFallback(finding) {
+        const f = finding || {};
+        const rawClause = (f.clause != null ? f.clause : (f.kbMatch && f.kbMatch.clause)) || '';
+        const criterionRef = f.criterionRef || '';
+        const isInternalPrefix = CRITERION_INTERNAL_RX.test(String(rawClause || ''));
+        if (criterionRef) {
+            return { label: isInternalPrefix ? `${criterionRef} (internal ref ${rawClause})` : String(criterionRef), isInternal: false };
+        }
+        if (isInternalPrefix) {
+            return { label: `internal audit reference ${rawClause} (criterion to be assigned)`, isInternal: true };
+        }
+        return { label: rawClause || 'the applicable clause', isInternal: false };
+    }
+
+    function formatCriterion(finding) {
+        try {
+            if (window.ReportStats && typeof window.ReportStats.formatCriterion === 'function') {
+                const r = window.ReportStats.formatCriterion(finding);
+                if (r && r.label) return r;
+            }
+        } catch (_e) { /* fall through to local fallback */ }
+        return formatCriterionFallback(finding);
+    }
+
+    // Full narrative-ready phrase for a finding's clause/criterion, safe to
+    // embed directly into a sentence. Never produces "Clause FOCUS.x": an
+    // internal working reference without an assigned criterion is described
+    // as an internal audit reference, never as a "Clause".
+    function clauseText(finding) {
+        const c = formatCriterion(finding);
+        if (c.isInternal) return c.label;
+        return /^clause\b/i.test(c.label) ? c.label : `Clause ${c.label}`;
+    }
+
+    function normalizeDept(name) {
+        try {
+            if (window.ReportStats && typeof window.ReportStats.normalizeDeptName === 'function') {
+                return window.ReportStats.normalizeDeptName(name);
+            }
+        } catch (_e) { /* fall through to local fallback */ }
+        const s = String(name == null ? '' : name).trim();
+        if (!s || /^(unassigned|general|n\/?a|none|other)$/i.test(s)) return UNASSIGNED_LABEL;
+        return s;
+    }
+
+    function hasGenuineContent(arr) {
+        return safeArr(arr).some(s => String(s == null ? '' : s).trim().length > 0);
+    }
+
+    // ------------------------------------------------------------------
+    // 1. EXECUTIVE SUMMARY / AUDIT OUTCOME SUMMARY
     // ------------------------------------------------------------------
 
     function buildExecSummaryPrompt(d) {
@@ -161,27 +220,23 @@
         const deptList = Object.keys(depts).join(', ') || 'N/A';
 
         const ncLines = realNCs.slice(0, 25).map((i, idx) =>
-            `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] Clause ${clauseLabel(i)}${clauseTitle(i) ? ' — ' + clauseTitle(i) : ''} (Dept: ${i.department || 'General'})`
+            `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseText(i)}${clauseTitle(i) ? ' — ' + clauseTitle(i) : ''} (Dept: ${normalizeDept(i.department)})`
         ).join('\n');
 
         return `
-You are an ISO management-system audit reporting assistant. Produce an executive summary of THIS audit for the client's senior management, using only the data provided below. Do not invent, assume, or infer any fact not present in the Audit Data or Non-Conformity Detail sections.
-
-Narrative structure (answer in this order across the fields, so a reader top-to-bottom gets the full picture):
-1. Overall health (health field) — is the management system fundamentally sound, based on the conformity rate and findings below?
-2. Certification status (outcome, recommendation) — where does this leave certification?
-3. Consequences of the findings (risks, businessImpact, concerns) — what does this mean for the certification process (closure timelines, scope of verification at the next audit)?
-4. What management should do (priorities, managementActions) — the concrete next steps.
-5. Forward readiness / confidence (forwardOutlook) — how ready is the organization heading into the next audit stage?
+You are an ISO management-system audit reporting assistant. Produce factual, evidence-bound narrative fields for THIS audit's executive summary, for the client's senior management, using only the data provided below. Do not invent, assume, or infer any fact not present in the Audit Data or Non-Conformity Detail sections. Do not produce an overall certification verdict or recommendation yourself — that is sourced elsewhere, verbatim, from the certification decision record.
 
 Voice rules (strict):
+- Report counts and evidence-based statements only. Never characterize the management system's overall "health", "soundness", "resilience", or "maturity" in subjective terms, and never render a one-line verdict.
+- Banned words — do not use any of these anywhere, in any form, alone or combined with another word: "soundness", "fundamental", "health", "resilience", "verdict", "certifiable". Also banned phrases: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of", "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "in conclusion", "moving forward". Banned: any sentence that could be pasted into a different company's report unchanged.
 - Use plain audit language: requirement -> objective evidence -> evaluation -> finding. State only what the audit evidence supports.
-- EVERY paragraph-level field (outcome, health, businessImpact, risks, forwardOutlook) MUST contain at least one concrete quantified reference — a score, a count, a clause number, or a named department — pulled from the data below. A sentence with no number, clause, or department name is not acceptable.
-- Never write generic filler like "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "healthy operational posture", "in conclusion", or "moving forward". Banned phrases, do not use any of these anywhere: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of". Banned: any sentence that could be pasted into a different company's report unchanged.
+- EVERY paragraph-level field (businessImpact, risks, forwardOutlook) MUST contain at least one concrete quantified reference — a count, a clause, or a named department — pulled from the data below. A sentence with no number, clause, or department name is not acceptable.
+- Never write the word "Clause" immediately before an internal audit working reference (anything starting with FOCUS, SURV, ORG, or DOC) — those are not final ISO clause citations. Reuse clause/reference text exactly as it already appears in the Non-Conformity Detail list below; never re-derive or reformat a clause reference yourself.
 - Never state or estimate financial figures, revenue, penalties, customer loss, cost, contract exposure, or reputational damage. Consequences may reference ONLY certification-process outcomes — e.g. closure timelines, certification decision status, or the scope of verification at the next audit — never business, commercial, or financial outcomes.
-- Never claim a weakness is "recurring", "repeated", "systemic", or a "pattern" — recurrence can only be stated if the data below explicitly identifies that the same clause failed in a prior audit. If no prior-audit data is provided, describe multiple related findings only by count or as a concentration within this audit, never as a trend across audits.
+- Never claim a finding is "recurring", "repeated", "systemic", or a "pattern" — recurrence can only be stated if the data below explicitly identifies that the same clause failed in a prior audit. If no prior-audit data is provided, describe multiple related findings only by count or as a concentration within this audit, never as a trend across audits.
+- Never state a corrective-action requirement as an absolute condition of keeping certification (e.g. do not write "is required to maintain certification" or "must be closed to maintain certification"). State only that findings require corrective action and closure through the certification body's corrective-action process.
 - Never list a department or clause under "strengths" if that same department or clause also appears in the Non-Conformity Detail list below.
-- For each bullet list (strengths, weaknesses, concerns, priorities, managementActions): identify only genuinely DISTINCT points — do not restate the same underlying theme in different words to pad the list. Cap each list at 3 bullets maximum, even if fewer than 3 distinct points exist. It is better to return 1 sharp bullet than 3 that repeat one theme.
+- For each bullet list (strengths, findings, concerns): identify only genuinely DISTINCT points — do not restate the same underlying theme in different words to pad the list. Cap each list at 3 bullets maximum. "concerns" may be an empty array if there is nothing genuinely distinct beyond what "findings" already covers — it is better to return fewer bullets, or none, than several that repeat one theme.
 - No hedging beyond what the evidence supports, but do not overstate certainty either — take a clear position grounded strictly in the data above. Quantify wherever possible (percentages, counts, timeframes).
 - Write in plain, declarative sentences a senior manager reads in 90 seconds. No jargon, no markdown symbols.
 
@@ -196,34 +251,25 @@ Audit Data:
 - Minor Non-Conformities: ${stats.minorNC || 0}
 - Observations: ${stats.observationCount || 0}
 - Opportunities for Improvement: ${stats.ofiCount || 0}
-- Certification Recommendation: ${stats.recommendation || 'Pending'}
 - Departments Assessed: ${deptList}
 
 Non-Conformity Detail:
 ${ncLines || 'None recorded.'}
 
-Write a JSON object with these fields (plain text, NO markdown symbols like ** or ##, use complete sentences, reference real numbers/clauses/departments from above):
+Write a JSON object with these fields (plain text, NO markdown symbols like ** or ##, use complete sentences, reference real numbers/clauses/departments from above, using clause references exactly as formatted in the Non-Conformity Detail list):
 {
-  "verdict": "one short phrase, 2-5 words, the overall health verdict a CEO could repeat in a hallway (e.g. 'Certifiable with targeted fixes' or 'At risk — major gaps in Production')",
-  "outcome": "1-2 sentence overall audit outcome statement citing actual counts",
-  "health": "1-2 sentence organizational health / management system maturity statement",
   "strengths": ["up to 3 short bullet strings, each a genuinely distinct key strength, cite departments/clauses — never a department or clause that also appears in the Non-Conformity Detail list above"],
-  "weaknesses": ["up to 3 short bullet strings, each a genuinely distinct key weakness, cite departments/clauses — do not repeat the same theme worded differently"],
-  "concerns": ["up to 3 short bullet strings, each a genuinely distinct concern for management, framed only in certification-process terms (closure timelines, verification scope) — never financial or commercial terms"],
-  "priorities": ["up to 3 short bullet strings, recommended management priorities, action-oriented, owner-implied"],
-  "recommendation": "1-2 sentence certification recommendation statement",
-  "risks": "1-2 sentence forward-looking risk statement with at least one number/clause/department — certification-process consequences only (e.g. what could delay closure or affect the scope of verification at the next audit); never revenue, cost, penalties, or customer/business impact",
+  "findings": ["up to 3 short bullet strings, each a genuinely distinct key finding, cite departments/clauses — do not repeat the same theme worded differently"],
+  "concerns": ["0 to 3 short bullet strings, each a genuinely distinct concern for management beyond what 'findings' already covers, framed only in certification-process terms (closure timelines, verification scope) — never financial or commercial terms; return an empty array if there is nothing genuinely distinct to add"],
   "businessImpact": "1-2 sentence statement on the certification-process implications of the findings with at least one number/clause/department (e.g. effect on closure timeline or scope of the next audit) — never a financial, revenue, or commercial figure",
-  "managementActions": ["up to 3 short bullet strings, each a genuinely distinct top-management responsibility per ISO clause 5/9.3 style, action-oriented with implied ownership"],
+  "risks": "1-2 sentence forward-looking risk statement with at least one number/clause/department — certification-process consequences only (e.g. what could delay closure or affect the scope of verification at the next audit); never revenue, cost, penalties, or customer/business impact",
   "forwardOutlook": "1-2 sentence statement on forward readiness/confidence heading into the next audit stage, citing at least one number/clause/department"
 }
 Return ONLY the raw JSON object, no markdown fences.`;
     }
 
     function fallbackExecSummaryData(d) {
-        const report = (d && d.report) || {};
         const stats = getStats(d);
-        const realNCs = getRealNCs(d);
         const depts = getDepartments(d);
         const deptEntries = Object.entries(depts);
 
@@ -233,94 +279,53 @@ Return ONLY the raw JSON object, no markdown fences.`;
         deptEntries.filter(([, v]) => v.total > 0 && v.nc === 0).slice(0, 3).forEach(([name]) => strengths.push(`${name} demonstrated full conformity during this audit.`));
         if (!strengths.length) strengths.push('No specific department-level strengths could be isolated from available data.');
 
-        const weaknesses = [];
+        const findings = [];
         deptEntries.filter(([, v]) => v.major > 0 || v.minor > 0).sort((a, b) => (b[1].major * 2 + b[1].minor) - (a[1].major * 2 + a[1].minor)).slice(0, 4).forEach(([name, v]) =>
-            weaknesses.push(`${name}: ${v.major} major and ${v.minor} minor non-conformity(ies) identified.`));
-        if (!weaknesses.length) weaknesses.push('No significant departmental weaknesses identified in this audit cycle.');
+            findings.push(`${name}: ${v.major} major and ${v.minor} minor non-conformity(ies) identified.`));
+        if (!findings.length) findings.push('No significant departmental weaknesses identified in this audit cycle.');
 
+        // Genuinely distinct concerns only — no filler placeholder pushed here.
+        // An empty array is the honest answer when there is nothing beyond
+        // what "findings" already covers; the render layer hides the card.
         const concerns = [];
         if (stats.majorNC > 0) concerns.push(`${stats.majorNC} major non-conformity(ies) present a certification risk requiring immediate corrective action.`);
         if (stats.minorNC > 2) concerns.push(`Multiple minor nonconformities (${stats.minorNC}) were identified across processes; collectively they warrant a review of the underlying controls.`);
-        if (!concerns.length) concerns.push('No material strategic concerns identified at this time.');
-
-        const priorities = realNCs.slice(0, 5).map(i => `Close the ${((i.ncrType || 'nc')).toUpperCase()} finding at clause ${clauseLabel(i)}${i.department ? ' in ' + i.department : ''} within the required timeframe.`);
-        if (!priorities.length) priorities.push('Sustain current controls and formalize continual-improvement review cadence.');
-
-        const worstDept = deptEntries.filter(([, v]) => v.major > 0 || v.minor > 0).sort((a, b) => (b[1].major * 2 + b[1].minor) - (a[1].major * 2 + a[1].minor))[0];
-
-        const managementActions = [];
-        if (stats.majorNC > 0) managementActions.push(`Assign an executive owner to drive closure of ${stats.majorNC} major non-conformity(ies) within 30 days.`);
-        if (worstDept) managementActions.push(`Direct ${worstDept[0]} leadership to root-cause its ${worstDept[1].major + worstDept[1].minor} open finding(s), not just remediate symptoms.`);
-        managementActions.push('Review evidence-capture discipline at the next management review to ensure findings are defensible under accreditation scrutiny.');
-        if (!managementActions.length) managementActions.push('Maintain current management review cadence; no elevated management action required this cycle.');
-
-        let verdict;
-        if (stats.majorNC > 0) verdict = 'At risk — major gaps require immediate closure';
-        else if (stats.minorNC > 3) verdict = 'Certifiable, with clustered minor gaps to close';
-        else if (conformPct >= 85) verdict = 'Strong — certifiable with minimal follow-up';
-        else verdict = 'Certifiable with targeted corrective action';
-
-        const recommendation = stats.recommendation || (stats.majorNC > 0 ? 'Conditional Recommendation, pending closure of major non-conformities.' : 'Recommended for Certification.');
-
-        const forwardOutlook = stats.majorNC > 0
-            ? `Certification remains achievable on the current timeline if the ${stats.majorNC} major finding(s) above are closed within the corrective-action window; the audit team has moderate confidence in readiness pending that closure.`
-            : conformPct >= 80
-                ? `The management system is on a stable trajectory toward the next audit stage; the audit team has high confidence in continued conformity if current controls are sustained.`
-                : `The management system is progressing toward the maturity expected at the next audit stage; sustained attention to the priorities above will support continued readiness.`;
 
         return {
-            verdict,
-            outcome: `Against ${report.standard || 'the applicable standard'}, ${report.client || 'the organization'} closed this audit cycle with ${stats.actualNCCount || 0} non-conformity(ies) (${stats.majorNC || 0} major, ${stats.minorNC || 0} minor) and ${stats.obsOfiCount || 0} observation(s)/opportunity(ies) across ${stats.applicableCount || 0} applicable requirements.`,
-            health: `The management system is ${conformPct >= 80 ? 'effectively implemented, with controls consistently applied across assessed areas' : conformPct >= 60 ? 'functioning but unevenly embedded across departments' : 'still maturing, with core controls not yet consistently applied'} at a ${conformPct}% conformity rate${worstDept ? `. Opportunities remain to strengthen preventive controls within ${worstDept[0]}` : ''}.`,
             strengths,
-            weaknesses,
+            findings,
             concerns,
-            recommendation,
-            priorities,
             businessImpact: stats.majorNC > 0
                 ? `Unresolved major findings (${stats.majorNC}) put the certification decision and closure timeline at risk; each week of delay extends the scope of verification required at the next audit stage.`
                 : `Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.`,
-            managementActions,
             risks: stats.majorNC > 0
                 ? 'Failure to close major non-conformities within the required timeframe may delay or jeopardize certification issuance.'
                 : 'Continued monitoring of minor findings and observations is advised to prevent them from compounding into a broader pattern of control gaps.',
-            forwardOutlook
+            forwardOutlook: stats.majorNC > 0
+                ? `Certification remains achievable on the current timeline if the ${stats.majorNC} major finding(s) above are closed within the corrective-action window; the audit team has moderate confidence in readiness pending that closure.`
+                : conformPct >= 80
+                    ? `The management system is on a stable trajectory toward the next audit stage; the audit team has high confidence in continued conformity if current controls are sustained.`
+                    : `The management system is progressing toward the maturity expected at the next audit stage; sustained attention to the findings above will support continued readiness.`
         };
     }
 
     function renderExecSummaryHtml(data, glance, brief) {
         const list = (arr) => safeArr(arr).map(x => `<li>${esc(x)}</li>`).join('') || `<li class="b4-muted-item">None identified.</li>`;
-        const verdictClass = /at risk/i.test(data.verdict || '') ? 'b4-bad' : /strong|minimal/i.test(data.verdict || '') ? 'b4-good' : 'b4-warn';
         const g = glance || {};
-        const briefHtml = brief ? renderBoardBrief(brief) : '';
+        const briefHtml = brief ? renderAuditOutcomeSummary(brief) : '';
+        const showConcerns = hasGenuineContent(data.concerns);
 
         return `
 ${briefHtml}
 <div class="b4-glance-strip">
   <div class="b4-glance-item">
-    <div class="b4-eyebrow">Verdict</div>
-    <div class="b4-glance-value b4-glance-value--${verdictClass}">${esc(data.verdict || 'Under Review')}</div>
-  </div>
-  <div class="b4-glance-item">
-    <div class="b4-eyebrow">Conformity Score</div>
-    <div class="b4-glance-value">${g.conformPct != null ? g.conformPct + '%' : '—'}</div>
-    ${g.coveragePct != null ? `<div class="b4-caption">${g.coveragePct}% coverage</div>` : ''}
-  </div>
-  <div class="b4-glance-item">
-    <div class="b4-eyebrow">Recommendation</div>
-    <div class="b4-glance-value b4-glance-value--sm">${esc(g.recommendationShort || data.recommendation || '—')}</div>
+    <div class="b4-eyebrow">Audit Coverage</div>
+    <div class="b4-glance-value">${g.coveragePct != null ? g.coveragePct + '%' : '—'}</div>
   </div>
   <div class="b4-glance-item">
     <div class="b4-eyebrow">Findings</div>
     <div class="b4-glance-value">${g.majorNC || 0}<span class="b4-glance-unit">MAJOR</span> &nbsp;/&nbsp; ${g.minorNC || 0}<span class="b4-glance-unit">MINOR</span></div>
   </div>
-</div>
-
-<div class="b4-highlight b4-highlight--${verdictClass}" style="margin-top:var(--b4-s5);">
-  <div class="b4-eyebrow">Overall Health Verdict</div>
-  <div class="b4-highlight-title">${esc(data.verdict || 'Under Review')}</div>
-  <p class="b4-body">${esc(data.outcome)}</p>
-  <p class="b4-body" style="margin:0;">${esc(data.health)}</p>
 </div>
 
 <div class="b4-grid-2" style="margin:var(--b4-s5) 0;">
@@ -330,41 +335,15 @@ ${briefHtml}
   </div>
   <div class="b4-card b4-callout b4-callout--warn">
     <div class="b4-eyebrow">${icon('alert')} Forward-Looking Risk</div>
-    <p class="b4-body" style="margin:0;">${esc(data.risks)}</p>
+    <p class="b4-body" style="margin:0;">${esc(data.risks || '')}</p>
   </div>
 </div>
 
-<div class="b4-section-title" style="margin-top:var(--b4-s5);">At a Glance — Findings</div>
-<div class="b4-grid-2">
-  <div class="b4-card b4-insight-card">
-    <div class="b4-card-heading">${icon('check')} Key Strengths</div>
-    <ul class="b4-bullets b4-bullets--wide">${list(data.strengths)}</ul>
-  </div>
-  <div class="b4-card b4-insight-card">
-    <div class="b4-card-heading">${icon('alert')} Key Weaknesses</div>
-    <ul class="b4-bullets b4-bullets--wide">${list(data.weaknesses)}</ul>
-  </div>
-</div>
-<div class="b4-card b4-insight-card" style="margin-top:var(--b4-s4);">
-  <div class="b4-card-heading">${icon('risk')} Strategic Concerns</div>
+${showConcerns ? `
+<div class="b4-card b4-insight-card" style="margin-bottom:var(--b4-s4);">
+  <div class="b4-card-heading">${icon('risk')} Key Concerns</div>
   <ul class="b4-bullets b4-bullets--wide">${list(data.concerns)}</ul>
-</div>
-
-<div class="b4-grid-2" style="margin-top:var(--b4-s5);">
-  <div class="b4-card">
-    <div class="b4-card-heading">${icon('target')} Management Priorities</div>
-    <ul class="b4-bullets b4-bullets--wide">${list(data.priorities)}</ul>
-  </div>
-  <div class="b4-card">
-    <div class="b4-card-heading">${icon('management')} Top-Management Responsibilities</div>
-    <ul class="b4-bullets b4-bullets--wide">${list(data.managementActions)}</ul>
-  </div>
-</div>
-
-<div class="b4-highlight b4-highlight--neutral" style="margin-top:var(--b4-s5);">
-  <div class="b4-eyebrow">${icon('clause')} Certification Recommendation</div>
-  <p class="b4-body" style="margin:0;">${esc(data.recommendation)}</p>
-</div>
+</div>` : ''}
 
 ${data.forwardOutlook ? `
 <div class="b4-rule"></div>
@@ -404,17 +383,13 @@ ${data.forwardOutlook ? `
         return Math.round((assessed / all.length) * 100);
     }
 
-    function buildGlance(d, data) {
+    function buildGlance(d) {
         const stats = getStats(d);
-        const conformPct = computeConformPct(d, stats);
         const coveragePct = computeCoveragePct(d);
-        const recShort = (stats.recommendation || data.recommendation || '').split(/[.;]/)[0].trim().substring(0, 40);
         return {
-            conformPct,
             coveragePct,
             majorNC: stats.majorNC || 0,
-            minorNC: stats.minorNC || 0,
-            recommendationShort: recShort
+            minorNC: stats.minorNC || 0
         };
     }
 
@@ -433,7 +408,7 @@ ${data.forwardOutlook ? `
         return out.slice(0, max || 3);
     }
 
-    const BULLET_FIELDS = ['strengths', 'weaknesses', 'concerns', 'priorities', 'managementActions'];
+    const BULLET_FIELDS = ['strengths', 'findings', 'concerns'];
     function capExecSummaryLists(data) {
         const out = Object.assign({}, data);
         BULLET_FIELDS.forEach(f => { out[f] = dedupeCap(out[f], 3); });
@@ -441,9 +416,12 @@ ${data.forwardOutlook ? `
     }
 
     // ------------------------------------------------------------------
-    // Board Decision Brief — compact, one-printed-page-max block that leads
-    // the exec-summary section body. Derived honestly from the same data
-    // driving the narrative below it; nothing here is invented.
+    // Audit Outcome Summary — compact, row-based block that leads the
+    // exec-summary section body in the formal certification report.
+    // Derived honestly from the same data driving the narrative below it;
+    // nothing here is invented. Exactly one certification conclusion is
+    // ever shown (stats.recommendation, verbatim) — no separate AI-authored
+    // verdict or recommendation is generated for this block.
     // ------------------------------------------------------------------
 
     // Next audit-programme milestone, derived from the current audit type and
@@ -485,67 +463,111 @@ ${data.forwardOutlook ? `
         return t.length > max ? t.slice(0, max - 1).trim() + '…' : t;
     }
 
-    function buildBoardBrief(d, data) {
-        const stats = getStats(d);
+    // Deterministic evidence-bound conclusion sentence: factual counts,
+    // followed by the certification recommendation verbatim. Never AI-authored
+    // — guarantees the recommendation shown here always matches stats.recommendation
+    // exactly and never drifts into subjective "health"/"verdict" language.
+    function buildFactualConclusion(d, stats) {
+        const total = stats.totalItems || stats.applicableCount || 0;
+        const conform = stats.conformCount || 0;
+        const major = stats.majorNC || 0;
+        const minor = stats.minorNC || 0;
+        const obs = stats.observationCount || 0;
+        const ofi = stats.ofiCount || 0;
+        const coveragePct = computeCoveragePct(d);
 
-        const status = data.recommendation || stats.recommendation || 'Certification decision pending';
+        const parts = [`${conform} conforming`];
+        if (major > 0) parts.push(`${major} major nonconformit${major === 1 ? 'y' : 'ies'}`);
+        parts.push(`${minor} minor nonconformit${minor === 1 ? 'y' : 'ies'}`);
+        parts.push(`${obs} observation${obs === 1 ? '' : 's'}`);
+        parts.push(`${ofi} opportunit${ofi === 1 ? 'y' : 'ies'} for improvement`);
+        const last = parts.pop();
+        const countsText = parts.length ? parts.join(', ') + ' and ' + last : last;
 
-        const riskSource = (data.concerns && data.concerns.length) ? data.concerns : (data.weaknesses || []);
-        let risks = dedupeCap(riskSource, 3).map(s => truncate(cleanFindingText(s, 140), 140));
-        if (!risks.length) risks = ['Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.'];
-
-        let actions = dedupeCap(data.managementActions || [], 3).map(s => truncate(cleanFindingText(s, 140), 140));
-        if (!actions.length) actions = ['Maintain current management review cadence; no elevated management action required this cycle.'];
-
-        let decisions;
-        if (stats.majorNC > 0) {
-            decisions = `Approve resourcing and timeline to close ${stats.majorNC} major non-conformity(ies) before the certification decision is finalized.`;
-        } else if (stats.minorNC > 0) {
-            decisions = `Approve corrective action resources for ${stats.minorNC} open minor non-conformity(ies); no certification-affecting decisions required.`;
-        } else {
-            decisions = 'Approve corrective action resources; no certification-affecting decisions required.';
+        let sentence = `The audit assessed ${total} checklist item${total === 1 ? '' : 's'} within the sampled scope: ${countsText}.`;
+        if (coveragePct != null && coveragePct < 100) {
+            sentence += ` Objective-evidence coverage across assessed items was ${coveragePct}%.`;
         }
-
-        const recommendation = data.recommendation || stats.recommendation || 'Pending';
-        const milestone = computeNextMilestone(d);
-
-        return { status, risks, actions, decisions, recommendation, milestone };
+        const recommendation = String(stats.recommendation || '').trim();
+        return recommendation ? `${sentence} ${recommendation}` : sentence;
     }
 
-    function renderBoardBrief(brief) {
+    // Deterministic corrective-action sentence — never phrased as an absolute
+    // condition of keeping certification; closure happens through the
+    // certification body's corrective-action process.
+    function buildCorrectiveActionText(stats) {
+        const major = stats.majorNC || 0;
+        const minor = stats.minorNC || 0;
+        const total = major + minor;
+        if (!total) return 'No open nonconformities were identified during this audit; no corrective action is required at this time.';
+        const labelParts = [];
+        if (major) labelParts.push(`${major} major`);
+        if (minor) labelParts.push(`${minor} minor`);
+        const noun = total === 1 ? 'nonconformity' : 'nonconformities';
+        const verb = total === 1 ? 'requires' : 'require';
+        return `The ${labelParts.join(' and ')} ${noun} ${verb} corrective action and satisfactory closure in accordance with the certification body's corrective-action process.`;
+    }
+
+    function buildAuditOutcomeSummary(d, data) {
+        const stats = getStats(d);
+        const report = (d && d.report) || {};
+
+        const conclusion = buildFactualConclusion(d, stats);
+
+        let strengths = dedupeCap(data.strengths, 3).map(s => truncate(cleanFindingText(s, 140), 140));
+        if (!strengths.length) strengths = ['No specific department-level strengths could be isolated from available data.'];
+
+        let findings = dedupeCap(data.findings, 4).map(s => truncate(cleanFindingText(s, 140), 140));
+        if (!findings.length) findings = ['No significant findings identified in this audit cycle.'];
+
+        const previousFindingsStatus = (report.previousFindingsStatus && String(report.previousFindingsStatus).trim()) || '—';
+
+        const correctiveAction = buildCorrectiveActionText(stats);
+
+        const recommendation = stats.recommendation || 'Certification decision pending.';
+
+        const milestone = computeNextMilestone(d);
+        const nextAudit = milestone ? `${milestone.stage} — ${milestone.date}` : '—';
+
+        return { conclusion, strengths, findings, previousFindingsStatus, correctiveAction, recommendation, nextAudit };
+    }
+
+    function renderAuditOutcomeSummary(s) {
         const li = (arr) => safeArr(arr).map(x => `<li>${esc(x)}</li>`).join('');
-        const milestoneRow = brief.milestone ? `
-  <div class="b4-board-brief-row">
-    <div class="b4-board-brief-label">${icon('clock', { size: 13 })} Next Milestone</div>
-    <div class="b4-board-brief-value">${esc(brief.milestone.stage)} — ${esc(brief.milestone.date)}</div>
-  </div>` : '';
 
         return `
 <div class="b4-board-brief">
   <div class="b4-board-brief-head">
-    <div class="b4-eyebrow">${icon('shield')} Board Decision Brief</div>
-    <div class="b4-caption">One page &middot; readable in under two minutes</div>
+    <div class="b4-eyebrow">${icon('shield')} Audit Outcome Summary</div>
   </div>
   <div class="b4-board-brief-row">
-    <div class="b4-board-brief-label">Current Certification Status</div>
-    <div class="b4-board-brief-value">${esc(brief.status)}</div>
+    <div class="b4-board-brief-label">${icon('finding', { size: 13 })} Overall Conclusion</div>
+    <div class="b4-board-brief-value">${esc(s.conclusion)}</div>
   </div>
   <div class="b4-board-brief-row">
-    <div class="b4-board-brief-label">${icon('risk', { size: 13 })} Top Business Risks</div>
-    <ul class="b4-bullets b4-board-brief-list">${li(brief.risks)}</ul>
+    <div class="b4-board-brief-label">${icon('check', { size: 13 })} Key Strengths</div>
+    <ul class="b4-bullets b4-board-brief-list">${li(s.strengths)}</ul>
   </div>
   <div class="b4-board-brief-row">
-    <div class="b4-board-brief-label">${icon('target', { size: 13 })} Key Management Actions</div>
-    <ul class="b4-bullets b4-board-brief-list">${li(brief.actions)}</ul>
+    <div class="b4-board-brief-label">${icon('alert', { size: 13 })} Key Findings</div>
+    <ul class="b4-bullets b4-board-brief-list">${li(s.findings)}</ul>
   </div>
   <div class="b4-board-brief-row">
-    <div class="b4-board-brief-label">${icon('management', { size: 13 })} Decisions Required of the Board</div>
-    <div class="b4-board-brief-value">${esc(brief.decisions)}</div>
+    <div class="b4-board-brief-label">${icon('clock', { size: 13 })} Previous Findings Status</div>
+    <div class="b4-board-brief-value">${esc(s.previousFindingsStatus)}</div>
+  </div>
+  <div class="b4-board-brief-row">
+    <div class="b4-board-brief-label">${icon('capa', { size: 13 })} Corrective Action Requirements</div>
+    <div class="b4-board-brief-value">${esc(s.correctiveAction)}</div>
   </div>
   <div class="b4-board-brief-row">
     <div class="b4-board-brief-label">${icon('check', { size: 13 })} Certification Recommendation</div>
-    <div class="b4-board-brief-value">${esc(brief.recommendation)}</div>
-  </div>${milestoneRow}
+    <div class="b4-board-brief-value">${esc(s.recommendation)}</div>
+  </div>
+  <div class="b4-board-brief-row">
+    <div class="b4-board-brief-label">${icon('clock', { size: 13 })} Next Audit</div>
+    <div class="b4-board-brief-value">${esc(s.nextAudit)}</div>
+  </div>
 </div>
 <div class="b4-rule"></div>`;
     }
@@ -583,7 +605,7 @@ ${data.forwardOutlook ? `
         const fallback = fallbackExecSummaryData(d);
         if (!window.AI_SERVICE || typeof window.AI_SERVICE.callProxyAPI !== 'function') {
             const capped = capExecSummaryLists(fallback);
-            return { html: renderExecSummaryHtml(capped, buildGlance(d, capped), buildBoardBrief(d, capped)) };
+            return { html: renderExecSummaryHtml(capped, buildGlance(d), buildAuditOutcomeSummary(d, capped)) };
         }
         try {
             const prompt = buildExecSummaryPrompt(d);
@@ -593,11 +615,11 @@ ${data.forwardOutlook ? `
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
             if (Array.isArray(parsed.strengths)) parsed.strengths = filterStrengthsAgainstNCs(d, parsed.strengths);
             const merged = capExecSummaryLists(Object.assign({}, fallback, parsed));
-            return { html: renderExecSummaryHtml(merged, buildGlance(d, merged), buildBoardBrief(d, merged)) };
+            return { html: renderExecSummaryHtml(merged, buildGlance(d), buildAuditOutcomeSummary(d, merged)) };
         } catch (err) {
             console.warn('[ReportExecutive] generateExecutiveSummary AI failed, using fallback:', err);
             const capped = capExecSummaryLists(fallback);
-            return { html: renderExecSummaryHtml(capped, buildGlance(d, capped), buildBoardBrief(d, capped)) };
+            return { html: renderExecSummaryHtml(capped, buildGlance(d), buildAuditOutcomeSummary(d, capped)) };
         }
     }
 
@@ -623,7 +645,7 @@ ${data.forwardOutlook ? `
 
         items.forEach(item => {
             const imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
-            const dept = (item.department && String(item.department).trim()) || 'General';
+            const dept = normalizeDept(item.department);
             if (!byDepartment[dept]) byDepartment[dept] = { total: 0, withEvidence: 0 };
             byDepartment[dept].total++;
 
@@ -891,7 +913,7 @@ ${intel.missingEvidence.length ? `
         if (recurrenceData && recurrenceData.hasPrior) {
             recurringPairsLen = recurrenceData.recurringClauses.length;
             recurring = recurrenceData.recurringClauses.map(({ clause, count }) =>
-                `Clause ${clause}: ${count} finding(s) this audit, and also failed in the client's prior audit.`);
+                `${clauseText({ clause })}: ${count} finding(s) this audit, and also failed in the client's prior audit.`);
             if (!recurring.length) recurring.push('No clauses failed in both this audit and the client\'s prior audit.');
             recurringTitle = 'Recurring Weaknesses';
         } else {
@@ -899,7 +921,7 @@ ${intel.missingEvidence.length ? `
             realNCs.forEach(i => { const c = clauseLabel(i).split('.').slice(0, 2).join('.'); clauseCounts[c] = (clauseCounts[c] || 0) + 1; });
             const concentrationPairs = Object.entries(clauseCounts).filter(([, c]) => c > 1);
             recurringPairsLen = concentrationPairs.length;
-            recurring = concentrationPairs.map(([c, count]) => `Clause ${c}: ${count} findings in this audit.`);
+            recurring = concentrationPairs.map(([c, count]) => `${clauseText({ clause: c })}: ${count} findings in this audit.`);
             if (!recurring.length) recurring.push('No clause concentrations detected in this audit.');
             recurringTitle = 'Clause Concentrations (this audit)';
         }
@@ -913,7 +935,7 @@ ${intel.missingEvidence.length ? `
         readiness.push(stats.recommendation || (stats.majorNC > 0 ? 'Conditional — major non-conformities must be closed first.' : 'Ready for certification recommendation.'));
         readiness.push(`Current standing: ${stats.majorNC || 0} major, ${stats.minorNC || 0} minor open item(s).`);
 
-        const strategic = realNCs.slice(0, 4).map(i => `Prioritize closure of ${(i.ncrType || 'nc').toUpperCase()} at clause ${clauseLabel(i)}.`);
+        const strategic = realNCs.slice(0, 4).map(i => `Prioritize closure of ${(i.ncrType || 'nc').toUpperCase()} at ${clauseText(i)}.`);
         if (intel.coveragePct < 70) strategic.push('Improve evidence-capture discipline across audit teams.');
         if (!strategic.length) strategic.push('Sustain current practices; focus on continual improvement initiatives.');
 
@@ -976,20 +998,22 @@ ${intel.missingEvidence.length ? `
         const realNCs = getRealNCs(d);
         const depts = getDepartments(d);
         const deptSummary = Object.entries(depts).map(([n, v]) => `${n}: total ${v.total}, conform ${v.conform}, major ${v.major}, minor ${v.minor}`).join('; ');
-        const ncLines = realNCs.slice(0, 20).map((i, idx) => `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseLabel(i)} (${i.department || 'General'})`).join('\n');
+        const ncLines = realNCs.slice(0, 20).map((i, idx) => `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseText(i)} (${normalizeDept(i.department)})`).join('\n');
 
         const recurrenceData = computeGenuineRecurrence(d);
         let priorAuditLines = 'Not available — no prior finalized audit found for this client/standard.';
         if (recurrenceData && recurrenceData.hasPrior) {
             priorAuditLines = recurrenceData.recurringClauses.length
-                ? `Prior finalized audit exists. Clauses that failed both then and in this audit: ${recurrenceData.recurringClauses.map(r => r.clause).join(', ')}.`
+                ? `Prior finalized audit exists. Clauses that failed both then and in this audit: ${recurrenceData.recurringClauses.map(r => clauseText({ clause: r.clause })).join(', ')}.`
                 : 'Prior finalized audit exists for this client, but no clause that failed previously failed again in this audit.';
         }
 
         return `
-You are an ISO management-system audit reporting assistant generating executive insight cards for an audit report dashboard, using only the data provided below. Each bullet must be specific and decision-oriented — cite real numbers, clause numbers, and department names from the data. No hedging, no generic filler ("it is important to note", "overall", "the organization demonstrates compliance"). Banned phrases, do not use any of these anywhere: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of". Use plain audit language: requirement -> objective evidence -> evaluation -> finding.
+You are an ISO management-system audit reporting assistant generating executive insight cards for an audit report dashboard, using only the data provided below. Each bullet must be specific and decision-oriented — cite real numbers, clause numbers, and department names from the data. No hedging, no generic filler ("it is important to note", "overall", "the organization demonstrates compliance"). Banned phrases, do not use any of these anywhere: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of". Also banned anywhere, alone or combined with another word: "soundness", "fundamental", "health", "resilience", "verdict", "certifiable". Use plain audit language: requirement -> objective evidence -> evaluation -> finding.
 - Never state or estimate financial figures, revenue, penalties, customer loss, cost, contract exposure, or reputational damage. Frame consequences only in certification-process terms (closure timelines, verification scope at the next audit).
 - Never claim a finding, weakness, or clause is "recurring," "repeated," "systemic," or part of a "pattern" across audits unless the Prior-Audit Comparison line below explicitly shows it failed previously too. Absent that, describe same-audit clusters only as a count or "concentration within this audit."
+- Never write the word "Clause" immediately before an internal audit working reference (anything starting with FOCUS, SURV, ORG, or DOC). Reuse clause references exactly as formatted in the Non-conformities list below; never re-derive or reformat one yourself.
+- Never state a corrective-action requirement as an absolute condition of keeping certification (e.g. do not write "is required to maintain certification"). State only that findings require corrective action and closure through the certification body's corrective-action process.
 
 Context:
 - Client: ${report.client || ''}
@@ -1102,7 +1126,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
 
         const summaryHtml = (cached && cached.summary && cached.summary.html) || (function () {
             const capped = capExecSummaryLists(fallbackExecSummaryData(d));
-            return renderExecSummaryHtml(capped, buildGlance(d, capped), buildBoardBrief(d, capped));
+            return renderExecSummaryHtml(capped, buildGlance(d), buildAuditOutcomeSummary(d, capped));
         })();
         const insightsHtml = (cached && cached.insights && cached.insights.html) || renderInsightsHtml(fallbackInsights(d));
 
@@ -1110,7 +1134,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
             {
                 key: 'exec-summary',
                 name: 'EXECUTIVE SUMMARY',
-                desc: 'CEO-level summary of audit outcome, organizational health, and strategic priorities.',
+                desc: 'Evidence-based summary of audit outcome, findings, and certification recommendation.',
                 color: '#0f2a43',
                 bodyHtml: summaryHtml,
                 charts: []
@@ -1149,8 +1173,8 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
     function buildAskContext(d) {
         const report = (d && d.report) || {};
         const stats = getStats(d);
-        const realNCs = getRealNCs(d).map(i => ({ clause: clauseLabel(i), type: i.ncrType, department: i.department || 'General', dueDate: i.caDueDate || null, comment: (i.comment || '').substring(0, 200) }));
-        const obsOfi = getObsOfi(d).map(i => ({ clause: clauseLabel(i), type: i.ncrType, department: i.department || 'General' }));
+        const realNCs = getRealNCs(d).map(i => ({ clause: formatCriterion(i).label, type: i.ncrType, department: normalizeDept(i.department), dueDate: i.caDueDate || null, comment: (i.comment || '').substring(0, 200) }));
+        const obsOfi = getObsOfi(d).map(i => ({ clause: formatCriterion(i).label, type: i.ncrType, department: normalizeDept(i.department) }));
         const depts = getDepartments(d);
         return {
             client: report.client,
@@ -1188,7 +1212,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
         if (/overdue/.test(q) && /capa|corrective|action/.test(q)) {
             const overdue = overdueCapas(d);
             if (!overdue.length) return 'No overdue corrective actions found.';
-            return `${overdue.length} overdue corrective action(s): ` + overdue.map(i => `Clause ${clauseLabel(i)} (${i.department || 'General'}, due ${i.caDueDate})`).join('; ');
+            return `${overdue.length} overdue corrective action(s): ` + overdue.map(i => `${clauseText(i)} (${normalizeDept(i.department)}, due ${i.caDueDate})`).join('; ');
         }
         if (/department/.test(q) && /(attention|worst|risk|concern)/.test(q)) {
             const depts = getDepartments(d);
@@ -1203,7 +1227,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
         if (/major/.test(q) && /nc|non.?conform/.test(q)) {
             const majors = getRealNCs(d).filter(i => (i.ncrType || '').toLowerCase() === 'major');
             if (!majors.length) return 'No major non-conformities were raised in this audit.';
-            return `${majors.length} major non-conformity(ies): ` + majors.map(i => `Clause ${clauseLabel(i)} (${i.department || 'General'})`).join('; ');
+            return `${majors.length} major non-conformity(ies): ` + majors.map(i => `${clauseText(i)} (${normalizeDept(i.department)})`).join('; ');
         }
         return `I can answer questions about this audit's non-conformities, observations, departments, evidence coverage, and CAPA due dates. Try: "summarize this audit", "top five risks", "overdue CAPAs", or "which department needs attention".`;
     }
@@ -1217,7 +1241,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
         try {
             const context = buildAskContext(d);
             const prompt = `
-You are an audit intelligence assistant embedded in an ISO certification body's report preview tool. Answer the user's question about THIS audit concisely (2-5 sentences, plain text, no markdown symbols), using only the JSON context provided. If the answer requires data not present in the context, say so plainly rather than inventing facts. Never state or estimate financial figures, revenue, penalties, customer loss, cost, or reputational damage. Never describe a finding as "recurring," "repeated," or "systemic" unless the context explicitly shows it also failed in a prior audit.
+You are an audit intelligence assistant embedded in an ISO certification body's report preview tool. Answer the user's question about THIS audit concisely (2-5 sentences, plain text, no markdown symbols), using only the JSON context provided. If the answer requires data not present in the context, say so plainly rather than inventing facts. Never state or estimate financial figures, revenue, penalties, customer loss, cost, or reputational damage. Never describe a finding as "recurring," "repeated," or "systemic" unless the context explicitly shows it also failed in a prior audit. Reuse the "clause" values from the JSON context exactly as given; never prepend the word "Clause" to a value that already reads as an internal audit reference (e.g. "internal audit reference FOCUS.2 (criterion to be assigned)"). Never state a corrective-action requirement as an absolute condition of keeping certification.
 
 Audit Context (JSON):
 ${JSON.stringify(context).substring(0, 6000)}
@@ -1696,7 +1720,7 @@ Answer:`;
   .b4-tbl td:has(> .b4-pill), .b4-tbl td:has(> .b4-badge) { white-space: nowrap; width: 1%; }
 }
 
-/* ---------- Board Decision Brief (top of exec-summary body) ---------- */
+/* ---------- Audit Outcome Summary (top of exec-summary body) ---------- */
 .b4-board-brief {
   border: 1px solid var(--b4-line);
   border-left: 3px solid var(--b4-navy);

@@ -382,6 +382,25 @@
         return ANNEX_SL[main] || `Clause ${main}`;
     }
 
+    // Conservative keyword -> clause fallback, engaged only when no numeric
+    // clause token was found in the focus text (see deriveCriterionRef below).
+    // Only the Annex SL high-level-structure clauses that are common across the
+    // 9001-family standards this app audits — kept deliberately short so a false
+    // match is unlikely; criterionSource stays 'focus-carryover' either way, so
+    // the auditor still confirms via the existing NCR form field before it's
+    // treated as authoritative.
+    const KEYWORD_CLAUSE_FALLBACK = [
+        { re: /internal audit/i, clause: '9.2' },
+        { re: /management review/i, clause: '9.3' },
+        { re: /documented information|document control/i, clause: '7.5' },
+        { re: /competence|training/i, clause: '7.2' },
+        { re: /risk(s)?\s*(and|&)?\s*opportunit/i, clause: '6.1' },
+        { re: /calibration|monitoring\s*(&|and)?\s*measur(ing|ement)\s*resources/i, clause: '7.1.5' },
+        { re: /legal|statutory|regulatory/i, clause: '' }, // too ambiguous — leave empty
+        { re: /customer satisfaction/i, clause: '9.1.2' },
+        { re: /nonconform|non-conform|corrective action/i, clause: '10.2' }
+    ];
+
     /**
      * Recover a real ISO clause reference from Stage 1 focus-point / mandatory
      * surveillance-element text so a FOCUS.n or SURV checklist item — whose own
@@ -399,11 +418,20 @@
      */
     function deriveCriterionRef(text, standard) {
         const matches = String(text || '').match(/\b(\d{1,2}(?:\.\d{1,2}){0,2})\b/g) || [];
-        if (!matches.length) return '';
         const isAnnexSLFamily = /\b(9001|14001|45001|22000|27001|13485|20000|37001|50001)\b/.test(String(standard || '')) || !standard;
-        for (const token of matches) {
-            const main = parseInt(token.split('.')[0], 10);
-            if (!isAnnexSLFamily || (main >= 4 && main <= 10)) return token;
+        if (matches.length) {
+            for (const token of matches) {
+                const main = parseInt(token.split('.')[0], 10);
+                if (!isAnnexSLFamily || (main >= 4 && main <= 10)) return token;
+            }
+        }
+        // No numeric clause token found in the text — conservative keyword
+        // fallback, Annex-SL family only.
+        if (isAnnexSLFamily) {
+            const t = String(text || '');
+            for (const kw of KEYWORD_CLAUSE_FALLBACK) {
+                if (kw.re.test(t)) return kw.clause;
+            }
         }
         return '';
     }

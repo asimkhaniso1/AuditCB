@@ -34,6 +34,25 @@
     const CURRENCY_RE = /[$€£]\s?\d|\b\d+(\.\d+)?\s?(million|M)\b.*(revenue|cost|penalt)/i;
     const RECURRING_RE = /recurring|repeated weakness|persistent/i;
     const GRANTING_RE = /recommended for certification/i;
+    // Internal tracking reference (FOCUS/SURV/ORG/DOC) masquerading as a real
+    // standard Clause reference inside free-text narrative — e.g. "Clause FOCUS.2".
+    const NARRATIVE_INTERNAL_CLAUSE_RE = /Clauses?\s+(FOCUS|SURV|ORG|DOC)[.\s]/i;
+    // Secondary/unsanctioned certification-verdict language that must never appear
+    // in the formal narrative — the only certification decision is the deterministic
+    // recommendation sentence (ReportStats.recommendationText).
+    const BANNED_FORMAL_PHRASES = [
+        /certifiable with targeted fixes/i,
+        /overall health verdict/i,
+        /fundamental soundness/i
+    ];
+
+    // Observation items (advisory, not major/minor) — kept separate from
+    // allNCRs() which is major/minor only, for the pseudo-criterion warning.
+    function allObservations(report) {
+        return safeArr(report && report.checklistProgress)
+            .filter((i) => i && lower(i.status) === 'nc' && lower(i.ncrType) === 'observation')
+            .map((i) => ({ clause: i.clause || '', criterionRef: i.criterionRef, _source: 'checklist' }));
+    }
 
     // Narrative fields that flow through to the printed report.
     function narrativeFields(report) {
@@ -120,6 +139,25 @@
                 `Finding on clause "${ncr.clause}" uses a placeholder/checklist tag rather than a real standard clause, and no criterionRef is set.`,
                 ncr._source === 'manual' ? 'manual NCR register' : 'checklist finding',
                 'Set the finding\'s criterionRef to the actual clause of the standard being audited.'
+            ));
+        });
+    }
+
+    // B1 refinement: an internal tracking reference (FOCUS/SURV/ORG/DOC) presented
+    // as if it were a real standard "Clause" inside free narrative text — distinct
+    // from checkB1FocusCriterion, which only looks at structured finding.clause.
+    function checkB1NarrativeInternalRef(report, results) {
+        const narrative = narrativeFields(report);
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text || !NARRATIVE_INTERNAL_CLAUSE_RE.test(text)) return;
+            results.blockers.push(item(
+                'B1n-' + key,
+                'blocker',
+                'narrative',
+                `Narrative (${key}) presents an internal tracking reference as a standard "Clause" (e.g. "Clause FOCUS.2") — internal refs are not real clauses.`,
+                'report.' + key,
+                'Replace the internal reference with the real standard clause (via criterionRef), or reword to avoid calling it a "Clause".'
             ));
         });
     }
@@ -257,6 +295,28 @@
         });
     }
 
+    // B6-style scan extended with banned formal phrases: a secondary/unsanctioned
+    // certification verdict or unsupported evaluative claim slipping into the
+    // formal narrative (the only certification decision is the deterministic
+    // recommendation sentence — see ReportStats.recommendationText).
+    function checkB6BannedPhrases(report, results) {
+        const narrative = narrativeFields(report);
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            const hit = BANNED_FORMAL_PHRASES.some((re) => re.test(text));
+            if (!hit) return;
+            results.blockers.push(item(
+                'B6p-' + key,
+                'blocker',
+                'narrative',
+                `Narrative (${key}) contains a secondary certification verdict / unsupported evaluative claim in formal narrative.`,
+                'report.' + key,
+                'Remove the informal verdict language; the only certification decision is the deterministic recommendation sentence.'
+            ));
+        });
+    }
+
     function checkB7RecurringWithoutHistory(report, client, results) {
         const narrative = narrativeFields(report);
         const hasPrior = hasPriorFinalizedReport(client, report);
@@ -273,6 +333,71 @@
                 'Either remove the recurrence claim or link the prior audit report that establishes the history.'
             ));
         });
+    }
+
+    // B8: NCs exist but the report has no standard/version recorded anywhere.
+    function checkB8MissingStandard(report, auditPlan, ncrs, results) {
+        if (!ncrs.length) return;
+        const standard = trim((report && report.standard) || (auditPlan && auditPlan.standard));
+        if (standard) return;
+        results.blockers.push(item(
+            'B8',
+            'blocker',
+            'report',
+            'Non-conformities were raised but the report has no standard/version recorded (report.standard / auditPlan.standard).',
+            'report.standard / auditPlan.standard',
+            'Set the standard and version (e.g. "ISO 9001:2015") on the report or audit plan before issuing.'
+        ));
+    }
+
+    // B9: next-audit/recertification chronology. Distinct, explicitly-identified
+    // rule on top of B2's generic programme-issue pass-through — catches both a
+    // textual chronology issue and the silent case of nextAudit being null while
+    // the programme still has stages nominally 'Planned' (a data contradiction).
+    function checkB9NextAuditChronology(input, results) {
+        const { report, auditPlan, client } = input;
+        try {
+            if (!(global.ReportStats && typeof global.ReportStats.buildProgramme === 'function')) return;
+            const allReports = safeArr(global.state && global.state.auditReports);
+            const programme = global.ReportStats.buildProgramme({ client, auditPlan, report, allReports });
+            const chronoIssues = safeArr(programme && programme.issues).filter((issue) => {
+                const msg = typeof issue === 'string' ? issue : (issue && issue.message) || '';
+                return /not after the current audit/i.test(msg);
+            });
+            const hasPlannedRemaining = safeArr(programme && programme.stages).some((s) => s.status === 'Planned');
+            if (chronoIssues.length === 0 && !(programme && programme.nextAudit == null && hasPlannedRemaining)) return;
+            const msg = chronoIssues.length
+                ? (typeof chronoIssues[0] === 'string' ? chronoIssues[0] : chronoIssues[0].message)
+                : 'The certification programme has no valid next audit / recertification date after the current audit.';
+            results.blockers.push(item(
+                'B9',
+                'blocker',
+                'programme',
+                msg,
+                'ReportStats.buildProgramme',
+                'Correct the certificate expiry date or the certification programme stage dates before issuing.'
+            ));
+        } catch (_e) { /* skip */ }
+    }
+
+    // B10: no certification recommendation can be resolved from anywhere.
+    function checkB10MissingRecommendation(input, results) {
+        const { report, stats } = input;
+        const manualRec = trim(report && report.recommendation);
+        const narrative = narrativeFields(report);
+        let derived = '';
+        try {
+            if (stats && stats.recommendation) derived = stats.recommendation;
+        } catch (_e) { /* ignore */ }
+        if (manualRec || derived || trim(narrative.conclusion)) return;
+        results.blockers.push(item(
+            'B10',
+            'blocker',
+            'recommendation',
+            'No certification recommendation could be resolved (report.recommendation, ReportStats recommendation, and conclusion are all empty).',
+            'report.recommendation / ReportStats.build().recommendation / report.conclusion',
+            'Set an explicit recommendation, or ensure ReportStats.build() / recommendationText produces one before issuing.'
+        ));
     }
 
     // ── Warning rules ────────────────────────────────────────────────────────
@@ -402,6 +527,40 @@
         });
     }
 
+    // W7: an observation carries a stated pseudo-criterion (an internal
+    // FOCUS/SURV/ORG/DOC tracking reference) with no criterionRef resolved —
+    // advisory-severity version of B1, kept as a warning since observations
+    // don't block issuance the way major/minor findings do.
+    function checkW7ObservationPseudoCriterion(report, results) {
+        allObservations(report).forEach((obs, idx) => {
+            if (trim(obs.criterionRef)) return;
+            if (!FOCUS_CLAUSE_RE.test(trim(obs.clause))) return;
+            results.warnings.push(item(
+                'W7-' + idx,
+                'warning',
+                'findings',
+                `Observation on internal reference "${obs.clause}" has a stated pseudo-criterion but no resolved criterionRef.`,
+                'checklistProgress[].observation',
+                'Resolve the observation to a real standard clause via criterionRef, or leave the reference unclaused.'
+            ));
+        });
+    }
+
+    // W9: audit coverage below the 70% sampling-sufficiency threshold. (W8 is
+    // already used by checkB5RecommendationMismatch.)
+    function checkW9LowCoverage(stats, results) {
+        if (!stats || stats.coveragePct == null || stats.coveragePct === undefined) return;
+        if (Number(stats.coveragePct) >= 70) return;
+        results.warnings.push(item(
+            'W9',
+            'warning',
+            'coverage',
+            `Audit coverage is ${stats.coveragePct}%, below the 70% sampling-sufficiency threshold.`,
+            'ReportStats.build().coveragePct',
+            'Confirm sampling was sufficient, or complete outstanding checklist items before issuing.'
+        ));
+    }
+
     // I1-I4 information items
 
     function checkInformation(report, results) {
@@ -434,12 +593,17 @@
         const ncrs = allNCRs(report);
 
         try { checkB1FocusCriterion(ncrs, results); } catch (_e) { /* skip */ }
+        try { checkB1NarrativeInternalRef(report, results); } catch (_e) { /* skip */ }
         try { checkB2Chronology({ report, auditPlan, client, stats }, results); } catch (_e) { /* skip */ }
         try { checkB3MissingEvidence(ncrs, results); } catch (_e) { /* skip */ }
         try { checkB4MissingCriterion(ncrs, results); } catch (_e) { /* skip */ }
         try { checkB5RecommendationMismatch({ report, auditPlan, stats }, results); } catch (_e) { /* skip */ }
         try { checkB6FinancialClaims(report, results); } catch (_e) { /* skip */ }
+        try { checkB6BannedPhrases(report, results); } catch (_e) { /* skip */ }
         try { checkB7RecurringWithoutHistory(report, client, results); } catch (_e) { /* skip */ }
+        try { checkB8MissingStandard(report, auditPlan, ncrs, results); } catch (_e) { /* skip */ }
+        try { checkB9NextAuditChronology({ report, auditPlan, client }, results); } catch (_e) { /* skip */ }
+        try { checkB10MissingRecommendation({ report, stats }, results); } catch (_e) { /* skip */ }
 
         try { checkW1StrengthNcOverlap(ncrs, report, results); } catch (_e) { /* skip */ }
         try { checkW2RiskWithoutAssessment(ncrs, report, results); } catch (_e) { /* skip */ }
@@ -447,6 +611,8 @@
         try { checkW4AutoGeneratedRCA(report, results); } catch (_e) { /* skip */ }
         try { checkW5AddressInconsistency({ client, auditPlan, report, certificate: safeInput.certificate }, results); } catch (_e) { /* skip */ }
         try { checkW6UnreviewedAIContent(report, results); } catch (_e) { /* skip */ }
+        try { checkW7ObservationPseudoCriterion(report, results); } catch (_e) { /* skip */ }
+        try { checkW9LowCoverage(stats, results); } catch (_e) { /* skip */ }
 
         try { checkInformation(report, results); } catch (_e) { /* skip */ }
 
