@@ -2475,7 +2475,11 @@
             }));
         },
         CATEGORIES,
-        ANNEX_SL
+        ANNEX_SL,
+        // Exposed so the Report Integrity panel can pre-suggest a real clause
+        // when an auditor maps a legacy FOCUS/SURV finding to its criterion —
+        // one keyword map, not a second copy living in the UI layer.
+        deriveCriterionRef
     };
 
     window.ClientDocsBulk = ClientDocsBulk;

@@ -314,7 +314,7 @@
         // current audit's own date (only used for the audit-date-fallback path).
         const certs = safeArr(client.certificates);
         const cert = certs.find((c) => trim(c.standard).toLowerCase() === trim(standard).toLowerCase()) || certs[0] || null;
-        const certStart = cert ? (parseDateSafe(cert.initialDate) || parseDateSafe(cert.issueDate)) : null;
+        const certStart = cert ? (parseDateSafe(cert.initialDate) || parseDateSafe(cert.issueDate) || parseDateSafe(cert.currentIssue)) : null;
         const certExpiry = cert ? parseDateSafe(cert.expiryDate) : null;
 
         // History: real audits for this client+standard, finalized/approved/published,

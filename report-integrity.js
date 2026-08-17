@@ -24,8 +24,24 @@
     const safeArr = (a) => (Array.isArray(a) ? a : []);
     const lower = (s) => trim(s).toLowerCase();
 
-    function item(id, severity, section, message, source, suggestion) {
-        return { id, severity, section, message, source, suggestion };
+    function item(id, severity, section, message, source, suggestion, ref) {
+        const out = { id, severity, section, message, source, suggestion };
+        // `ref` locates the offending record so a UI can offer a direct fix
+        // (e.g. "Set criterion" on a finding). Omitted for rules that concern
+        // the report as a whole.
+        if (ref) out.ref = ref;
+        return out;
+    }
+
+    function findingRef(ncr, idx) {
+        return {
+            kind: 'finding',
+            index: idx,
+            clause: (ncr && ncr.clause) || '',
+            source: (ncr && ncr._source) || 'checklist',
+            checklistId: ncr && ncr.checklistId,
+            itemIdx: ncr && ncr.itemIdx
+        };
     }
 
     // ── Shared helpers ──────────────────────────────────────────────────────
@@ -77,10 +93,13 @@
                 evidence: i.evidence,
                 evidenceImage: i.evidenceImage,
                 evidenceImages: i.evidenceImages,
-                comment: i.comment,
+                comment: i.comment || i.ncrDescription,
                 department: i.department,
                 riskLikelihood: i.riskLikelihood,
                 riskImpact: i.riskImpact,
+                checklistId: i.checklistId,
+                itemIdx: i.itemIdx,
+                requirement: i.requirement,
                 _source: 'checklist'
             }));
         const fromManual = safeArr(report && report.ncrs)
@@ -102,11 +121,21 @@
         return fromChecklist.concat(fromManual);
     }
 
+    // A checklist finding has no dedicated "evidence" text field in the
+    // execution UI — the auditor records the objective evidence in the
+    // finding's own remarks. Treating only `evidence`/images as evidence
+    // therefore blocked every photo-less checklist NC even when the auditor
+    // had written a full evidence statement. A substantive remark counts;
+    // a stub ("n/a", "see notes") does not.
+    const EVIDENCE_STUB_RE = /^(n\/?a|none|tbc|tbd|see notes?|as above|-{1,3})\.?$/i;
+    const MIN_EVIDENCE_NARRATIVE = 25;
     function hasEvidence(ncr) {
         if (!ncr) return false;
         const textEvidence = trim(ncr.evidence) || (Array.isArray(ncr.evidence) && ncr.evidence.length > 0);
         const hasImage = !!ncr.evidenceImage || (Array.isArray(ncr.evidenceImages) && ncr.evidenceImages.length > 0);
-        return !!(textEvidence || hasImage);
+        const narrative = trim(ncr.comment);
+        const hasNarrative = narrative.length >= MIN_EVIDENCE_NARRATIVE && !EVIDENCE_STUB_RE.test(narrative);
+        return !!(textEvidence || hasImage || hasNarrative);
     }
 
     function hasPriorFinalizedReport(client, report) {
@@ -138,7 +167,8 @@
                 'findings',
                 `Finding on clause "${ncr.clause}" uses a placeholder/checklist tag rather than a real standard clause, and no criterionRef is set.`,
                 ncr._source === 'manual' ? 'manual NCR register' : 'checklist finding',
-                'Set the finding\'s criterionRef to the actual clause of the standard being audited.'
+                'Set the finding\'s criterionRef to the actual clause of the standard being audited.',
+                findingRef(ncr, idx)
             ));
         });
     }
@@ -225,7 +255,8 @@
                 'findings',
                 'A non-conformity finding has no clause and no criterionRef set.',
                 ncr._source === 'manual' ? 'manual NCR register' : 'checklist finding',
-                'Assign the specific standard clause this finding relates to.'
+                'Assign the specific standard clause this finding relates to.',
+                findingRef(ncr, idx)
             ));
         });
     }
@@ -650,15 +681,24 @@
                 ? global.DataService.findAuditPlan(planId)
                 : safeArr(global.state && global.state.auditPlans).find((p) => String(p.id) === String(planId));
 
+            // Client resolution must not fail quietly: an unresolved client has
+            // no certificates, which made the chronology rule report "no
+            // certificate on file" for clients that plainly have one. Try every
+            // identifier the report and its plan carry, by id then by name.
+            const clientIds = [report.clientId, auditPlan && auditPlan.clientId].filter((v) => v != null);
+            const clientNames = [report.client, report.clientName, auditPlan && auditPlan.client, auditPlan && auditPlan.clientName]
+                .map((v) => trim(v)).filter(Boolean);
             let client = null;
-            if (global.DataService && typeof global.DataService.findClient === 'function' && report.clientId != null) {
-                client = global.DataService.findClient(report.clientId);
+            if (global.DataService && typeof global.DataService.findClient === 'function') {
+                for (let i = 0; i < clientIds.length && !client; i++) {
+                    client = global.DataService.findClient(clientIds[i]);
+                }
             }
             if (!client) {
-                client = safeArr(global.state && global.state.clients).find((c) =>
-                    (report.clientId != null && String(c.id) === String(report.clientId))
-                    || (report.client && c.name === report.client)
-                );
+                const clients = safeArr(global.state && global.state.clients);
+                client = clients.find((c) => clientIds.some((id) => String(c.id) === String(id)))
+                    || clients.find((c) => clientNames.some((n) => trim(c.name).toLowerCase() === n.toLowerCase()))
+                    || null;
             }
 
             let stats = null;

@@ -128,7 +128,9 @@ describe('KTD surveillance acceptance', () => {
             executiveSummary: 'Certification protects an estimated $5M annual revenue tied to certified status. This recurring weakness may result in contractual penalties.',
             conclusion: 'The organization is Recommended for Certification.',
             checklistProgress: [
-                ncItem({ clause: 'FOCUS.2', criterionRef: '', department: 'General', evidence: '' }),
+                // No evidence field, no photo AND no substantive remark — a
+                // genuinely unevidenced nonconformity.
+                ncItem({ clause: 'FOCUS.2', criterionRef: '', department: 'General', evidence: '', comment: '' }),
                 ncItem({ clause: 'FOCUS.8', criterionRef: '' })
             ],
             ncrs: []
@@ -182,6 +184,61 @@ describe('KTD surveillance acceptance', () => {
             report: {}, certificate: null
         });
         expect(clean).toEqual([]); // "Dr" vs "Drive" normalized, same city
+    });
+
+    // Checklist findings have no dedicated evidence-text field in the execution
+    // UI — the auditor writes the objective evidence into the finding's remarks.
+    // B3 must accept that, or every photo-less checklist NC blocks issuance.
+    describe('B3 objective evidence', () => {
+        const base = (overrides) => ({
+            id: 'rep-e', planId: 'plan-ktd', clientId: 'ktd-1', client: 'KTD Select',
+            date: '2026-08-12', auditType: 'Surveillance', standard: 'ISO 9001:2015',
+            conclusion: 'Continued certification is recommended subject to satisfactory closure of applicable nonconformities.',
+            checklistProgress: [Object.assign({
+                status: 'nc', ncrType: 'minor', clause: '9.2', department: 'Quality', evidence: ''
+            }, overrides)],
+            ncrs: []
+        });
+        const b3s = (report) => window.ReportIntegrity.check({ report, auditPlan: KTD_PLAN(), client: KTD_CLIENT() })
+            .blockers.filter((b) => b.id.startsWith('B3'));
+
+        it('a substantive remark counts as the objective-evidence statement', () => {
+            expect(b3s(base({ comment: 'Internal audit programme IA-2026 reviewed; two of six scheduled audits were not performed.' }))).toEqual([]);
+        });
+
+        it('a photo alone still satisfies it', () => {
+            expect(b3s(base({ comment: '', evidenceImage: 'data:image/jpeg;base64,xxx' }))).toEqual([]);
+        });
+
+        it('an empty or stub remark with no photo still blocks', () => {
+            expect(b3s(base({ comment: '' })).length).toBe(1);
+            expect(b3s(base({ comment: 'n/a' })).length).toBe(1);
+            expect(b3s(base({ comment: 'see notes' })).length).toBe(1);
+        });
+
+        // An unresolved client has no certificates, which made the chronology
+        // rule claim "no certificate on file" for a client that plainly has one.
+        it('checkById resolves the client via the audit plan when the report lacks clientId', () => {
+            const client = KTD_CLIENT();
+            const plan = Object.assign(KTD_PLAN(), { clientId: 'ktd-1' });
+            const report = {
+                id: 'rep-noclient', planId: 'plan-ktd', client: 'KTD Select', // no clientId
+                date: '2026-08-12', auditType: 'Surveillance', standard: 'ISO 9001:2015',
+                conclusion: 'Continued certification is recommended subject to satisfactory closure of applicable nonconformities.',
+                checklistProgress: [], ncrs: []
+            };
+            window.state = { auditReports: [report], auditPlans: [plan], clients: [client], ncrs: [] };
+            const result = window.ReportIntegrity.checkById('rep-noclient');
+            const certIssue = result.blockers.filter((b) => /no certificate/i.test(b.message));
+            expect(certIssue).toEqual([]);
+        });
+
+        it('criterion blockers carry a ref so the UI can offer a direct fix', () => {
+            const report = base({ clause: 'FOCUS.2', criterionRef: '', checklistId: 'cl-1', itemIdx: 4, comment: 'Programme not fully implemented as scheduled.' });
+            const b1 = window.ReportIntegrity.check({ report, auditPlan: KTD_PLAN(), client: KTD_CLIENT() })
+                .blockers.find((b) => b.id.startsWith('B1-'));
+            expect(b1.ref).toEqual({ kind: 'finding', index: 0, clause: 'FOCUS.2', source: 'checklist', checklistId: 'cl-1', itemIdx: 4 });
+        });
     });
 
     // Cycle state drives the dashboard widget's stage ticks. A stage is
