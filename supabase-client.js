@@ -57,7 +57,16 @@ const SupabaseClient = {
         this.client.auth.onAuthStateChange((event, session) => {
             Logger.info('Auth state changed:', event);
 
-            if (event === 'SIGNED_IN' && session) {
+            if (event === 'PASSWORD_RECOVERY') {
+                // The user arrived on a valid password-recovery link. Without
+                // this case the recovery session was silently treated like any
+                // other sign-in and no reset UI ever appeared — the email flow
+                // was a dead end.
+                Logger.info('Password recovery session detected');
+                if (typeof window.showPasswordRecoveryModal === 'function') {
+                    window.showPasswordRecoveryModal();
+                }
+            } else if (event === 'SIGNED_IN' && session) {
                 this.handleSignIn(session);
             } else if (event === 'SIGNED_OUT') {
                 this.handleSignOut();

@@ -1834,24 +1834,31 @@ window.showForgotPassword = function () {
         return;
     }
 
-    // Check if user exists
+    // If Supabase is configured, use Supabase password reset. Accounts live in
+    // Supabase Auth, NOT window.state.users — that list is empty before login,
+    // so the old local-existence check rejected every real account with
+    // "No account found" and the reset email was never sent. The response is
+    // deliberately neutral so it never confirms whether an email is registered.
+    if (window.SupabaseClient?.isInitialized) {
+        window.SupabaseClient.sendPasswordResetEmail(email)
+            .then(() => {
+                window.showNotification('If an account exists for that email, a password reset link has been sent. Check your inbox (and spam folder).', 'success');
+            })
+            .catch(err => {
+                console.error('Password reset failed:', err);
+                window.showNotification('Failed to send reset email. Please contact admin.', 'error');
+            });
+        return;
+    }
+
+    // Local mode only: state.users is the actual account store here.
     const user = window.state.users?.find(u => u.email === email);
     if (!user) {
         window.showNotification('No account found with that email address', 'error');
         return;
     }
 
-    // If Supabase is configured, use Supabase password reset
-    if (window.SupabaseClient?.isInitialized) {
-        window.SupabaseClient.sendPasswordResetEmail(email)
-            .then(() => {
-                window.showNotification('Password reset email sent! Check your inbox.', 'success');
-            })
-            .catch(err => {
-                console.error('Password reset failed:', err);
-                window.showNotification('Failed to send reset email. Please contact admin.', 'error');
-            });
-    } else {
+    {
         // Local mode - show password to admin
         if (confirm(`Local mode: Contact your administrator.\n\nAdmin: Would you like to reset this user's password?`)) {
             const newPassword = prompt('Enter new password for ' + email + ':');
@@ -1868,6 +1875,85 @@ window.showForgotPassword = function () {
         }
     }
 };
+
+// ─── Password recovery landing ──────────────────────────────────────────────
+// A Supabase recovery email drops the user back on this page — either with a
+// live recovery session (PASSWORD_RECOVERY fires, supabase-client.js calls
+// showPasswordRecoveryModal) or, when the link is expired/reused, with an
+// error hash (#error=access_denied&error_code=otp_expired&...). Neither was
+// handled before: valid links showed the ordinary login screen with no way to
+// set the new password, and expired links failed silently.
+
+window.showPasswordRecoveryModal = function () {
+    if (document.getElementById('password-recovery-overlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'password-recovery-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.72);z-index:10002;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = `
+        <div style="background:#fff;border-radius:16px;box-shadow:0 25px 60px -12px rgba(0,0,0,0.45);max-width:400px;width:100%;padding:2rem;">
+            <h3 style="margin:0 0 0.4rem;color:#0f2a43;"><i class="fa-solid fa-key" style="margin-right:0.5rem;color:#2563eb;"></i>Set a new password</h3>
+            <p style="margin:0 0 1.25rem;font-size:0.88rem;color:#64748b;">Your reset link was verified. Choose a new password for your account.</p>
+            <form id="password-recovery-form" data-action-submit="handlePasswordRecoverySubmit" data-id="this">
+                <label style="display:block;font-size:0.8rem;font-weight:600;color:#334155;margin-bottom:0.3rem;">New password</label>
+                <input type="password" name="newPassword" class="form-control" minlength="6" required autocomplete="new-password" style="margin-bottom:0.9rem;">
+                <label style="display:block;font-size:0.8rem;font-weight:600;color:#334155;margin-bottom:0.3rem;">Confirm new password</label>
+                <input type="password" name="confirmPassword" class="form-control" minlength="6" required autocomplete="new-password" style="margin-bottom:1.25rem;">
+                <button type="submit" class="btn btn-primary" style="width:100%;">Update password</button>
+                <button type="button" class="btn btn-secondary" data-action="dismissPasswordRecovery" style="width:100%;margin-top:0.6rem;">Cancel</button>
+            </form>
+        </div>`;
+    document.body.appendChild(overlay);
+    const first = overlay.querySelector('input[name="newPassword"]');
+    if (first) first.focus();
+};
+
+window.dismissPasswordRecovery = function () {
+    const overlay = document.getElementById('password-recovery-overlay');
+    if (overlay) overlay.remove();
+    if (window.location.hash) history.replaceState(null, '', window.location.pathname + window.location.search);
+};
+
+window.handlePasswordRecoverySubmit = async function (form) {
+    const p1 = form.newPassword.value;
+    const p2 = form.confirmPassword.value;
+    if (p1.length < 6) { window.showNotification('Password must be at least 6 characters', 'error'); return; }
+    if (p1 !== p2) { window.showNotification('Passwords do not match', 'error'); return; }
+    try {
+        const { error } = await window.SupabaseClient.client.auth.updateUser({ password: p1 });
+        if (error) throw error;
+        window.dismissPasswordRecovery();
+        window.showNotification('Password updated — signing you in…', 'success');
+        // The recovery link established a live session; reloading lets the
+        // normal session-detection boot path take the user into the app.
+        setTimeout(() => { window.location.reload(); }, 900);
+    } catch (e) {
+        console.error('Password update failed:', e);
+        window.showNotification('Could not update the password: ' + (e.message || 'unknown error'), 'error');
+    }
+};
+
+// Expired/invalid recovery link: Supabase redirects with the failure in the
+// URL hash instead of a recovery session. Surface it and clean the URL so the
+// user is not left staring at an unexplained login screen.
+(function handleAuthErrorHash() {
+    const h = String(window.location.hash || '');
+    if (!/error(_code)?=/i.test(h)) return;
+    const expired = /otp_expired/i.test(h);
+    const show = () => {
+        window.showNotification(
+            expired
+                ? 'That password reset link is invalid or has expired (links are single-use). Use "Forgot Password?" to request a new one.'
+                : 'Sign-in link error: ' + (decodeURIComponent((h.match(/error_description=([^&]+)/i) || [])[1] || 'unknown').replace(/\+/g, ' ')),
+            'error'
+        );
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => setTimeout(show, 400));
+    } else {
+        setTimeout(show, 400);
+    }
+})();
 
 
 // Update CB Logo in Sidebar Header
