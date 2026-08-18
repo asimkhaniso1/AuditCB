@@ -1674,7 +1674,13 @@ function showLoginOverlay() {
                         </div>
                         <div class="form-group">
                             <label><i class="fa-solid fa-lock" style="margin-right: 0.35rem; color: #64748b;"></i>Password</label>
-                            <input type="password" name="password" placeholder="Enter your password" required>
+                            <div style="position: relative;">
+                                <input type="password" name="password" placeholder="Enter your password" required style="padding-right: 2.6rem; width: 100%;">
+                                <button type="button" data-action="togglePasswordVisibility" aria-label="Show password" title="Show/hide password"
+                                    style="position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #64748b; padding: 0.45rem;">
+                                    <i class="fa-solid fa-eye" style="pointer-events: none;"></i>
+                                </button>
+                            </div>
                         </div>
                         <button type="submit" class="login-btn">
                             <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In
@@ -1895,9 +1901,21 @@ window.showPasswordRecoveryModal = function () {
             <p style="margin:0 0 1.25rem;font-size:0.88rem;color:#64748b;">Your reset link was verified. Choose a new password for your account.</p>
             <form id="password-recovery-form" data-action-submit="handlePasswordRecoverySubmit" data-id="this">
                 <label style="display:block;font-size:0.8rem;font-weight:600;color:#334155;margin-bottom:0.3rem;">New password</label>
-                <input type="password" name="newPassword" class="form-control" minlength="6" required autocomplete="new-password" style="margin-bottom:0.9rem;">
+                <div style="position:relative;margin-bottom:0.9rem;">
+                    <input type="password" name="newPassword" class="form-control" minlength="6" required autocomplete="new-password" style="padding-right:2.6rem;width:100%;">
+                    <button type="button" data-action="togglePasswordVisibility" aria-label="Show password" title="Show/hide password"
+                        style="position:absolute;right:0.35rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#64748b;padding:0.45rem;">
+                        <i class="fa-solid fa-eye" style="pointer-events:none;"></i>
+                    </button>
+                </div>
                 <label style="display:block;font-size:0.8rem;font-weight:600;color:#334155;margin-bottom:0.3rem;">Confirm new password</label>
-                <input type="password" name="confirmPassword" class="form-control" minlength="6" required autocomplete="new-password" style="margin-bottom:1.25rem;">
+                <div style="position:relative;margin-bottom:1.25rem;">
+                    <input type="password" name="confirmPassword" class="form-control" minlength="6" required autocomplete="new-password" style="padding-right:2.6rem;width:100%;">
+                    <button type="button" data-action="togglePasswordVisibility" aria-label="Show password" title="Show/hide password"
+                        style="position:absolute;right:0.35rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#64748b;padding:0.45rem;">
+                        <i class="fa-solid fa-eye" style="pointer-events:none;"></i>
+                    </button>
+                </div>
                 <button type="submit" class="btn btn-primary" style="width:100%;">Update password</button>
                 <button type="button" class="btn btn-secondary" data-action="dismissPasswordRecovery" style="width:100%;margin-top:0.6rem;">Cancel</button>
             </form>
@@ -1905,6 +1923,19 @@ window.showPasswordRecoveryModal = function () {
     document.body.appendChild(overlay);
     const first = overlay.querySelector('input[name="newPassword"]');
     if (first) first.focus();
+};
+
+// Show/hide the password in the field this eye button sits next to. Works for
+// the login form and the recovery modal — the button is a sibling of its input.
+window.togglePasswordVisibility = function (el) {
+    const wrap = el && el.closest ? el.closest('div') : null;
+    const input = wrap && wrap.querySelector('input[type="password"], input[type="text"]');
+    if (!input) return;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    const icon = el.querySelector('i');
+    if (icon) icon.className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+    el.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
 };
 
 window.dismissPasswordRecovery = function () {
