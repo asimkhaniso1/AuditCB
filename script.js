@@ -1714,6 +1714,7 @@ window.handleLoginSubmit = async function (form) {
     const password = form.password.value;
 
     let user = null;
+    let authFailureReason = null;
 
     // Try Supabase Auth first
     if (window.SupabaseClient?.isInitialized) {
@@ -1731,6 +1732,20 @@ window.handleLoginSubmit = async function (form) {
             }
         } catch (authError) {
             console.warn('Supabase Auth failed, trying local auth:', authError.message);
+            // A plain wrong password stays generic, but every other auth failure
+            // (rate-limit lockout, unconfirmed email, banned user, network) was
+            // being collapsed into "Invalid email or password" — hiding the real
+            // cause from the person staring at the login screen.
+            const code = authError?.code || '';
+            if (code === 'over_request_rate_limit' || authError?.status === 429) {
+                authFailureReason = 'Too many sign-in attempts — wait a few minutes, then try again.';
+            } else if (code === 'email_not_confirmed') {
+                authFailureReason = 'This email address has not been confirmed yet — check your inbox for the confirmation link.';
+            } else if (code === 'user_banned') {
+                authFailureReason = 'This account has been disabled. Contact your administrator.';
+            } else if (authError?.status >= 500 || /fetch|network/i.test(authError?.message || '')) {
+                authFailureReason = 'Could not reach the authentication service — check your connection and try again.';
+            }
         }
     }
 
@@ -1799,7 +1814,10 @@ window.handleLoginSubmit = async function (form) {
 
         window.showNotification(`Welcome, ${user.name}!`, 'success');
     } else {
-        window.showNotification('Invalid email or password', 'error');
+        // Specific auth failure (rate limit, unconfirmed email, banned, network)
+        // beats the generic message; plain wrong-password stays generic so the
+        // toast never confirms whether an email exists.
+        window.showNotification(authFailureReason || 'Invalid email or password', 'error');
     }
 };
 
