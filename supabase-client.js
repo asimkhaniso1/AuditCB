@@ -1104,8 +1104,11 @@ const SupabaseClient = {
         return { added, updated };
     },
 
-    /**
-     // Send password reset email via Supabase Auth
+    // Send password reset email via Supabase Auth.
+    // (This was previously wrapped in an unterminated `/**` block comment that
+    // ran to the next `*/` — silently commenting out BOTH this function and
+    // updateUserPassword below, so every password-reset path threw
+    // "sendPasswordResetEmail is not a function".)
     sendPasswordResetEmail: async function (email) {
         try {
             if (!this.client) {
