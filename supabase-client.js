@@ -23,6 +23,22 @@ const SupabaseClient = {
                 return false;
             }
 
+            // Older reset emails redirected to "/#password-reset", and Supabase
+            // then appended its own fragment, producing a DOUBLE hash
+            // ("#password-reset#access_token=..."). detectSessionInUrl parses the
+            // fragment as key=value pairs, so the first pair became the garbage
+            // key "password-reset#access_token" — the token was never read and
+            // PASSWORD_RECOVERY never fired. Normalize before creating the
+            // client so those links (still live in inboxes) work.
+            try {
+                const h = String(window.location.hash || '');
+                const m = h.match(/^#[^#&=]*#(access_token=.+)$/);
+                if (m) history.replaceState(null, '', window.location.pathname + window.location.search + '#' + m[1]);
+                if (/access_token=/.test(window.location.hash) && /type=recovery/.test(window.location.hash)) {
+                    window.__pendingPasswordRecovery = true;
+                }
+            } catch (_e) { /* non-fatal */ }
+
             // Initialize Supabase client
             // Explicit auth options so session survives page reloads.
             this.client = supabase.createClient(supabaseUrl, supabaseKey, {
@@ -39,6 +55,23 @@ const SupabaseClient = {
 
             // Setup auth state listener
             this.setupAuthListener();
+
+            // Belt-and-braces: if the URL carried a recovery token but the
+            // PASSWORD_RECOVERY event was missed (timing, or an already-
+            // consumed event), still surface the set-a-new-password modal once
+            // the recovery session is established.
+            if (window.__pendingPasswordRecovery) {
+                setTimeout(() => {
+                    try {
+                        if (document.getElementById('password-recovery-overlay')) return;
+                        this.client.auth.getSession().then(({ data }) => {
+                            if (data && data.session && typeof window.showPasswordRecoveryModal === 'function') {
+                                window.showPasswordRecoveryModal();
+                            }
+                        });
+                    } catch (_e) { /* non-fatal */ }
+                }, 1500);
+            }
 
             return true;
         } catch (error) {
@@ -1115,8 +1148,13 @@ const SupabaseClient = {
                 throw new Error('Supabase client not initialized');
             }
 
+            // Plain origin only — a redirectTo carrying its own "#fragment"
+            // collides with the "#access_token=...&type=recovery" fragment
+            // Supabase appends, mangling the token parse (the double-hash bug).
+            // The recovery UI is triggered by the PASSWORD_RECOVERY event and
+            // the type=recovery hash, not by a path.
             const { error } = await this.client.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/#password-reset`
+                redirectTo: `${window.location.origin}/`
             });
 
             if (error) throw error;
