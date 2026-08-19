@@ -2994,9 +2994,23 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;"><i class="fa-solid fa-spinner fa-spin"></i> Running checks...</p>';
         }
 
+        // Prefer the shared issuance gate (ai-service.js computeIssuanceGate) so
+        // this panel shows EXACTLY what Finalize & Publish will enforce —
+        // validator items plus the gate-level checks (scope, lead auditor, data
+        // reconciliation, technical review). The two used to disagree (panel
+        // counted validator items only), which read as the button being broken.
         let result;
+        let gateItems = [];
         try {
-            result = await window.ReportIntegrity.checkById(reportId);
+            if (typeof window.computeIssuanceGate === 'function') {
+                const gate = window.computeIssuanceGate(reportId);
+                if (!gate) throw new Error('Report not found.');
+                result = gate.integrity || { blockers: [], warnings: [], information: [] };
+                gateItems = (gate.gateBlockers || []).map((m, i) => ({ id: 'GATE-B' + i, severity: 'blocker', section: 'issuance', message: m, source: 'finalize gate', suggestion: '' }))
+                    .concat((gate.gateWarnings || []).map((m, i) => ({ id: 'GATE-W' + i, severity: 'warning', section: 'issuance', message: m, source: 'finalize gate', suggestion: '' })));
+            } else {
+                result = await window.ReportIntegrity.checkById(reportId);
+            }
         } catch (err) {
             console.warn('Report Integrity check failed:', err);
             if (!silent) {
@@ -3010,8 +3024,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             return;
         }
 
-        const blockers = Array.isArray(result.blockers) ? result.blockers : [];
-        const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+        const blockers = (Array.isArray(result.blockers) ? result.blockers : []).concat(gateItems.filter(g => g.severity === 'blocker'));
+        const warnings = (Array.isArray(result.warnings) ? result.warnings : []).concat(gateItems.filter(g => g.severity === 'warning'));
         const information = Array.isArray(result.information) ? result.information : [];
         const allItems = [...blockers, ...warnings, ...information];
         const ready = blockers.length === 0;

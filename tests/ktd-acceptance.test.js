@@ -340,6 +340,21 @@ describe('KTD surveillance acceptance', () => {
         it('returns null when the client has no usable certificate', () => {
             expect(window.ReportStats.cycleState({ client: { id: 'x', name: 'No Cert' }, standard: 'ISO 9001:2015', allReports: [] })).toBe(null);
         });
+
+        // The widget must be able to tell an EARNED stage from a PROJECTED one:
+        // with no finalized audit on file the stage label is a calendar
+        // projection ("Surveillance N period") that sits beside unticked stage
+        // nodes, so the UI annotates it — stageSource is that discriminator.
+        it('flags a calendar-projected stage (no finalized history) as stageSource "calendar"', () => {
+            const cs = window.ReportStats.cycleState(args([sv2Report('draft')]));
+            expect(cs.stageSource).toBe('calendar');
+            expect(cs.stage).toMatch(/period|Initial certification|Recertification due/);
+        });
+
+        it('flags an audit-earned stage as stageSource "history"', () => {
+            const cs = window.ReportStats.cycleState(args([sv2Report('final')]));
+            expect(cs.stageSource).toBe('history');
+        });
     });
 
     // Item 10 — certificate's own recorded site (sitesCovered[] snapshot from

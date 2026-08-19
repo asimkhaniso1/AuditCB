@@ -904,7 +904,14 @@
             return pvAllSites.length ? [pvAllSites[0].name] : [];
         })();
 
-        const pill = (s) => `<label class="rp-pill ${s.hide ? '' : 'active'}" id="pill-${s.id}" style="${s.hide ? 'background:white;color:#94a3b8;border-color:#cbd5e1;' : 'background:' + s.color + ';border-color:' + s.color + ';color:white;'}" data-action="toggleReportSection" data-arg1="${s.id}" data-arg2="${s.color}"><i class="fa-solid ${s.icon}"></i> ${s.label}</label>`;
+        // Sidebar row (replaces the old pill cloud): the row itself navigates —
+        // clicking it scrolls the preview to that section — while the leading
+        // checkbox is the include/exclude toggle (innermost data-action wins in
+        // the event delegator, so the two don't fight). Row id stays 'pill-<id>'
+        // because toggleReportSection targets it.
+        const pill = (s) => `<div class="rp-side-item ${s.hide ? '' : 'active'}" id="pill-${s.id}" style="--sec-color:${s.color};" data-action="scrollToReportSection" data-arg1="${s.id}" title="Jump to ${s.label}">`
+            + `<input type="checkbox" ${s.hide ? '' : 'checked'} data-action="toggleReportSection" data-arg1="${s.id}" data-arg2="${s.color}" aria-label="Include ${s.label}" title="Include / exclude ${s.label}">`
+            + `<i class="fa-solid ${s.icon}"></i><span>${s.label}</span></div>`;
 
         // Helper: render all evidence images for a checklist item (preview mode)
         const renderEvThumbs = (item) => {
@@ -959,11 +966,28 @@
         overlay.innerHTML = `
         <style>
             #report-preview-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;background:rgba(15,23,42,0.7);display:flex;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
-            .rp-modal{background:#f8fafc;border-radius:16px;width:100%;max-width:1100px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.3);}
+            .rp-modal{background:#f8fafc;border-radius:16px;width:100%;max-width:1280px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.3);}
             .rp-header{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:white;padding:20px 28px;}
-            .rp-pills{padding:12px 28px;background:white;border-bottom:1px solid #e2e8f0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
-            .rp-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;font-size:0.8rem;font-weight:600;cursor:pointer;border:2px solid;transition:all 0.2s;user-select:none;}
-            .rp-content{flex:1;overflow-y:auto;padding:16px 28px;}
+            .rp-body{display:flex;flex:1;min-height:0;}
+            .rp-sidebar{width:272px;flex-shrink:0;background:white;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;min-height:0;}
+            .rp-side-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 8px;font-size:0.72rem;font-weight:700;color:#64748b;letter-spacing:0.06em;}
+            .rp-side-head button{border:none;background:none;color:#2563eb;font-size:0.72rem;font-weight:600;cursor:pointer;padding:2px 4px;}
+            .rp-side-count{background:#eff6ff;color:#1d4ed8;border-radius:10px;padding:1px 8px;margin-left:6px;font-size:0.7rem;}
+            .rp-side-list{flex:1;overflow-y:auto;padding:0 8px 8px;}
+            .rp-side-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;font-size:0.82rem;font-weight:600;color:#334155;cursor:pointer;user-select:none;border-left:3px solid transparent;margin-bottom:1px;}
+            .rp-side-item:hover{background:#f1f5f9;}
+            .rp-side-item i.fa-solid{width:16px;text-align:center;color:#94a3b8;font-size:0.8rem;flex-shrink:0;}
+            .rp-side-item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+            .rp-side-item input[type=checkbox]{accent-color:var(--sec-color,#2563eb);cursor:pointer;flex-shrink:0;}
+            .rp-side-item.active{border-left-color:var(--sec-color,#2563eb);}
+            .rp-side-item.active i.fa-solid{color:var(--sec-color,#2563eb);}
+            .rp-side-item:not(.active){color:#94a3b8;}
+            .rp-side-item:not(.active) span{text-decoration:line-through;text-decoration-color:#cbd5e1;}
+            .rp-side-parts{border-top:1px solid #e2e8f0;padding:10px 14px 12px;background:#f8fafc;}
+            .rp-side-parts-title{font-size:0.68rem;font-weight:700;color:#64748b;letter-spacing:0.06em;margin-bottom:7px;}
+            .rp-side-parts label{display:flex;align-items:center;gap:7px;font-size:0.78rem;color:#334155;padding:3px 0;cursor:pointer;}
+            @media(max-width:900px){.rp-sidebar{display:none;}}
+            .rp-content{flex:1;overflow-y:auto;padding:16px 28px;min-width:0;}
             .rp-sec{background:white;border-radius:10px;margin-bottom:14px;border:1px solid #e2e8f0;overflow:hidden;}
             .rp-sec-hdr{display:flex;align-items:center;padding:11px 16px;cursor:pointer;gap:10px;font-weight:600;color:white;font-size:0.92rem;}
             .rp-sec-body{padding:14px 16px;border-top:1px solid #e2e8f0;}
@@ -984,19 +1008,25 @@
                     <button data-action="removeElement" data-id="report-preview-overlay" style="background:rgba(255,255,255,0.15);border:none;color:white;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;" aria-label="Close"><i class="fa-solid fa-times"></i></button>
                 </div>
             </div>
-            <div class="rp-pills">
-                <span style="font-size:0.78rem;color:#64748b;font-weight:600;margin-right:4px;">INCLUDE:</span>
-                ${sections.map(s => pill(s)).join('')}
-                <div style="flex:1;"></div>
-                <button data-action="expandAllSections" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Expand All</button>
-                <button data-action="collapseAllSections" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Collapse All</button>
-            </div>
-            <div class="rp-pills" style="background:#f8fafc;">
-                <span style="font-size:0.78rem;color:#64748b;font-weight:600;margin-right:4px;">REPORT PARTS:</span>
-                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;color:#0f172a;font-weight:600;"><input type="checkbox" checked disabled> Formal Certification Report (always included)</label>
-                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;color:#334155;"><input type="checkbox" id="annex-toggle-analytics" ${_annexToggles.analytics ? 'checked' : ''} data-action="toggleReportAnnex" data-arg1="analytics"> Management Analytics Annex</label>
-                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;color:#334155;"><input type="checkbox" id="annex-toggle-evidence" ${_annexToggles.evidence ? 'checked' : ''} data-action="toggleReportAnnex" data-arg1="evidence"> Evidence Annex</label>
-                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;color:#334155;"><input type="checkbox" id="annex-toggle-capa" ${_annexToggles.capa ? 'checked' : ''} data-action="toggleReportAnnex" data-arg1="capa"> CAPA Annex</label>
+            <div class="rp-body">
+            <div class="rp-sidebar">
+                <div class="rp-side-head">
+                    <span>SECTIONS<span class="rp-side-count">${sections.length}</span></span>
+                    <span>
+                        <button type="button" data-action="expandAllSections" title="Expand all sections">Expand All</button>
+                        <button type="button" data-action="collapseAllSections" title="Collapse all sections">Collapse All</button>
+                    </span>
+                </div>
+                <div class="rp-side-list">
+                    ${sections.map(s => pill(s)).join('')}
+                </div>
+                <div class="rp-side-parts">
+                    <div class="rp-side-parts-title">REPORT PARTS</div>
+                    <label style="font-weight:600;color:#0f172a;"><input type="checkbox" checked disabled> Formal Certification Report</label>
+                    <label><input type="checkbox" id="annex-toggle-analytics" ${_annexToggles.analytics ? 'checked' : ''} data-action="toggleReportAnnex" data-arg1="analytics"> Management Analytics Annex</label>
+                    <label><input type="checkbox" id="annex-toggle-evidence" ${_annexToggles.evidence ? 'checked' : ''} data-action="toggleReportAnnex" data-arg1="evidence"> Evidence Annex</label>
+                    <label><input type="checkbox" id="annex-toggle-capa" ${_annexToggles.capa ? 'checked' : ''} data-action="toggleReportAnnex" data-arg1="capa"> CAPA Annex</label>
+                </div>
             </div>
             <div class="rp-content">
                 <!-- COVER PAGE -->
@@ -2003,6 +2033,7 @@
                     </div>
                 </div>
             </div>
+            </div><!-- /rp-body -->
             ${(window.ReportExecutive && window.ReportExecutive.renderAssistantPanel) ? window.ReportExecutive.renderAssistantPanel() : ''}
             <div class="rp-footer">
                 <div style="font-size:0.82rem;color:#64748b;max-width:46%;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>${sections.filter(s => !s.hide).length} sections • Click any section to edit • Changes reflect in PDF<br><span style="color:#94a3b8;">In the print dialog: turn "Headers and footers" OFF and "Background graphics" ON for correct output.</span></div>
@@ -2217,22 +2248,26 @@
     };
     window._persistReportConfig = _persistReportConfig;
 
-    window.toggleReportSection = function (id, color) {
-        const pill = document.getElementById('pill-' + id);
+    // Sidebar include/exclude toggle. The row keeps the historical 'pill-<id>'
+    // element id; styling is class-driven (.rp-side-item[.active] + --sec-color)
+    // so this only flips state, the class, the checkbox, and the section.
+    window.toggleReportSection = function (id, _color) {
+        const row = document.getElementById('pill-' + id);
         const sec = document.getElementById('sec-' + id);
-        if (!pill) return;
-        const wasActive = pill.classList.contains('active');
-        window._reportSectionState[id] = !wasActive;
-        if (wasActive) {
-            pill.classList.remove('active');
-            pill.style.background = 'white'; pill.style.color = '#94a3b8'; pill.style.borderColor = '#cbd5e1';
-            if (sec) sec.style.display = 'none';
-        } else {
-            pill.classList.add('active');
-            pill.style.background = color; pill.style.color = 'white'; pill.style.borderColor = color;
-            if (sec) sec.style.display = '';
-        }
+        if (!row) return;
+        const nowActive = !row.classList.contains('active');
+        window._reportSectionState[id] = nowActive;
+        row.classList.toggle('active', nowActive);
+        const cb = row.querySelector('input[type=checkbox]');
+        if (cb) cb.checked = nowActive;
+        if (sec) sec.style.display = nowActive ? '' : 'none';
         _persistReportConfig();
+    };
+
+    // Sidebar row click: scroll the preview pane to that section.
+    window.scrollToReportSection = function (id) {
+        const sec = document.getElementById('sec-' + id);
+        if (sec && sec.style.display !== 'none') sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     // Annex master toggle checkbox (Management Analytics / Evidence / CAPA annexes).
@@ -3544,6 +3579,24 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // .b4-bar keep their clipping), and no table may exceed the page width.
             +   '.sb [style*="overflow-x"],.sb [style*="overflow:auto"],.sb [style*="overflow: auto"]{overflow:visible !important;}'
             +   '.sb table{max-width:100% !important;min-width:0 !important;width:100% !important;table-layout:fixed;}'
+            // The whole report rides inside one td of the .rpt-running wrapper
+            // table. That table is AUTO layout, so a single over-wide descendant
+            // (a nowrap line, an inline min-width, a grid track's min-content
+            // floor) silently widened the entire document past the A4 content
+            // box and Chrome clipped EVERY page on the right — cover title,
+            // table columns and narrative all cut mid-word. Fixed layout makes
+            // the wrapper obey its width:100% regardless of content, and the
+            // screen-only 1050px body cap must not leak into print.
+            +   'body{max-width:none !important;width:auto !important;}'
+            +   '.rpt-running{table-layout:fixed !important;width:100% !important;}'
+            +   '.rpt-running > tbody > tr > td{min-width:0;}'
+            // Grid tracks: 1fr's implicit min-content floor lets one long token
+            // push a grid past the page; minmax(0,1fr) keeps tracks equal and
+            // clamped so text wraps instead of widening the page.
+            +   '.stat-grid{grid-template-columns:repeat(4,minmax(0,1fr)) !important;}'
+            +   '.chart-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}'
+            +   '.ev-grid{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}'
+            +   '.sb [style*="min-width"]{min-width:0 !important;}'
             // For long-text findings tables, avoid mid-row splits per-row (readability) while still
             // letting the table itself break across pages (table{break-inside:auto} above already
             // allows that) — this is the pragmatic choice over per-row height thresholds, which
@@ -4085,18 +4138,29 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // in this exported document, so this pass silently downscaled zero images and
             // full-resolution photos stayed embedded. Images actually present here are
             // .ev-inline (:2698), report-findings-ops.js:409, and the CB/client logos.
-            // Target ~3x the printed box (comfortably past 300dpi at these sizes) and
-            // leave anything already small alone, which also spares the QR codes.
-            +   'document.querySelectorAll("img").forEach(function(im){try{'
+            // Two hardening points measured off a real 3.7MB export that still carried
+            // 1600x1000 evidence JPEGs:
+            //  (1) an <img> not yet decoded at this point has naturalWidth 0 and was
+            //      silently skipped at full resolution — so the pass now awaits
+            //      decode() on every image first, and only then flags _chartsReady
+            //      (the print trigger), so printing can't race the downscale;
+            //  (2) shown*3 measures the SCREEN layout, which can exceed the printed
+            //      box many times over — so thumbnail contexts (.ev-inline, table
+            //      cells) get a hard 480px cap and everything else caps at 1000px,
+            //      plenty for the widest printable box at 300dpi.
+            +   'var _imgs=Array.prototype.slice.call(document.querySelectorAll("img"));'
+            +   'Promise.all(_imgs.map(function(im){return (im.decode?im.decode():Promise.resolve()).catch(function(){});})).then(function(){'
+            +   '_imgs.forEach(function(im){try{'
             +     'if(!im.naturalWidth||im.naturalWidth<=400)return;'
             +     'var shown=Math.round((im.getBoundingClientRect().width||im.clientWidth||0));'
-            +     'var target=Math.max(320,shown*3);if(target>=im.naturalWidth)return;'
+            +     'var cap=(im.closest&&im.closest(".ev-inline,td"))?480:1000;'
+            +     'var target=Math.min(cap,Math.max(320,shown*3));if(target>=im.naturalWidth)return;'
             +     'var s=target/im.naturalWidth;'
             +     'var oc=document.createElement("canvas");oc.width=Math.round(im.naturalWidth*s);oc.height=Math.round(im.naturalHeight*s);'
             +     'var ox=oc.getContext("2d");ox.fillStyle="#ffffff";ox.fillRect(0,0,oc.width,oc.height);'
             +     'ox.imageSmoothingQuality="high";ox.drawImage(im,0,0,oc.width,oc.height);'
             +     'im.src=oc.toDataURL("image/jpeg",0.8);'
-            + '}catch(e){}});window._chartsReady=true;},2500);'
+            + '}catch(e){}});window._chartsReady=true;});},2500);'
             + '}function _waitForChart(){if(typeof Chart!=="undefined"){rc();}else{setTimeout(_waitForChart,100);}}_waitForChart();'
             // Wire up data-action buttons (Download PDF, Close) — parent's event delegator does not run in this window
             + 'document.addEventListener("click",function(ev){'

@@ -435,7 +435,24 @@ function renderClientOverview(client) {
     // "Completed" figure here can't drift from either of those views.
     const completedAudits = window.DataService.getPlanCompletionStats(clientPlans).completed;
     const upcomingAudits = clientPlans.filter(p => p.status === 'Planned' || p.status === 'Approved').length;
-    const validCerts = clientCerts.filter(c => c.status === 'Valid').length;
+    // Valid Certs counts the client's own certificate register (client.certificates —
+    // the store Settings edits and the cycle cards read), not the global decision
+    // register, which is only populated by the Certifications module and uses a
+    // different status vocabulary ('Valid') than Settings-created certs ('Active').
+    // Reading only state.certifications with status==='Valid' showed 0 next to
+    // three in-date certificates. A cert is invalid only when explicitly revoked
+    // or actually past its expiry date.
+    const _certIsValid = (c) => {
+        if (!c) return false;
+        if (['Suspended', 'Withdrawn', 'Expired'].includes(c.status)) return false;
+        const exp = c.expiryDate ? new Date(c.expiryDate) : null;
+        if (exp && !isNaN(exp.getTime()) && exp.getTime() < Date.now() - 86400000) return false;
+        return true;
+    };
+    const _ownCerts = Array.isArray(client.certificates) ? client.certificates : [];
+    const validCerts = _ownCerts.length
+        ? _ownCerts.filter(_certIsValid).length
+        : clientCerts.filter(c => c.status === 'Valid').length;
     const totalSites = (client.sites || []).length;
     const totalEmployees = (client.sites || []).reduce((acc, site) => acc + (parseInt(site.employees, 10) || 0), 0) || client.employees || 0;
 
@@ -944,6 +961,10 @@ function renderCertificationCycleWidget(client) {
         const nextAuditLabel = (cs && cs.nextAudit && cs.nextAudit.source === 'scheduled') ? 'Next Audit (scheduled)' : 'Next Audit';
         const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
         const isUrgent = daysToNext > 0 && daysToNext <= 60;
+        // Calendar-projected stage (no finalized audit on file) must say so —
+        // otherwise "Surveillance 2 period" sits beside unticked S1/S2 nodes
+        // and reads as a contradiction. cycleState exposes stageSource for this.
+        const isProjectedStage = !!(cs && cs.stageSource === 'calendar');
 
         return `
             <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, ${expired ? '#fee2e2' : '#f0f9ff'} 0%, ${expired ? '#fecaca' : '#e0f2fe'} 100%); border-left: 4px solid ${expired ? '#dc2626' : '#3b82f6'};">
@@ -967,6 +988,7 @@ function renderCertificationCycleWidget(client) {
                             <div>
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Current Stage</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-top: 0.25rem;">${currentStage}</div>
+                                ${isProjectedStage ? '<div style="font-size: 0.7rem; color: #b45309; margin-top: 0.15rem;" title="Stage nodes tick only when the corresponding audit report is finalized in Audit360."><i class="fa-solid fa-circle-info" style="margin-right: 3px;"></i>Projected from certificate dates — no finalized audit on file yet</div>' : ''}
                             </div>
                             ${nextAudit ? `
                             <div>
@@ -1116,6 +1138,7 @@ function renderAuditCycleTimeline(client) {
                     <i class="fa-solid fa-sync" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
                     <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${currentStage}</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Current Cycle Stage</p>
+                    ${(cs && cs.stageSource === 'calendar') ? '<p style="font-size: 0.72rem; color: #b45309; margin: 0.25rem 0 0;">Projected from certificate dates — no finalized audit on file yet</p>' : ''}
                 </div>
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
                     <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>

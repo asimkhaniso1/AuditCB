@@ -1032,24 +1032,25 @@ function _hasReportIssuanceRole() {
     return true; // AuthManager not wired in this environment — fail open rather than lock out.
 }
 
-// 1. Finalize & Publish (One-Click Workflow)
-window.finalizeAndPublish = function (reportId) {
+// Shared pre-issuance gate. Computes everything finalizeAndPublish checks
+// BEYOND the ReportIntegrity validator (scope, lead auditor, ReportStats
+// reconciliation, technical review) plus the validator's own result. Exposed
+// on window so the Finalization tab's Report Integrity panel can display the
+// SAME totals the Finalize gate enforces — previously the panel counted only
+// validator items, so its numbers disagreed with the Finalize dialog (e.g.
+// 7 warnings in the panel vs 9 at finalize) and the check button looked broken.
+// Returns { report, plan, stats, gateBlockers, gateWarnings, integrity } or
+// null when the report cannot be found.
+window.computeIssuanceGate = function (reportId) {
     const report = window.DataService.findAuditReport(reportId);
-    if (!report) return;
+    if (!report) return null;
 
-    if (!_hasReportIssuanceRole()) {
-        window.showNotification && window.showNotification('You do not have permission to finalize this report.', 'error');
-        return;
-    }
-
-    // ─── Issuance gate: hard blockers stop finalize outright; soft warnings need
-    // an explicit confirm before proceeding ───
     const plan = (window.state && window.state.auditPlans || []).find(p => String(p.id) === String(report.planId));
-    const blockers = [];
-    const warnings = [];
+    const gateBlockers = [];
+    const gateWarnings = [];
 
     const scopeText = report.scope || report.auditScope || (plan && (plan.auditObjectives || plan.scope || plan.auditCriteria));
-    if (!scopeText) blockers.push('Audit scope/criteria is not recorded on the report or linked audit plan.');
+    if (!scopeText) gateBlockers.push('Audit scope/criteria is not recorded on the report or linked audit plan.');
 
     // Lead auditor: fall back to the linked plan, mirroring the scope check above.
     // report.leadAuditor is only backfilled when the report PREVIEW is opened
@@ -1070,7 +1071,7 @@ window.finalizeAndPublish = function (reportId) {
             || '';
     }
 
-    if (!report.leadAuditor) blockers.push('Lead auditor is not set on the report.');
+    if (!report.leadAuditor) gateBlockers.push('Lead auditor is not set on the report.');
 
     let rs = null;
     try {
@@ -1084,23 +1085,23 @@ window.finalizeAndPublish = function (reportId) {
     const reconciliation = (rs && Array.isArray(rs.reconciliation)) ? rs.reconciliation : [];
     const hasPendingClassification = reconciliation.some(r => r.code === 'pending_classification')
         || (report.checklistProgress || []).some(i => i.status === 'nc' && !i.ncrType);
-    if (hasPendingClassification) blockers.push('One or more findings are still pending severity classification.');
+    if (hasPendingClassification) gateBlockers.push('One or more findings are still pending severity classification.');
 
     // 'coverage_gap' is downgraded to a warning per spec; every other reconciliation
     // code is treated as error-level and blocks finalize.
     reconciliation.forEach(r => {
         if (r.code === 'coverage_gap') return;
-        blockers.push('Data quality: ' + (r.message || r.code));
+        gateBlockers.push('Data quality: ' + (r.message || r.code));
     });
 
     const coverageGap = reconciliation.find(r => r.code === 'coverage_gap');
-    if (coverageGap) warnings.push(coverageGap.message || 'Audit coverage is incomplete.');
+    if (coverageGap) gateWarnings.push(coverageGap.message || 'Audit coverage is incomplete.');
 
     const auditTypeStr = String((plan && plan.auditType) || report.auditType || '').toLowerCase();
     const isCertificationType = /stage|surveillance|recert/i.test(auditTypeStr);
     const reviewOutcome = report.technicalReview && report.technicalReview.outcome;
     if (isCertificationType && reviewOutcome !== 'Approved') {
-        warnings.push('Technical review outcome is not "Approved" for this certification-type audit.');
+        gateWarnings.push('Technical review outcome is not "Approved" for this certification-type audit.');
     }
 
     // ─── Report Integrity Validator: additional cross-cutting checks (evidence,
@@ -1114,6 +1115,26 @@ window.finalizeAndPublish = function (reportId) {
             integrityResult = window.ReportIntegrity.check({ report, auditPlan: plan, client, stats: rs });
         }
     } catch (e) { console.error('ReportIntegrity.check failed during finalize gate:', e); }
+
+    return { report, plan, stats: rs, gateBlockers, gateWarnings, integrity: integrityResult };
+};
+
+// 1. Finalize & Publish (One-Click Workflow)
+window.finalizeAndPublish = function (reportId) {
+    if (!_hasReportIssuanceRole()) {
+        window.showNotification && window.showNotification('You do not have permission to finalize this report.', 'error');
+        return;
+    }
+
+    // ─── Issuance gate: hard blockers stop finalize outright; soft warnings need
+    // an explicit confirm before proceeding ───
+    const gate = window.computeIssuanceGate(reportId);
+    if (!gate) return;
+    const report = gate.report;
+    const rs = gate.stats;
+    const integrityResult = gate.integrity;
+    const blockers = gate.gateBlockers.slice();
+    const warnings = gate.gateWarnings.slice();
 
     if (integrityResult) {
         integrityResult.blockers.forEach(b => blockers.push(b.message));

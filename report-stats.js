@@ -585,7 +585,12 @@
         const completed = { certification: true, s1: surveillancesDone >= 1, s2: surveillancesDone >= 2, recert: recertDone };
         const hasHistory = history.length > 0;
 
-        let stage, dueDate, progress;
+        // stageSource discriminates the two derivations: 'history' stages are
+        // earned by finalized audits (they agree with the S1/S2 stage ticks);
+        // 'calendar' stages are pure projections used only when NO finalized
+        // audit exists — the UI must present those as projections, or the label
+        // ("Surveillance 2 period") visibly contradicts the unticked stage nodes.
+        let stage, dueDate, progress, stageSource = 'history';
         if (recertDone) {
             stage = 'Recertification completed'; dueDate = null; progress = 100;
         } else if (surveillancesDone >= 2) {
@@ -598,6 +603,7 @@
             // No finalized history — project from the calendar, preserving the
             // long-standing "stage = last milestone passed, next = the one
             // after it" reading of this widget.
+            stageSource = 'calendar';
             stage = 'Initial certification'; dueDate = surv1Due; progress = 0;
             if (today > surv1Due) { stage = 'Surveillance 1 period'; dueDate = surv2Due; progress = 33; }
             if (today > surv2Due) { stage = 'Surveillance 2 period'; dueDate = recertDue; progress = 66; }
@@ -627,7 +633,7 @@
         return {
             anchor, cycleEnd, rawExpiry, surv1Due, surv2Due, recertDue,
             completed, surveillancesDone, recertDone, hasHistory,
-            stage, progress, nextAudit,
+            stage, stageSource, progress, nextAudit,
             expired: !recertDone && today > cycleEnd
         };
     }

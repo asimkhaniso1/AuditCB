@@ -2873,23 +2873,34 @@ window.navigateToReporting = function (planId) {
         return;
     }
 
-    // Switch to reporting. Clicking the global sidebar entry only works from the
-    // global shell — inside a client workspace that element does not exist, so
-    // the button silently did nothing. Fall back to rendering the module
-    // directly, which works in both shells.
-    const tab = document.querySelector('[data-module="audit-reporting"]');
+    // Reporting lives in the Execution module's "Review & Submit" (Finalization)
+    // tab — draft/review/finalize/export all happen there. The old target, the
+    // global "Audit Reporting" module, is an under-development stub, and
+    // window.openReportingDetail never existed, so this button dead-ended in a
+    // "Reporting module is still loading" toast forever. Route to the real flow.
+    const reportIdStr = String(report.id);
+    const openReviewTab = (attempt) => {
+        if (typeof window.renderExecutionDetail === 'function') {
+            window.renderExecutionDetail(reportIdStr);
+            // Land on the Review & Submit tab once the execution detail renders.
+            setTimeout(() => {
+                const reviewBtn = document.querySelector('.tab-btn[data-tab="review"]');
+                if (reviewBtn) reviewBtn.click();
+            }, 300);
+        } else if (attempt < 10) {
+            setTimeout(() => openReviewTab(attempt + 1), 300);
+        } else {
+            window.showNotification('Execution module not loaded after retries. Please refresh the page.', 'error');
+        }
+    };
+
+    const tab = document.querySelector('[data-module="audit-execution"]');
     if (tab) {
         tab.click();
-    } else if (typeof window.renderModule === 'function') {
-        window.renderModule('audit-reporting');
+        setTimeout(() => openReviewTab(0), 200);
     } else {
-        window.location.hash = 'audit-reporting';
+        openReviewTab(0);
     }
-
-    setTimeout(() => {
-        if (window.openReportingDetail) window.openReportingDetail(report.id);
-        else window.showNotification('Reporting module is still loading — try again in a moment.', 'warning');
-    }, 250);
 };
 window.updateClientDetails = updateClientDetails;
 window.autoCalculateDays = autoCalculateDays;
