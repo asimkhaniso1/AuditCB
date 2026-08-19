@@ -415,3 +415,53 @@ describe('ReportIntegrity — report/dataset agreement', () => {
         expect(result.editorial.length).toBe(0);
     });
 });
+
+// W13 exists to force an applicability decision, so a recorded decision must
+// silence it — a warning that never clears is one auditors learn to ignore.
+describe('ReportIntegrity — W13 respects a recorded applicability decision', () => {
+    const designClient = () => baseClient({
+        certificationScope: 'Engineering and new product development, wire harness design and manufacturing.'
+    });
+    const reportWithConflict = (overrides) => baseReport(Object.assign({
+        conclusion: 'Continued certification is recommended.',
+        checklistProgress: [{ status: 'conform', clause: '8.1', comment: 'No Design Development applicable.' }]
+    }, overrides));
+
+    it('still warns while no decision has been recorded', () => {
+        const result = window.ReportIntegrity.check({
+            report: reportWithConflict(), auditPlan: {}, client: designClient()
+        });
+        expect(result.warnings.some((w) => w.id === 'W13')).toBe(true);
+    });
+
+    it('clears once the exclusion is justified in writing', () => {
+        const report = reportWithConflict({
+            applicabilityDecisions: {
+                '8.3': {
+                    applicable: false,
+                    justification: 'Design authority rests with the customer; the organization manufactures to supplied drawings only.',
+                    decidedBy: 'Lead Auditor',
+                    decidedAt: '2026-08-19T10:00:00Z'
+                }
+            }
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: designClient() });
+        expect(result.warnings.some((w) => w.id === 'W13')).toBe(false);
+    });
+
+    it('clears when the auditor decides 8.3 IS applicable', () => {
+        const report = reportWithConflict({
+            applicabilityDecisions: { '8.3': { applicable: true, decidedBy: 'Lead Auditor' } }
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: designClient() });
+        expect(result.warnings.some((w) => w.id === 'W13')).toBe(false);
+    });
+
+    it('keeps warning when an exclusion was recorded without a justification', () => {
+        const report = reportWithConflict({
+            applicabilityDecisions: { '8.3': { applicable: false, justification: '   ' } }
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: designClient() });
+        expect(result.warnings.some((w) => w.id === 'W13')).toBe(true);
+    });
+});

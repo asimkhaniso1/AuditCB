@@ -908,7 +908,21 @@
     const DESIGN_SCOPE_RE = /\b(design|development|engineering|new product)\b/i;
     const DESIGN_EXCLUDED_RE = /\bno\s+design\b|design\s*(&|and)?\s*development\s+(is\s+)?not\s+applicable|not\s+applicable[^.]{0,20}\bdesign\b/i;
 
+    // An auditor's recorded decision settles the applicability question. The
+    // rule exists to force that decision, so once one is on file it must stop
+    // asking — otherwise the warning is permanent and auditors learn to ignore
+    // it. An exclusion needs its justification; declaring 8.3 applicable does
+    // not (the clause then simply gets assessed).
+    function applicabilityDecided(report, clause) {
+        const decisions = (report && report.applicabilityDecisions) || {};
+        const d = decisions[clause];
+        if (!d || typeof d !== 'object') return false;
+        if (d.applicable === true) return true;
+        return !!trim(d.justification);
+    }
+
     function checkW13DesignApplicability(report, client, auditPlan, results) {
+        if (applicabilityDecided(report, '8.3')) return;
         const scopeText = [
             client && client.certificationScope,
             client && client.industry,
