@@ -303,7 +303,11 @@ Return ONLY the raw JSON object, no markdown fences.`;
         const intel = computeEvidenceIntel(d);
         const concerns = [];
         if (intel.missingEvidence.length > 0 && intel.coveragePct < 70) {
-            concerns.push(`Objective-evidence coverage across applicable items is ${intel.coveragePct}%; ${intel.missingEvidence.length} finding(s) currently lack supporting evidence.`);
+            // intel.coveragePct is the evidence-ATTACHMENT metric (items with
+            // supporting evidence attached), distinct from Audit Coverage
+            // (items-assessed, see computeCoveragePct) — labelled accordingly
+            // so the two metrics never read as the same figure.
+            concerns.push(`Evidence-attachment coverage across applicable items is ${intel.coveragePct}%; ${intel.missingEvidence.length} finding(s) currently lack supporting evidence.`);
         }
 
         return {
@@ -375,8 +379,10 @@ ${data.forwardOutlook ? `
         return Math.round(((conform + advisories) / items.length) * 100);
     }
 
-    // Coverage: assessed applicable items / total applicable items (blank-status
-    // items reduce coverage; 'na' items are excluded from both sides).
+    // AUDIT COVERAGE (items-assessed metric — distinct from evidence-attachment
+    // coverage in computeEvidenceIntel() below, and must never share its label):
+    // assessed applicable items / total applicable items (blank-status items
+    // reduce coverage; 'na' items are excluded from both sides).
     function computeCoveragePct(d) {
         try {
             if (window.ReportStats && typeof window.ReportStats.build === 'function') {
@@ -406,9 +412,12 @@ ${data.forwardOutlook ? `
     }
 
     const BULLET_FIELDS = ['strengths', 'findings', 'concerns'];
-    function capExecSummaryLists(data) {
+    function capExecSummaryLists(data, d) {
         const out = Object.assign({}, data);
         BULLET_FIELDS.forEach(f => { out[f] = dedupeCap(out[f], 3); });
+        // Task 1: qualify (never delete) any surviving strength that names a
+        // clause family also carrying an open major/minor NC.
+        out.strengths = qualifyStrengthConflicts(d, out.strengths);
         return out;
     }
 
@@ -476,7 +485,12 @@ ${data.forwardOutlook ? `
 
         let sentence = `The audit assessed ${total} checklist item${total === 1 ? '' : 's'} within the sampled scope: ${countsText}.`;
         if (coveragePct != null && coveragePct < 100) {
-            sentence += ` Objective-evidence coverage across assessed items was ${coveragePct}%.`;
+            // computeCoveragePct is items-assessed/applicable — the canonical
+            // "Audit Coverage" metric (window.ReportStats.build().coveragePct).
+            // Must NOT be worded as "evidence coverage" — that is a different
+            // metric (objective-evidence attachment, see computeEvidenceIntel)
+            // and the two must never share a label.
+            sentence += ` Audit coverage across applicable items was ${coveragePct}%.`;
         }
         return sentence;
     }
@@ -561,38 +575,145 @@ ${data.forwardOutlook ? `
     }
 
     // Cross-checks AI-authored "strengths" against the real NC list before it
-    // is ever merged/rendered: a department or clause that appears in the
+    // is ever merged/rendered: a department that appears in the
     // non-conformity list must never also be cited as a strength — the model
     // has no reliable self-check against the data it was given, so this is
-    // enforced in code, not just via prompt instruction.
+    // enforced in code, not just via prompt instruction. Clause-level
+    // conflicts are handled separately below (qualified, not dropped — see
+    // qualifyStrengthConflicts / Task 1).
     function buildNCExclusionSet(d) {
         const realNCs = getRealNCs(d);
         const depts = new Set();
-        const clauses = new Set();
         realNCs.forEach(i => {
             const dep = (i.department && String(i.department).trim()) || '';
             if (dep) depts.add(dep.toLowerCase());
-            const cl = clauseLabel(i);
-            if (cl && cl !== 'General') clauses.add(String(cl).toLowerCase());
         });
-        return { depts, clauses };
+        return { depts };
     }
 
     function filterStrengthsAgainstNCs(d, strengths) {
         const excl = buildNCExclusionSet(d);
-        if (!excl.depts.size && !excl.clauses.size) return safeArr(strengths);
+        if (!excl.depts.size) return safeArr(strengths);
         return safeArr(strengths).filter(s => {
             const low = String(s == null ? '' : s).toLowerCase();
             for (const dep of excl.depts) { if (dep && low.indexOf(dep) !== -1) return false; }
-            for (const cl of excl.clauses) { if (cl && low.indexOf(cl) !== -1) return false; }
             return true;
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Strength / nonconformity CLAUSE conflict (never present a strength in
+    // a way that implies conformity where an open NC exists on the SAME
+    // clause area — see module task notes). Unlike the department check
+    // above, a clause-level conflict is never a reason to drop a genuine
+    // strength outright: the underlying fact (a process/system exists) can
+    // still be true even where implementation was not fully effective, so
+    // the strength is QUALIFIED instead — see qualifyStrengthConflicts.
+    // ------------------------------------------------------------------
+
+    // Clause "family" = leading two dot-segments, e.g. "7.2.1" and "7.2"
+    // share family "7.2" — the same grouping already used above for
+    // same-audit clause concentration (fallbackInsights' "recurring" card).
+    function clauseFamily(clauseLike) {
+        const s = String(clauseLike == null ? '' : clauseLike).trim();
+        if (!s) return '';
+        return s.split('.').slice(0, 2).join('.').toLowerCase();
+    }
+
+    // Resolved criterion per the task spec: criterionRef when present, else
+    // the raw clause — never the KB-matched label, which is a lookup
+    // convenience, not what was actually raised against.
+    function resolvedCriterion(finding) {
+        const f = finding || {};
+        return String(f.criterionRef || f.clause || '').trim();
+    }
+
+    // Map of open-NC clause families -> a genuine NCR/finding reference (or
+    // null when none can be resolved without fabricating one). Sourced from
+    // BOTH report.checklistProgress NC items and the report.ncrs register,
+    // as required. Prefers window.ReportStats.build() — the same engine
+    // already relied on elsewhere in this file (computeConformPct /
+    // computeCoveragePct) — because it already reconciles checklist +
+    // register + manual NCRs into one set of finding ids and exposes a
+    // genuine capaRef (linked CAPA register id) when one exists, so this
+    // never derives a second, possibly-conflicting numbering scheme.
+    function buildClauseConflictMap(d) {
+        const map = {};
+        const note = (rawCriterion, ref) => {
+            const family = clauseFamily(rawCriterion);
+            if (!family) return;
+            if (!map[family]) map[family] = { ref: ref || null };
+            else if (!map[family].ref && ref) map[family].ref = ref;
+        };
+
+        let sourced = false;
+        try {
+            if (window.ReportStats && typeof window.ReportStats.build === 'function') {
+                const ds = window.ReportStats.build(d || {});
+                safeArr(ds && ds.uniqueFindings).forEach(f => {
+                    if (!f || (f.severity !== 'major' && f.severity !== 'minor')) return;
+                    const ref = f.capaRef != null ? ('NCR-' + String(f.capaRef).padStart(3, '0')) : (f.id || null);
+                    note(f.criterionRef || f.clause, ref);
+                });
+                sourced = true;
+            }
+        } catch (_e) { /* fall through to local derivation below */ }
+
+        if (!sourced) {
+            getRealNCs(d).forEach(item => note(resolvedCriterion(item), null));
+            safeArr(d && d.report && d.report.ncrs)
+                .filter(n => n && /^major|minor$/i.test(String(n.type || n.ncrType || n.severity || '')))
+                .forEach(n => note(String(n.criterionRef || n.clause || '').trim(), null));
+        }
+
+        return map;
+    }
+
+    // Does free-text bullet content name a clause number matching one of
+    // the conflicting families? Scans for clause-shaped tokens (e.g. "7.2",
+    // "A.9.4.1") rather than requiring an exact string match, since
+    // strength text is prose, not a structured finding — the exec-summary
+    // prompt already instructs the model to "cite departments/clauses" in
+    // every strength bullet.
+    const CLAUSE_TOKEN_RX = /\b[A-Za-z]?\d{1,2}(?:\.\d{1,2}){0,4}\b/g;
+    function findConflictingFamily(text, conflictMap) {
+        const tokens = String(text == null ? '' : text).match(CLAUSE_TOKEN_RX) || [];
+        for (const t of tokens) {
+            const fam = clauseFamily(t);
+            if (fam && conflictMap[fam]) return conflictMap[fam].ref || null;
+        }
+        return undefined; // no conflicting token found
+    }
+
+    // Appends a neutral qualifying clause distinguishing "the process/system
+    // exists" from "implementation was fully effective" — never rewrites or
+    // removes the original strength text, never upgrades/downgrades the
+    // underlying finding, never invents an NCR reference (cites one only
+    // when buildClauseConflictMap resolved a genuine one).
+    function qualifyStrength(text, ref) {
+        const clean = String(text == null ? '' : text).trim().replace(/[.;\s]+$/, '');
+        const tail = ref
+            ? `implementation gaps are addressed under ${ref}`
+            : 'implementation gaps are addressed under the nonconformity raised against this clause';
+        return `${clean}; however, ${tail}.`;
+    }
+
+    // Applied to a finished bullet list (post dedupe/cap) — qualifies any
+    // bullet naming a clause family that also has an open major/minor NC;
+    // leaves every other bullet untouched.
+    function qualifyStrengthConflicts(d, strengths) {
+        const conflictMap = buildClauseConflictMap(d);
+        if (!Object.keys(conflictMap).length) return safeArr(strengths);
+        return safeArr(strengths).map(s => {
+            const ref = findConflictingFamily(s, conflictMap);
+            return ref !== undefined ? qualifyStrength(s, ref) : s;
         });
     }
 
     async function generateExecutiveSummary(d) {
         const fallback = fallbackExecSummaryData(d);
         if (!window.AI_SERVICE || typeof window.AI_SERVICE.callProxyAPI !== 'function') {
-            const capped = capExecSummaryLists(fallback);
+            const capped = capExecSummaryLists(fallback, d);
             return { html: renderExecSummaryHtml(capped, buildAuditOutcomeSummary(d, capped)) };
         }
         try {
@@ -602,11 +723,11 @@ ${data.forwardOutlook ? `
             const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
             if (Array.isArray(parsed.strengths)) parsed.strengths = filterStrengthsAgainstNCs(d, parsed.strengths);
-            const merged = capExecSummaryLists(Object.assign({}, fallback, parsed));
+            const merged = capExecSummaryLists(Object.assign({}, fallback, parsed), d);
             return { html: renderExecSummaryHtml(merged, buildAuditOutcomeSummary(d, merged)) };
         } catch (err) {
             console.warn('[ReportExecutive] generateExecutiveSummary AI failed, using fallback:', err);
-            const capped = capExecSummaryLists(fallback);
+            const capped = capExecSummaryLists(fallback, d);
             return { html: renderExecSummaryHtml(capped, buildAuditOutcomeSummary(d, capped)) };
         }
     }
@@ -686,15 +807,23 @@ ${data.forwardOutlook ? `
         const coveragePct = total > 0 ? Math.round((withEvidence / total) * 100) : 0;
         const interviewCount = personnelSet.size;
 
+        // This coveragePct is the evidence-ATTACHMENT metric (items with
+        // supporting evidence attached / applicable items) — distinct from
+        // Audit Coverage (items-assessed, see computeCoveragePct above) and
+        // labelled "evidence-attachment coverage" throughout so the two
+        // never read as the same figure. The low-coverage branch states the
+        // factual percentage and count only — "defensibility" / accreditation
+        // -review commentary is internal QA framing, not client report
+        // content (validator rule B11 blocks it in client-facing text).
         let qualityNote;
         if (total === 0) {
-            qualityNote = 'No applicable items recorded — coverage cannot be assessed.';
+            qualityNote = 'No applicable items recorded — evidence-attachment coverage cannot be assessed.';
         } else if (coveragePct >= 80) {
-            qualityNote = `Objective evidence is well-documented at ${coveragePct}% coverage.`;
+            qualityNote = `Objective evidence is well-documented, with evidence-attachment coverage at ${coveragePct}%.`;
         } else if (coveragePct >= 50) {
-            qualityNote = `Coverage is moderate at ${coveragePct}%; ${missingEvidence.length} finding(s) need supporting evidence before issuance.`;
+            qualityNote = `Evidence-attachment coverage is moderate at ${coveragePct}%; ${missingEvidence.length} finding(s) need supporting evidence before issuance.`;
         } else {
-            qualityNote = `Coverage is low at ${coveragePct}%, weakening defensibility of ${missingEvidence.length} finding(s) under accreditation review.`;
+            qualityNote = `Evidence-attachment coverage is low at ${coveragePct}%; ${missingEvidence.length} finding(s) currently lack supporting evidence.`;
         }
 
         return {
@@ -772,7 +901,7 @@ ${data.forwardOutlook ? `
   <div class="b4-kpi-card b4-kpi-card--accent">
     <div class="b4-kpi-icon">${icon('evidence')}</div>
     <div class="b4-kpi-value">${intel.coveragePct}%</div>
-    <div class="b4-kpi-label">Evidence Coverage</div>
+    <div class="b4-kpi-label">Evidence Attachment</div>
   </div>
   <div class="b4-kpi-card">
     <div class="b4-kpi-icon">${icon('check')}</div>
@@ -787,7 +916,7 @@ ${data.forwardOutlook ? `
 </div>
 <p class="b4-caption" style="margin-top:var(--b4-s3);">${esc(intel.qualityNote)}</p>
 
-<div class="b4-section-title" style="margin-top:var(--b4-s5);">Evidence Coverage by Department</div>
+<div class="b4-section-title" style="margin-top:var(--b4-s5);">Evidence Attachment by Department</div>
 <div class="b4-card">${deptRows}</div>
 
 ${sampleCards ? `
@@ -875,7 +1004,10 @@ ${intel.missingEvidence.length ? `
 
         const risks = [];
         if (stats.majorNC > 0) risks.push(`${stats.majorNC} major non-conformity(ies) could delay certification issuance.`);
-        if (intel.coveragePct < 50) risks.push('Low evidence coverage weakens the defensibility of findings under accreditation scrutiny.');
+        // Factual percentage only — "defensibility"/accreditation-scrutiny
+        // framing is internal QA commentary, not client report content
+        // (validator rule B11 blocks it in client-facing narrative text).
+        if (intel.coveragePct < 50) risks.push(`Evidence-attachment coverage is ${intel.coveragePct}%; supporting evidence is not yet attached for all findings.`);
         if (stats.minorNC > 3) {
             if (recurrenceData && recurrenceData.hasPrior && recurrenceData.recurringClauses.length) {
                 risks.push(`${stats.minorNC} minor non-conformities include ${recurrenceData.recurringClauses.length} clause(s) that also failed in the client's prior audit — a genuine recurrence pattern.`);
@@ -1049,10 +1181,22 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
         };
     }
 
-    function renderInsightsHtml(data) {
+    function renderInsightsHtml(data, d) {
+        // Task 1: the "Positive Improvements" card is this section's other
+        // positive-observation surface (alongside exec-summary strengths) —
+        // qualify, never drop, any bullet naming a clause family that also
+        // carries an open major/minor NC.
+        const conflictMap = buildClauseConflictMap(d);
         const cards = INSIGHT_CARD_DEFS.map(def => {
             const entry = (data && data[def.key]) || { bullets: [], confidence: 'Moderate', priority: 'Monitor', recommendation: '' };
-            const bulletItems = safeArr(entry.bullets).slice(0, 3).map(b => `<li>${esc(cleanFindingText(b, 140))}</li>`).join('') || '<li class="b4-muted-item">No data available.</li>';
+            let bullets = safeArr(entry.bullets);
+            if (def.key === 'improvements' && Object.keys(conflictMap).length) {
+                bullets = bullets.map(b => {
+                    const ref = findConflictingFamily(b, conflictMap);
+                    return ref !== undefined ? qualifyStrength(b, ref) : b;
+                });
+            }
+            const bulletItems = bullets.slice(0, 3).map(b => `<li>${esc(cleanFindingText(b, 140))}</li>`).join('') || '<li class="b4-muted-item">No data available.</li>';
             const confClass = CONFIDENCE_BADGE_CLASS[entry.confidence] || 'b4-badge--neutral';
             const prioClass = PRIORITY_BADGE_CLASS[entry.priority] || 'b4-badge--neutral';
             return `
@@ -1072,7 +1216,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
     async function generateExecutiveInsights(d) {
         const fallback = fallbackInsights(d);
         if (!window.AI_SERVICE || typeof window.AI_SERVICE.callProxyAPI !== 'function') {
-            return { html: renderInsightsHtml(fallback) };
+            return { html: renderInsightsHtml(fallback, d) };
         }
         try {
             const prompt = buildInsightsPrompt(d);
@@ -1082,10 +1226,10 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned) || {};
             const merged = {};
             INSIGHT_CARD_DEFS.forEach(def => { merged[def.key] = normalizeInsightEntry(parsed[def.key], fallback[def.key]); });
-            return { html: renderInsightsHtml(merged) };
+            return { html: renderInsightsHtml(merged, d) };
         } catch (err) {
             console.warn('[ReportExecutive] generateExecutiveInsights AI failed, using fallback:', err);
-            return { html: renderInsightsHtml(fallback) };
+            return { html: renderInsightsHtml(fallback, d) };
         }
     }
 
@@ -1113,10 +1257,10 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
         const intel = computeEvidenceIntel(d);
 
         const summaryHtml = (cached && cached.summary && cached.summary.html) || (function () {
-            const capped = capExecSummaryLists(fallbackExecSummaryData(d));
+            const capped = capExecSummaryLists(fallbackExecSummaryData(d), d);
             return renderExecSummaryHtml(capped, buildAuditOutcomeSummary(d, capped));
         })();
-        const insightsHtml = (cached && cached.insights && cached.insights.html) || renderInsightsHtml(fallbackInsights(d));
+        const insightsHtml = (cached && cached.insights && cached.insights.html) || renderInsightsHtml(fallbackInsights(d), d);
 
         return [
             {
@@ -1130,7 +1274,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
             {
                 key: 'evidence-intel',
                 name: 'EVIDENCE INTELLIGENCE',
-                desc: 'Coverage analysis of objective evidence supporting audit findings.',
+                desc: 'Evidence-attachment analysis for objective evidence supporting audit findings.',
                 color: '#0e7490',
                 bodyHtml: renderEvidenceIntelHtml(intel),
                 charts: []
@@ -1210,7 +1354,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
         }
         if (/evidence/.test(q)) {
             const intel = computeEvidenceIntel(d);
-            return `Evidence coverage is ${intel.coveragePct}% (${intel.withEvidence} of ${intel.totalApplicable} applicable items). ${intel.missingEvidence.length} finding(s) lack supporting evidence.`;
+            return `Evidence-attachment coverage is ${intel.coveragePct}% (${intel.withEvidence} of ${intel.totalApplicable} applicable items). ${intel.missingEvidence.length} finding(s) lack supporting evidence.`;
         }
         if (/major/.test(q) && /nc|non.?conform/.test(q)) {
             const majors = getRealNCs(d).filter(i => (i.ncrType || '').toLowerCase() === 'major');
