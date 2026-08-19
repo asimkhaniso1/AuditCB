@@ -62,12 +62,30 @@
     // ============================================
     // EVIDENCE UTILS — shared compression/thumb helpers + evidence ID registry
     // ============================================
+    // Evidence synced to the cloud lives in the public `audit-images` Supabase
+    // Storage bucket, so these are cross-origin https:// URLs. Loading one
+    // WITHOUT crossOrigin taints the canvas, and _canvasDownscale's
+    // toDataURL() then throws SecurityError — which every caller swallowed as
+    // "compression unavailable" and silently embedded the ORIGINAL image. That
+    // is why exported PDFs carried full-resolution (1920px) evidence and ran to
+    // 5MB. Supabase Storage answers with `Access-Control-Allow-Origin: *`, so
+    // requesting with CORS keeps the canvas clean and downscaling works.
+    // Falls back to a plain (tainting) load if the host sends no CORS headers,
+    // so display still works even though compression will fail there.
     function _loadImage(dataUrl) {
         return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = (e) => reject(e);
-            img.src = dataUrl;
+            const isRemote = typeof dataUrl === 'string' && /^https?:\/\//i.test(dataUrl);
+            const attempt = (useCors) => {
+                const img = new Image();
+                if (useCors) img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = (e) => {
+                    if (useCors) { attempt(false); return; }
+                    reject(e);
+                };
+                img.src = dataUrl;
+            };
+            attempt(isRemote);
         });
     }
 

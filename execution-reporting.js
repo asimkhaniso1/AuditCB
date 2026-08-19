@@ -2907,7 +2907,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 if (!item) return;
                 const fulls = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
                 if (!fulls.length) return;
-                if (Array.isArray(item.evidenceThumbs) && item.evidenceThumbs.length) return;
+                // A "thumb" identical to its full image means thumbnailing failed
+                // earlier and fell back to the original (getEvVariants swallows the
+                // error) — that is exactly the case worth retrying here, so only
+                // skip when every thumb genuinely differs from its source.
+                const thumbsOk = Array.isArray(item.evidenceThumbs)
+                    && item.evidenceThumbs.length === fulls.length
+                    && item.evidenceThumbs.every(function (t, i) { return t && t !== fulls[i]; });
+                if (thumbsOk) return;
                 pendingThumbs.push(
                     Promise.all(fulls.slice(0, 4).map(function (u) {
                         return Promise.resolve(window.EvidenceUtils.thumb(u, { maxPx: 480, quality: 0.72 }))
@@ -3693,6 +3700,16 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // allows that) — this is the pragmatic choice over per-row height thresholds, which
             // Chrome's print engine can't evaluate reliably at layout time anyway.
             +   '.f-tbl td{max-height:none;}'
+            // Cover page: on screen it fills the viewport (min-height:100vh) with
+            // the doc-control block pinned to its bottom. In print, 100vh is the
+            // PAGE box — taller than the usable flow area once the @page margins
+            // and the repeating header/footer rows are subtracted — so the pinned
+            // block sat below the page and Chrome pushed it onto page 2 alone.
+            // In print the cover sizes to its content and the doc-control block
+            // returns to normal flow directly beneath it, with an explicit break
+            // so the contents page still starts on page 2.
+            +   '.cover{min-height:0 !important;height:auto !important;padding:24px 40px 28px !important;page-break-after:always;break-after:page;}'
+            +   '.cover-doc{position:static !important;left:auto !important;right:auto !important;bottom:auto !important;width:100%;margin-top:28px;}'
             +   '@page{size:A4;margin:20mm 14mm 16mm 14mm;}'
             + '}'
             // The running header is 18mm tall with 3mm of vertical padding, so its
@@ -3817,7 +3834,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
             + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
             + '</div>'
-            + '<div style="position:absolute;bottom:50px;left:50px;right:50px;border-top:2px solid #cbd5e1;padding-top:16px;">'
+            + '<div class="cover-doc" style="position:absolute;bottom:50px;left:50px;right:50px;border-top:2px solid #cbd5e1;padding-top:16px;">'
             + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;"><span><strong>Doc ID:</strong> ' + reportRef(d) + '</span><span><strong>Status:</strong> ' + ((d.report.reportStatus === 'final') ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
             + '</div>'
             + '</div>'
