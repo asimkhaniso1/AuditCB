@@ -584,12 +584,17 @@
         });
     };
     // Returns the inner HTML for the "Timeframes" callout (icon lives in the caller's
-    // markup, which differs slightly between preview and export). ReportStats missing
-    // degrades to the previous hardcoded text rather than breaking the callout.
+    // markup, which differs slightly between preview and export). A day count is
+    // printed ONLY when the CB has configured one — including when ReportStats is
+    // missing entirely, since falling back to a literal "30/90 days" would state
+    // the very thing this change exists to stop: a scheme rule presented as though
+    // the audited standard required it. The sentence is duplicated here rather than
+    // read from ReportStats precisely because this branch means ReportStats is gone.
+    const CAPA_PROCEDURE_FALLBACK = 'Corrective action timeframe: in accordance with the certification body\'s applicable corrective-action procedure.';
     const capaTimeframesInnerHtml = (d) => {
         const t = resolveCapaTimeframesForReport(d);
-        if (!t) return '<strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance';
-        if (!t.configured) return window.ReportStats.CAPA_PROCEDURE_SENTENCE;
+        if (!t) return CAPA_PROCEDURE_FALLBACK;
+        if (!t.configured) return window.ReportStats.CAPA_PROCEDURE_SENTENCE || CAPA_PROCEDURE_FALLBACK;
         return '<strong>Timeframes:</strong> Major NC — ' + t.major + ' days | Minor NC — ' + t.minor + ' days from report issuance';
     };
     window._capaTimeframesInnerHtml = capaTimeframesInnerHtml;
