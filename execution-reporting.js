@@ -355,6 +355,72 @@
     };
     window._formalCriterionCell = formalCriterionCell;
 
+    // ─── Formal three-part NC statement (client spec #11) ─────────────────────
+    // A formal major/minor finding must read as Requirement / Objective Evidence
+    // / Nonconformity Statement, never one blended paragraph — but observations
+    // and OFI are advisory, not formal NCs, and stay out of this. Shared by the
+    // preview modal's ncRows and the print export's ncRowsHtml so the two can
+    // never disagree. Every part is sourced ONLY from data actually recorded on
+    // the item; a missing part prints a plain, visible gap — never synthesised
+    // conclusion/impact/cause prose (spec explicitly forbids inventing any of it):
+    //   Requirement            — the already-resolved `req`/`title` (KB requirement
+    //                            or item.requirement), but ONLY when formatCriterion()
+    //                            classifies the criterion 'standard'. A programme/
+    //                            internal/unverified/unclassifiable criterion never
+    //                            gets presented as if it carries an ISO requirement.
+    //   Objective Evidence      — item.clientEvidenceStatement (an approved
+    //                            client-facing evidence statement, once a parallel
+    //                            task populates it) used as recorded; otherwise the
+    //                            auditor's own remark, mechanically cleaned via
+    //                            cleanEvidenceText (no rewording).
+    //   Nonconformity Statement — the auditor's own recorded NC write-up
+    //                            (item.ncrDescription — the checklist item's
+    //                            "Describe the non-conformity" field, distinct
+    //                            from the evidence remark in item.comment). Never
+    //                            synthesised from evidence; blank prints "not
+    //                            recorded" rather than a generated conclusion.
+    const buildFormalNCParts = (item, req, title, opts) => {
+        const maxLen = (opts && opts.maxLen) || 0;
+        // Preview and print style the KB title/requirement block slightly
+        // differently (font-size/line-height) — caller supplies its own to
+        // keep each call site's existing look unchanged.
+        const titleStyle = (opts && opts.titleStyle) || '';
+        const reqStyle = (opts && opts.reqStyle) || 'margin-top:4px;color:#475569;font-size:0.85em;line-height:1.5;';
+        const reqText = req || '';
+        const reqDisplay = (maxLen && reqText.length > maxLen) ? reqText.substring(0, maxLen) + '...' : reqText;
+
+        const fc = (window.ReportStats && typeof window.ReportStats.formatCriterion === 'function')
+            ? (function () { try { return window.ReportStats.formatCriterion(item); } catch (_e) { return null; } })()
+            : null;
+        // No ReportStats loaded — degrade to the pre-existing unconditional
+        // display rather than guessing a classification.
+        const kind = fc ? fc.kind : 'standard';
+
+        let reqHtml;
+        if (kind === 'standard') {
+            reqHtml = reqText
+                ? (title ? '<strong' + (titleStyle ? ' style="' + titleStyle + '"' : '') + '>' + title + '</strong><div style="' + reqStyle + '">' + reqDisplay + '</div>' : reqDisplay)
+                : '<em style="color:#94a3b8;">Requirement not recorded.</em>';
+        } else {
+            // programme / internal / unverified / none — a non-standard criterion
+            // must never be presented as if it carries an ISO clause requirement (#6).
+            reqHtml = '<em style="color:#64748b;">Not applicable — criterion is not a clause of the audited standard.</em>';
+        }
+
+        const approvedEvidence = item.clientEvidenceStatement ? String(item.clientEvidenceStatement).trim() : '';
+        const evidenceHtml = approvedEvidence || cleanEvidenceText(item.comment);
+        const stmtRaw = String(item.ncrDescription || '').trim();
+        const stmtHtml = stmtRaw ? cleanEvidenceText(stmtRaw) : '';
+        const LBL = 'display:block;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#64748b;margin-bottom:2px;';
+        const remarksHtml = '<div><span style="' + LBL + '">Objective Evidence</span>'
+            + (evidenceHtml || '<span style="color:#94a3b8;">No evidence recorded.</span>') + '</div>'
+            + '<div style="margin-top:6px;"><span style="' + LBL + '">Nonconformity Statement</span>'
+            + (stmtHtml || '<span style="color:#94a3b8;">Nonconformity statement not recorded.</span>') + '</div>';
+
+        return { reqHtml, remarksHtml };
+    };
+    window._buildFormalNCParts = buildFormalNCParts;
+
     // Build the list of revision-history rows to render on the cover page.
     // Does NOT mutate the report — pure read helper used by both the preview modal and PDF export.
     // Version bumps now happen ONLY at finalize/re-issue time (see ai-service.js
@@ -1078,7 +1144,9 @@
             const fsKey = String(item.clause || '') + '|' + String(item.department || '');
             const fsCurrent = (d.report.findingStatus && d.report.findingStatus[fsKey] && d.report.findingStatus[fsKey].status) || 'open';
             const fsSelect = `<select data-action-change="updateFindingStatus" data-arg1="${window.UTILS.escapeHtml(fsKey)}" data-arg2="this.value" style="width:100%;padding:5px 6px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.78rem;background:white;">${FINDING_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === fsCurrent ? 'selected' : ''}>${o.label}</option>`).join('')}</select>`;
-            return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td><td style="padding:10px 14px;">${fsSelect}</td></tr>`;
+            // Formal three-part statement (client spec #11) — see buildFormalNCParts.
+            const ncParts = buildFormalNCParts(item, req, title, { maxLen: 180, reqStyle: 'margin-top:4px;color:#475569;font-size:0.82rem;' });
+            return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${ncParts.reqHtml}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${ncParts.remarksHtml}${renderEvThumbs(item)}</td><td style="padding:10px 14px;">${fsSelect}</td></tr>`;
         }).join('');
         const ncPendingFootnote = d.hydratedProgress.some(i => i.status === 'nc' && !i.ncrType) ? '<div style="margin-top:6px;font-size:0.75rem;color:#94a3b8;">† Pending classification — recorded as NC but severity not yet assigned; shown under Minor pending review.</div>' : '';
 
@@ -3274,7 +3342,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const fsEntry = d.report.findingStatus && d.report.findingStatus[fsKey2];
             const fsLabelMap = { open: 'Open', corrected_during_audit: 'Corrected During Audit', verified: 'Verified', pending_verification: 'Pending Verification', closed: 'Closed', escalated: 'Escalated' };
             const fsBadge = fsEntry && fsEntry.status ? '<div style="margin-top:6px;"><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:0.7rem;font-weight:700;background:#eef2ff;color:#3730a3;">Status: ' + (fsLabelMap[fsEntry.status] || fsEntry.status) + '</span></div>' : '';
-            return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + sevBg + ';color:' + sevFg + ';">' + sev + '</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + fsBadge + '</td></tr>';
+            // Formal three-part statement (client spec #11) — see buildFormalNCParts.
+            const ncParts = buildFormalNCParts(item, req, title, { titleStyle: 'color:#1e293b;', reqStyle: 'margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;' });
+            return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + ncParts.reqHtml + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + sevBg + ';color:' + sevFg + ';">' + sev + '</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + ncParts.remarksHtml + renderEvThumbsPdf(item) + fsBadge + '</td></tr>';
         }).join('');
 
         // OBS rows for PDF (Observations only)
