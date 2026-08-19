@@ -617,3 +617,111 @@ describe('ReportIntegrity — criterion belongs to the audited standard', () => 
         expect(result.blockers.some((b) => b.id.startsWith('B15'))).toBe(false);
     });
 });
+
+// Specification #33 — the KTD Select surveillance audit as the regression test.
+// The capstone is the CORRECTED report: every rule added across phases A-E must
+// stay silent on a properly-formed certification report. A validator that only
+// ever fires is as useless as one that never does.
+describe('KTD acceptance #33 — the corrected report issues cleanly', () => {
+    // 4 minor NCs, 4 observations, 1 OFI — each NC carrying an auditor-confirmed
+    // clause of the audited standard, evidence, and a real department.
+    const correctedProgress = () => [
+        { status: 'nc', ncrType: 'minor', clause: 'FOCUS.2', criterionRef: '9.2', criterionSource: 'auditor-assigned', department: 'Quality',
+            comment: 'Internal audit programme IA-2026 was reviewed; two scheduled audits had not been performed within the planned programme.' },
+        { status: 'nc', ncrType: 'minor', clause: 'FOCUS.8', criterionRef: '8.2.2', criterionSource: 'auditor-assigned', department: 'Compliance',
+            comment: 'The legal and other requirements register was requested and was not available for review during the audit.' },
+        { status: 'nc', ncrType: 'minor', clause: '7.2', department: 'Human Resources',
+            comment: 'Training records for two operators showed required competence training had not been completed.' },
+        { status: 'nc', ncrType: 'minor', clause: '9.1', department: 'Quality',
+            comment: 'Monitoring and measurement data was not analysed at the intervals defined by the organization.' },
+        { status: 'nc', ncrType: 'observation', clause: '7.1', criterionRef: '7.1', department: 'Human Resources',
+            comment: 'A competency matrix was maintained and was available for the sample reviewed.' },
+        { status: 'nc', ncrType: 'observation', clause: '8.1', department: 'Production',
+            comment: 'Production planning records were complete for the sample reviewed.' },
+        { status: 'nc', ncrType: 'observation', clause: '8.4', department: 'Purchasing',
+            comment: 'Supplier evaluation records were available for the sample reviewed.' },
+        { status: 'nc', ncrType: 'observation', clause: '10.2', department: 'Quality',
+            comment: 'Corrective action records were retained for the sample reviewed.' },
+        { status: 'nc', ncrType: 'ofi', clause: '6.1', department: 'Quality',
+            comment: 'The organization may consider recording named owners against each risk-register mitigation.' },
+        { status: 'conform', clause: '4.1', department: 'Management',
+            comment: 'Context of the organization is documented in the system manual and was reviewed.' }
+    ];
+
+    const correctedReport = () => ({
+        id: 'rep-ktd-fixed', planId: 'plan-ktd', clientId: 'ktd-1', client: 'KTD Select',
+        date: '2026-08-14', auditType: 'Surveillance', standard: 'ISO 9001:2015',
+        auditMethod: 'Remote',
+        scope: 'Manufacture and supply of precision cable and wire harness assemblies.',
+        leadAuditor: 'Muhammad Asim Khan',
+        // Counts stated exactly, with observations and OFIs kept distinct.
+        executiveSummary: 'The audit identified 4 non-conformities, 4 observations and 1 opportunity for improvement.',
+        previousFindingsStatus: 'No previous nonconformities requiring follow-up.',
+        changesSinceLastAudit: 'No significant changes to the management system scope or organizational structure were reported.',
+        conclusion: 'Continued certification is recommended subject to satisfactory closure of applicable nonconformities.',
+        checklistProgress: correctedProgress(),
+        ncrs: []
+    });
+
+    const remotePlan = () => Object.assign(KTD_PLAN(), { auditMethod: 'Remote' });
+
+    const builtStats = () => window.ReportStats.build({
+        report: correctedReport(), hydratedProgress: correctedProgress(),
+        auditPlan: remotePlan(), client: KTD_CLIENT()
+    });
+
+    it('raises no blockers at all', () => {
+        const result = window.ReportIntegrity.check({
+            report: correctedReport(), auditPlan: remotePlan(), client: KTD_CLIENT(), stats: builtStats()
+        });
+
+        expect(result.blockers).toEqual([]);
+        expect(result.status).toBe('READY FOR AUDITOR REVIEW');
+    });
+
+    it('counts 4 minor nonconformities, 4 observations and 1 OFI', () => {
+        const stats = builtStats();
+        expect(stats.resultCounts.majorNC).toBe(0);
+        expect(stats.resultCounts.minorNC).toBe(4);
+        expect(stats.advisories.observation).toBe(4);
+        expect(stats.advisories.ofi).toBe(1);
+    });
+
+    it('never presents a FOCUS item as a clause of the standard', () => {
+        correctedProgress().filter((i) => /^FOCUS/.test(i.clause)).forEach((i) => {
+            const fc = window.ReportStats.formatCriterion(i);
+            expect(fc.kind).toBe('standard');   // resolved to a real clause
+            expect(fc.label).not.toMatch(/FOCUS/);
+        });
+    });
+
+    it('keeps management system effectiveness consistent with the findings', () => {
+        const eff = window.ReportStats.effectivenessStatements(correctedReport());
+        // 9.2 carries a minor NC, so the internal audit programme cannot read as conforming.
+        expect(eff.internalAudit).toMatch(/minor nonconformity/i);
+        expect(eff.internalAudit).not.toMatch(/conforms to the requirements/i);
+    });
+
+    it('states a surveillance recommendation, never a granting one', () => {
+        const text = window.ReportStats.recommendationText('Surveillance', { majorNC: 0, minorNC: 4 });
+        expect(text.toLowerCase()).not.toContain('recommended for certification');
+    });
+
+    it('catches each original defect if it returns', () => {
+        const stats = builtStats();
+        const withDefect = (patch) => window.ReportIntegrity.check({
+            report: Object.assign(correctedReport(), patch),
+            auditPlan: remotePlan(), client: KTD_CLIENT(), stats
+        });
+
+        // Internal metadata leaking into client-facing text.
+        expect(withDefect({ conclusion: 'Continued certification is recommended. (system-derived: x)' })
+            .blockers.some((b) => b.id.startsWith('B11'))).toBe(true);
+        // On-site wording on a Remote audit.
+        expect(withDefect({ executiveSummary: 'The audit included on-site observation of production activities.' })
+            .blockers.some((b) => b.id.startsWith('B12'))).toBe(true);
+        // Observations and OFIs summed into one figure.
+        expect(withDefect({ executiveSummary: 'The audit identified 4 non-conformities and 5 opportunities for improvement.' })
+            .blockers.some((b) => b.id.startsWith('B13'))).toBe(true);
+    });
+});
