@@ -749,14 +749,41 @@
 
     // Counts asserted in prose must match the validated findings dataset.
     // Observations and OFIs are distinct classifications and are never summed.
+    // ReportStats.build() returns counts NESTED (resultCounts.majorNC,
+    // advisories.observation), while callers that assemble their own summary
+    // object use flat names (majorNC, observationCount). Reading only the flat
+    // names against a built dataset yields 0 for everything, which would make
+    // B13 fire a false blocker on every report that states any count — so both
+    // shapes are read, and a dataset carrying neither is treated as
+    // "cannot verify" rather than "everything is zero".
+    function normalizedCounts(stats) {
+        if (!stats) return null;
+        const rc = stats.resultCounts || {};
+        const adv = stats.advisories || {};
+        const pick = (flat, nested) => {
+            const f = Number(flat);
+            if (flat != null && !isNaN(f)) return f;
+            const n = Number(nested);
+            if (nested != null && !isNaN(n)) return n;
+            return null;
+        };
+        const major = pick(stats.majorNC, rc.majorNC);
+        const minor = pick(stats.minorNC, rc.minorNC);
+        const observations = pick(stats.observationCount, adv.observation);
+        const ofi = pick(stats.ofiCount, adv.ofi);
+        if (major === null && minor === null && observations === null && ofi === null) return null;
+        return { major: major || 0, minor: minor || 0, observations: observations || 0, ofi: ofi || 0 };
+    }
+
     function checkB13NarrativeCounts(input, results) {
         const { report, stats } = input;
-        if (!stats) return;
-        const ncTotal = (Number(stats.majorNC) || 0) + (Number(stats.minorNC) || 0);
+        const counts = normalizedCounts(stats);
+        if (!counts) return;
+        const ncTotal = counts.major + counts.minor;
         const expectations = [
             { re: /(\d+)\s+(?:minor\s+)?non-?conformit(?:y|ies)/gi, actual: ncTotal, label: 'nonconformities' },
-            { re: /(\d+)\s+opportunit(?:y|ies)\s+for\s+improvement/gi, actual: Number(stats.ofiCount) || 0, label: 'opportunities for improvement' },
-            { re: /(\d+)\s+observations?\b/gi, actual: Number(stats.observationCount) || 0, label: 'observations' }
+            { re: /(\d+)\s+opportunit(?:y|ies)\s+for\s+improvement/gi, actual: counts.ofi, label: 'opportunities for improvement' },
+            { re: /(\d+)\s+observations?\b/gi, actual: counts.observations, label: 'observations' }
         ];
         const narrative = narrativeFields(report);
         Object.keys(narrative).forEach((key) => {

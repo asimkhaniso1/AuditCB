@@ -465,19 +465,21 @@ describe('KTD surveillance acceptance', () => {
     // opts.showInternal restores the 'real (internalRef)' label for internal/CAPA
     // contexts that still want the carryover tag visible.
     it('formatCriterion resolves internal refs, resolved criteria and plain clauses', () => {
+        // `kind` classifies what the reference actually is, so a caller never
+        // presents a programme criterion or internal ref as a clause of the standard.
         expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2' }))
-            .toEqual({ label: 'internal ref FOCUS.2', isInternal: true, real: null, internalRef: null });
+            .toEqual({ label: 'internal ref FOCUS.2', isInternal: true, real: null, internalRef: null, kind: 'internal' });
         expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2', criterionRef: '9.2' }))
-            .toEqual({ label: '9.2', isInternal: false, real: '9.2', internalRef: 'FOCUS.2' });
+            .toEqual({ label: '9.2', isInternal: false, real: '9.2', internalRef: 'FOCUS.2', kind: 'standard' });
         expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2', criterionRef: '9.2' }, { showInternal: true }))
-            .toEqual({ label: '9.2 (FOCUS.2)', isInternal: false, real: '9.2', internalRef: 'FOCUS.2' });
+            .toEqual({ label: '9.2 (FOCUS.2)', isInternal: false, real: '9.2', internalRef: 'FOCUS.2', kind: 'standard' });
         expect(window.ReportStats.formatCriterion({ clause: '7.1' }))
-            .toEqual({ label: '7.1', isInternal: false, real: '7.1', internalRef: null });
+            .toEqual({ label: '7.1', isInternal: false, real: '7.1', internalRef: null, kind: 'standard' });
         expect(window.ReportStats.formatCriterion({}))
-            .toEqual({ label: '', isInternal: false, real: null, internalRef: null });
+            .toEqual({ label: '', isInternal: false, real: null, internalRef: null, kind: 'none' });
         // showInternal has no effect on an unresolved internal ref — nothing to restore.
         expect(window.ReportStats.formatCriterion({ clause: 'FOCUS.2' }, { showInternal: true }))
-            .toEqual({ label: 'internal ref FOCUS.2', isInternal: true, real: null, internalRef: null });
+            .toEqual({ label: 'internal ref FOCUS.2', isInternal: true, real: null, internalRef: null, kind: 'internal' });
     });
 
     // Banned secondary-verdict language in formal narrative → blocked.
@@ -524,5 +526,63 @@ describe('KTD acceptance — source hygiene', () => {
         const src = read('./report-risk.js');
         expect(src).toMatch(/AUDITEE CORRECTIVE ACTION PLAN/);
         expect(src).not.toContain('retrain the relevant personnel');
+    });
+});
+
+// Regression: the validator must read the SHAPE ReportStats.build() actually
+// returns. build() nests counts (resultCounts.majorNC, advisories.observation);
+// reading only flat names yielded 0 for everything, which made the narrative
+// count rule fire a false blocker on every report that stated any count.
+describe('ReportIntegrity consumes the real ReportStats dataset shape', () => {
+    const progress = [
+        { status: 'nc', ncrType: 'minor', clause: '9.2', comment: 'Internal audit programme was not fully implemented as scheduled.' },
+        { status: 'nc', ncrType: 'minor', clause: '7.2', comment: 'Required training for two operators had not been completed.' },
+        { status: 'nc', ncrType: 'minor', clause: '8.2.2', comment: 'Legal and other requirements register was not available for review.' },
+        { status: 'nc', ncrType: 'minor', clause: '9.1', comment: 'Monitoring data was not analysed at the planned intervals.' },
+        { status: 'nc', ncrType: 'observation', clause: '7.1', comment: 'Competency matrix maintained; consider adding re-evaluation dates.' },
+        { status: 'nc', ncrType: 'observation', clause: '8.1', comment: 'Production planning records were complete for the sample reviewed.' },
+        { status: 'nc', ncrType: 'observation', clause: '8.4', comment: 'Supplier evaluation records were available for the sample reviewed.' },
+        { status: 'nc', ncrType: 'observation', clause: '10.2', comment: 'Corrective action records were retained for the sample reviewed.' },
+        { status: 'nc', ncrType: 'ofi', clause: '6.1', comment: 'The risk register could link actions to named owners.' },
+        { status: 'conform', clause: '4.1', comment: 'Context of the organization is documented in the system manual.' }
+    ];
+
+    function builtStats(report) {
+        return window.ReportStats.build({
+            report, hydratedProgress: progress, auditPlan: KTD_PLAN(), client: KTD_CLIENT()
+        });
+    }
+
+    it('does not raise a false count blocker when the narrative agrees with the dataset', () => {
+        const report = {
+            id: 'rep-shape', planId: 'plan-ktd', clientId: 'ktd-1', client: 'KTD Select',
+            date: '2026-08-12', auditType: 'Surveillance', standard: 'ISO 9001:2015',
+            executiveSummary: 'The audit identified 4 non-conformities, 4 observations and 1 opportunity for improvement.',
+            conclusion: 'Continued certification is recommended subject to satisfactory closure of applicable nonconformities.',
+            checklistProgress: progress, ncrs: []
+        };
+        const stats = builtStats(report);
+        // Guards the assumption this test exists to protect.
+        expect(stats.resultCounts.minorNC).toBe(4);
+        expect(stats.advisories.ofi).toBe(1);
+
+        const result = window.ReportIntegrity.check({ report, auditPlan: KTD_PLAN(), client: KTD_CLIENT(), stats });
+        expect(result.blockers.some((b) => b.id.startsWith('B13'))).toBe(false);
+    });
+
+    it('still catches the real defect — observations and OFIs summed into one figure', () => {
+        const report = {
+            id: 'rep-shape-2', planId: 'plan-ktd', clientId: 'ktd-1', client: 'KTD Select',
+            date: '2026-08-12', auditType: 'Surveillance', standard: 'ISO 9001:2015',
+            executiveSummary: 'The assessment concluded with the identification of 4 non-conformities and 5 opportunities for improvement.',
+            conclusion: 'Continued certification is recommended subject to satisfactory closure of applicable nonconformities.',
+            checklistProgress: progress, ncrs: []
+        };
+        const result = window.ReportIntegrity.check({
+            report, auditPlan: KTD_PLAN(), client: KTD_CLIENT(), stats: builtStats(report)
+        });
+        const b13 = result.blockers.find((b) => b.id.startsWith('B13'));
+        expect(b13).toBeTruthy();
+        expect(b13.message).toContain('opportunities for improvement');
     });
 });
