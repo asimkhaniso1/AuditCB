@@ -1015,6 +1015,130 @@
         });
     }
 
+    // ── Advisory classification integrity (#16) and CB impartiality (#17) ────
+
+    // Every advisory the report carries, with the classification it was filed
+    // under. Observations and OFIs are distinct classifications: an Observation
+    // is a noteworthy audit condition that is not a nonconformity; an OFI is a
+    // potential improvement the organization may consider.
+    function advisoryItems(report) {
+        const out = [];
+        safeArr(report && report.checklistProgress).forEach((i, idx) => {
+            if (!i || lower(i.status) !== 'nc') return;
+            const t = lower(i.ncrType);
+            if (t !== 'observation' && t !== 'ofi') return;
+            const text = trim(i.comment || i.ncrDescription);
+            if (text) out.push({ kind: t, text, idx, label: t === 'ofi' ? 'OFI' : 'Observation' });
+        });
+        return out;
+    }
+
+    // W17 — an advisory whose narrative contradicts the classification it was
+    // filed under: an Observation that describes itself as an opportunity for
+    // improvement (or the reverse) reports the same thing under two names.
+    const CALLS_ITSELF_OFI_RE = /\bopportunit(?:y|ies)\s+for\s+improvement\b/i;
+    const CALLS_ITSELF_OBSERVATION_RE = /\b(?:an?\s+)?observation\s+(?:was|is)\s+(?:made|noted|raised|identified)\b/i;
+
+    function checkW17AdvisoryClassification(report, results) {
+        advisoryItems(report).forEach((a) => {
+            const misfiled = a.kind === 'observation'
+                ? CALLS_ITSELF_OFI_RE.test(a.text)
+                : CALLS_ITSELF_OBSERVATION_RE.test(a.text);
+            if (!misfiled) return;
+            const claimed = a.kind === 'observation' ? 'an opportunity for improvement' : 'an observation';
+            results.warnings.push(item(
+                'W17-' + a.idx,
+                'warning',
+                'findings',
+                `An item filed as ${a.label} describes itself as ${claimed}, so the same issue is presented under two classifications.`,
+                'checklistProgress[' + a.idx + ']',
+                'Either reclassify the item or reword it so the narrative matches the classification — an Observation is a noteworthy condition, an OFI is a potential improvement.'
+            ));
+        });
+    }
+
+    // W18 — substantially the same issue raised under more than one
+    // classification. Jaccard overlap on meaningful tokens: no dependency, and
+    // deliberately conservative so ordinary shared audit vocabulary does not
+    // trip it — this asks the auditor to look, it does not merge anything.
+    const SIMILARITY_STOPWORDS = new Set([
+        'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'for', 'on', 'at', 'by', 'with', 'is',
+        'was', 'were', 'are', 'be', 'been', 'that', 'this', 'it', 'as', 'not', 'no', 'has', 'have',
+        'had', 'but', 'from', 'their', 'its', 'organization', 'organisation', 'audit', 'auditor'
+    ]);
+    const SIMILARITY_THRESHOLD = 0.6;
+    const MIN_SIMILARITY_TOKENS = 5;
+
+    function meaningfulTokens(text) {
+        return new Set(
+            lower(text).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+                .filter((w) => w.length > 2 && !SIMILARITY_STOPWORDS.has(w))
+        );
+    }
+
+    function jaccard(a, b) {
+        let shared = 0;
+        a.forEach((t) => { if (b.has(t)) shared++; });
+        const union = a.size + b.size - shared;
+        return union > 0 ? shared / union : 0;
+    }
+
+    function checkW18DuplicateAdvisories(report, ncrs, results) {
+        const entries = advisoryItems(report).concat(
+            ncrs.map((n, idx) => ({
+                kind: 'nc', label: 'nonconformity', idx: 'nc-' + idx, text: trim(n.comment)
+            })).filter((n) => n.text)
+        ).map((e) => Object.assign({}, e, { tokens: meaningfulTokens(e.text) }))
+            .filter((e) => e.tokens.size >= MIN_SIMILARITY_TOKENS);
+
+        const reported = {};
+        for (let i = 0; i < entries.length; i++) {
+            for (let j = i + 1; j < entries.length; j++) {
+                const a = entries[i];
+                const b = entries[j];
+                if (a.kind === b.kind) continue; // same classification is not a cross-filing
+                if (jaccard(a.tokens, b.tokens) < SIMILARITY_THRESHOLD) continue;
+                const key = a.idx + '|' + b.idx;
+                if (reported[key]) continue;
+                reported[key] = true;
+                results.warnings.push(item(
+                    'W18-' + a.idx + '-' + b.idx,
+                    'warning',
+                    'findings',
+                    `The same issue appears to be reported both as ${a.label} and as ${b.label}.`,
+                    'checklistProgress[] / report.ncrs[]',
+                    'Confirm these are genuinely separate issues — the same finding should not be reported twice under different classifications.'
+                ));
+            }
+        }
+    }
+
+    // W19 — a certification body determines conformity; it does not design the
+    // solution. Prescribing the corrective action compromises impartiality, so
+    // advisories must stay neutral ("the organization may consider ...").
+    const PRESCRIPTIVE_PATTERNS = [
+        /\b(?:must|shall|should|needs?\s+to|is\s+required\s+to|has\s+to)\s+(?:implement|establish|create|develop|introduce|adopt|purchase|procure|hire|appoint|revise|rewrite|redesign|install|deploy)\b/i,
+        /\bwe\s+recommend\b/i,
+        /\byou\s+(?:should|must|need\s+to)\b/i,
+        /\bit\s+is\s+recommended\s+that\s+the\s+organi[sz]ation\s+(?:implement|establish|create|develop|adopt)\b/i
+    ];
+
+    function checkW19ConsultancyLanguage(report, results) {
+        advisoryItems(report).forEach((a) => {
+            const hit = PRESCRIPTIVE_PATTERNS.find((re) => re.test(a.text));
+            if (!hit) return;
+            const phrase = trim((a.text.match(hit) || [''])[0]);
+            results.warnings.push(item(
+                'W19-' + a.idx,
+                'warning',
+                'findings',
+                `${a.label} prescribes a solution ("${phrase}"), which crosses from auditing into consultancy.`,
+                'checklistProgress[' + a.idx + ']',
+                'State the condition observed and leave the remedy to the organization — neutral wording such as "the organization may consider ..." preserves certification-body impartiality.'
+            ));
+        });
+    }
+
     // I1-I4 information items
 
     function checkInformation(report, results) {
@@ -1083,6 +1207,9 @@
         try { checkW14PreviousFindings(report, auditPlan, results); } catch (_e) { /* skip */ }
         try { checkW15NextAuditType({ report, auditPlan, client }, results); } catch (_e) { /* skip */ }
         try { checkW16ChangesContradiction(report, client, results); } catch (_e) { /* skip */ }
+        try { checkW17AdvisoryClassification(report, results); } catch (_e) { /* skip */ }
+        try { checkW18DuplicateAdvisories(report, ncrs, results); } catch (_e) { /* skip */ }
+        try { checkW19ConsultancyLanguage(report, results); } catch (_e) { /* skip */ }
         try { checkE1RawAuditorNotes(report, results); } catch (_e) { /* skip */ }
 
         try { checkInformation(report, results); } catch (_e) { /* skip */ }

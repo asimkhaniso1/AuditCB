@@ -323,6 +323,85 @@ describe('ReportIntegrity — report/dataset agreement', () => {
         expect(result.warnings.some((w) => w.id === 'W16')).toBe(false);
     });
 
+    it('W17: an Observation that calls itself an opportunity for improvement warns', () => {
+        const report = baseReport({
+            conclusion: 'Continued certification is recommended.',
+            checklistProgress: [{
+                status: 'nc', ncrType: 'observation', clause: '7.1',
+                comment: 'An opportunity for improvement was identified regarding the competency matrix.'
+            }]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W17'))).toBe(true);
+    });
+
+    it('W17: an Observation worded as an observation is left alone', () => {
+        const report = baseReport({
+            conclusion: 'Continued certification is recommended.',
+            checklistProgress: [{
+                status: 'nc', ncrType: 'observation', clause: '7.1',
+                comment: 'The competency matrix was maintained and available for the sample reviewed.'
+            }]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W17'))).toBe(false);
+    });
+
+    it('W18: the same issue filed as both an OFI and a nonconformity warns', () => {
+        const shared = 'Calibration records for torque tooling were not retained for the sampled production line';
+        const report = baseReport({
+            conclusion: 'Continued certification is recommended.',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: '7.1.5', comment: shared + '.' },
+                { status: 'nc', ncrType: 'ofi', clause: '7.1.5', comment: shared + ' during the review.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W18'))).toBe(true);
+    });
+
+    it('W18: genuinely different advisories are not flagged as duplicates', () => {
+        const report = baseReport({
+            conclusion: 'Continued certification is recommended.',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: '9.2', comment: 'Two scheduled internal audits were not performed within the planned programme.' },
+                { status: 'nc', ncrType: 'ofi', clause: '6.1', comment: 'The risk register could link mitigation actions to named process owners.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W18'))).toBe(false);
+    });
+
+    it('W19: an advisory prescribing the solution warns (CB impartiality)', () => {
+        const report = baseReport({
+            conclusion: 'Continued certification is recommended.',
+            checklistProgress: [{
+                status: 'nc', ncrType: 'ofi', clause: '6.1',
+                comment: 'The organization must implement a documented risk-assessment procedure using FMEA.'
+            }]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W19'))).toBe(true);
+    });
+
+    it('W19: neutral "may consider" wording is acceptable', () => {
+        const report = baseReport({
+            conclusion: 'Continued certification is recommended.',
+            checklistProgress: [{
+                status: 'nc', ncrType: 'ofi', clause: '6.1',
+                comment: 'The organization may consider strengthening how risk-assessment outputs are recorded.'
+            }]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W19'))).toBe(false);
+    });
+
     it('E1: a full client-facing evidence statement is not flagged', () => {
         const report = baseReport({
             checklistProgress: [{
