@@ -308,3 +308,49 @@ describe('ReportStats.classifyCriterion', () => {
         expect(fc.real).toBe('9.2');
     });
 });
+
+// Corrective-action timeframes are the certification body's scheme rules, not
+// requirements of ISO 9001, so they must be configurable rather than hardcoded.
+describe('ReportStats.capaTimeframes', () => {
+    it('falls back to 30/90 and reports that nothing is configured', () => {
+        const t = window.ReportStats.capaTimeframes({});
+        expect(t).toMatchObject({ major: 30, minor: 90, source: 'fallback', configured: false });
+    });
+
+    it('accepts a flat configuration', () => {
+        const t = window.ReportStats.capaTimeframes({ settings: { capaTimeframes: { major: 14, minor: 60 } } });
+        expect(t).toMatchObject({ major: 14, minor: 60, source: 'default', configured: true });
+    });
+
+    it('prefers the standard over the default', () => {
+        const settings = { capaTimeframes: { default: { major: 30, minor: 90 }, byStandard: { 'ISO 27001:2022': { major: 21, minor: 45 } } } };
+        const t = window.ReportStats.capaTimeframes({ settings, standard: 'ISO 27001:2022' });
+        expect(t).toMatchObject({ major: 21, minor: 45, source: 'standard' });
+    });
+
+    it('prefers the certification stage over the standard', () => {
+        const settings = {
+            capaTimeframes: {
+                default: { major: 30, minor: 90 },
+                byStandard: { 'ISO 9001:2015': { major: 21, minor: 45 } },
+                byStage: { 'Stage 2': { major: 7, minor: 30 } }
+            }
+        };
+        const t = window.ReportStats.capaTimeframes({ settings, standard: 'ISO 9001:2015', stage: 'Stage 2' });
+        expect(t).toMatchObject({ major: 7, minor: 30, source: 'stage' });
+    });
+
+    it('fills a missing severity from the fallback rather than dropping it', () => {
+        const t = window.ReportStats.capaTimeframes({ settings: { capaTimeframes: { major: 14 } } });
+        expect(t).toMatchObject({ major: 14, minor: 90, configured: true });
+    });
+
+    it('ignores nonsense values instead of printing them', () => {
+        const t = window.ReportStats.capaTimeframes({ settings: { capaTimeframes: { major: 0, minor: -5 } } });
+        expect(t).toMatchObject({ major: 30, minor: 90, source: 'fallback', configured: false });
+    });
+
+    it('exposes the procedure sentence for unconfigured schemes', () => {
+        expect(window.ReportStats.CAPA_PROCEDURE_SENTENCE).toMatch(/corrective-action procedure/i);
+    });
+});

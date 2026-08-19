@@ -1150,9 +1150,75 @@
         return out;
     }
 
+    // ─── Corrective-action timeframes ───────────────────────────────────────
+    // 30/90 days are the certification body's own scheme rules, NOT requirements
+    // of ISO 9001 — printing them as though the standard mandates them is wrong,
+    // and a CB operating a different scheme cannot change them. They are
+    // therefore configuration, resolved most-specific-first:
+    //   settings.capaTimeframes.byStage[stage]      (e.g. 'Stage 2', 'Surveillance')
+    //   settings.capaTimeframes.byStandard[standard]
+    //   settings.capaTimeframes.default             (or a flat {major, minor})
+    //   built-in fallback
+    // `source` reports which level answered, so the UI can show whether a CB has
+    // actually configured its scheme or is running on the fallback.
+    const DEFAULT_CAPA_TIMEFRAMES = { major: 30, minor: 90 };
+    // Printed instead of a hardcoded day count when the CB has not configured
+    // its scheme — the procedure governs, not a number we invented.
+    const CAPA_PROCEDURE_SENTENCE = 'Corrective action timeframe: in accordance with the certification body\'s applicable corrective-action procedure.';
+
+    function positiveDays(v) {
+        const n = Number(v);
+        return (!isNaN(n) && n > 0) ? Math.round(n) : null;
+    }
+
+    function normalizeTimeframeEntry(entry) {
+        if (!entry || typeof entry !== 'object') return null;
+        const major = positiveDays(entry.major);
+        const minor = positiveDays(entry.minor);
+        if (major === null && minor === null) return null;
+        return { major, minor };
+    }
+
+    /**
+     * Resolve corrective-action timeframes for an audit.
+     * @param {{settings?:object, standard?:string, stage?:string}} opts
+     * @returns {{major:number, minor:number, source:'stage'|'standard'|'default'|'fallback', configured:boolean}}
+     */
+    function capaTimeframes(opts) {
+        const o = opts || {};
+        const cfg = (o.settings && o.settings.capaTimeframes) || null;
+        const stage = trim(o.stage);
+        const standard = trim(o.standard);
+
+        const candidates = [];
+        if (cfg) {
+            if (stage && cfg.byStage) candidates.push(['stage', normalizeTimeframeEntry(cfg.byStage[stage])]);
+            if (standard && cfg.byStandard) candidates.push(['standard', normalizeTimeframeEntry(cfg.byStandard[standard])]);
+            candidates.push(['default', normalizeTimeframeEntry(cfg.default) || normalizeTimeframeEntry(cfg)]);
+        }
+        for (let i = 0; i < candidates.length; i++) {
+            const [source, entry] = candidates[i];
+            if (!entry) continue;
+            return {
+                major: entry.major === null ? DEFAULT_CAPA_TIMEFRAMES.major : entry.major,
+                minor: entry.minor === null ? DEFAULT_CAPA_TIMEFRAMES.minor : entry.minor,
+                source,
+                configured: true
+            };
+        }
+        return {
+            major: DEFAULT_CAPA_TIMEFRAMES.major,
+            minor: DEFAULT_CAPA_TIMEFRAMES.minor,
+            source: 'fallback',
+            configured: false
+        };
+    }
+
     global.ReportStats = {
         build,
         version: 1,
+        capaTimeframes,
+        CAPA_PROCEDURE_SENTENCE,
         normalizeDeptName,
         UNASSIGNED_LABEL,
         recommendationText,
