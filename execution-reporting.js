@@ -209,6 +209,77 @@
     };
     window._effectivenessDefaults = _effectivenessDefaults;
 
+    // ─── Previous Findings Status default (never a bare dash) ─────────────────
+    // A blank/dash isn't a status — W14 warns exactly about this on
+    // surveillance/recertification reports. Derive the actual position from
+    // data instead of ever assuming a favourable one; an auditor's own entered
+    // text always wins. Prior-report lookup mirrors report-integrity.js's
+    // hasPriorFinalizedReport (clientId, else client-name match, against
+    // window.state.auditReports, finalized only) so preview/export/validator
+    // never disagree about which report is "the previous one".
+    const PREV_STATUS_EMPTY_RE = /^(—|-{1,3}|n\/?a|none|nil|\.)?$/i; // same "blank" test as report-integrity.js EMPTY_STATUS_RE
+    const _derivePreviousFindingsStatus = (d) => {
+        const report = (d && d.report) || {};
+        const auditPlan = (d && d.auditPlan) || {};
+        const entered = String(report.previousFindingsStatus || '').trim();
+        if (entered && !PREV_STATUS_EMPTY_RE.test(entered)) return entered;
+
+        const auditTypeStr = String(auditPlan.auditType || auditPlan.type || report.auditType || '').toLowerCase();
+        if (!auditTypeStr || /initial|stage/.test(auditTypeStr)) {
+            return 'Not applicable — initial certification audit.';
+        }
+
+        const allReports = (window.state && window.state.auditReports) || [];
+        const clientKey = report.clientId != null ? String(report.clientId) : ((d && d.client && d.client.id != null) ? String(d.client.id) : null);
+        const clientName = report.client || (d && d.client && d.client.name) || null;
+        const prevReport = allReports.filter(function (r) {
+            if (!r || String(r.id) === String(report.id)) return false;
+            const rClientKey = r.clientId != null ? String(r.clientId) : null;
+            const matchesClient = (clientKey && rClientKey && rClientKey === clientKey)
+                || (clientName && r.client && String(r.client).trim().toLowerCase() === String(clientName).trim().toLowerCase());
+            if (!matchesClient) return false;
+            return r.status === 'Finalized' || r.reportStatus === 'final';
+        }).sort(function (a, b) { return new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt); })[0];
+
+        if (!prevReport) return 'Records of previous findings were not available for review.';
+
+        const prevNCs = (prevReport.checklistProgress || []).filter(function (p) {
+            return p && p.status === 'nc' && ['major', 'minor'].includes(String(p.ncrType || '').toLowerCase());
+        });
+        const prevNCRs = (prevReport.ncrs || []).filter(function (n) {
+            return n && /^major|minor$/i.test(String(n.type || n.ncrType || n.severity || ''));
+        });
+        if (prevNCs.length === 0 && prevNCRs.length === 0) {
+            return 'No previous nonconformities requiring follow-up.';
+        }
+
+        // Closed-vs-open comes from the prior report's own finding-status field
+        // — the same auditor-set field this report's own findings table reads
+        // (report.findingStatus[clause|department].status via updateFindingStatus).
+        const CLOSED_STATES = ['closed', 'verified'];
+        const fsMap = prevReport.findingStatus || {};
+        let anyKnown = false, anyOpen = false;
+        prevNCs.forEach(function (nc) {
+            const key = String(nc.clause || '') + '|' + String(nc.department || '');
+            const st = fsMap[key] && fsMap[key].status;
+            if (!st) return;
+            anyKnown = true;
+            if (CLOSED_STATES.indexOf(st) === -1) anyOpen = true;
+        });
+        prevNCRs.forEach(function (ncr) {
+            const st = ncr.status ? String(ncr.status).toLowerCase() : null;
+            if (!st) return;
+            anyKnown = true;
+            if (st !== 'closed' && st !== 'verified') anyOpen = true;
+        });
+
+        // Prior NCs exist but neither this report's findingStatus map nor the
+        // register carries a resolvable state — don't guess a favourable one.
+        if (!anyKnown) return 'Records of previous findings were not available for review.';
+        return anyOpen ? 'Previous nonconformity(ies) remain open.' : 'Previous nonconformities verified and closed.';
+    };
+    window._derivePreviousFindingsStatus = _derivePreviousFindingsStatus;
+
     // ─── Client logo resolution ────────────────────────────────────────────────
     // client.logoUrl is only ever set by a manual upload in Account Setup, so
     // clients with a website on file still printed the dashed "Client Logo"
@@ -1869,7 +1940,9 @@
                                 .filter(r => r.clientId === d.report.clientId && String(r.id) !== String(d.report.id))
                                 .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
                             const prevReport = prevReports[0];
-                            const prevFindingsNarrative = '<div style="margin-top:12px;"><div style="font-size:0.8rem;font-weight:600;color:#3730a3;margin-bottom:6px;">Previous Findings Status (editable)</div><div id="rp-prev-findings" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">' + (d.report.previousFindingsStatus || 'Nonconformities and observations from the previous audit were reviewed. All corrective actions were verified as effectively implemented unless otherwise stated below.') + '</div></div>';
+                            // Pre-filled with the derived status (never invented/favourable) — the
+                            // auditor's own previously-entered text still wins inside the helper itself.
+                            const prevFindingsNarrative = '<div style="margin-top:12px;"><div style="font-size:0.8rem;font-weight:600;color:#3730a3;margin-bottom:6px;">Previous Findings Status (editable)</div><div id="rp-prev-findings" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">' + _derivePreviousFindingsStatus(d) + '</div></div>';
                             if (!prevReport) {
                                 return '<div style="text-align:center;padding:20px;color:#94a3b8;"><i class="fa-solid fa-info-circle" style="margin-right:6px;"></i>No previous audit reports found for this client. Enter the previous findings status manually below.</div>' + prevFindingsNarrative;
                             }
@@ -2999,7 +3072,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const auditTypeStr = String(d.auditPlan?.auditType || '').toLowerCase();
         const isSurveillanceOrRecert = /surveillance|recert/.test(auditTypeStr);
         const isInitialOrStage = /initial|stage/.test(auditTypeStr) || !auditTypeStr;
-        let editedPrevFindings = document.getElementById('rp-prev-findings')?.innerText || d.report.previousFindingsStatus || '';
+        // Falls back through: live preview-modal edit -> stored report field -> derived
+        // status (never a blank/invented default) — same precedence as the preview box.
+        let editedPrevFindings = document.getElementById('rp-prev-findings')?.innerText || d.report.previousFindingsStatus || _derivePreviousFindingsStatus(d);
         editedPrevFindings = editedPrevFindings.replace(/Click to edit[^.]*\.?/gi, '').trim();
         const editedUnresolved = document.getElementById('rp-unresolved')?.innerText || d.report.unresolvedIssues || 'None. All findings were acknowledged by the auditee at the closing meeting.';
         // Effectiveness defaults derive from the validated findings, so the table
@@ -3197,23 +3272,50 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
-        // Build clause/area performance analysis
+        // Build clause/area performance analysis. NC attribution (major/minor,
+        // including unclassified-NC-as-minor) resolves the SAME way as
+        // d.stats.ncByClause — resolved criterion (criterionRef when present,
+        // else clause) — off the same d.hydratedProgress dataset the rest of the
+        // report uses, so this table's NC column can never silently disagree with
+        // the report's own major+minor NC total. Conform/OBS/OFI keep the
+        // pre-existing kbMatch-based attribution — reconciliation is an NC-only
+        // requirement (B14), and OBS/OFI are advisory, never part of the NC sum.
         const clauseAreaNames = { '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning', '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation', '10': 'Improvement' };
         const areaStats = {};
+        // NCs whose resolved criterion doesn't land in one of the seven areas above
+        // (no real clause resolved, per B14's own test) — kept instead of dropped,
+        // so the table can still visibly account for every nonconformity.
+        let unplacedNC = { major: 0, minor: 0 };
         (d.hydratedProgress || []).forEach(function (item) {
-            let clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || '';
-            let mainC = clause.split('.')[0];
-            if (!mainC || !clauseAreaNames[mainC]) return;
-            if (!areaStats[mainC]) areaStats[mainC] = { conform: 0, minor: 0, major: 0, obs: 0, ofi: 0 };
-            if (item.status === 'conform') areaStats[mainC].conform++;
-            else if (item.status === 'nc') {
-                let t = (item.ncrType || '').toLowerCase();
-                if (t === 'major') areaStats[mainC].major++;
-                else if (t === 'minor') areaStats[mainC].minor++;
-                else if (t === 'observation') areaStats[mainC].obs++;
-                else if (t === 'ofi') areaStats[mainC].ofi++;
-                else areaStats[mainC].minor++;
+            if (item.status === 'conform') {
+                let clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || '';
+                let mainC = clause.split('.')[0];
+                if (!mainC || !clauseAreaNames[mainC]) return;
+                if (!areaStats[mainC]) areaStats[mainC] = { conform: 0, minor: 0, major: 0, obs: 0, ofi: 0 };
+                areaStats[mainC].conform++;
+                return;
             }
+            if (item.status !== 'nc') return;
+            let t = (item.ncrType || '').toLowerCase();
+            if (t === 'observation' || t === 'ofi') {
+                let clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || '';
+                let mainC = clause.split('.')[0];
+                if (!mainC || !clauseAreaNames[mainC]) return;
+                if (!areaStats[mainC]) areaStats[mainC] = { conform: 0, minor: 0, major: 0, obs: 0, ofi: 0 };
+                if (t === 'observation') areaStats[mainC].obs++; else areaStats[mainC].ofi++;
+                return;
+            }
+            // Major/minor/pending-classification NC — resolved-criterion attribution
+            // (same rule as B14: a bare criterionRef is always trusted as real).
+            const sevKey = t === 'major' ? 'major' : 'minor';
+            const criterionRef = String(item.criterionRef || '').trim();
+            const rawClause = String(item.clause || '').trim();
+            const resolved = criterionRef || rawClause;
+            const unattributable = !resolved || (!criterionRef && INTERNAL_REF_PREFIX_RE.test(rawClause));
+            const mainC = unattributable ? null : resolved.split('.')[0];
+            if (!mainC || !clauseAreaNames[mainC]) { unplacedNC[sevKey]++; return; }
+            if (!areaStats[mainC]) areaStats[mainC] = { conform: 0, minor: 0, major: 0, obs: 0, ofi: 0 };
+            areaStats[mainC][sevKey]++;
         });
         let areaSortedKeys = Object.keys(areaStats).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); });
         let areaTableRows = areaSortedKeys.map(function (k) {
@@ -3224,7 +3326,17 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             let statusTxt = hasIssue ? (s.major > 0 ? 'Needs Action' : 'Minor Issues') : 'Satisfactory';
             return '<tr><td style="padding:8px 12px;font-weight:600;">Clause ' + k + '</td><td style="padding:8px 12px;">' + clauseAreaNames[k] + '</td><td style="padding:8px 12px;text-align:center;">' + total + '</td><td style="padding:8px 12px;text-align:center;color:#166534;">' + s.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;">' + (s.major + s.minor) + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">' + statusTxt + '</span></td></tr>';
         }).join('');
-        let areaTableHtml = areaSortedKeys.length > 0 ? '<div style="margin-top:16px;page-break-before:always;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:left;">Area</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">NC</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table></div>' : '';
+        // Surface unplaced NCs as their own labelled row rather than a silent drop —
+        // "Criterion not assigned" mirrors displayCriterion()'s finding-row wording
+        // for the identical condition. This keeps Major+Minor across ALL rows
+        // (including this one) equal to the report's formal NC total.
+        let unplacedNCTotal = unplacedNC.major + unplacedNC.minor;
+        if (unplacedNCTotal > 0) {
+            let statusBg = unplacedNC.major > 0 ? '#fee2e2' : '#fef3c7';
+            let statusFg = unplacedNC.major > 0 ? '#991b1b' : '#92400e';
+            areaTableRows += '<tr style="background:#fff7ed;"><td style="padding:8px 12px;font-weight:600;">—</td><td style="padding:8px 12px;font-style:italic;color:#92400e;">Criterion not assigned</td><td style="padding:8px 12px;text-align:center;">' + unplacedNCTotal + '</td><td style="padding:8px 12px;text-align:center;color:#166534;">0</td><td style="padding:8px 12px;text-align:center;color:#dc2626;">' + unplacedNCTotal + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">Needs Attribution</span></td></tr>';
+        }
+        let areaTableHtml = (areaSortedKeys.length > 0 || unplacedNCTotal > 0) ? '<div style="margin-top:16px;page-break-before:always;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:left;">Area</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">NC</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table>' + (unplacedNCTotal > 0 ? '<div style="margin-top:6px;font-size:0.72rem;color:#64748b;">† Criterion not assigned = nonconformity(ies) with no real standard clause resolved; not attributable to a clause area above.</div>' : '') + '</div>' : '';
         // Serialize area stats for chart script
         let areaChartData = JSON.stringify({ keys: areaSortedKeys, names: areaSortedKeys.map(function (k) { return clauseAreaNames[k]; }), conform: areaSortedKeys.map(function (k) { return areaStats[k].conform; }), nc: areaSortedKeys.map(function (k) { return areaStats[k].major + areaStats[k].minor; }), obs: areaSortedKeys.map(function (k) { return areaStats[k].obs; }), ofi: areaSortedKeys.map(function (k) { return areaStats[k].ofi; }) });
 
@@ -3529,7 +3641,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 ? client.sites.map(function (s) { return s.name; }).filter(Boolean).join(', ')
                 : ([client.address, client.city].filter(Boolean).join(', ') || '—');
             const team = (Array.isArray(plan.team) && plan.team.length) ? plan.team.join(', ') : (report.leadAuditor || '—');
-            const prevStatus = report.previousFindingsStatus ? 'Reviewed — see Previous Findings Status section' : '—';
+            // Never a bare dash — derived from prior-audit data (or the auditor's own
+            // entered text) by the same helper the Previous Findings Status section uses.
+            const prevStatus = esc(_derivePreviousFindingsStatus(d));
             const recommendation = (rs && rs.recommendation) || stats.recommendation || '—';
             const row = function (label, value) {
                 return '<tr><td style="padding:6px 12px;color:#64748b;font-weight:600;width:34%;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;vertical-align:top;">' + esc(label) + '</td><td style="padding:6px 12px;font-size:0.85rem;color:#1e293b;">' + (value || '—') + '</td></tr>';
@@ -4020,7 +4134,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + (prevFindingsRowsHtml
                     ? '<div style="margin-bottom:12px;padding:10px 14px;background:#eff6ff;border-radius:8px;font-size:0.88rem;color:#1d4ed8;">Nonconformities and observations raised at the previous audit were reviewed for effective closure.</div>'
                         + '<table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:14%;">Ref</th><th style="width:18%;">Clause</th><th style="width:12%;text-align:center;">Type</th><th style="width:56%;">Follow-up Status</th></tr></thead><tbody>' + prevFindingsRowsHtml + '</tbody></table>'
-                    : '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedPrevFindings || 'Nonconformities and observations from the previous audit were reviewed. All corrective actions were verified as effectively implemented unless otherwise stated below.') + '</div>')
+                    : '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedPrevFindings || _derivePreviousFindingsStatus(d)) + '</div>')
                 + '</div>' : '')
             // SECTION: OBSERVATIONS
             + (secMap['obs'] ? '<div id="sec-obs" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('obs') + 'OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:10%;">Clause</th><th style="width:30%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
