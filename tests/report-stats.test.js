@@ -201,3 +201,58 @@ describe('ReportStats.cleanEvidenceText', () => {
         expect(window.ReportStats.cleanEvidenceText('   ')).toBe('');
     });
 });
+
+// A process governed by an open nonconformity can never be reported as fully
+// conforming — the Management System Effectiveness table derives from findings.
+describe('ReportStats.effectivenessStatements', () => {
+    it('reports a minor NC against clause 9.2 on the internal audit programme', () => {
+        const report = {
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: '9.2', comment: 'Planned internal audits were not completed.' }
+            ]
+        };
+        const eff = window.ReportStats.effectivenessStatements(report);
+
+        expect(eff.internalAudit).toMatch(/minor nonconformity/i);
+        expect(eff.internalAudit).toMatch(/internal audit programme/i);
+        expect(eff.internalAudit).not.toMatch(/conforms to the requirements/i);
+    });
+
+    it('credits a Stage 1 carryover resolved to 9.2 against the internal audit programme', () => {
+        const report = {
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: 'FOCUS.2', criterionRef: '9.2' }
+            ]
+        };
+        expect(window.ReportStats.effectivenessStatements(report).internalAudit).toMatch(/minor nonconformity/i);
+    });
+
+    it('escalates a major NC to not effective', () => {
+        const report = { checklistProgress: [{ status: 'nc', ncrType: 'major', clause: '9.3' }] };
+        expect(window.ReportStats.effectivenessStatements(report).mgmtReview).toMatch(/^Not effective/);
+    });
+
+    it('reports an observation as an improvement opportunity, not a nonconformity', () => {
+        const report = { checklistProgress: [{ status: 'nc', ncrType: 'observation', clause: '9.3' }] };
+        const eff = window.ReportStats.effectivenessStatements(report);
+
+        expect(eff.mgmtReview).toMatch(/opportunity for improvement/i);
+        expect(eff.mgmtReview).not.toMatch(/nonconformity/i);
+    });
+
+    it('keeps the conforming statement for an assessed area with no findings', () => {
+        const report = { checklistProgress: [{ status: 'conform', clause: '9.2' }] };
+        expect(window.ReportStats.effectivenessStatements(report).internalAudit)
+            .toBe('Implemented and effective; conforms to the requirements of the standard.');
+    });
+
+    it('says not assessed rather than conforming when the area was never sampled', () => {
+        const report = { checklistProgress: [{ status: 'conform', clause: '8.1' }] };
+        expect(window.ReportStats.effectivenessStatements(report).internalAudit).toBe('Not assessed during this audit.');
+    });
+
+    it('counts a manually raised NCR from the register', () => {
+        const report = { checklistProgress: [{ status: 'conform', clause: '9.3' }], ncrs: [{ clause: '9.3', type: 'minor' }] };
+        expect(window.ReportStats.effectivenessStatements(report).mgmtReview).toMatch(/minor nonconformity/i);
+    });
+});

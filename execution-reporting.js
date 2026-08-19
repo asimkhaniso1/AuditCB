@@ -189,6 +189,26 @@
     };
     window._reportRef = reportRef;
 
+    // Effectiveness defaults for the Management System Effectiveness table.
+    // Delegates to ReportStats (the canonical findings source) so preview and
+    // export agree; falls back to the pre-derivation wording only when that
+    // module has not loaded.
+    const EFFECTIVENESS_FALLBACK = 'Implemented and effective; conforms to the requirements of the standard.';
+    const _effectivenessDefaults = (report) => {
+        try {
+            if (window.ReportStats && typeof window.ReportStats.effectivenessStatements === 'function') {
+                return window.ReportStats.effectivenessStatements(report);
+            }
+        } catch (_e) { /* fall through */ }
+        return {
+            internalAudit: EFFECTIVENESS_FALLBACK,
+            mgmtReview: EFFECTIVENESS_FALLBACK,
+            complaints: EFFECTIVENESS_FALLBACK,
+            legal: EFFECTIVENESS_FALLBACK
+        };
+    };
+    window._effectivenessDefaults = _effectivenessDefaults;
+
     // ─── Client logo resolution ────────────────────────────────────────────────
     // client.logoUrl is only ever set by a manual upload in Account Setup, so
     // clients with a website on file still printed the dashed "Client Logo"
@@ -1986,11 +2006,11 @@
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#ecfeff;"><th style="padding:10px 14px;text-align:left;width:38%;">Process</th><th style="padding:10px 14px;text-align:left;width:62%;">Effectiveness Status (click to edit)</th></tr></thead>
                             <tbody>
-                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Internal Audit Programme</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-internal-audit" class="rp-edit" contenteditable="true">${d.report.effInternalAudit || 'Implemented and effective; conforms to the requirements of the standard.'}</td></tr>
-                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Management Review</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-mgmt-review" class="rp-edit" contenteditable="true">${d.report.effMgmtReview || 'Implemented and effective; conforms to the requirements of the standard.'}</td></tr>
-                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Handling of Complaints</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-complaints" class="rp-edit" contenteditable="true">${d.report.effComplaints || 'Implemented and effective; conforms to the requirements of the standard.'}</td></tr>
+                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Internal Audit Programme</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-internal-audit" class="rp-edit" contenteditable="true">${d.report.effInternalAudit || _effectivenessDefaults(d.report).internalAudit}</td></tr>
+                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Management Review</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-mgmt-review" class="rp-edit" contenteditable="true">${d.report.effMgmtReview || _effectivenessDefaults(d.report).mgmtReview}</td></tr>
+                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Handling of Complaints</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-complaints" class="rp-edit" contenteditable="true">${d.report.effComplaints || _effectivenessDefaults(d.report).complaints}</td></tr>
                                 <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Use of Certification Marks / Logo</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-marks" class="rp-edit" contenteditable="true">${d.report.effMarks || (/initial|stage/.test(String(d.auditPlan?.auditType || '').toLowerCase()) || !d.auditPlan?.auditType ? 'Not applicable — initial certification audit.' : 'Usage verified as conforming to CB rules.')}</td></tr>
-                                <tr><td style="padding:8px 14px;font-weight:600;">Legal &amp; Regulatory Compliance</td><td style="padding:8px 14px;" id="rp-eff-legal" class="rp-edit" contenteditable="true">${d.report.effLegal || 'Implemented and effective; conforms to the requirements of the standard.'}</td></tr>
+                                <tr><td style="padding:8px 14px;font-weight:600;">Legal &amp; Regulatory Compliance</td><td style="padding:8px 14px;" id="rp-eff-legal" class="rp-edit" contenteditable="true">${d.report.effLegal || _effectivenessDefaults(d.report).legal}</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2982,11 +3002,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         let editedPrevFindings = document.getElementById('rp-prev-findings')?.innerText || d.report.previousFindingsStatus || '';
         editedPrevFindings = editedPrevFindings.replace(/Click to edit[^.]*\.?/gi, '').trim();
         const editedUnresolved = document.getElementById('rp-unresolved')?.innerText || d.report.unresolvedIssues || 'None. All findings were acknowledged by the auditee at the closing meeting.';
-        const editedEffInternalAudit = document.getElementById('rp-eff-internal-audit')?.innerText || d.report.effInternalAudit || 'Implemented and effective; conforms to the requirements of the standard.';
-        const editedEffMgmtReview = document.getElementById('rp-eff-mgmt-review')?.innerText || d.report.effMgmtReview || 'Implemented and effective; conforms to the requirements of the standard.';
-        const editedEffComplaints = document.getElementById('rp-eff-complaints')?.innerText || d.report.effComplaints || 'Implemented and effective; conforms to the requirements of the standard.';
+        // Effectiveness defaults derive from the validated findings, so the table
+        // cannot declare a process conforming while an NC stands against its
+        // clause. An auditor's own wording still wins.
+        const effDefaults = _effectivenessDefaults(d.report);
+        const editedEffInternalAudit = document.getElementById('rp-eff-internal-audit')?.innerText || d.report.effInternalAudit || effDefaults.internalAudit;
+        const editedEffMgmtReview = document.getElementById('rp-eff-mgmt-review')?.innerText || d.report.effMgmtReview || effDefaults.mgmtReview;
+        const editedEffComplaints = document.getElementById('rp-eff-complaints')?.innerText || d.report.effComplaints || effDefaults.complaints;
         const editedEffMarks = document.getElementById('rp-eff-marks')?.innerText || d.report.effMarks || (isInitialOrStage ? 'Not applicable — initial certification audit.' : 'Usage verified as conforming to CB rules.');
-        const editedEffLegal = document.getElementById('rp-eff-legal')?.innerText || d.report.effLegal || 'Implemented and effective; conforms to the requirements of the standard.';
+        const editedEffLegal = document.getElementById('rp-eff-legal')?.innerText || d.report.effLegal || effDefaults.legal;
         const technicalReview = resolveTechnicalReview(d.report);
         const editedReviewerName = technicalReview.reviewer || '';
         const editedSigDate = document.getElementById('rp-sig-date')?.innerText || new Date().toLocaleDateString('en-GB');

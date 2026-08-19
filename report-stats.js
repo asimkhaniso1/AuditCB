@@ -1016,6 +1016,78 @@
         };
     }
 
+    // ─── Management system effectiveness, derived from the findings ──────────
+    // The Management System Effectiveness table used to print a fixed
+    // "Implemented and effective; conforms to the requirements of the standard"
+    // for every process, so a report could declare the internal audit programme
+    // conforming on one page while raising a nonconformity against clause 9.2 on
+    // another. Effectiveness is therefore derived from the validated findings:
+    // an area governed by an open NC can never be reported as fully conforming.
+    //
+    // Clause prefixes per area. An area is matched on the finding's RESOLVED
+    // criterion (criterionRef when present, else clause) so a Stage 1 carryover
+    // resolved to 9.2 counts against the internal audit programme.
+    const EFFECTIVENESS_AREAS = {
+        internalAudit: { label: 'internal audit programme', clauses: ['9.2'] },
+        mgmtReview: { label: 'management review', clauses: ['9.3'] },
+        complaints: { label: 'handling of complaints', clauses: ['9.1.2', '8.2.1', '10.2'] },
+        legal: { label: 'legal and regulatory compliance', clauses: ['4.2', '6.1.3', '8.2.2'] }
+    };
+
+    function effectivenessFindings(report) {
+        const fromChecklist = safeArr(report && report.checklistProgress)
+            .filter((i) => i && String(i.status).toLowerCase() === 'nc')
+            .map((i) => ({
+                ref: trim(i.criterionRef) || trim(i.clause),
+                type: String(i.ncrType || '').toLowerCase()
+            }));
+        const fromManual = safeArr(report && report.ncrs).map((n) => ({
+            ref: trim(n && (n.criterionRef || n.clause)),
+            type: String((n && (n.type || n.ncrType || n.severity)) || '').toLowerCase()
+        }));
+        return fromChecklist.concat(fromManual).filter((f) => f.ref);
+    }
+
+    function matchesArea(ref, clauses) {
+        return clauses.some((c) => ref === c || ref.indexOf(c + '.') === 0);
+    }
+
+    /**
+     * Effectiveness statement per process area, derived from the findings.
+     * Returns { internalAudit, mgmtReview, complaints, legal } — sentences ready
+     * to print. Callers treat these as DEFAULTS: an auditor's own wording wins.
+     */
+    function effectivenessStatements(report) {
+        const findings = effectivenessFindings(report);
+        const assessedRefs = safeArr(report && report.checklistProgress)
+            .map((i) => trim(i && (i.criterionRef || i.clause)))
+            .filter(Boolean);
+        const out = {};
+        Object.keys(EFFECTIVENESS_AREAS).forEach((key) => {
+            const area = EFFECTIVENESS_AREAS[key];
+            const hits = findings.filter((f) => matchesArea(f.ref, area.clauses));
+            const major = hits.filter((f) => f.type === 'major').length;
+            const minor = hits.filter((f) => f.type === 'minor').length;
+            const advisory = hits.filter((f) => f.type === 'observation' || f.type === 'ofi').length;
+            const assessed = assessedRefs.some((r) => matchesArea(r, area.clauses));
+
+            if (major) {
+                out[key] = 'Not effective — ' + major + ' major nonconformity(ies) identified regarding the '
+                    + area.label + '. Corrective action required.';
+            } else if (minor) {
+                out[key] = 'Implemented; ' + minor + ' minor nonconformity(ies) identified regarding the '
+                    + area.label + '. Corrective action required.';
+            } else if (advisory) {
+                out[key] = 'Implemented; opportunity for improvement identified regarding the ' + area.label + '.';
+            } else if (assessed) {
+                out[key] = 'Implemented and effective; conforms to the requirements of the standard.';
+            } else {
+                out[key] = 'Not assessed during this audit.';
+            }
+        });
+        return out;
+    }
+
     global.ReportStats = {
         build,
         version: 1,
@@ -1025,7 +1097,8 @@
         buildProgramme,
         cycleState,
         formatCriterion,
-        cleanEvidenceText
+        cleanEvidenceText,
+        effectivenessStatements
     };
 
     if (typeof module !== 'undefined' && module.exports) {
