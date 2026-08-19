@@ -256,3 +256,55 @@ describe('ReportStats.effectivenessStatements', () => {
         expect(window.ReportStats.effectivenessStatements(report).mgmtReview).toMatch(/minor nonconformity/i);
     });
 });
+
+// A client report must never present a certification-programme criterion or an
+// internal tracking reference as though it were a clause of the audited standard.
+describe('ReportStats.classifyCriterion', () => {
+    it('treats a plain clause as a clause of the audited standard', () => {
+        expect(window.ReportStats.classifyCriterion({ clause: '9.2' }).kind).toBe('standard');
+    });
+
+    it('classifies an ISO 17021 surveillance element cited as 9.6.2(b) as a programme criterion', () => {
+        expect(window.ReportStats.classifyCriterion({ clause: '9.6.2(b)' }).kind).toBe('programme');
+        expect(window.ReportStats.classifyCriterion({ clause: '9.6.2 (f)' }).kind).toBe('programme');
+    });
+
+    it('honours an explicitly recorded criterionSource over any heuristic', () => {
+        expect(window.ReportStats.classifyCriterion({ clause: '9.2', criterionSource: 'surveillance' }).kind).toBe('programme');
+    });
+
+    it('classifies FOCUS/SURV/ORG/DOC references as internal', () => {
+        expect(window.ReportStats.classifyCriterion({ clause: 'FOCUS.4' }).kind).toBe('internal');
+        expect(window.ReportStats.classifyCriterion({ clause: 'ORG.1' }).kind).toBe('internal');
+    });
+
+    it('prefers a resolved criterionRef over the source question clause', () => {
+        const c = window.ReportStats.classifyCriterion({ clause: 'FOCUS.4', criterionRef: '7.2' });
+        expect(c.kind).toBe('standard');
+        expect(c.ref).toBe('7.2');
+    });
+
+    it('reports a reference absent from the standard clause inventory as unverified', () => {
+        const inventory = ['4', '5', '6', '7', '8', '9.1', '9.2', '9.3', '10'];
+        expect(window.ReportStats.classifyCriterion({ clause: '9.6' }, { standardClauses: inventory }).kind).toBe('unverified');
+        expect(window.ReportStats.classifyCriterion({ clause: '9.2.1' }, { standardClauses: inventory }).kind).toBe('standard');
+    });
+
+    it('returns none when there is no criterion at all', () => {
+        expect(window.ReportStats.classifyCriterion({}).kind).toBe('none');
+    });
+
+    it('formatCriterion marks a programme criterion so callers do not label it an ISO clause', () => {
+        const fc = window.ReportStats.formatCriterion({ clause: '9.6.2(b)' });
+        expect(fc.kind).toBe('programme');
+        // `real` keeps its legacy meaning for existing callers; `kind` is the
+        // signal that this must not be printed as a clause of the standard.
+        expect(fc.isInternal).toBe(false);
+    });
+
+    it('formatCriterion still exposes a genuine clause as real', () => {
+        const fc = window.ReportStats.formatCriterion({ clause: '9.2' });
+        expect(fc.kind).toBe('standard');
+        expect(fc.real).toBe('9.2');
+    });
+});

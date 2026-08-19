@@ -236,11 +236,61 @@
     //   - otherwise                         -> clause is already a real/plain
     //                                          reference; used as-is.
     const FOCUS_REF_RE = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
+
+    // ─── Criterion classification ────────────────────────────────────────────
+    // Three different things can sit in a finding's criterion field, and a client
+    // report must never present them as if they were the same:
+    //   'standard'   a clause of the management-system standard being audited
+    //                (ISO 9001:2015 9.2) — may be printed as an ISO requirement
+    //   'programme'  a certification/surveillance programme criterion, e.g. the
+    //                ISO 17021-1 surveillance elements cited as "9.6.2(b)".
+    //                These are NOT clauses of the audited standard and must be
+    //                labelled as a surveillance criterion instead
+    //   'internal'   an internal tracking reference (FOCUS/SURV/ORG/DOC)
+    //   'unverified' a reference that cannot be confirmed against the audited
+    //                standard's clause inventory — never claim it is a clause
+    //
+    // Surveillance programme elements are cited with a parenthesised sub-letter
+    // ("9.6.2(b)"); management-system clauses are not written that way.
+    const PROGRAMME_CRITERION_RE = /^\d{1,2}(?:\.\d{1,2}){1,3}\s*\(\s*[a-z]\s*\)$/i;
+
+    /**
+     * Classify a finding's criterion. `opts.standardClauses` is the audited
+     * standard's clause inventory (e.g. from the Knowledge Base) — when supplied,
+     * a reference absent from it is reported 'unverified' rather than being
+     * assumed to be a clause of that standard.
+     * @returns {{kind:'standard'|'programme'|'internal'|'unverified'|'none', ref:string}}
+     */
+    function classifyCriterion(finding, opts) {
+        const f = finding || {};
+        const o = opts || {};
+        const clause = trim(f.clause);
+        const criterionRef = trim(f.criterionRef);
+        const source = trim(f.criterionSource).toLowerCase();
+        const ref = criterionRef || clause;
+        if (!ref) return { kind: 'none', ref: '' };
+
+        // How the item was authored is authoritative when it was recorded.
+        if (/programme|surveillance|17021/.test(source)) return { kind: 'programme', ref };
+        if (FOCUS_REF_RE.test(ref)) return { kind: 'internal', ref };
+        if (PROGRAMME_CRITERION_RE.test(ref)) return { kind: 'programme', ref };
+
+        const inventory = safeArr(o.standardClauses).map(trim).filter(Boolean);
+        if (inventory.length) {
+            const known = inventory.some((c) => ref === c || ref.indexOf(c + '.') === 0);
+            if (!known) return { kind: 'unverified', ref };
+        }
+        return { kind: 'standard', ref };
+    }
+
     function formatCriterion(finding, opts) {
         const f = finding || {};
         const showInternal = !!(opts && opts.showInternal);
         const clause = trim(f.clause);
         const criterionRef = trim(f.criterionRef);
+        // `kind` tells a caller whether this may be presented as a clause of the
+        // audited standard; existing fields are unchanged for older callers.
+        const kind = classifyCriterion(f, opts).kind;
         if (criterionRef) {
             const isCarryover = clause && FOCUS_REF_RE.test(clause) && clause.toLowerCase() !== criterionRef.toLowerCase();
             const internalRef = isCarryover ? clause : null;
@@ -248,13 +298,25 @@
                 label: (showInternal && internalRef) ? (criterionRef + ' (' + internalRef + ')') : criterionRef,
                 isInternal: false,
                 real: criterionRef,
-                internalRef
+                internalRef,
+                kind
             };
         }
         if (clause && FOCUS_REF_RE.test(clause)) {
-            return { label: 'internal ref ' + clause, isInternal: true, real: null, internalRef: null };
+            return { label: 'internal ref ' + clause, isInternal: true, real: null, internalRef: null, kind };
         }
-        return { label: clause, isInternal: false, real: clause || null, internalRef: null };
+        // `real` keeps its long-standing meaning (the reference itself) so
+        // existing callers are unaffected; `kind` is what tells a caller whether
+        // it may be presented as a clause of the audited standard. A programme
+        // criterion such as "9.6.2(b)" must be labelled a surveillance criterion,
+        // never "ISO 9001:2015 — Clause 9.6.2(b)".
+        return {
+            label: clause,
+            isInternal: false,
+            real: clause || null,
+            internalRef: null,
+            kind
+        };
     }
 
     // ─── Certification-cycle programme — single computation for preview + export ──
@@ -1097,6 +1159,7 @@
         buildProgramme,
         cycleState,
         formatCriterion,
+        classifyCriterion,
         cleanEvidenceText,
         effectivenessStatements
     };
