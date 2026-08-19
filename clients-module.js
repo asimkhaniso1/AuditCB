@@ -2024,19 +2024,34 @@ window.renderEditClient = function (clientId) {
             <div style="display: flex; flex-direction: column; gap: 1.5rem;">
 
                  <!-- Branding Card -->
+                 ${(() => {
+        // No uploaded logo but a website on file → preview the site-derived
+        // logo (favicon service; same resolver the report export uses) and
+        // offer one click to persist it as the client logo. An uploaded logo
+        // always wins and hides this fallback entirely.
+        const derivedLogo = (!client.logoUrl && client.website && typeof window._resolveClientLogoUrl === 'function')
+            ? window._resolveClientLogoUrl(client) : '';
+        const shownLogo = client.logoUrl || derivedLogo;
+        return `
                  <div class="card" style="padding: 1.5rem; text-align: center; border: 1px solid rgba(226, 232, 240, 0.8);">
                     <div style="position: relative; width: 120px; height: 120px; margin: 0 auto 1rem auto; border-radius: 50%; border: 3px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff;">
-                         <div id="client-logo-preview-img" style="display: ${client.logoUrl ? 'block' : 'none'}; width: 100%; height: 100%; background-size: cover; background-position: center; background-image: ${client.logoUrl ? `url(${client.logoUrl})` : 'none'}"></div>
-                         <i id="client-logo-placeholder" class="fa-solid fa-image" style="display: ${client.logoUrl ? 'none' : 'block'}; font-size: 2.5rem; color: #cbd5e1;"></i>
+                         <div id="client-logo-preview-img" style="display: ${shownLogo ? 'block' : 'none'}; width: 100%; height: 100%; background-size: ${client.logoUrl ? 'cover' : 'contain'}; background-repeat: no-repeat; background-position: center; background-image: ${shownLogo ? `url(${shownLogo})` : 'none'}"></div>
+                         <i id="client-logo-placeholder" class="fa-solid fa-image" style="display: ${shownLogo ? 'none' : 'block'}; font-size: 2.5rem; color: #cbd5e1;"></i>
                     </div>
                     <div>
                          <label for="client-logo-upload" class="btn btn-outline-primary btn-sm" style="cursor: pointer;">
                             <i class="fa-solid fa-cloud-arrow-up"></i> Change Logo
                          </label>
                          <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" data-action-change="handleClientLogoUpload" data-arg1="this" data-arg2="${client.id}">
-                         <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">PNG, JPG up to 1MB</p>
+                         ${derivedLogo ? `
+                         <button type="button" class="btn btn-sm btn-outline-secondary" style="margin-left: 0.4rem;" data-action="applyWebsiteLogo" data-id="${client.id}" title="Save the logo fetched from ${window.UTILS.escapeHtml(client.website)} as this client's logo">
+                            <i class="fa-solid fa-globe"></i> Use website logo
+                         </button>
+                         <p style="font-size: 0.75rem; color: #b45309; margin-top: 0.5rem;">Preview fetched from the client's website — upload a file for print-quality branding.</p>
+                         ` : `<p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">PNG, JPG up to 1MB</p>`}
                     </div>
-                 </div>
+                 </div>`;
+    })()}
 
                 <!-- Contact Card -->
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, 0.8);">

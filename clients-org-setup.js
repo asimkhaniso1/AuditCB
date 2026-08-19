@@ -1293,6 +1293,21 @@ window.editSite = function (clientId, siteIndex) {
 // ============================================
 // 9b. CLIENT LOGO UPLOAD
 // ============================================
+// Persist the website-derived logo (see clients-module.js Branding Card and
+// window._resolveClientLogoUrl in execution-reporting.js) as client.logoUrl,
+// so it shows everywhere a stored logo does — reports already fall back to
+// the derived URL on their own, this just makes the choice explicit/stored.
+window.applyWebsiteLogo = function (clientId) {
+    const client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
+    if (!client) return;
+    const url = (typeof window._resolveClientLogoUrl === 'function') ? window._resolveClientLogoUrl(client) : '';
+    if (!url) { window.showNotification('No website on file to derive a logo from.', 'warning'); return; }
+    client.logoUrl = url;
+    window.DataService.syncClient(client);
+    window.showNotification('Website logo saved as client logo.', 'success');
+    if (typeof window.renderClientDetail === 'function') window.renderClientDetail(clientId);
+};
+
 window.handleClientLogoUpload = function (input, clientId) {
     if (!clientId) clientId = window.state.activeClientId;
     let file = input.files[0];
