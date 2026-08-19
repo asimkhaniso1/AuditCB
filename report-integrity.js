@@ -1015,6 +1015,48 @@
         });
     }
 
+    // B15/W20 — the criterion a nonconformity is raised against must be a
+    // requirement of the STANDARD BEING AUDITED. ReportStats.classifyCriterion
+    // distinguishes a real clause from a certification-programme criterion
+    // (ISO 17021 surveillance elements cited as "9.6.2(b)"), an internal
+    // tracking reference, and a reference that cannot be verified against the
+    // standard's clause inventory. Raising a client nonconformity against a
+    // programme criterion is a category error: those govern the certification
+    // body's own programme, not the client's management system.
+    // Skipped entirely when ReportStats is unavailable — B1/B4/B14 already
+    // cover the internal-reference cases without it.
+    function checkB15CriterionBelongsToStandard(ncrs, results) {
+        if (!(global.ReportStats && typeof global.ReportStats.classifyCriterion === 'function')) return;
+        ncrs.forEach((ncr, idx) => {
+            let kind;
+            try {
+                kind = global.ReportStats.classifyCriterion(ncr).kind;
+            } catch (_e) { return; }
+            const ref = trim(ncr.criterionRef) || trim(ncr.clause);
+            if (kind === 'programme') {
+                results.blockers.push(item(
+                    'B15-' + idx,
+                    'blocker',
+                    'findings',
+                    `Nonconformity is raised against "${ref}", which is a certification/surveillance programme criterion rather than a clause of the standard being audited.`,
+                    ncr._source === 'manual' ? 'manual NCR register' : 'checklist finding',
+                    'Raise the nonconformity against the requirement of the audited standard that the objective evidence shows was not fulfilled.',
+                    findingRef(ncr, idx)
+                ));
+            } else if (kind === 'unverified') {
+                results.warnings.push(item(
+                    'W20-' + idx,
+                    'warning',
+                    'findings',
+                    `Nonconformity is raised against "${ref}", which could not be matched to a clause of the audited standard.`,
+                    ncr._source === 'manual' ? 'manual NCR register' : 'checklist finding',
+                    'Confirm the reference against the standard — the report must not present it as a clause if it is not one.',
+                    findingRef(ncr, idx)
+                ));
+            }
+        });
+    }
+
     // ── Advisory classification integrity (#16) and CB impartiality (#17) ────
 
     // Every advisory the report carries, with the classification it was filed
@@ -1210,6 +1252,7 @@
         try { checkW17AdvisoryClassification(report, results); } catch (_e) { /* skip */ }
         try { checkW18DuplicateAdvisories(report, ncrs, results); } catch (_e) { /* skip */ }
         try { checkW19ConsultancyLanguage(report, results); } catch (_e) { /* skip */ }
+        try { checkB15CriterionBelongsToStandard(ncrs, results); } catch (_e) { /* skip */ }
         try { checkE1RawAuditorNotes(report, results); } catch (_e) { /* skip */ }
 
         try { checkInformation(report, results); } catch (_e) { /* skip */ }

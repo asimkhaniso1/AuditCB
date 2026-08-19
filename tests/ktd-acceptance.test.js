@@ -586,3 +586,34 @@ describe('ReportIntegrity consumes the real ReportStats dataset shape', () => {
         expect(b13.message).toContain('opportunities for improvement');
     });
 });
+
+
+// A client nonconformity must be raised against the standard being audited.
+// ISO 17021 surveillance elements (cited as "9.6.2(b)") govern the certification
+// body's own programme, not the client's management system.
+describe('ReportIntegrity — criterion belongs to the audited standard', () => {
+    const base = (clause) => ({
+        id: 'rep-b15', planId: 'plan-ktd', clientId: 'ktd-1', client: 'KTD Select',
+        date: '2026-08-12', auditType: 'Surveillance', standard: 'ISO 9001:2015',
+        conclusion: 'Continued certification is recommended subject to satisfactory closure of applicable nonconformities.',
+        checklistProgress: [ncItem({ clause })],
+        ncrs: []
+    });
+
+    it('blocks a nonconformity raised against a surveillance programme criterion', () => {
+        const result = window.ReportIntegrity.check({
+            report: base('9.6.2(b)'), auditPlan: KTD_PLAN(), client: KTD_CLIENT()
+        });
+        const b15 = result.blockers.find((b) => b.id.startsWith('B15'));
+        expect(b15).toBeTruthy();
+        expect(b15.message).toContain('9.6.2(b)');
+        expect(result.status).toBe('BLOCKED');
+    });
+
+    it('leaves a nonconformity raised against a real clause alone', () => {
+        const result = window.ReportIntegrity.check({
+            report: base('9.2'), auditPlan: KTD_PLAN(), client: KTD_CLIENT()
+        });
+        expect(result.blockers.some((b) => b.id.startsWith('B15'))).toBe(false);
+    });
+});
