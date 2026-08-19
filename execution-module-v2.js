@@ -3071,6 +3071,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // Third fix action: the scope blocker ("Audit scope/criteria is not
         // recorded…") likewise pointed at data with no edit path from this tab.
         const showSetScope = /scope\/criteria is not recorded/i.test(String((it && it.message) || ''));
+        // Fourth fix action: W12 (report-integrity.js's checkW12EmployeeCount)
+        // flags a headcount in evidence that contradicts the controlled client
+        // profile. Its id is 'W12-' + the stated figure, so match by prefix
+        // the same way the criterion buttons match B1/B4 by id prefix.
+        const showReviewEmployeeCount = /^W12-/.test(String((it && it.id) || ''));
+        // Fifth fix action: W13 (checkW13DesignApplicability) flags a design/
+        // development scope alongside clause 8.3 treated as not applicable —
+        // an applicability conflict only an explicit auditor decision can
+        // resolve. Its id is the fixed literal 'W13'.
+        const showConfirm83 = String((it && it.id) || '') === 'W13';
         const fixBtn = showSetCriterion ? `
                         <button type="button" class="btn btn-sm btn-outline-primary" style="margin-top: 0.45rem;"
                             data-action="setFindingCriterion"
@@ -3092,6 +3102,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             data-action="setAuditScope" data-id="${esc(String(reportId))}"
                             aria-label="Set audit scope">
                             <i class="fa-solid fa-bullseye" style="margin-right: 0.3rem;"></i>Set audit scope
+                        </button>` : showReviewEmployeeCount ? `
+                        <button type="button" class="btn btn-sm btn-outline-primary" style="margin-top: 0.45rem;"
+                            data-action="reviewEmployeeCount" data-id="${esc(String(reportId))}"
+                            aria-label="Review employee count">
+                            <i class="fa-solid fa-users" style="margin-right: 0.3rem;"></i>Review employee count
+                        </button>` : showConfirm83 ? `
+                        <button type="button" class="btn btn-sm btn-outline-primary" style="margin-top: 0.45rem;"
+                            data-action="confirmDesignApplicability" data-id="${esc(String(reportId))}"
+                            aria-label="Confirm 8.3 applicability">
+                            <i class="fa-solid fa-drafting-compass" style="margin-right: 0.3rem;"></i>Confirm 8.3 applicability
                         </button>` : '';
         return `
                     <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
@@ -3345,6 +3365,256 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             }
             window.closeModal();
             persistAndRefreshIntegrity(reportId, 'Audit scope recorded.');
+        });
+    };
+
+    // ── "Review employee count" fix action (Report Integrity panel) ────────
+    // W12 (report-integrity.js's checkW12EmployeeCount) flags a headcount
+    // mentioned in audit evidence that contradicts the controlled
+    // organization profile. Per spec, auditor free text must never silently
+    // override controlled data — the auditor confirms explicitly, and only
+    // then does the confirmed figure propagate to the client record. Both
+    // figures are RECOMPUTED here from the client record and report evidence
+    // (not parsed back out of the warning's message text), so the fix action
+    // stays correct even when several evidence mentions exist.
+
+    /** Controlled headcount — mirrors report-integrity.js's controlledEmployeeCount(). */
+    function controlledEmployeeCountLocal(client) {
+        if (!client) return null;
+        const siteTotal = (Array.isArray(client.sites) ? client.sites : [])
+            .reduce((acc, s) => acc + (parseInt(s && s.employees, 10) || 0), 0);
+        if (siteTotal > 0) return siteTotal;
+        const direct = parseInt(client.employees, 10);
+        return isNaN(direct) ? null : direct;
+    }
+
+    /**
+     * Every headcount mentioned in evidence that disagrees with `controlled`
+     * — mirrors report-integrity.js's checkW12EmployeeCount source scan
+     * (checklist comments + narrative fields, same regex) so this agrees
+     * with the validator about what it's flagging.
+     */
+    function findEvidenceEmployeeCounts(report, controlled) {
+        const re = /\b(\d{1,6})\s+(?:now\s+)?(?:total\s+)?empl\w*/gi;
+        const sources = [];
+        ((report && report.checklistProgress) || []).forEach((i) => {
+            const text = String((i && (i.comment || i.ncrDescription)) || '').trim();
+            if (text) sources.push({ text, label: 'checklist comment' });
+        });
+        const narrative = {
+            'executive summary': report && report.executiveSummary,
+            'positive observations': report && report.positiveObservations,
+            'opportunities for improvement': Array.isArray(report && report.ofi) ? report.ofi.join('\n') : (report && report.ofi),
+            'conclusion': report && (report.editedConclusion || report.conclusion),
+            'previous findings status': report && report.previousFindingsStatus
+        };
+        Object.keys(narrative).forEach((label) => {
+            const text = String(narrative[label] || '').trim();
+            if (text) sources.push({ text, label });
+        });
+
+        const found = [];
+        const seen = {};
+        sources.forEach(({ text, label }) => {
+            re.lastIndex = 0;
+            let m;
+            while ((m = re.exec(text)) !== null) {
+                const stated = parseInt(m[1], 10);
+                if (isNaN(stated) || stated === controlled) continue;
+                const key = stated + '|' + label;
+                if (seen[key]) continue;
+                seen[key] = true;
+                found.push({ stated, label });
+            }
+        });
+        return found;
+    }
+
+    /**
+     * Write a confirmed headcount to the client's controlled record so it
+     * propagates everywhere client.sites[]/client.employees is read. A
+     * single-site client gets the figure directly. A multi-site client keeps
+     * its existing relative site sizes: the new total is distributed
+     * proportionally to each site's current share, with the last site
+     * absorbing the rounding remainder so the sum is exact (site totals, not
+     * a guess, drive the controlled figure — see controlledEmployeeCountLocal
+     * above). A client with no per-site breakdown yet records the whole
+     * figure on its first site rather than inventing a split with no basis.
+     */
+    function propagateEmployeeCount(client, newTotal) {
+        const sites = Array.isArray(client.sites) ? client.sites : [];
+        if (!sites.length) {
+            client.employees = newTotal;
+            return;
+        }
+        if (sites.length === 1) {
+            sites[0].employees = newTotal;
+            client.employees = newTotal;
+            return;
+        }
+        const currentTotal = sites.reduce((acc, s) => acc + (parseInt(s && s.employees, 10) || 0), 0);
+        if (currentTotal > 0) {
+            let allocated = 0;
+            sites.forEach((s, idx) => {
+                if (idx === sites.length - 1) {
+                    s.employees = newTotal - allocated;
+                } else {
+                    const share = Math.round((parseInt(s.employees, 10) || 0) / currentTotal * newTotal);
+                    s.employees = share;
+                    allocated += share;
+                }
+            });
+        } else {
+            sites[0].employees = newTotal;
+        }
+        client.employees = sites.reduce((acc, s) => acc + (parseInt(s && s.employees, 10) || 0), 0);
+    }
+
+    /**
+     * "Review employee count" fix action for a Report Integrity W12 warning
+     * (data-action target — see the button rendered in runReportIntegrityCheck).
+     * Shows the controlled figure and every conflicting figure recomputed
+     * from evidence, and requires the auditor to explicitly confirm a real
+     * headcount before anything changes. On confirm, writes the controlled
+     * client record (client.sites[]/client.employees) via
+     * propagateEmployeeCount and persists through window.DataService.syncClient
+     * — the same path clients-org-setup.js uses for a site edit — then
+     * refreshes the integrity check. Closing the dialog without confirming
+     * changes nothing (dismissed as not a real change).
+     */
+    window.reviewEmployeeCount = function (reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) { window.showNotification('Report not found.', 'error'); return; }
+        const plan = (state.auditPlans || []).find(p => String(p.id) === String(report.planId));
+        const client = window.DataService.resolveReportClient(report, plan);
+        if (!client) { window.showNotification('Could not resolve the client for this report.', 'error'); return; }
+
+        const controlled = controlledEmployeeCountLocal(client);
+        const evidence = findEvidenceEmployeeCounts(report, controlled);
+        if (!evidence.length) {
+            window.showNotification('No conflicting headcount found in evidence — re-run the check.', 'info');
+            return;
+        }
+
+        // Default to the most recently authored mention as the likely-current
+        // figure; the auditor can still adjust it before confirming.
+        const suggested = evidence[evidence.length - 1].stated;
+        const esc = window.UTILS.escapeHtml;
+        const evidenceListHtml = evidence.map(e => `<li>${esc(String(e.stated))} employees — <em>${esc(e.label)}</em></li>`).join('');
+
+        window.DataService.openFormModal('Review Employee Count', `
+            <div class="form-group">
+                <label>Controlled organization profile</label>
+                <div style="padding: 0.5rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">${esc(String(controlled))} employees</div>
+            </div>
+            <div class="form-group">
+                <label>Figure(s) found in audit evidence</label>
+                <ul style="margin: 0.25rem 0 0; padding-left: 1.25rem; font-size: 0.85rem;">${evidenceListHtml}</ul>
+            </div>
+            <p style="font-size: 0.9rem; color: #1e293b;">Auditor evidence indicates employee count may have changed from ${esc(String(controlled))} to ${esc(String(suggested))}. Update organization profile?</p>
+            <div class="form-group">
+                <label>Confirmed headcount <span style="color: var(--danger-color);">*</span></label>
+                <input type="number" min="0" class="form-control" id="employee-count-input" value="${esc(String(suggested))}">
+                <small id="employee-count-warning" style="display:none; color: #dc2626; margin-top: 0.35rem;"></small>
+            </div>
+            <small style="color: var(--text-secondary); display: block; margin-top: 0.35rem;">Confirming updates the client's controlled organization profile everywhere it is used. If this note is not a real change, close this dialog without confirming and correct the field note instead.</small>
+        `, () => {
+            const input = document.getElementById('employee-count-input');
+            const warning = document.getElementById('employee-count-warning');
+            const value = parseInt((input && input.value) || '', 10);
+            if (isNaN(value) || value < 0) {
+                if (warning) { warning.textContent = 'Enter a valid non-negative headcount.'; warning.style.display = 'block'; }
+                return;
+            }
+
+            propagateEmployeeCount(client, value);
+            window.closeModal();
+            window.DataService.syncClient(client);
+            persistAndRefreshIntegrity(reportId, 'Employee count confirmed at ' + value + ' and updated on the organization profile.');
+        });
+    };
+
+    // ── "Confirm 8.3 applicability" fix action (Report Integrity panel) ────
+    // W13 (report-integrity.js's checkW13DesignApplicability) flags a
+    // scope/applicability conflict: certified activities indicate design and
+    // development work while clause 8.3 has been treated as not applicable.
+    // Per spec, applicability must never be inferred from keywords alone —
+    // this requires the auditor's explicit decision, with a non-trivial
+    // written justification whenever the auditor still excludes 8.3.
+
+    /** True once a justification reads as a real explanation, not a token dismissal ("n/a", "no"). */
+    function isNonTrivialJustification(text) {
+        const trimmed = String(text || '').trim();
+        const words = trimmed.split(/\s+/).filter(Boolean);
+        return words.length >= 3 && trimmed.length >= 15;
+    }
+
+    /**
+     * "Confirm 8.3 applicability" fix action for the Report Integrity W13
+     * warning (data-action target — see the button rendered in
+     * runReportIntegrityCheck). States the conflict plainly and offers the
+     * auditor exactly two explicit outcomes — the system records the
+     * decision, it never determines applicability itself. Writes
+     * report.applicabilityDecisions['8.3'] = {applicable, justification,
+     * decidedBy, decidedAt} and persists via persistAndRefreshIntegrity, the
+     * same path the other fix actions use. Note: checkW13DesignApplicability
+     * itself is a text heuristic over scope/checklist/narrative wording (see
+     * report-integrity.js) and does not consult this decision record, so the
+     * warning can legitimately keep appearing after a decision is recorded —
+     * that's expected: it is a nag to re-review, not a data mismatch this
+     * action is meant to erase, and the recorded decision is what satisfies
+     * the "explicit auditor justification" requirement regardless.
+     */
+    window.confirmDesignApplicability = function (reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) { window.showNotification('Report not found.', 'error'); return; }
+
+        const existing = (report.applicabilityDecisions && report.applicabilityDecisions['8.3']) || null;
+        const esc = window.UTILS.escapeHtml;
+
+        window.DataService.openFormModal('Confirm Clause 8.3 Applicability', `
+            <p style="font-size: 0.9rem; color: #1e293b;">The certified scope indicates design and development activity, but clause 8.3 (Design and Development) has been treated as not applicable. This is an auditor decision — it cannot be inferred from keywords alone.</p>
+            <div class="form-group">
+                <label>Decision <span style="color: var(--danger-color);">*</span></label>
+                <select class="form-control" id="applicability-decision-input">
+                    <option value="" ${!existing ? 'selected' : ''}>— select —</option>
+                    <option value="applicable" ${existing && existing.applicable === true ? 'selected' : ''}>Clause 8.3 IS applicable — must be assessed</option>
+                    <option value="excluded" ${existing && existing.applicable === false ? 'selected' : ''}>Exclusion of clause 8.3 is justified</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Justification <span style="color: var(--danger-color);">*</span> when excluding</label>
+                <textarea class="form-control" id="applicability-justification-input" rows="3" placeholder="Explain why clause 8.3 does or does not apply to the certified scope.">${esc((existing && existing.justification) || '')}</textarea>
+                <small style="color: var(--text-secondary); display: block; margin-top: 0.35rem;">Required and must be a real explanation (not "N/A" or one word) when excluding clause 8.3.</small>
+                <small id="applicability-warning" style="display:none; color: #dc2626; margin-top: 0.35rem;"></small>
+            </div>
+        `, () => {
+            const decision = document.getElementById('applicability-decision-input')?.value || '';
+            const justification = Sanitizer.sanitizeText(document.getElementById('applicability-justification-input')?.value || '').trim();
+            const warning = document.getElementById('applicability-warning');
+
+            if (decision !== 'applicable' && decision !== 'excluded') {
+                if (warning) { warning.textContent = 'Select whether clause 8.3 is applicable or the exclusion is justified.'; warning.style.display = 'block'; }
+                return;
+            }
+            const applicable = decision === 'applicable';
+            if (!applicable && !isNonTrivialJustification(justification)) {
+                if (warning) { warning.textContent = 'Enter a real justification for excluding clause 8.3 — a blank or one-word entry is not acceptable.'; warning.style.display = 'block'; }
+                return;
+            }
+
+            if (!report.applicabilityDecisions) report.applicabilityDecisions = {};
+            report.applicabilityDecisions['8.3'] = {
+                applicable,
+                justification,
+                decidedBy: window.state.currentUser?.name || 'Auditor',
+                decidedAt: new Date().toISOString()
+            };
+
+            window.closeModal();
+            persistAndRefreshIntegrity(reportId, applicable
+                ? 'Clause 8.3 recorded as applicable — assess it in the checklist.'
+                : 'Clause 8.3 exclusion justification recorded.');
         });
     };
 
