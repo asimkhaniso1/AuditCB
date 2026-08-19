@@ -91,7 +91,8 @@
             positiveObservations: r.positiveObservations || '',
             ofi: Array.isArray(r.ofi) ? r.ofi.join('\n') : (r.ofi || ''),
             conclusion: r.editedConclusion || r.conclusion || '',
-            previousFindingsStatus: r.previousFindingsStatus || ''
+            previousFindingsStatus: r.previousFindingsStatus || '',
+            changesSinceLastAudit: r.changesSinceLastAudit || ''
         };
     }
 
@@ -839,31 +840,67 @@
         return isNaN(direct) ? null : direct;
     }
 
-    function checkW12EmployeeCount(report, client, results) {
-        const controlled = controlledEmployeeCount(client);
-        if (!controlled) return;
-        // Tolerates the misspellings common in field notes ("emplyees").
+    // Headcounts asserted anywhere in the audit's own text. Tolerates the
+    // misspellings common in field notes ("8 now total emplyees").
+    function statedEmployeeCounts(report) {
         const re = /\b(\d{1,6})\s+(?:now\s+)?(?:total\s+)?empl\w*/gi;
-        const sources = clientFacingComments(report).concat(Object.keys(narrativeFields(report)).map((k) => narrativeFields(report)[k]));
-        const seen = {};
+        const narrative = narrativeFields(report);
+        const sources = clientFacingComments(report)
+            .concat(Object.keys(narrative).map((k) => narrative[k]));
+        const found = [];
         sources.forEach((text) => {
             if (!text) return;
             let m;
             re.lastIndex = 0;
             while ((m = re.exec(text)) !== null) {
-                const stated = parseInt(m[1], 10);
-                if (isNaN(stated) || stated === controlled || seen[stated]) continue;
-                seen[stated] = true;
-                results.warnings.push(item(
-                    'W12-' + stated,
-                    'warning',
-                    'client-data',
-                    `Audit evidence refers to ${stated} employees, but the controlled organization profile records ${controlled}.`,
-                    'checklistProgress[].comment / report narrative vs client.sites[].employees',
-                    'Confirm the current headcount with the auditee and update the organization profile, or correct the note — controlled organization data and the report must agree.'
-                ));
+                const n = parseInt(m[1], 10);
+                if (!isNaN(n) && found.indexOf(n) === -1) found.push(n);
             }
         });
+        return found;
+    }
+
+    function checkW12EmployeeCount(report, client, results) {
+        const controlled = controlledEmployeeCount(client);
+        if (!controlled) return;
+        statedEmployeeCounts(report).forEach((stated) => {
+            if (stated === controlled) return;
+            results.warnings.push(item(
+                'W12-' + stated,
+                'warning',
+                'client-data',
+                `Audit evidence refers to ${stated} employees, but the controlled organization profile records ${controlled}.`,
+                'checklistProgress[].comment / report narrative vs client.sites[].employees',
+                'Confirm the current headcount with the auditee and update the organization profile, or correct the note — controlled organization data and the report must agree.'
+            ));
+        });
+    }
+
+    // W16 — "Changes Since Last Audit" must not assert stability while the
+    // audit's own evidence shows a controlled organization datum has moved.
+    // The no-changes sentence is a RENDER-TIME DEFAULT: when the auditor leaves
+    // the field empty the client still reads "No significant changes...", so an
+    // empty field counts as the assertion having been made.
+    const NO_CHANGES_RE = /no\s+(significant\s+)?changes?\b/i;
+
+    function checkW16ChangesContradiction(report, client, results) {
+        const stated = trim(report && report.changesSinceLastAudit);
+        const assertsNoChanges = !stated || NO_CHANGES_RE.test(stated);
+        if (!assertsNoChanges) return;
+
+        const controlled = controlledEmployeeCount(client);
+        if (!controlled) return;
+        const differing = statedEmployeeCounts(report).filter((n) => n !== controlled);
+        if (!differing.length) return;
+
+        results.warnings.push(item(
+            'W16',
+            'warning',
+            'changes',
+            `Changes Since Last Audit reports no significant change, but audit evidence indicates the headcount may have moved from ${controlled} to ${differing[0]}.`,
+            'report.changesSinceLastAudit vs audit evidence / client organization profile',
+            'Whether a change is significant is the auditor\'s determination — confirm the headcount and either record the change or confirm it is not significant.'
+        ));
     }
 
     // Design/development activity in the certified scope alongside an 8.3
@@ -1045,6 +1082,7 @@
         try { checkW13DesignApplicability(report, client, auditPlan, results); } catch (_e) { /* skip */ }
         try { checkW14PreviousFindings(report, auditPlan, results); } catch (_e) { /* skip */ }
         try { checkW15NextAuditType({ report, auditPlan, client }, results); } catch (_e) { /* skip */ }
+        try { checkW16ChangesContradiction(report, client, results); } catch (_e) { /* skip */ }
         try { checkE1RawAuditorNotes(report, results); } catch (_e) { /* skip */ }
 
         try { checkInformation(report, results); } catch (_e) { /* skip */ }

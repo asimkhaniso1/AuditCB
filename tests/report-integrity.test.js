@@ -285,6 +285,44 @@ describe('ReportIntegrity — report/dataset agreement', () => {
         expect(result.status).toBe('READY FOR AUDITOR REVIEW');
     });
 
+    it('W16: asserting no significant changes while evidence shows a headcount move warns', () => {
+        const report = baseReport({
+            // Left empty on purpose: the "no significant changes" sentence is a
+            // render-time default, so the client still reads that claim.
+            changesSinceLastAudit: '',
+            checklistProgress: [{ status: 'conform', clause: '7.1', comment: '8 now total emplyees' }]
+        });
+        const client = baseClient({ sites: [{ city: 'Springfield', employees: 10 }] });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client });
+
+        const w16 = result.warnings.find((w) => w.id === 'W16');
+        expect(w16).toBeTruthy();
+        expect(w16.message).toContain('10');
+        expect(w16.message).toContain('8');
+    });
+
+    it('W16: does not fire once the auditor records the change', () => {
+        const report = baseReport({
+            changesSinceLastAudit: 'Headcount reduced from 10 to 8 following a departmental restructure.',
+            checklistProgress: [{ status: 'conform', clause: '7.1', comment: '8 now total emplyees' }]
+        });
+        const client = baseClient({ sites: [{ city: 'Springfield', employees: 10 }] });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client });
+
+        expect(result.warnings.some((w) => w.id === 'W16')).toBe(false);
+    });
+
+    it('W16: stays silent when the evidence agrees with the organization profile', () => {
+        const report = baseReport({
+            changesSinceLastAudit: '',
+            checklistProgress: [{ status: 'conform', clause: '7.1', comment: '10 now total employees' }]
+        });
+        const client = baseClient({ sites: [{ city: 'Springfield', employees: 10 }] });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client });
+
+        expect(result.warnings.some((w) => w.id === 'W16')).toBe(false);
+    });
+
     it('E1: a full client-facing evidence statement is not flagged', () => {
         const report = baseReport({
             checklistProgress: [{
