@@ -4167,13 +4167,30 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             +     'var ox=oc.getContext("2d");ox.fillStyle="#ffffff";ox.fillRect(0,0,oc.width,oc.height);'
             +     'ox.imageSmoothingQuality="high";ox.drawImage(im,0,0,oc.width,oc.height);'
             +     'im.src=oc.toDataURL("image/jpeg",0.8);'
-            + '}catch(e){}});window._chartsReady=true;});},2500);'
+            + '}catch(e){}});'
+            // Chrome keeps painting an <img>'s OLD bitmap until the swapped-in
+            // src finishes decoding — a print snapshot taken in that window
+            // embeds the ORIGINAL full-res JPEGs (measured: a 4.76MB export with
+            // all 17 evidence shots still at 1600px). So the ready flag is only
+            // raised after every swapped image has decoded its new resource.
+            + 'Promise.all(_imgs.map(function(im){return (im.decode?im.decode():Promise.resolve()).catch(function(){});})).then(function(){window._chartsReady=true;});});},2500);'
             + '}function _waitForChart(){if(typeof Chart!=="undefined"){rc();}else{setTimeout(_waitForChart,100);}}_waitForChart();'
-            // Wire up data-action buttons (Download PDF, Close) — parent's event delegator does not run in this window
+            // Wire up data-action buttons (Download PDF, Close) — parent's event delegator does not run in this window.
+            // The print action is GATED on _chartsReady: an early click printed the
+            // document before the chart/evidence downscale passes finished, embedding
+            // full-resolution images (the 4.76MB export). If preparation somehow never
+            // completes, print anyway after 15s rather than dead-ending the button.
             + 'document.addEventListener("click",function(ev){'
             + 'var t=ev.target.closest("[data-action]");if(!t)return;'
             + 'var a=t.getAttribute("data-action");'
-            + 'if(a==="print"){ev.preventDefault();window.print();}'
+            + 'if(a==="print"){ev.preventDefault();'
+            +   'if(window._chartsReady){window.print();return;}'
+            +   'if(t._waiting)return;t._waiting=true;'
+            +   'var lbl=t.innerHTML;t.innerHTML="Optimizing images…";'
+            +   'var t0=Date.now();var iv=setInterval(function(){'
+            +     'if(window._chartsReady||Date.now()-t0>15000){clearInterval(iv);t.innerHTML=lbl;t._waiting=false;window.print();}'
+            +   '},200);'
+            + '}'
             + 'else if(a==="close"){ev.preventDefault();window.close();}'
             + '});';
 
@@ -4217,7 +4234,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             try {
                 if (printWindow.window && printWindow.window._chartsReady) {
                     printWindow.print();
-                } else if (attempts < 20) {
+                } else if (attempts < 90) {
+                    // A big report (dozens of charts + evidence images) can take
+                    // well over the old 10s cap to rasterize charts and downscale
+                    // images — printing before _chartsReady embeds the ORIGINAL
+                    // full-resolution images (measured: 4.76MB instead of ~2MB).
+                    // Wait up to 45s before the print-anyway fallback.
                     setTimeout(function () { _attemptPrint(attempts + 1); }, 500);
                 } else {
                     // Timeout fallback — print anyway

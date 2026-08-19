@@ -45,6 +45,22 @@
 (function (global) {
     'use strict';
 
+    // Clause prefix for finding labels — routed through
+    // ReportStats.formatCriterion (the single clause-stringify source) so a
+    // resolved Stage 1 carryover prints its REAL clause ("Clause 9.2 — ") and
+    // an unresolved internal tag prints as an internal ref, never
+    // "Clause FOCUS.2" (a tracking tag presented as a standard clause).
+    function clauseLabelPrefix(f) {
+        try {
+            if (global.ReportStats && typeof global.ReportStats.formatCriterion === 'function') {
+                var fc = global.ReportStats.formatCriterion(f);
+                if (fc.isInternal) return 'Internal ref ' + (f.clause || '') + ' — ';
+                return fc.real ? 'Clause ' + fc.real + ' — ' : '';
+            }
+        } catch (e) { /* fall through */ }
+        return f && f.clause ? 'Clause ' + f.clause + ' — ' : '';
+    }
+
     // ─── Rule tables (extendable per-standard) ─────────────────────────────
 
     // Clause "theme" classification — used for impact scoring, business impact
@@ -278,6 +294,9 @@
         return {
             ref: (source === 'ncr' ? 'NCR-' : 'CL-') + (index + 1),
             clause: clause,
+            // Carried so clauseLabelPrefix/formatCriterion can print the REAL
+            // clause for resolved Stage 1 carryovers instead of "Internal ref".
+            criterionRef: raw.criterionRef || '',
             department: raw.department || raw.riskOwner || '',
             ncrType: type,
             text: text,
@@ -632,13 +651,16 @@
         });
 
         var baseDate = (d.report && (d.report.date || d.report.createdAt)) || null;
+        // Clause prefix via the module-level clauseLabelPrefix (formatCriterion-
+        // routed) — see top of file.
+        var clausePrefix = clauseLabelPrefix;
         var riskRegister = scoredFindings.map(function (f) {
             var rec = f.capaRecord;
             var targetDate = (rec && rec.dueDate) || f.caDueDate || addDays(baseDate, 90);
             var status = rec ? realCapaStatus(rec) : deriveStatus(Object.assign({}, f, { caDueDate: targetDate }), baseDate);
             return {
                 ref: f.ref,
-                risk: (f.clause ? 'Clause ' + f.clause + ' — ' : '') + cleanFindingText(f.text || 'Non-conformance identified', 160),
+                risk: clausePrefix(f) + cleanFindingText(f.text || 'Non-conformance identified', 160),
                 likelihood: f.likelihood,
                 impact: f.impact,
                 score: f.score,
@@ -661,7 +683,7 @@
             var dueDate = f.caDueDate || addDays(baseDate, /major/i.test(f.ncrType) ? 30 : 90);
             var rec = f.capaRecord;
             var hasRealAction = !!(rec && rec.correctiveAction);
-            var findingSummary = (f.clause ? 'Clause ' + f.clause + ' — ' : '') + cleanFindingText(f.text || 'Non-conformance identified', 100);
+            var findingSummary = clausePrefix(f) + cleanFindingText(f.text || 'Non-conformance identified', 100);
             return {
                 priority: f.priority,
                 action: hasRealAction ? rec.correctiveAction : ('To be defined by the auditee\'s corrective action response for: ' + findingSummary),
@@ -1116,7 +1138,7 @@
             // auditor recorded an actual correction, which says something the
             // finding does not.
             var chain = '<div class="b4-timeline">'
-                + flowStep('Finding', (f.clause ? 'Clause ' + f.clause + ' — ' : '') + cleanFindingText(f.text || 'Non-conformance identified'))
+                + flowStep('Finding', clauseLabelPrefix(f) + cleanFindingText(f.text || 'Non-conformance identified'))
                 + (hasReal && rec.correction ? flowStep('Correction', immediateCause) : '')
                 + flowStep('Root Cause', rootCauseText, 'warn')
                 + flowStep('Business Impact', f.businessImpacts.join(', '))
@@ -1125,7 +1147,7 @@
                 + '</div>';
             return '<div class="b4-card b4-mb-4' + (f.priority === 'P1' ? ' b4-card--flagged' : '') + '" style="page-break-inside:avoid;break-inside:avoid;">'
                 + '<div class="b4-card-heading" style="justify-content:space-between;">'
-                + '<span>' + esc(f.ref) + (f.clause ? ' — Clause ' + esc(f.clause) : '') + '</span>'
+                + '<span>' + esc(f.ref) + (clauseLabelPrefix(f) ? ' — ' + esc(clauseLabelPrefix(f).replace(/ — $/, '')) : '') + '</span>'
                 + priorityBadge(f.priority)
                 + '</div>'
                 + chain
@@ -1152,21 +1174,29 @@
         Object.keys(planCounts).forEach(function (p) {
             if (planCounts[p] > 1) { planIndex[p] = sharedPlans.length + 1; sharedPlans.push(p); }
         });
+        // Print-safe layout: the old 11-column row gave Status/Priority/Residual
+        // ~40-55px each on A4 portrait, and their no-wrap badges painted straight
+        // over the neighbouring cells in the exported PDF. Related values are now
+        // STACKED inside 5 wider columns, so every badge gets a full line.
         var registerRows = r.riskRegister.map(function (row) {
             var treatmentHtml = planIndex[row.treatmentPlan]
                 ? 'Treatment: see note ' + planIndex[row.treatmentPlan]
                 : 'Treatment: ' + esc(row.treatmentPlan);
             return '<tr style="page-break-inside:avoid;break-inside:avoid;">' + refCell(row.ref)
                 + '<td>' + esc(row.risk) + '<div class="b4-caption b4-mt-1">Controls: ' + esc(row.existingControls) + ' &middot; ' + treatmentHtml + '</div></td>'
-                + '<td style="text-align:center;">' + pipBar(row.likelihood) + '</td>'
-                + '<td style="text-align:center;">' + pipBar(row.impact) + '</td>'
-                + '<td style="text-align:center;">' + scoreBadge(row.score, row.residualRisk) + '</td>'
-                + '<td style="text-align:center;">' + basisBadge(row.basis) + '</td>'
-                + '<td>' + esc(row.riskOwner) + '</td>'
-                + '<td style="white-space:nowrap;">' + esc(row.reviewDate) + '</td>'
-                + '<td style="text-align:center;">' + statusBadge(row.status) + '</td>'
-                + '<td style="text-align:center;">' + priorityBadge(row.priority) + '</td>'
-                + '<td style="text-align:center;">' + bandBadge(row.residualRisk) + '<div class="b4-caption">' + esc(riskBandInterpretation(row.residualRisk)) + '</div></td></tr>';
+                + '<td style="text-align:center;">'
+                +   '<div style="white-space:nowrap;">L ' + pipBar(row.likelihood) + '</div>'
+                +   '<div style="white-space:nowrap;">I ' + pipBar(row.impact) + '</div>'
+                +   '<div class="b4-mt-1">' + scoreBadge(row.score, row.residualRisk) + '</div>'
+                +   '<div class="b4-mt-1">' + basisBadge(row.basis) + '</div>'
+                + '</td>'
+                + '<td>' + esc(row.riskOwner) + '<div class="b4-caption b4-mt-1">Target: ' + esc(row.reviewDate) + '</div></td>'
+                + '<td style="text-align:center;">'
+                +   '<div>' + statusBadge(row.status) + '</div>'
+                +   '<div class="b4-mt-1">' + priorityBadge(row.priority) + '</div>'
+                +   '<div class="b4-mt-1">' + bandBadge(row.residualRisk) + '</div>'
+                +   '<div class="b4-caption">' + esc(riskBandInterpretation(row.residualRisk)) + '</div>'
+                + '</td></tr>';
         }).join('');
         var registerNotes = sharedPlans.length
             ? '<div class="b4-callout b4-callout--info b4-mt-3"><div class="b4-eyebrow">Shared Treatment Plans</div><ol class="b4-bullets">'
@@ -1180,7 +1210,7 @@
             color: '#be185d',
             charts: [],
             bodyHtml: r.riskRegister.length
-                ? noAssessmentNote + '<div><table class="b4-tbl b4-tbl--compact"><thead><tr><th style="width:7%;">Ref</th><th style="width:20%;">Risk</th><th style="width:7%;text-align:center;">Likelihood</th><th style="width:7%;text-align:center;">Impact</th><th style="width:7%;text-align:center;">Risk Score</th><th style="width:9%;text-align:center;">Basis</th><th style="width:11%;">Owner</th><th style="width:8%;">Target Date</th><th style="width:8%;text-align:center;">Status</th><th style="width:6%;text-align:center;">Priority</th><th style="width:9%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + registerRows + '</tbody></table></div>' + registerNotes
+                ? noAssessmentNote + '<div><table class="b4-tbl b4-tbl--compact"><thead><tr><th style="width:8%;">Ref</th><th style="width:41%;">Risk</th><th style="width:16%;text-align:center;">Scoring (L / I / Score / Basis)</th><th style="width:17%;">Owner &amp; Target</th><th style="width:18%;text-align:center;">Status / Priority / Residual</th></tr></thead><tbody>' + registerRows + '</tbody></table></div>' + registerNotes
                 : emptyState('Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.')
         });
 
