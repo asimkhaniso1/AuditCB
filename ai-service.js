@@ -356,6 +356,76 @@ function _reconcileNarrativeCounts(text, authoritative, fieldLabel) {
     return result;
 }
 
+// ============================================
+// EVIDENCE-DRIVEN CLAUSE SUGGESTER GUARDRAIL HELPERS (client spec #3)
+// ============================================
+// "Never invent an ISO clause" needs to be a structural guarantee, not just a
+// prompt instruction — these helpers give AI_SERVICE.suggestFindingClause() a
+// closed inventory to prompt from AND to validate the model's answer against,
+// so an out-of-inventory clause can never reach the caller.
+
+// Exact sentence the auditor-facing UI must display verbatim whenever
+// suggestFindingClause() resolves with insufficientEvidence: true.
+const CLAUSE_MAPPING_INSUFFICIENT_EVIDENCE_MESSAGE = 'Clause mapping requires auditor review — available evidence does not provide sufficient confidence for automatic classification.';
+
+// Locate the audited standard's ready, populated KB clause inventory.
+// Same two-direction normalized-name matching as getRelevantKBClauses() /
+// KB_HELPERS.lookupKBRequirement() — duplicated rather than shared because
+// those two also need to return different shapes (text vs a single clause).
+function _findReadyKBStandardDoc(standardName) {
+    const kb = window.state && window.state.knowledgeBase;
+    if (!kb || !kb.standards || !kb.standards.length || !standardName) return null;
+    const normStd = window.KB_HELPERS.normalizeStdName(standardName);
+    if (!normStd) return null;
+    return kb.standards.find(s => s.status === 'ready' && s.clauses && s.clauses.length > 0 &&
+            window.KB_HELPERS.normalizeStdName(s.name).includes(normStd))
+        || kb.standards.find(s => s.status === 'ready' && s.clauses && s.clauses.length > 0 &&
+            normStd.includes(window.KB_HELPERS.normalizeStdName(s.name)))
+        || null;
+}
+
+// Build the candidate-clause listing injected into the prompt. Includes
+// requirement text where the size budget allows; when it doesn't, requirement
+// text is dropped UNIFORMLY across every entry (never mid-string truncated)
+// so the model always sees a complete, valid list of clause numbers/titles to
+// choose from — partial truncation could silently hide legitimate choices.
+function _buildClauseInventoryForPrompt(stdDoc) {
+    const clauses = stdDoc.clauses || [];
+    const withReq = clauses.map(c => `${c.clause}: ${c.title || ''}${c.requirement ? ' — ' + c.requirement : ''}`).join('\n');
+    if (withReq.length <= 8000) return withReq;
+    const titlesOnly = clauses.map(c => `${c.clause}: ${c.title || ''}`).join('\n');
+    return titlesOnly.length <= 20000 ? titlesOnly : titlesOnly.substring(0, 20000);
+}
+
+// Defensive parse for a single JSON object response (the model may wrap it in
+// prose or markdown fences) — same multi-strategy approach as
+// AI_SERVICE.parseAgendaResponse(), adapted for an object instead of an array.
+function _parseClauseSuggestionJSON(text) {
+    if (!text) return null;
+    const cleanText = String(text).replace(/```json/gi, '').replace(/```/g, '').trim();
+    try {
+        const json = JSON.parse(cleanText);
+        if (json && typeof json === 'object' && !Array.isArray(json)) return json;
+    } catch (_e) { /* try next strategy */ }
+    const objMatch = cleanText.match(/\{[\s\S]*\}/);
+    if (objMatch) {
+        try {
+            const json = JSON.parse(objMatch[0]);
+            if (json && typeof json === 'object' && !Array.isArray(json)) return json;
+        } catch (_e) { /* give up — caller degrades to insufficientEvidence */ }
+    }
+    return null;
+}
+
+// Minimal markdown stripper for model-authored free text (reason strings),
+// same pattern already used inline by runAutoSummary()'s stripMd — kept as a
+// small named helper here since it's needed before the AI_SERVICE object
+// (and its confirm-overwrite flow) is reached.
+function _stripMdLite(text) {
+    if (!text) return '';
+    return String(text).replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1').replace(/^#+\s*/gm, '').replace(/^[-•]\s*/gm, '').trim();
+}
+
 const AI_SERVICE = {
 
     // Main function to generate agenda
@@ -608,6 +678,192 @@ Return a raw JSON array with 'id' and 'text' fields only:
             return findings; // Return original on failure
         }
     },
+
+    // Exact sentence the UI must show verbatim when suggestFindingClause()
+    // returns insufficientEvidence: true. Exposed here so the confirmation
+    // modal (execution-module-v2.js, follow-up task) never has to re-author it.
+    INSUFFICIENT_EVIDENCE_MESSAGE: CLAUSE_MAPPING_INSUFFICIENT_EVIDENCE_MESSAGE,
+
+    /**
+     * 1d. Evidence-driven clause suggester for NC conversion (client spec #3).
+     *
+     * When an auditor converts a FOCUS/custom checklist item into a
+     * nonconformity, the source question's own clause is NOT trustworthy as
+     * the answer — the objective evidence may independently point at a
+     * different requirement entirely. This asks the model to apply the
+     * governing test verbatim:
+     *   "If the original FOCUS/checklist question were removed, which
+     *   requirement of the applicable ISO standard would the objective
+     *   evidence independently demonstrate was not fulfilled?"
+     * reasoning from the evidence and the condition identified — explicitly
+     * NOT from sourceQuestion/sourceClause, which are passed only as
+     * background context.
+     *
+     * GUARDRAIL (structural, not just prompted): the model may choose only
+     * from the audited standard's real clause inventory —
+     * window.state.knowledgeBase.standards[] entries with status 'ready' and
+     * a populated clauses[] of {clause, title, requirement}. That inventory
+     * is (1) injected into the prompt as the closed candidate list and (2)
+     * used again afterwards to validate the model's answer. A clause that
+     * does not appear in the inventory is discarded and the result degrades
+     * to insufficientEvidence — it is never surfaced to the caller. Returned
+     * clauseTitle values are always the KB's own title text for the matched
+     * clause, never the model's title, so a title cannot be invented even
+     * when a clause number does validate. If the Knowledge Base has no ready
+     * standard matching `standard`, this returns insufficientEvidence: true
+     * immediately, before any AI call — it never falls back to guessing from
+     * clause-number patterns.
+     *
+     * Never throws: any missing KB standard, network failure, or unparseable
+     * AI response degrades to insufficientEvidence: true.
+     *
+     * @param {Object} params
+     * @param {string} params.evidence - Objective evidence gathered by the auditor. Required — empty evidence short-circuits to insufficientEvidence without calling the AI.
+     * @param {string} [params.auditorRemarks] - Auditor's own notes/interpretation of the evidence, if any.
+     * @param {string} [params.sourceQuestion] - The FOCUS/custom checklist question text. Background context only — must not drive the answer.
+     * @param {string} [params.sourceClause] - The source question's own clause. Background context only — must NOT be inherited as the answer.
+     * @param {string} params.standard - The audited ISO standard name (e.g. "ISO 9001:2015"). Required — used to select the KB clause inventory that gates every answer.
+     * @param {string} [params.department] - Department/process area, for context only.
+     * @returns {Promise<{
+     *   clause: string|null,
+     *   clauseTitle: string|null,
+     *   reason: string,
+     *   alternatives: Array<{clause: string, clauseTitle: string}>,
+     *   confidence: 'high'|'medium'|'low',
+     *   insufficientEvidence: boolean
+     * }>}
+     *   clause/clauseTitle are null and alternatives is [] whenever
+     *   insufficientEvidence is true. When insufficientEvidence is true, the
+     *   caller should show AI_SERVICE.INSUFFICIENT_EVIDENCE_MESSAGE verbatim
+     *   to the auditor — `reason` here carries the specific technical cause
+     *   (missing KB standard, out-of-inventory clause, parse/network
+     *   failure, etc.) for logging/debugging, not necessarily client-facing
+     *   copy.
+     */
+    suggestFindingClause: async ({ evidence, auditorRemarks, sourceQuestion, sourceClause, standard, department } = {}) => {
+        const insufficient = (reason) => ({
+            clause: null,
+            clauseTitle: null,
+            reason: reason || 'Insufficient evidence to suggest a clause.',
+            alternatives: [],
+            confidence: 'low',
+            insufficientEvidence: true
+        });
+
+        const evidenceText = String(evidence || '').trim();
+        if (!evidenceText) return insufficient('No objective evidence was provided to evaluate.');
+        if (!standard || !String(standard).trim()) return insufficient('No audited standard was specified — cannot validate against the Knowledge Base.');
+
+        // Guardrail step 1: the audited standard must have a ready, populated
+        // clause inventory in the Knowledge Base. Never fall back to guessing
+        // from clause-number patterns when it doesn't (per spec — this is a
+        // hard requirement, not a nicety).
+        const stdDoc = _findReadyKBStandardDoc(standard);
+        if (!stdDoc) {
+            return insufficient(`No ready Knowledge Base standard matching "${standard}" was found — clause mapping cannot be validated without a clause inventory.`);
+        }
+
+        const validClauses = new Map((stdDoc.clauses || [])
+            .filter(c => c && c.clause)
+            .map(c => [String(c.clause).trim(), c]));
+        if (validClauses.size === 0) {
+            return insufficient(`The Knowledge Base entry for "${stdDoc.name || standard}" has no clauses recorded.`);
+        }
+
+        const clauseInventoryText = _buildClauseInventoryForPrompt(stdDoc);
+
+        const prompt = `
+You are a Senior Lead Auditor at a top-tier international Certification Body, determining the correct ISO clause classification for a nonconformity being raised from FOCUS/custom checklist evidence. The report will be reviewed by a Qualified Registrar before client submission.
+
+GOVERNING TEST — apply this exact test and no other:
+"If the original FOCUS/checklist question were removed, which requirement of the applicable ISO standard would the objective evidence independently demonstrate was not fulfilled?"
+
+Reason ONLY from the objective evidence and the actual condition identified below. The source question and its own clause, if provided, are strictly background context to help you understand where this evidence came from — they must NOT determine your answer, and you must NOT simply inherit the source clause as the answer. Independently identify which requirement, if any, the evidence itself demonstrates was not fulfilled.
+
+Audited Standard: ${stdDoc.name || standard}
+${department ? `Department/Process Area: ${department}\n` : ''}${sourceQuestion ? `Source Checklist Question (context only — do not inherit its clause): ${sourceQuestion}\n` : ''}${sourceClause ? `Source Question's Own Clause (context only — do NOT default to this): ${sourceClause}\n` : ''}
+Objective Evidence:
+${evidenceText}
+${auditorRemarks ? `\nAuditor Remarks:\n${String(auditorRemarks).trim()}\n` : ''}
+Candidate Clauses — you MUST choose the primary clause and any alternatives ONLY from this list, exactly as written. Do not invent, rename, renumber, or paraphrase a clause number or title. If none of these clauses is clearly demonstrated as unfulfilled by the evidence, say so instead of guessing:
+${clauseInventoryText}
+
+Confidence rules:
+- "high": ONLY when the evidence plainly and specifically demonstrates that one particular requirement above was not fulfilled.
+- "medium" or "low": whenever identifying the requirement takes auditor judgement, the evidence is suggestive but not conclusive, or more than one clause is plausible.
+- If the evidence does not provide sufficient basis to identify a specific requirement from the list above, set "insufficientEvidence": true, set "clause" and "clauseTitle" to null, and explain why in "reason" — do NOT guess or force a match to the nearest-sounding clause.
+
+Alternative Related Clause(s): only include a clause here where it is genuinely relevant to the same evidence — do not pad the list. Return an empty array if there is no genuinely relevant alternative.
+
+Return raw JSON only (no markdown code fences, no prose outside the JSON):
+{
+  "clause": "<clause number exactly as it appears in the candidate list above, or null>",
+  "clauseTitle": "<its title exactly as it appears in the candidate list above, or null>",
+  "reason": "<2-4 sentences grounded in the objective evidence and the specific requirement not fulfilled — not the source question>",
+  "alternatives": [{"clause": "...", "clauseTitle": "..."}],
+  "confidence": "high" | "medium" | "low",
+  "insufficientEvidence": false
+}
+`;
+
+        let responseText;
+        try {
+            responseText = await AI_SERVICE.callProxyAPI(prompt);
+        } catch (error) {
+            if (window.Logger) window.Logger.warn('AI_SERVICE', 'suggestFindingClause: AI request failed, degrading to insufficientEvidence.', error);
+            return insufficient('The AI request failed — clause mapping could not be evaluated automatically.');
+        }
+
+        const parsed = _parseClauseSuggestionJSON(responseText);
+        if (!parsed) {
+            if (window.Logger) window.Logger.warn('AI_SERVICE', 'suggestFindingClause: could not parse AI response as JSON.');
+            return insufficient('The AI response could not be interpreted — clause mapping could not be evaluated automatically.');
+        }
+
+        if (parsed.insufficientEvidence === true || !parsed.clause) {
+            return insufficient(_stripMdLite(parsed.reason) || 'The available evidence does not clearly demonstrate that a specific requirement was not fulfilled.');
+        }
+
+        // Guardrail step 2: validate the model's answer against the SAME
+        // inventory passed into the prompt. An out-of-inventory clause is
+        // never surfaced to the caller — this is what makes "never invent an
+        // ISO clause" a structural guarantee rather than a matter of trusting
+        // the model's compliance with the prompt.
+        const normalizedClause = window.KB_HELPERS.extractClauseNum(String(parsed.clause).trim());
+        const kbEntry = validClauses.get(normalizedClause) || validClauses.get(String(parsed.clause).trim());
+        if (!kbEntry) {
+            if (window.Logger) window.Logger.warn('AI_SERVICE', `suggestFindingClause: model returned clause "${parsed.clause}" not found in Knowledge Base inventory for "${stdDoc.name}" — discarding rather than surfacing an unvalidated clause.`);
+            return insufficient(`The AI suggested a clause not found in the "${stdDoc.name || standard}" Knowledge Base inventory — this has been discarded rather than risking an invented clause reference.`);
+        }
+
+        // Alternatives go through the identical validation + KB title
+        // lookup. Titles are ALWAYS the KB's own text, never the model's —
+        // a title cannot be invented even for a clause number that validates.
+        const alternatives = [];
+        if (Array.isArray(parsed.alternatives)) {
+            parsed.alternatives.forEach(alt => {
+                if (!alt || !alt.clause) return;
+                const altNorm = window.KB_HELPERS.extractClauseNum(String(alt.clause).trim());
+                const altEntry = validClauses.get(altNorm) || validClauses.get(String(alt.clause).trim());
+                if (altEntry && altEntry.clause !== kbEntry.clause) {
+                    alternatives.push({ clause: altEntry.clause, clauseTitle: altEntry.title || '' });
+                }
+            });
+        }
+
+        let confidence = String(parsed.confidence || '').toLowerCase().trim();
+        if (!['high', 'medium', 'low'].includes(confidence)) confidence = 'low'; // unrecognized/missing confidence defaults to the most conservative value
+
+        return {
+            clause: kbEntry.clause,
+            clauseTitle: kbEntry.title || '',
+            reason: _stripMdLite(parsed.reason) || 'The objective evidence indicates this requirement was not fulfilled.',
+            alternatives,
+            confidence,
+            insufficientEvidence: false
+        };
+    },
+
     draftExecutiveSummary: async (reportData, compliantAreas = [], observationItems = []) => {
         // Authoritative figures come from ReportStats — the same dataset the
         // finalize gate reconciles narrative against. Fall back to a local
