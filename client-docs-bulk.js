@@ -1352,7 +1352,7 @@
         </table>
         <div class="foot">
             Prepared for pre-audit document review under ISO/IEC 17021-1. Coverage reflects the documents supplied by the client
-            and their clause mapping in Audit360; it is not by itself a conformity assessment.
+            and their clause mapping in ISOXPERT Audit360; it is not by itself a conformity assessment.
         </div>
         </body></html>`);
         win.document.close();

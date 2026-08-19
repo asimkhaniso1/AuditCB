@@ -56,7 +56,7 @@ module.exports = async (req, res) => {
 
         // Send email
         const info = await transporter.sendMail({
-            from: from || `AuditCB360 <${process.env.SMTP_USER}>`,
+            from: from || `ISOXPERT Audit360 <${process.env.SMTP_USER}>`,
             to: to,
             replyTo: replyTo || process.env.SMTP_USER,
             subject: subject,

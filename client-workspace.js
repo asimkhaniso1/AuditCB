@@ -988,7 +988,7 @@ function renderCertificationCycleWidget(client) {
                             <div>
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Current Stage</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-top: 0.25rem;">${currentStage}</div>
-                                ${isProjectedStage ? '<div style="font-size: 0.7rem; color: #b45309; margin-top: 0.15rem;" title="Stage nodes tick only when the corresponding audit report is finalized in Audit360."><i class="fa-solid fa-circle-info" style="margin-right: 3px;"></i>Projected from certificate dates — no finalized audit on file yet</div>' : ''}
+                                ${isProjectedStage ? '<div style="font-size: 0.7rem; color: #b45309; margin-top: 0.15rem;" title="Stage nodes tick only when the corresponding audit report is finalized in ISOXPERT Audit360."><i class="fa-solid fa-circle-info" style="margin-right: 3px;"></i>Projected from certificate dates — no finalized audit on file yet</div>' : ''}
                             </div>
                             ${nextAudit ? `
                             <div>

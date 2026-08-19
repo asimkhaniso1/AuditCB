@@ -424,7 +424,7 @@ window.exportRetentionReport = function () {
         <body>
             <h1>📁 Record Retention Report</h1>
             <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
-            <p><strong>Organization:</strong> AuditCB360 Certification Body</p>
+            <p><strong>Organization:</strong> ISOXPERT Audit360 Certification Body</p>
             
             <h2>Summary Statistics</h2>
             <div>

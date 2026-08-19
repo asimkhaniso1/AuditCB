@@ -1444,7 +1444,7 @@ function showLoginOverlay() {
     `;
 
     // Get CB settings for branding
-    const cbName = window.state?.cbSettings?.cbName || 'Audit360 Suite';
+    const cbName = window.state?.cbSettings?.cbName || 'ISOXPERT Audit360';
 
     overlay.innerHTML = `
         <style>
@@ -1662,7 +1662,7 @@ function showLoginOverlay() {
             <div class="hero-right">
                 <div class="login-card">
                     <div class="logo-area">
-                        <img src="./Audit360-logo.jpeg" alt="Audit360" style="max-height: 72px; object-fit: contain;">
+                        <img src="./Audit360-logo.jpeg" alt="ISOXPERT Audit360" style="max-height: 72px; object-fit: contain;">
                         <h2>${cbName}</h2>
                         <p>Sign in to your account</p>
                     </div>
@@ -1705,7 +1705,7 @@ function showLoginOverlay() {
                 </div>
 
                 <div class="hero-footer">
-                    &copy; ${new Date().getFullYear()} ${cbName} &bull; Powered by Audit360
+                    &copy; ${new Date().getFullYear()} ${cbName} &bull; Powered by ISOXPERT Audit360
                 </div>
             </div>
         </div>
@@ -1996,14 +1996,14 @@ function updateCBLogoDisplay() {
         // Use maximum defensiveness
         const settings = (window.state && window.state.cbSettings) ? window.state.cbSettings : {};
         const logoUrl = settings.logoUrl || '';
-        const cbName = settings.cbName || 'Audit360 Suite';
+        const cbName = settings.cbName || 'ISOXPERT Audit360';
 
         if (logoUrl && (logoUrl.startsWith('data:') || logoUrl.startsWith('http'))) {
             // Replace entire header with just the logo
             logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${window.UTILS?.escapeHtml(cbName) || 'Logo'}">`;
         } else {
             // Default: icon + text
-            logoContainer.innerHTML = `<i class="fa-solid fa-certificate"></i><h1>${window.UTILS?.escapeHtml(cbName) || 'AuditCB360'}</h1>`;
+            logoContainer.innerHTML = `<i class="fa-solid fa-certificate"></i><h1>${window.UTILS?.escapeHtml(cbName) || 'ISOXPERT Audit360'}</h1>`;
         }
     } catch (e) {
         console.warn('[SILENT ERROR] updateCBLogoDisplay failed:', e.message);

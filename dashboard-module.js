@@ -180,7 +180,7 @@ function renderDashboardEnhanced() {
         <div class="fade-in">
             <!-- Header Section -->
             <div style="margin-bottom: 2rem;">
-                <h2 style="margin: 0; font-size: 1.75rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">AuditCB360 Dashboard</h2>
+                <h2 style="margin: 0; font-size: 1.75rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">ISOXPERT Audit360 Dashboard</h2>
                 <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">
                     <i class="fa-solid fa-calendar"></i> ${window.UTILS.formatDate(new Date())}
                     <span style="margin-left: 1rem; padding-left: 1rem; border-left: 1px solid #e2e8f0;">

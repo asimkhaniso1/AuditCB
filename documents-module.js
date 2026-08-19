@@ -778,7 +778,7 @@ window.printMasterDocumentList = function () {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Master Document List - AuditCB360</title>
+            <title>Master Document List - ISOXPERT Audit360</title>
             <style>
                 body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; }
                 h1 { color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 10px; font-size: 18px; }
@@ -820,7 +820,7 @@ window.printMasterDocumentList = function () {
             <div class="footer">
                 <p><strong>ISO 17021-1 Clause 8.3</strong> - Control of Documents</p>
                 <p>This Master Document List is maintained as evidence of document control per accreditation requirements.</p>
-                <p>AuditCB360 Certification Body Management System</p>
+                <p>ISOXPERT Audit360 Certification Body Management System</p>
             </div>
         </body>
         </html>

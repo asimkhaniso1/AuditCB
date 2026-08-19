@@ -470,7 +470,7 @@ const AuthManager = {
         if (!contentArea) return;
 
         // Get CB settings for branding
-        const cbName = window.state?.cbSettings?.cbName || 'Audit360 Suite';
+        const cbName = window.state?.cbSettings?.cbName || 'ISOXPERT Audit360';
         const _cbLogo = window.state?.cbSettings?.cbLogo || '';
 
         contentArea.style.padding = '0';
@@ -838,7 +838,7 @@ const AuthManager = {
                 <div class="hero-right">
                     <div class="login-card">
                         <div class="logo-area">
-                            <img src="./Audit360-logo.jpeg" alt="Audit360" style="max-height: 72px; object-fit: contain;">
+                            <img src="./Audit360-logo.jpeg" alt="ISOXPERT Audit360" style="max-height: 72px; object-fit: contain;">
                             <h2>${window.UTILS?.escapeHtml?.(cbName) || cbName}</h2>
                             <p>Sign in to your account</p>
                         </div>
@@ -869,7 +869,7 @@ const AuthManager = {
                     </div>
 
                     <div class="hero-footer">
-                        &copy; ${new Date().getFullYear()} ${window.UTILS?.escapeHtml?.(cbName) || cbName} &bull; Powered by Audit360
+                        &copy; ${new Date().getFullYear()} ${window.UTILS?.escapeHtml?.(cbName) || cbName} &bull; Powered by ISOXPERT Audit360
                     </div>
                 </div>
             </div>

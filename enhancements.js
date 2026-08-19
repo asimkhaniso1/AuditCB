@@ -517,7 +517,7 @@
             <img src="${qrUrl}" style="width:68px;height:68px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;" alt="QR">
             <div class="standard-tag">${window.UTILS?.escapeHtml(checklist.standard || 'General') || 'General'}</div>
             <p>Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            <p>AuditCB360 Platform</p>
+            <p>ISOXPERT Audit360 Platform</p>
         </div>
     </div>
     

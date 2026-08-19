@@ -1,6 +1,6 @@
 {
-  "name": "AuditCB360 Certification System",
-  "short_name": "AuditCB360",
+  "name": "ISOXPERT Audit360 Certification System",
+  "short_name": "ISOXPERT Audit360",
   "description": "Comprehensive Audit & Certification Management System",
   "start_url": "./index.html",
   "display": "standalone",

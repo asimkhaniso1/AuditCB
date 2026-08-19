@@ -1040,7 +1040,7 @@
         var allDerived = r.scoredFindings.length > 0 && r.scoredFindings.every(function (f) { return f.riskSource !== 'assessed'; });
         var noAssessmentNote = allDerived
             ? '<div class="b4-callout b4-callout--warn b4-mb-4">' + iconSafe('alert', { size: 12 })
-                + 'No formal risk assessment has been performed. Ratings shown are Audit360 analytical indicators derived from finding classification and text, provided for management insight only — they are not audit conclusions.</div>'
+                + 'No formal risk assessment has been performed. Ratings shown are ISOXPERT Audit360 analytical indicators derived from finding classification and text, provided for management insight only — they are not audit conclusions.</div>'
             : '';
 
         // 1. RISK HEAT MAP — the visually dominant risk page. Trimmed to
@@ -1091,7 +1091,7 @@
             }).join('') + '</div>'
             : '';
         var impactMethodologyNote = '<div class="b4-callout b4-callout--info b4-mb-4">' + iconSafe('finding', { size: 12 })
-            + 'Theme classification is derived automatically from keywords in the finding text. It is an Audit360 analytical indicator for management insight only — it does not represent an assessed business or financial impact.</div>';
+            + 'Theme classification is derived automatically from keywords in the finding text. It is an ISOXPERT Audit360 analytical indicator for management insight only — it does not represent an assessed business or financial impact.</div>';
         out.push({
             key: 'business-impact',
             name: 'FINDING IMPACT THEMES',
@@ -1130,7 +1130,7 @@
                 ? '<div class="b4-caption b4-mt-2">' + iconSafe('check', { size: 12 }) + 'Recorded by auditee/auditor' + (rec.raisedBy ? ' (' + esc(rec.raisedBy) + ')' : '') + '</div>'
                 : '<div class="b4-caption b4-mt-2">' + iconSafe('finding', { size: 12 }) + 'Awaiting auditee response</div>';
             var draftSuggestion = !hasRealRootCause
-                ? '<div class="b4-caption b4-mt-1" style="font-style:italic;">' + iconSafe('finding', { size: 12 }) + 'Audit360 draft suggestion (not an audit conclusion): ' + esc(rc.rootCause) + '</div>'
+                ? '<div class="b4-caption b4-mt-1" style="font-style:italic;">' + iconSafe('finding', { size: 12 }) + 'ISOXPERT Audit360 draft suggestion (not an audit conclusion): ' + esc(rc.rootCause) + '</div>'
                 : '';
             // The rule-generated "immediate cause" is the finding text with a
             // prefix, so rendering it under its own heading printed the same

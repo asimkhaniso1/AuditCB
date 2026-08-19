@@ -984,7 +984,7 @@
         }
 
         const kpis = `<div class="b4-kpi-grid" style="margin-bottom:var(--b4-s4);">${certCard}</div><div class="b4-kpi-grid">${cards.join('')}</div>`;
-        const indicatorFootnote = `<div class="b4-footnote" style="margin-top:var(--b4-s2);">Audit Grade, Maturity and percentage scores are Audit360 analytical indicators provided for management insight only. They do not represent an ISO certification score, grade, or certification decision.</div>`;
+        const indicatorFootnote = `<div class="b4-footnote" style="margin-top:var(--b4-s2);">Audit Grade, Maturity and percentage scores are ISOXPERT Audit360 analytical indicators provided for management insight only. They do not represent an ISO certification score, grade, or certification decision.</div>`;
         const noPriorCaption = !hasPrior
             ? `<div class="b4-footnote" style="margin-top:var(--b4-s2);">First audit in cycle — trend comparison available from next audit.</div>`
             : '';

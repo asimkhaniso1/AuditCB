@@ -675,7 +675,7 @@ window.viewCertificate = function (certId) {
             <div class="cert-frame">
                 <div class="cert-inner-border">
                     <div class="cert-header">Certificate of Registration</div>
-                    <div class="cert-subtitle">AuditCB360 Certification Body</div>
+                    <div class="cert-subtitle">ISOXPERT Audit360 Certification Body</div>
                     
                     <div class="cert-body">
                         <div class="cert-presented">This is to certify that the Management System of:</div>
@@ -705,7 +705,7 @@ window.viewCertificate = function (certId) {
                         </div>
                     </div>
                 </div>
-                <div class="meta-info">This certificate remains the property of AuditCB360 and must be returned upon request. Verify validity at audit.companycertification.com/verify</div>
+                <div class="meta-info">This certificate remains the property of ISOXPERT Audit360 and must be returned upon request. Verify validity at audit.companycertification.com/verify</div>
             </div>
             <script>
                 // Auto print

@@ -235,7 +235,7 @@ window.exportCertificatePDF = function (certId) {
             <div class="logo">
                 <i class="fa-solid fa-certificate"></i>
             </div>
-            <div class="cb-name">${cbSettings.cbName || 'AuditCB360'}</div>
+            <div class="cb-name">${cbSettings.cbName || 'ISOXPERT Audit360'}</div>
             ${cert.accreditationBody ? `
                 <div class="accreditation">
                     Accredited by ${cert.accreditationBody}
