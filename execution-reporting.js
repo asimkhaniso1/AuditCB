@@ -92,13 +92,21 @@
     // visible reporting gap — flagged so it cannot pass unnoticed (the integrity
     // validator, report-integrity.js, blocks finalization on this).
     //
-    // Classification (real-vs-internal) is delegated to the single shared source,
-    // ReportStats.formatCriterion(), so every report module agrees on it. What
-    // stays local here is presentation: the alarm-red "Criterion not assigned"
-    // wording is reserved for finding contexts (NC rows, and OBS/OFI rows shown
-    // as findings); conforming checklist rows, plain listings and the Evidence
-    // Index get a neutral "Internal focus item … (Stage 1 carryover)" label
-    // instead — an unresolved internal ref there is expected, not alarming.
+    // Classification is delegated to the single shared source,
+    // ReportStats.classifyCriterion()/formatCriterion(), so every report module
+    // agrees on it. What stays local here is presentation: the alarm-red
+    // "Criterion not assigned" wording is reserved for finding contexts (NC rows,
+    // and OBS/OFI rows shown as findings); conforming checklist rows, plain
+    // listings and the Evidence Index get a neutral "Internal focus item …
+    // (Stage 1 carryover)" label instead — an unresolved internal ref there is
+    // expected, not alarming.
+    //
+    // A certification/surveillance programme criterion (kind:'programme', e.g.
+    // ISO 17021-1's surveillance elements cited as "9.6.2(b)") is a genuine,
+    // resolved reference — not an error state like an unresolved internal ref —
+    // but it must never be presented as a clause of the audited standard (#6).
+    // It gets its own neutral "Surveillance criterion" label instead, in both
+    // finding and non-finding contexts alike.
     const INTERNAL_REF_PREFIX_RE = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
     const displayCriterion = (finding, isFinding) => {
         const esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml : (s) => String(s == null ? '' : s);
@@ -115,13 +123,22 @@
             // fc.label is the real clause only (no internal-ref parenthetical) by
             // default — ReportStats.formatCriterion only surfaces the internal ref
             // when called with {showInternal:true}, which no client-facing row does.
-            return esc(fc ? fc.label : clause);
+            const label = esc(fc ? fc.label : clause);
+            if (fc && fc.kind === 'programme') {
+                // Same wrap-safe block shape as the internal-ref case below (see the
+                // note there) — a bare reference like "9.6.2(b)" under a "Criterion"
+                // column reads as an ISO clause unless labelled otherwise.
+                return '<span style="display:block;white-space:normal;overflow-wrap:break-word;line-height:1.3;" title="Certification/surveillance programme criterion — not a clause of the audited standard">Surveillance criterion<br><span style="font-weight:600;font-size:0.85em;">' + label + '</span></span>';
+            }
+            // 'standard' is unchanged; 'unverified'/'none' were already presented
+            // plainly (no clause-of-the-standard claim in the cell itself) and stay so.
+            return label;
         }
         // Both flags below render as a block with explicit white-space:normal +
         // overflow-wrap so they stay wrap-safe even inside a parent <td> that sets
         // white-space:nowrap for the common short-clause case (e.g. "9.2") — an
         // un-overridden nowrap span here overflowed narrow (10%) Clause columns
-        // and painted over the adjacent ISO Requirement text in the printed PDF.
+        // and painted over the adjacent Requirement text in the printed PDF.
         if (isFinding) {
             return '<span style="color:#b91c1c;font-weight:700;display:block;white-space:normal;overflow-wrap:break-word;line-height:1.3;" title="Criterion not assigned — internal tracking reference only">Criterion not assigned<br><span style="font-weight:600;font-size:0.85em;">(' + esc(clause) + ')</span></span>';
         }
@@ -308,6 +325,12 @@
     // focus items" list and the two non-finding/finding fallback labels below.
     // An unresolved internal ref (no real clause resolved) keeps the same
     // alarm wording as displayCriterion's finding-context branch.
+    //
+    // A programme criterion (kind:'programme') never gets the "ISO 9001:2015 —
+    // Clause …" formal treatment or the standard's name attached (#6) — it gets
+    // its own "Surveillance criterion …" formal wording instead. An unverified
+    // reference (kind:'unverified') is presented plainly, with neither the
+    // standard's name nor "Clause" claiming it either.
     const formalCriterionCell = (finding, standard) => {
         const esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml : (s) => String(s == null ? '' : s);
         if (!finding) return '';
@@ -321,6 +344,12 @@
             return '<span style="color:#b91c1c;font-weight:700;display:block;white-space:normal;overflow-wrap:break-word;line-height:1.3;" title="Criterion not assigned — internal tracking reference only">Criterion not assigned<br><span style="font-weight:600;font-size:0.85em;">(' + esc(clause) + ')</span></span>';
         }
         const real = fc ? fc.real : clause;
+        if (fc && fc.kind === 'programme') {
+            return '<div>Surveillance criterion ' + esc(real) + '</div>';
+        }
+        if (fc && fc.kind === 'unverified') {
+            return '<div>' + esc(real) + '</div>';
+        }
         const stdPrefix = standard ? esc(standard) + ' — ' : '';
         return '<div>' + stdPrefix + 'Clause ' + esc(real) + '</div>';
     };
@@ -1924,7 +1953,7 @@
                     <div class="rp-sec-hdr" style="border-left-color:#10b981;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">4</span>CONFORMANCE VERIFICATION (${d.stats.conformCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
-                            <thead><tr style="background:#f0fdf4;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Status</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
+                            <thead><tr style="background:#f0fdf4;"><th style="padding:10px 14px;text-align:left;width:12%;">Criterion</th><th style="padding:10px 14px;text-align:left;width:40%;">Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Status</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
                             <tbody>${conformRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No conformance evidence recorded</td></tr>'}</tbody>
                         </table>
                     </div>
@@ -1971,7 +2000,7 @@
                     <div class="rp-sec-hdr" style="border-left-color:#7c3aed;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">5</span>OBSERVATIONS (${d.stats.observationCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
-                            <thead><tr style="background:#f5f3ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:40%;">Details</th></tr></thead>
+                            <thead><tr style="background:#f5f3ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Criterion</th><th style="padding:10px 14px;text-align:left;width:40%;">Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:40%;">Details</th></tr></thead>
                             <tbody>${obsOnlyRows}</tbody>
                         </table>
                     </div>
@@ -1982,7 +2011,7 @@
                     <div class="rp-sec-hdr" style="border-left-color:#06b6d4;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">6</span>OPPORTUNITIES FOR IMPROVEMENT (${d.stats.ofiCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
-                            <thead><tr style="background:#ecfeff;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:40%;">Recommendation</th></tr></thead>
+                            <thead><tr style="background:#ecfeff;"><th style="padding:10px 14px;text-align:left;width:12%;">Criterion</th><th style="padding:10px 14px;text-align:left;width:40%;">Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:40%;">Recommendation</th></tr></thead>
                             <tbody>${ofiOnlyRows}</tbody>
                         </table>
                     </div>
@@ -1992,7 +2021,7 @@
                     <div class="rp-sec-hdr" style="border-left-color:#dc2626;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">7</span>FINDING DETAILS (${d.stats.ncCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
-                            <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;width:10%;">Clause</th><th style="padding:10px 14px;text-align:left;width:33%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:10%;">Severity</th><th style="padding:10px 14px;text-align:left;width:32%;">Evidence & Remarks</th><th style="padding:10px 14px;text-align:left;width:15%;">Finding Status</th></tr></thead>
+                            <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;width:10%;">Criterion</th><th style="padding:10px 14px;text-align:left;width:33%;">Requirement</th><th style="padding:10px 14px;text-align:left;width:10%;">Severity</th><th style="padding:10px 14px;text-align:left;width:32%;">Evidence & Remarks</th><th style="padding:10px 14px;text-align:left;width:15%;">Finding Status</th></tr></thead>
                             <tbody>${ncRows || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No non-conformities found</td></tr>'}</tbody>
                         </table>
                         ${ncPendingFootnote}
@@ -2010,7 +2039,7 @@
                     <div class="rp-sec-hdr" style="border-left-color:#be185d;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">9</span>CORRECTIVE ACTION REQUIREMENTS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
-                            <thead><tr style="background:#fdf2f8;"><th style="padding:10px 14px;text-align:left;width:10%;">NC Ref</th><th style="padding:10px 14px;text-align:left;width:10%;">Clause</th><th style="padding:10px 14px;text-align:left;width:10%;">Type</th><th style="padding:10px 14px;text-align:left;width:35%;">Corrective Action Required</th><th style="padding:10px 14px;text-align:left;width:15%;">Due Date</th><th style="padding:10px 14px;text-align:left;width:20%;">Verification Method</th></tr></thead>
+                            <thead><tr style="background:#fdf2f8;"><th style="padding:10px 14px;text-align:left;width:10%;">NC Ref</th><th style="padding:10px 14px;text-align:left;width:10%;">Criterion</th><th style="padding:10px 14px;text-align:left;width:10%;">Type</th><th style="padding:10px 14px;text-align:left;width:35%;">Corrective Action Required</th><th style="padding:10px 14px;text-align:left;width:15%;">Due Date</th><th style="padding:10px 14px;text-align:left;width:20%;">Verification Method</th></tr></thead>
                             <tbody>${(() => {
                     const dueFromType = (typ) => { const t = (typ || '').toLowerCase(); const dt = new Date(); dt.setDate(dt.getDate() + (t === 'major' ? 30 : 90)); return dt.toISOString().split('T')[0]; };
                     let allNCs;
@@ -4111,7 +4140,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + (editedPositiveObs ? '<div style="margin-top:20px;padding:14px 16px;background:#ecfdf5;border-radius:10px;border-left:4px solid #15803d;break-inside:avoid;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><h4 style="margin:0;color:#15803d;font-size:0.95rem;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;">Positive Observations</h4></div><div style="color:#15803d;font-size:0.9rem;line-height:1.6;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION: CONFORMANCE VERIFICATION
-            + (secMap['conformance'] ? '<div id="sec-conformance" class="sh" style="border-left-color:#15803d;">' + sBadge('conformance') + 'CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#ecfdf5;"><th style="width:10%;">Clause</th><th style="width:30%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
+            + (secMap['conformance'] ? '<div id="sec-conformance" class="sh" style="border-left-color:#15803d;">' + sBadge('conformance') + 'CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#ecfdf5;"><th style="width:10%;">Criterion</th><th style="width:30%;">Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
             // SECTION: AUDIT TRAILS
             + (secMap['audit-trails'] ? '<div id="sec-audit-trails" class="sh" style="border-left-color:#0ea5e9;">' + sBadge('audit-trails') + 'AUDIT TRAILS</div><div class="sb">'
                 + (auditTrailTimelineHtml ? '<div style="margin-bottom:22px;">' + auditTrailTimelineHtml + '</div>' : '')
@@ -4137,20 +4166,20 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     : '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedPrevFindings || _derivePreviousFindingsStatus(d)) + '</div>')
                 + '</div>' : '')
             // SECTION: OBSERVATIONS
-            + (secMap['obs'] ? '<div id="sec-obs" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('obs') + 'OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:10%;">Clause</th><th style="width:30%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
+            + (secMap['obs'] ? '<div id="sec-obs" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('obs') + 'OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:10%;">Criterion</th><th style="width:30%;">Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
             // SECTION: OPPORTUNITIES FOR IMPROVEMENT (narrative + table)
             + (secMap['ofi'] ? '<div id="sec-ofi" class="sh" style="border-left-color:#b45309;">' + sBadge('ofi') + 'OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb">'
                 + (editedOfi ? '<div style="padding:14px 16px;background:#fffbeb;border-radius:10px;border-left:4px solid #b45309;margin-bottom:' + (ofiOnlyRowsHtml ? '14px' : '0') + ';">' + formatOfi(editedOfi) + '</div>' : '')
-                + (ofiOnlyRowsHtml ? '<table class="f-tbl"><thead><tr style="background:#f1f5f9;"><th style="width:10%;">Clause</th><th style="width:30%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Recommendation</th></tr></thead><tbody>' + ofiOnlyRowsHtml + '</tbody></table>' : '')
+                + (ofiOnlyRowsHtml ? '<table class="f-tbl"><thead><tr style="background:#f1f5f9;"><th style="width:10%;">Criterion</th><th style="width:30%;">Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Recommendation</th></tr></thead><tbody>' + ofiOnlyRowsHtml + '</tbody></table>' : '')
                 + '</div>' : '')
             // SECTION: FINDING DETAILS
-            + (secMap['findings'] ? '<div id="sec-findings" class="sh" style="border-left-color:#b91c1c;">' + sBadge('findings') + 'FINDING DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:30%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No findings recorded.</td></tr>') + '</tbody></table></div>' : '')
+            + (secMap['findings'] ? '<div id="sec-findings" class="sh" style="border-left-color:#b91c1c;">' + sBadge('findings') + 'FINDING DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Criterion</th><th style="width:30%;">Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No findings recorded.</td></tr>') + '</tbody></table></div>' : '')
             // SECTION: NCR REGISTER
             + (secMap['ncrs'] ? '<div id="sec-ncrs" class="sh" style="border-left-color:#b91c1c;">' + sBadge('ncrs') + 'NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#b91c1c' : '#b45309') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div style="font-size:0.95rem;"><strong>' + (ncr.type || '') + '</strong> — ' + formalCriterionCell(ncr, standard) + '</div><span style="color:#64748b;font-size:0.82rem;white-space:nowrap;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + (ncr.evidenceImageThumb || ncr.evidenceImage) + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
 
             // SECTION: CORRECTIVE ACTION REQUIREMENTS
             + (secMap['corrective'] ? '<div id="sec-corrective" class="sh" style="border-left-color:#be185d;">' + sBadge('corrective') + 'CORRECTIVE ACTION REQUIREMENTS</div><div class="sb">'
-                + '<table class="info-tbl" style="table-layout:fixed;"><thead><tr style="background:#f8fafc;"><th style="width:15%;">NC Ref</th><th style="width:9%;">Clause</th><th style="width:9%;">Type</th><th style="width:32%;">Corrective Action Required</th><th style="width:15%;">Due Date</th><th style="width:20%;">Verification</th></tr></thead><tbody>'
+                + '<table class="info-tbl" style="table-layout:fixed;"><thead><tr style="background:#f8fafc;"><th style="width:15%;">NC Ref</th><th style="width:9%;">Criterion</th><th style="width:9%;">Type</th><th style="width:32%;">Corrective Action Required</th><th style="width:15%;">Due Date</th><th style="width:20%;">Verification</th></tr></thead><tbody>'
                 + (function () {
                     // Due dates are computed & persisted once in generateAuditReport (from the audit
                     // end date) and stored as item.caDueDate / ncr.caDueDate. Reuse that stored value
@@ -4267,12 +4296,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const esc = window.UTILS && window.UTILS.escapeHtml ? window.UTILS.escapeHtml : function (s) { return String(s == null ? '' : s); };
                 // Department / Finding Ref / Captured are frequently blank on evidence
                 // captured outside a checklist item — buildAdaptiveTable drops whichever
-                // of those (never EV ID/Description/Clause) is empty on every exhibit.
+                // of those (never EV ID/Description/Criterion) is empty on every exhibit.
                 const evTdStyle = 'padding:8px 12px;';
                 const evHeaders = [
                     { label: 'EV ID', tdStyle: evTdStyle + 'font-weight:700;white-space:nowrap;' },
                     { label: 'Description', tdStyle: evTdStyle },
-                    { label: 'Clause', tdStyle: evTdStyle },
+                    { label: 'Criterion', tdStyle: evTdStyle },
                     { label: 'Department', tdStyle: evTdStyle },
                     { label: 'Finding Ref', tdStyle: evTdStyle },
                     { label: 'Captured', tdStyle: evTdStyle }
