@@ -973,12 +973,19 @@
             .rp-side-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 8px;font-size:0.72rem;font-weight:700;color:#64748b;letter-spacing:0.06em;}
             .rp-side-head button{border:none;background:none;color:#2563eb;font-size:0.72rem;font-weight:600;cursor:pointer;padding:2px 4px;}
             .rp-side-count{background:#eff6ff;color:#1d4ed8;border-radius:10px;padding:1px 8px;margin-left:6px;font-size:0.7rem;}
-            .rp-side-list{flex:1;overflow-y:auto;padding:0 8px 8px;}
+            .rp-side-list{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 8px 8px;}
             .rp-side-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;font-size:0.82rem;font-weight:600;color:#334155;cursor:pointer;user-select:none;border-left:3px solid transparent;margin-bottom:1px;}
             .rp-side-item:hover{background:#f1f5f9;}
             .rp-side-item i.fa-solid{width:16px;text-align:center;color:#94a3b8;font-size:0.8rem;flex-shrink:0;}
             .rp-side-item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-            .rp-side-item input[type=checkbox]{accent-color:var(--sec-color,#2563eb);cursor:pointer;flex-shrink:0;}
+            /* styles.css globals style EVERY input as a full-width padded form
+               field (width:100%;padding:.625rem;border;margin-bottom:1rem) and
+               every label as display:block — which turned these checkboxes into
+               giant rounded boxes and shoved the row labels out of the sidebar.
+               Reset explicitly; specificity (.rp-sidebar input[...]) beats the
+               bare element selectors. */
+            .rp-sidebar input[type=checkbox]{width:15px;height:15px;flex:0 0 auto;padding:0;margin:0;border:none;border-radius:3px;background:none;box-shadow:none;accent-color:var(--sec-color,#2563eb);cursor:pointer;}
+            .rp-sidebar label{margin-bottom:0;font-size:0.78rem;}
             .rp-side-item.active{border-left-color:var(--sec-color,#2563eb);}
             .rp-side-item.active i.fa-solid{color:var(--sec-color,#2563eb);}
             .rp-side-item:not(.active){color:#94a3b8;}
