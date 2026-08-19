@@ -3068,6 +3068,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // outcome without offering any path to record one (the actual control is
         // buried in the preview modal's Signature section) — surface it here.
         const showTechReview = /technical review outcome/i.test(String((it && it.message) || ''));
+        // Third fix action: the scope blocker ("Audit scope/criteria is not
+        // recorded…") likewise pointed at data with no edit path from this tab.
+        const showSetScope = /scope\/criteria is not recorded/i.test(String((it && it.message) || ''));
         const fixBtn = showSetCriterion ? `
                         <button type="button" class="btn btn-sm btn-outline-primary" style="margin-top: 0.45rem;"
                             data-action="setFindingCriterion"
@@ -3084,6 +3087,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             data-action="recordTechnicalReview" data-id="${esc(String(reportId))}"
                             aria-label="Record technical review">
                             <i class="fa-solid fa-user-check" style="margin-right: 0.3rem;"></i>Record technical review
+                        </button>` : showSetScope ? `
+                        <button type="button" class="btn btn-sm btn-outline-primary" style="margin-top: 0.45rem;"
+                            data-action="setAuditScope" data-id="${esc(String(reportId))}"
+                            aria-label="Set audit scope">
+                            <i class="fa-solid fa-bullseye" style="margin-right: 0.3rem;"></i>Set audit scope
                         </button>` : '';
         return `
                     <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
@@ -3101,6 +3109,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             </div>
             ` : '<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">No issues found.</p>'}
         `;
+
+        // A manual run needs unmistakable feedback — the re-render is instant
+        // and often shows identical totals, which read as "the button did
+        // nothing". Silent (auto) runs stay quiet.
+        if (!silent && typeof window.showNotification === 'function') {
+            window.showNotification(
+                'Integrity check complete — ' + blockers.length + ' blocker(s), ' + warnings.length + ' warning(s).',
+                blockers.length ? 'warning' : 'success'
+            );
+        }
 
         // Visual hint only — the hard finalize gate lives in finalizeAndPublish.
         const finalizeBtn = document.getElementById('btn-finalize-publish');
@@ -3283,6 +3301,50 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             report.technicalReview = { reviewer, outcome, date, notes };
             window.closeModal();
             persistAndRefreshIntegrity(reportId, 'Technical review recorded: ' + outcome + ' (' + reviewer + ').');
+        });
+    };
+
+    /**
+     * "Set audit scope" fix action for the issuance-gate scope blocker (data-
+     * action target — see the button rendered in runReportIntegrityCheck).
+     * The gate accepts report.scope OR the linked plan's objectives/scope/
+     * criteria; this writes report.scope (report-level, always checked first)
+     * and mirrors it onto an empty plan.scope so Plans views agree.
+     */
+    window.setAuditScope = function (reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) { window.showNotification('Report not found.', 'error'); return; }
+        const plan = (state.auditPlans || []).find(p => String(p.id) === String(report.planId));
+        const current = report.scope || report.auditScope
+            || (plan && (plan.auditObjectives || plan.scope || plan.auditCriteria)) || '';
+        const esc = window.UTILS.escapeHtml;
+
+        window.DataService.openFormModal('Set Audit Scope / Criteria', `
+            <div class="form-group">
+                <label>Audit scope &amp; criteria <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="scope-input" rows="5" placeholder="e.g. Provision of postal and logistics services at the Head Office, audited against ISO 9001:2015 clauses 4–10.">${esc(current)}</textarea>
+                <small style="color: var(--text-secondary); display: block; margin-top: 0.35rem;">Printed on the report cover and checked by the issuance gate.</small>
+                <small id="scope-warning" style="display:none; color: #dc2626;"></small>
+            </div>
+        `, () => {
+            const value = Sanitizer.sanitizeText(document.getElementById('scope-input')?.value || '').trim();
+            const warning = document.getElementById('scope-warning');
+            if (value.length < 10) {
+                if (warning) { warning.textContent = 'Enter a meaningful scope statement (at least 10 characters).'; warning.style.display = 'block'; }
+                return;
+            }
+            report.scope = value;
+            if (plan && !plan.scope) {
+                plan.scope = value;
+                // Plans sync in batch — SupabaseClient.syncAuditPlansToSupabase.
+                try {
+                    if (window.SupabaseClient && typeof window.SupabaseClient.syncAuditPlansToSupabase === 'function') {
+                        window.SupabaseClient.syncAuditPlansToSupabase([plan]);
+                    }
+                } catch (e) { /* local state persists via saveData either way */ }
+            }
+            window.closeModal();
+            persistAndRefreshIntegrity(reportId, 'Audit scope recorded.');
         });
     };
 
