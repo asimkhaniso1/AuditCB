@@ -1072,7 +1072,7 @@
                             <i class="fa-solid fa-certificate" style="color:white;font-size:2.5rem;"></i>
                         </div>
                         `}
-                        <h1 style="margin:0 0 0.5rem;font-size:1.8rem;color:#1e293b;font-weight:700;">${d.cbName || 'Audit360 Suite'}</h1>
+                        <h1 style="margin:0 0 0.5rem;font-size:1.8rem;color:#1e293b;font-weight:700;">${d.cbName || 'ISOXPERT Audit360'}</h1>
                         <div style="font-size:0.95rem;color:#64748b;font-weight:500;">ISO Certification Body</div>
                         <div style="width:60px;height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed);margin:1.5rem auto;border-radius:2px;"></div>
                     </div>
@@ -3664,13 +3664,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             +   '.sh{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;page-break-after:avoid;break-after:avoid;page-break-inside:avoid;break-inside:avoid;}'
             +   '.sb{page-break-before:avoid;break-before:avoid;}'
             // Major reading milestones start on a fresh page rather than being
-            // wedged under whatever preceded them: Audit Summary & Opening
-            // Meeting (5), Audit Conclusion & Recommendation (15) and Signature
-            // & Attestation (16). Targeted by section KEY, not by the printed
-            // number — the numbering shifts with whichever sections are enabled.
+            // wedged under whatever preceded them: Objectives, Criteria &
+            // Methodology (4), Audit Summary & Opening Meeting (5), Audit
+            // Conclusion & Recommendation (15) and Signature & Attestation (16).
+            // Targeted by section KEY, not by the printed number — the
+            // numbering shifts with whichever sections are enabled.
             // A forced break on a box already at a page boundary is ignored by
             // the fragmentation spec, so this cannot introduce blank pages.
-            +   '#sec-summary,#sec-conclusion,#sec-signature{page-break-before:always;break-before:page;}'
+            +   '#sec-objectives,#sec-summary,#sec-conclusion,#sec-signature{page-break-before:always;break-before:page;}'
             +   (d.report.reportStatus === 'draft' ? '.watermark{display:flex !important;}' : '')
             +   '.toc-item{break-inside:avoid;page-break-inside:avoid;}'
             // Print-quality guarantees: no orphan/widow lines, headings keep their
@@ -3817,16 +3818,20 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<div class="cover">'
             + '<div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%;position:absolute;top:40px;left:0;right:0;padding:0 50px;">'
             + (d.cbLogo ? '<img src="' + d.cbLogo + '" style="height:60px;object-fit:contain;" alt="CB Logo">' : '<div></div>')
-            + (function () {
+            // QR only prints when it resolves to a real, working address. In the
+            // fallback state (no publicReportUrl/live origin/cbWebsite configured)
+            // it encodes the sentinel https://audit-cb.example/ placeholder, which
+            // will never resolve — a dead QR handed to the client is worse than no
+            // QR at all, and the only warning about it (below) is print-hidden.
+            + (d.qrFallback ? '<div></div>' : (function () {
                 let qrHost;
                 try { qrHost = new URL(d.cardUrl).host; } catch (_e) { qrHost = ''; }
                 return '<div style="text-align:center;max-width:160px;">'
                     + '<img src="' + d.qrCodeUrl + '" style="height:120px;width:120px;display:block;margin:0 auto;" alt="Scan to verify">'
                     + '<div style="font-size:0.58rem;color:#64748b;margin-top:4px;letter-spacing:0.2px;font-weight:500;">Scan to view report card</div>'
                     + (qrHost ? '<div style="font-size:0.52rem;color:#94a3b8;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;">' + window.UTILS.escapeHtml(qrHost) + '</div>' : '')
-                    + (d.qrFallback ? '<div class="no-print" style="font-size:0.52rem;color:#b91c1c;margin-top:4px;font-weight:700;">⚠ Set CB website in Settings — QR points to a placeholder URL.</div>' : '')
                     + '</div></div>';
-            })()
+            })())
             + '<div style="margin-top:40px;"></div>'
             + '<div class="cover-line"></div>'
             + '<h1 style="font-size:2.8rem;font-weight:700;color:#0f172a;letter-spacing:1px;">AUDIT REPORT</h1>'
@@ -4035,8 +4040,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (secMap['conclusion'] ? '<div id="sec-conclusion" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('conclusion') + 'AUDIT CONCLUSION &amp; RECOMMENDATION</div><div class="sb">'
                 + (function () {
                     const rec = resolveRecommendation(d.report, d.stats);
-                    return '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (rec.primary === 'Recommended' ? 'background:#ecfdf5;color:#15803d;' : rec.primary === 'Not Recommended' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + rec.primary + '</span>'
-                        + (rec.showAutoCaption ? '<span style="margin-left:10px;font-size:0.74rem;color:#94a3b8;font-style:italic;">(system-derived: ' + rec.auto + ')</span>' : '') + '</div>';
+                    // rec.showAutoCaption (manual vs auto-derived recommendation mismatch) is
+                    // surfaced to CB staff in the preview/edit modal only — "system-derived" is
+                    // internal terminology and must never reach the client-facing PDF.
+                    return '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (rec.primary === 'Recommended' ? 'background:#ecfdf5;color:#15803d;' : rec.primary === 'Not Recommended' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + rec.primary + '</span></div>';
                 })()
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + formatRichText(editedConclusion) + '</div>'
                 + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1d4ed8;"><strong style="color:#1d4ed8;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr><tr><td>Unresolved Issues / Diverging Opinions</td><td>' + editedUnresolved + '</td></tr></table></div>'
@@ -4186,8 +4193,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     + (function () {
                         const rec = resolveRecommendation(d.report, d.stats);
                         const color = rec.isManual ? (rec.primary === 'Recommended' ? '#15803d' : rec.primary === 'Not Recommended' ? '#b91c1c' : '#b45309') : d.stats.recColor;
+                        // "system-derived" is internal terminology (see resolveRecommendation) —
+                        // never printed to the client; the spacer keeps the layout unchanged.
                         return '<div style="display:inline-block;padding:10px 26px;border:1px solid ' + color + ';border-radius:6px;color:' + color + ';font-weight:700;font-size:0.95rem;margin-bottom:8px;">' + rec.primary + '</div>'
-                            + (rec.showAutoCaption ? '<div style="font-size:0.72rem;color:#94a3b8;font-style:italic;margin-bottom:26px;">(system-derived: ' + rec.auto + ')</div>' : '<div style="margin-bottom:26px;"></div>');
+                            + '<div style="margin-bottom:26px;"></div>';
                     })()
                     + '<table style="border-collapse:collapse;width:100%;max-width:460px;text-align:left;border-top:1px solid #e7ecf1;border-bottom:1px solid #e7ecf1;margin-bottom:32px;">'
                     + row('Audit Reference', String(d.report.id))
@@ -4196,7 +4205,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     + row('Next Audit', nextStage)
                     + row('Contact', (cbName || '') + (cbEmail ? ' · ' + cbEmail : ''))
                     + '</table>'
-                    + (d.qrCodeUrl ? '<img src="' + d.qrCodeUrl + '" alt="Verification QR" style="width:84px;height:84px;margin-bottom:12px;">' + '<div style="font-size:0.68rem;color:#94a3b8;margin-bottom:26px;">Scan to verify this report</div>' : '')
+                    + (d.qrCodeUrl && !d.qrFallback ? '<img src="' + d.qrCodeUrl + '" alt="Verification QR" style="width:84px;height:84px;margin-bottom:12px;">' + '<div style="font-size:0.68rem;color:#94a3b8;margin-bottom:26px;">Scan to verify this report</div>' : '')
                     + '<div style="font-size:0.85rem;color:#475569;max-width:440px;line-height:1.6;">Thank you for the professional cooperation extended to the audit team. This report has been prepared in accordance with ' + standard + ' requirements; distribution is limited to authorized recipients listed herein.</div>'
                     + '<div style="margin-top:26px;font-size:0.72rem;color:#94a3b8;">Doc Ref: ' + reportRef(d) + ' · Issue Date: ' + d.today + '</div>'
                     + '</div>';

@@ -285,7 +285,7 @@ Return ONLY the raw JSON object, no markdown fences.`;
         const conformPct = computeConformPct(d, stats) ?? 0;
         if (conformPct >= 70) strengths.push(`Strong overall conformity across assessed clauses (${conformPct}% of applicable items conforming).`);
         deptEntries.filter(([, v]) => v.total > 0 && v.nc === 0).slice(0, 3).forEach(([name]) => strengths.push(`${name} demonstrated full conformity during this audit.`));
-        if (!strengths.length) strengths.push('No specific department-level strengths could be isolated from available data.');
+        if (!strengths.length) strengths.push('No specific strengths were separately highlighted during this surveillance audit.');
 
         const findings = [];
         deptEntries.filter(([, v]) => v.major > 0 || v.minor > 0).sort((a, b) => (b[1].major * 2 + b[1].minor) - (a[1].major * 2 + a[1].minor)).slice(0, 4).forEach(([name, v]) =>
@@ -504,7 +504,7 @@ ${data.forwardOutlook ? `
         const conclusion = buildFactualConclusion(d, stats);
 
         let strengths = dedupeCap(data.strengths, 3).map(s => truncate(cleanFindingText(s, 140), 140));
-        if (!strengths.length) strengths = ['No specific department-level strengths could be isolated from available data.'];
+        if (!strengths.length) strengths = ['No specific strengths were separately highlighted during this surveillance audit.'];
 
         let findings = dedupeCap(data.findings, 4).map(s => truncate(cleanFindingText(s, 140), 140));
         if (!findings.length) findings = ['No significant findings identified in this audit cycle.'];
