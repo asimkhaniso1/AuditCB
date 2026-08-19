@@ -426,6 +426,85 @@ function _stripMdLite(text) {
     return String(text).replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1').replace(/^#+\s*/gm, '').replace(/^[-•]\s*/gm, '').trim();
 }
 
+// ============================================
+// CLIENT-FACING EVIDENCE STATEMENT HELPERS (client spec #10)
+// ============================================
+// "Never invent a fact" needs the same structural treatment here that
+// suggestFindingClause() gives clause numbers above: a deterministic
+// pre-filter for notes too thin to safely expand, plus a deterministic
+// post-generation numeric-token check, so a faithful raw-note fallback is
+// what ships whenever the model's own judgement can't be fully trusted —
+// never an invention.
+
+// A raw note this thin (word count, not character count) cannot be expanded
+// into a statement without guessing at unstated context — "Website." is the
+// spec's own example. Kept intentionally low (<=2 words) so it only catches
+// genuinely content-free fragments; "Records Are Available." (3 words) and
+// "8 now total emplyees." (4 words) both carry enough to work from and are
+// sent to the model.
+const EVIDENCE_STATEMENT_SPARSE_MAX_WORDS = 2;
+
+function _evidenceWordCount(text) {
+    const t = String(text || '').trim();
+    if (!t) return 0;
+    return t.split(/\s+/).filter(Boolean).length;
+}
+
+// Same field-priority convention already used by refineAuditNotes/
+// generateConformanceText for locating an item's raw note text, with
+// `rawNote` checked first for callers that already model the two-field
+// (raw vs client-facing) contract this function introduces.
+function _extractRawNoteText(item) {
+    if (!item) return '';
+    return String(item.rawNote || item.comment || item.remarks || item.transcript || item.ncrDescription || item.description || '').trim();
+}
+
+// Mechanical-only fallback: defers to the canonical window.ReportStats.
+// cleanEvidenceText() (whitespace/capitalization/terminal period/entity
+// cleanup — never rewording) per this task's instruction not to reimplement
+// it. Falls back to an equivalent local mechanical pass only when
+// ReportStats hasn't loaded, so this never throws and never invents wording
+// either way.
+function _mechanicalCleanFallback(raw) {
+    try {
+        if (window.ReportStats && typeof window.ReportStats.cleanEvidenceText === 'function') {
+            return window.ReportStats.cleanEvidenceText(raw);
+        }
+    } catch (_e) { /* fall through to local mechanical pass */ }
+    let text = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+    if (!text) return text;
+    text = text.charAt(0).toUpperCase() + text.slice(1);
+    if (/[A-Za-z0-9]$/.test(text)) text += '.';
+    return text;
+}
+
+// Deterministic numeric-token safety net (client spec #10, task 4).
+// Extracts digit-led tokens (numbers, dates, percentages, decimals — e.g.
+// "2", "2-week", "50%", "2024-01-05") from a string. Boundary punctuation
+// (leading/trailing separators) is trimmed so "2." at a sentence end and a
+// bare "2" compare equal; internal separators (decimals, date dashes/slashes)
+// are kept so "2024-01-05" isn't fragmented into unrelated single digits.
+function _extractNumericTokens(text) {
+    if (!text) return [];
+    const matches = String(text).match(/\d[\d,.:/\-]*%?/g) || [];
+    return matches
+        .map(m => m.replace(/^[,.:/\-]+|[,.:/\-]+$/g, ''))
+        .filter(Boolean);
+}
+
+// Returns the list of numeric tokens present in `proposed` but absent from
+// `raw` — i.e. numbers/dates/percentages the model's rewrite introduced that
+// the auditor's own note never stated. An empty array means the proposal is
+// clean; ANY entry means the whole proposal for that item must be rejected
+// (never trimmed down to "just the sentence with the new number removed" —
+// a proposal that needed an invented number to read naturally is not safe to
+// partially salvage).
+function _introducedNumericTokens(raw, proposed) {
+    const rawTokens = new Set(_extractNumericTokens(raw));
+    const proposedTokens = _extractNumericTokens(proposed);
+    return proposedTokens.filter(t => !rawTokens.has(t));
+}
+
 const AI_SERVICE = {
 
     // Main function to generate agenda
@@ -862,6 +941,191 @@ Return raw JSON only (no markdown code fences, no prose outside the JSON):
             confidence,
             insufficientEvidence: false
         };
+    },
+
+    /**
+     * 1e. Client-facing evidence statement builder (client spec #10).
+     *
+     * Raw auditor field notes ("Records Are Available.", "Ssytem is in
+     * placed.", "8 now total emplyees.") are fine during fieldwork but must
+     * never print verbatim in a client certification report. This proposes,
+     * per checklist item, a professionalized "Client-Facing Evidence
+     * Statement" — WITHOUT ever touching the auditor's original raw note.
+     * The two fields stay structurally separate in the return value; nothing
+     * this function does mutates `items` or any field on it.
+     *
+     * THE HARD RULE (governs the prompt and both safety nets below): the
+     * model may improve grammar, spelling, capitalization and professional
+     * register ONLY. It must add no fact, finding, quantity, date, name,
+     * cause, or compliance/risk judgement absent from the raw note, and must
+     * not turn a plain observation into a finding. Preferring a faithful,
+     * plainly-worded statement over an impressive one is deliberate — see
+     * task spec #10 for the worked example this prompt is calibrated
+     * against ("Govt complain closed in a 2 week..." -> "...closed within
+     * approximately two weeks...").
+     *
+     * Two deterministic guardrails keep that rule structural, not just
+     * prompted:
+     *   1. Sparse-note pre-filter — a raw note of
+     *      EVIDENCE_STATEMENT_SPARSE_MAX_WORDS words or fewer (e.g.
+     *      "Website.") is too thin to expand without guessing at unstated
+     *      context. These are never sent to the model at all: `proposed` is
+     *      a purely mechanical clean of the raw note (via
+     *      window.ReportStats.cleanEvidenceText — never reworded) and
+     *      `flaggedSparse: true` tells the caller to prompt the auditor
+     *      directly rather than ship anything AI-authored for that item.
+     *   2. Numeric-token safety net — after generation, every digit-led
+     *      token (number, date, percentage — see _extractNumericTokens) in
+     *      the model's proposed text is compared against the tokens present
+     *      in the raw note. If the proposal contains ANY numeric token the
+     *      raw note doesn't have, the ENTIRE proposal for that item is
+     *      discarded (never partially salvaged) and replaced with the same
+     *      mechanical clean fallback used for sparse notes;
+     *      `safetyNetTriggered: true` marks that this happened.
+     *
+     * Never throws. Any missing AI configuration, network failure, or
+     * unparseable response degrades every eligible item to its mechanical
+     * clean fallback (raw note, tidied only) rather than propagating an
+     * error — same "fail toward the raw note" posture as the two guardrails
+     * above.
+     *
+     * @param {Array<Object>} items - Checklist items (or any objects) carrying
+     *   a raw auditor note. The raw note is read from, in priority order:
+     *   item.rawNote, item.comment, item.remarks, item.transcript,
+     *   item.ncrDescription, item.description. Not mutated.
+     * @param {Object} [opts]
+     * @param {string} [opts.standard] - Audited ISO standard name (e.g.
+     *   "ISO 9001:2015"), passed only as light framing context for register/
+     *   tone — never used to inject clause text or other facts the model
+     *   could fold into a rewrite.
+     * @returns {Promise<Array<{
+     *   index: number,
+     *   raw: string,
+     *   proposed: string,
+     *   unchanged: boolean,
+     *   flaggedSparse: boolean,
+     *   safetyNetTriggered: boolean
+     * }>>}
+     *   One entry per input item, in the same order, so `index` always maps
+     *   back to `items[index]` even for items skipped or degraded below:
+     *   - `raw` — the auditor's original note, verbatim, untouched.
+     *   - `proposed` — the candidate client-facing evidence statement. Equal
+     *     to a mechanical clean of `raw` (never AI-reworded) whenever
+     *     `flaggedSparse` or `safetyNetTriggered` is true, or the AI call
+     *     failed.
+     *   - `unchanged` — true when `proposed` carries no real
+     *     professionalization over `raw` (empty note, sparse note, safety-net
+     *     fallback, or AI failure). false only when the model's rewrite was
+     *     generated AND passed the numeric-token safety net.
+     *   - `flaggedSparse` — true when the raw note was too thin to safely
+     *     expand; the UI should ask the auditor for input rather than treat
+     *     `proposed` as a real draft.
+     *   - `safetyNetTriggered` — true when a model proposal was generated but
+     *     rejected for introducing a number/date/percentage absent from the
+     *     raw note, and `proposed` was replaced with the mechanical fallback.
+     *
+     * Additive only — not wired into any UI or existing function. auditor
+     * approve/edit UI is a follow-up task; this only needs to expose a stable
+     * contract for it to build against.
+     */
+    buildClientEvidenceStatements: async (items, opts = {}) => {
+        const standard = opts && opts.standard;
+        const list = Array.isArray(items) ? items : [];
+
+        const baseResult = (index, raw) => ({
+            index,
+            raw,
+            proposed: _mechanicalCleanFallback(raw),
+            unchanged: true,
+            flaggedSparse: false,
+            safetyNetTriggered: false
+        });
+
+        let entries;
+        try {
+            entries = list.map((item, index) => {
+                const raw = _extractRawNoteText(item);
+                const result = baseResult(index, raw);
+                if (raw && _evidenceWordCount(raw) <= EVIDENCE_STATEMENT_SPARSE_MAX_WORDS) {
+                    result.flaggedSparse = true;
+                }
+                return result;
+            });
+        } catch (e) {
+            if (window.Logger) window.Logger.warn('AI_SERVICE', 'buildClientEvidenceStatements: failed to read raw notes from items; returning empty result.', e);
+            return [];
+        }
+
+        // Only non-sparse notes with actual content are worth an AI call.
+        const eligible = entries.filter(r => r.raw && !r.flaggedSparse);
+        if (eligible.length === 0) return entries;
+
+        const prompt = `
+You are professionalizing raw auditor field notes into client-facing evidence statements for a formal ISO certification audit report${standard ? ` (Standard: ${standard})` : ''}. These statements will appear in a document submitted to the client.
+
+THE HARD RULE — apply this before anything else: you may improve grammar, spelling, capitalization and professional register ONLY. You MUST NOT add any fact, finding, quantity, date, name, cause, conclusion, or compliance/risk judgement that is not already present in the raw note. Do not turn a plain observation into a finding. Do not infer why something happened, its significance, or whether it demonstrates conformity or non-conformity unless the raw note already says so. A faithful, plainly-worded statement is always preferred over an impressive one.
+
+Rules:
+1. Fix grammar, spelling, capitalization and punctuation only.
+2. Preserve every fact stated in the raw note. Remove nothing material.
+3. Do not add adjectives, qualifiers, causes, outcomes, or interpretations that are not already present in the raw note.
+4. Preserve the auditor's own terminology, abbreviations, and any proper nouns EXACTLY as written — do not substitute synonyms for named systems, people, roles, or documents.
+5. Preserve every number, date, percentage and quantity exactly as given — never add, remove, or change a numeral or amount. You may spell a number out in words (e.g. "2" -> "two") but must not introduce any numeral, date, or percentage that is not already in the raw note.
+6. Write one to two clear, complete, professional sentences. Do not pad, elaborate, or speculate beyond what the raw note states.
+7. If a raw note is too sparse, fragmentary, or ambiguous to turn into a meaningful, faithful statement without guessing at unstated context, do NOT invent a subject, action, or context to fill the gap — instead return the note only trivially cleaned (spelling/case/punctuation) and set "sparse": true for that entry.
+8. Each entry is independent — do not cross-reference, combine, or borrow context from any other entry.
+9. Do NOT use markdown formatting. Return plain text only in each "proposed" value.
+
+Raw Auditor Notes:
+${JSON.stringify(eligible.map(r => ({ id: r.index, note: r.raw })), null, 2)}
+
+Return raw JSON only (no markdown fences, no prose outside the JSON), an array with 'id', 'proposed' and 'sparse' fields:
+[{"id": 0, "proposed": "Professional client-facing statement...", "sparse": false}, ...]
+`;
+
+        let parsed;
+        try {
+            const apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
+            parsed = AI_SERVICE.parseAgendaResponse(apiResponseText);
+        } catch (error) {
+            if (window.Logger) window.Logger.warn('AI_SERVICE', 'buildClientEvidenceStatements: AI request/parse failed; degrading every eligible item to its mechanical clean fallback.', error);
+            return entries; // every entry already carries its mechanical-clean fallback
+        }
+
+        if (!Array.isArray(parsed)) return entries;
+
+        const byIndex = new Map(entries.map(r => [r.index, r]));
+        parsed.forEach(p => {
+            if (!p || p.id === undefined || p.id === null) return;
+            const target = byIndex.get(Number(p.id));
+            if (!target) return;
+
+            if (p.sparse === true) {
+                // Model itself judged this too thin — trust the flag, but never
+                // its own rewrite; the mechanical fallback already in `target`
+                // (from baseResult) is what ships.
+                target.flaggedSparse = true;
+                return;
+            }
+
+            const candidate = _stripMdLite(String(p.proposed || '').trim());
+            if (!candidate) return; // nothing usable returned — keep mechanical fallback
+
+            const introduced = _introducedNumericTokens(target.raw, candidate);
+            if (introduced.length > 0) {
+                if (window.Logger) window.Logger.warn('AI_SERVICE', `buildClientEvidenceStatements: rejected proposal for item ${target.index} — introduced numeric token(s) not present in the raw note: ${introduced.join(', ')}. Falling back to mechanical clean.`);
+                target.safetyNetTriggered = true;
+                target.unchanged = true;
+                // target.proposed already holds the mechanical fallback from baseResult
+                return;
+            }
+
+            target.proposed = candidate;
+            const cleanedRaw = _mechanicalCleanFallback(target.raw);
+            target.unchanged = candidate.trim().toLowerCase() === cleanedRaw.trim().toLowerCase();
+        });
+
+        return entries;
     },
 
     draftExecutiveSummary: async (reportData, compliantAreas = [], observationItems = []) => {
