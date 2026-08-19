@@ -3663,6 +3663,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             +   'tfoot{display:table-footer-group;}'
             +   '.sh{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;page-break-after:avoid;break-after:avoid;page-break-inside:avoid;break-inside:avoid;}'
             +   '.sb{page-break-before:avoid;break-before:avoid;}'
+            // Major reading milestones start on a fresh page rather than being
+            // wedged under whatever preceded them: Audit Summary & Opening
+            // Meeting (5), Audit Conclusion & Recommendation (15) and Signature
+            // & Attestation (16). Targeted by section KEY, not by the printed
+            // number — the numbering shifts with whichever sections are enabled.
+            // A forced break on a box already at a page boundary is ignored by
+            // the fragmentation spec, so this cannot introduce blank pages.
+            +   '#sec-summary,#sec-conclusion,#sec-signature{page-break-before:always;break-before:page;}'
             +   (d.report.reportStatus === 'draft' ? '.watermark{display:flex !important;}' : '')
             +   '.toc-item{break-inside:avoid;page-break-inside:avoid;}'
             // Print-quality guarantees: no orphan/widow lines, headings keep their
