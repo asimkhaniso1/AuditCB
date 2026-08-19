@@ -680,17 +680,60 @@ function switchNCRTab(tabName, btnElement) {
 }
 
 // --------------------------------------------
+// CLIENT-WORKSPACE SCOPING
+// Every tab below (Register, OFI/OBS, CAPA Tracker, Verification,
+// Analytics) must show ONLY the active client's records when this module is
+// rendered inside a client workspace — otherwise another client's NCRs leak
+// into e.g. the CAPA Tracker. window.state.activeClientId is the
+// authoritative "are we inside a client workspace" flag (set by
+// selectClient()/handleRouteChange() in client-workspace.js/script.js);
+// ncrContextClientId is this module's own mirror of it (set by
+// renderNCRCAPAModule) and is used as a fallback so scoping still holds if
+// this module is ever driven without going through that router.
+function activeNCRClientId() {
+    return window.state.activeClientId != null ? window.state.activeClientId : window.state.ncrContextClientId;
+}
+
+// Local reimplementation of client-workspace.js's matchesClient(item, client)
+// — that module doesn't export it, so its semantics are mirrored here: match
+// by clientId when the record carries one, else fall back to a
+// case-insensitive client NAME match (covers legacy/checklist-synced records
+// that only ever got clientName populated, never a real clientId FK). Field
+// lookups try both an NCR record's shape (clientId/clientName) and an audit
+// report record's shape (clientId or client_id / client), so the same helper
+// covers every tab, including OFI/OBS which reads report records.
+//
+// Outside a client workspace (no active client) this is a no-op — every
+// record passes, exactly like today's unscoped global/dashboard view. Inside
+// a client workspace, a record with NEITHER a matching clientId NOR a
+// matching name is excluded — it is never guessed into the wrong client's
+// register. Such orphaned records stay visible in the global view (which
+// applies no filter at all), so nothing is silently dropped from the app —
+// only kept out of a workspace it can't be confirmed to belong to.
+function matchesActiveNCRClient(rec) {
+    const clientId = activeNCRClientId();
+    if (!clientId) return true; // global/dashboard view — unchanged, all clients
+    if (!rec) return false;
+
+    const recClientId = rec.clientId != null ? rec.clientId : rec.client_id;
+    if (recClientId != null) return String(recClientId) === String(clientId);
+
+    const recName = rec.clientName || rec.client;
+    if (!recName) return false; // nothing reliable to match on — keep out of the client-scoped view
+    const client = (window.state.clients || []).find(c => String(c.id) === String(clientId));
+    return !!client && String(recName).trim().toLowerCase() === String(client.name || '').trim().toLowerCase();
+}
+
+// --------------------------------------------
 // TAB 1: NCR REGISTER
 // --------------------------------------------
 
 function getNCRRegisterHTML() {
     let ncrs = window.state.ncrs || [];
 
-    // Filter by Context (if viewing a specific client)
-    if (window.state.ncrContextClientId) {
-        // ID comparison: Robust string comparison
-        ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
-    }
+    // Filter by Context (if viewing a specific client) — matchesActiveNCRClient
+    // also covers legacy records that only carry clientName, not clientId.
+    ncrs = ncrs.filter(matchesActiveNCRClient);
 
     // Default register view excludes Withdrawn records (still inspectable via the
     // Status filter dropdown, which offers an explicit "Withdrawn" option).
@@ -860,9 +903,7 @@ function filterNCRs() {
     let ncrs = window.state.ncrs || [];
 
     // Always apply context filter first
-    if (window.state.ncrContextClientId) {
-        ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
-    }
+    ncrs = ncrs.filter(matchesActiveNCRClient);
 
     let filtered = ncrs.filter(ncr => {
         // Withdrawn records are hidden from the default ("all") view — they're
@@ -892,20 +933,17 @@ function filterNCRs() {
 
 function getOFIOBSHTML() {
     const reports = window.state.auditReports || [];
-    const clientId = window.state.ncrContextClientId;
 
     // Collect all OFI/OBS from checklist progress across reports
     const findings = [];
 
     reports.forEach(report => {
-        // Context filter: only show findings for the active client
-        if (clientId) {
-            const reportClientId = report.clientId || report.client_id;
-            const client = (window.state.clients || []).find(c => c.name === report.client);
-            const matchesId = String(reportClientId) === String(clientId);
-            const matchesName = client && String(client.id) === String(clientId);
-            if (!matchesId && !matchesName) return;
-        }
+        // Context filter: only show findings for the active client. Reuses
+        // matchesActiveNCRClient (clientId match, else case-insensitive name
+        // match against report.client) so this tab agrees with the
+        // Register/CAPA/Verification/Analytics tabs on what "belongs to this
+        // client" means, instead of its own separate id/name lookup.
+        if (!matchesActiveNCRClient(report)) return;
 
         const progress = report.checklistProgress || [];
         progress.forEach(item => {
@@ -1032,9 +1070,7 @@ function getOFIOBSHTML() {
 
 function getCAPATrackerHTML() {
     let ncrs = window.state.ncrs || [];
-    if (window.state.ncrContextClientId) {
-        ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
-    }
+    ncrs = ncrs.filter(matchesActiveNCRClient);
 
     // CAPA Tracker is a default list view — Withdrawn NCRs no longer require action.
     ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
@@ -1107,9 +1143,7 @@ function getCAPATrackerHTML() {
 
 function getVerificationHTML() {
     let ncrs = window.state.ncrs || [];
-    if (window.state.ncrContextClientId) {
-        ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
-    }
+    ncrs = ncrs.filter(matchesActiveNCRClient);
 
     // Filter for items ready for verification (Withdrawn records never need verification)
     const pendingReview = ncrs.filter(n => !isWithdrawnNCR(n) &&
@@ -1164,9 +1198,7 @@ function getVerificationHTML() {
 
 function getAnalyticsHTML() {
     let ncrs = window.state.ncrs || [];
-    if (window.state.ncrContextClientId) {
-        ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
-    }
+    ncrs = ncrs.filter(matchesActiveNCRClient);
     // Analytics exclude Withdrawn NCRs entirely
     ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
 
@@ -1324,9 +1356,7 @@ function initNCRAnalyticsCharts() {
         if (existing) existing.destroy();
 
         let ncrs = window.state.ncrs || [];
-        if (window.state.ncrContextClientId) {
-            ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
-        }
+        ncrs = ncrs.filter(matchesActiveNCRClient);
         ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
         const major = ncrs.filter(n => (n.severity || '').toLowerCase() === 'major').length;
         const minor = ncrs.filter(n => (n.severity || '').toLowerCase() === 'minor').length;
@@ -1361,9 +1391,7 @@ function initNCRAnalyticsCharts() {
         if (existing) existing.destroy();
 
         let ncrs = window.state.ncrs || [];
-        if (window.state.ncrContextClientId) {
-            ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
-        }
+        ncrs = ncrs.filter(matchesActiveNCRClient);
         ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
         const open = ncrs.filter(n => n.status === 'Open').length;
         const inProg = ncrs.filter(n => n.status === 'In Progress').length;
@@ -1726,7 +1754,10 @@ window.deleteNCR = async function (id) {
 
 // --- PRINT NCR REGISTER ---
 window.printNCRRegister = function () {
-    const ncrs = window.state.ncrs || [];
+    // Printed register must match what's on screen — scope it the same way
+    // every tab does, so printing from inside a client workspace can never
+    // put another client's NCRs on paper.
+    const ncrs = (window.state.ncrs || []).filter(matchesActiveNCRClient);
     const printWindow = window.open('', '', 'width=1000,height=700');
 
     printWindow.document.write(`
