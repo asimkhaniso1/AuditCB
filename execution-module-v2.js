@@ -1138,6 +1138,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <div id="report-integrity-results">
                             <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Not yet run for this session.</p>
                         </div>
+                        <!-- Technical Review QA (client spec #31) — filled by the same
+                             runReportIntegrityCheck run, alongside the panel above. -->
+                        <div id="report-integrity-qa-panel"></div>
                     </div>
 
                     <!-- 2. Findings Review -->
@@ -2968,6 +2971,129 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         window.showNotification('Meeting records saved successfully', 'success');
     };
 
+    // ── Technical Review QA dimension map (client spec #31) ─────────────────
+    // "Before approval, give the Technical Reviewer a concise QA panel... show
+    // only exceptions requiring human decision" — this maps each
+    // report-integrity.js rule id (by prefix; see that file for the rule
+    // inventory) onto the QA dimension a reviewer actually thinks in, so the
+    // reviewer sees "Clause Mapping: REVIEW" instead of having to reread the
+    // whole report to notice B1/B4/B14/B15/W20/W7 are all the same underlying
+    // problem. One rule id can only belong to one dimension; a dimension can
+    // be fed by several rule ids.
+    //
+    //   Dimension                    Rule ids (report-integrity.js prefixes)
+    //   ────────────────────────     ──────────────────────────────────────
+    //   Clause Mapping                B1, B4, B14, B15, W20, W7
+    //   Finding Evidence              B3
+    //   Finding Counts                B13
+    //   Audit Method                  B12
+    //   Scope & Applicability         W13 (+ the finalize-gate scope check —
+    //                                  no rule id of its own; matched by message,
+    //                                  see GATE_SCOPE_MESSAGE_RE below)
+    //   Effectiveness Consistency     W1, W17, W18
+    //   Certification Cycle           B2, B9, W15
+    //   Client-Facing Language        B6p, W10, W19
+    //   Internal Metadata             B11
+    //
+    // Adding a rule to report-integrity.js later? Add its prefix to the
+    // matching row here. A rule id that fires and matches none of these rows
+    // is NOT dropped — classifyQaDimension's fallback below buckets it into
+    // QA_OTHER_DIMENSION so it still surfaces as a REVIEW exception instead of
+    // silently vanishing (e.g. B1n/B5/B6/B7/B8/B10/W2/W3/W4/W5/W6/W8/W9/W11/
+    // W12/W14/W16 are real rules today but aren't named in the spec's table,
+    // so they land in "Other" until someone gives them a real home).
+    const QA_DIMENSION_RULES = [
+        { dimension: 'Clause Mapping', prefixes: ['B1', 'B4', 'B14', 'B15', 'W20', 'W7'] },
+        { dimension: 'Finding Evidence', prefixes: ['B3'] },
+        { dimension: 'Finding Counts', prefixes: ['B13'] },
+        { dimension: 'Audit Method', prefixes: ['B12'] },
+        { dimension: 'Scope & Applicability', prefixes: ['W13'] },
+        { dimension: 'Effectiveness Consistency', prefixes: ['W1', 'W17', 'W18'] },
+        { dimension: 'Certification Cycle', prefixes: ['B2', 'B9', 'W15'] },
+        { dimension: 'Client-Facing Language', prefixes: ['B6p', 'W10', 'W19'] },
+        { dimension: 'Internal Metadata', prefixes: ['B11'] }
+    ];
+    const QA_OTHER_DIMENSION = 'Other (unmapped rule)';
+
+    // Exact id, or id + '-' — so tag 'B1' matches 'B1-0' but not 'B14'/'B15-0'
+    // or the unrelated 'B1n-...' rule, and tag 'W1' matches 'W1-clause' but
+    // not 'W10-.../W11-.../W12-...' etc.
+    function idMatchesRule(id, ruleTag) {
+        return id === ruleTag || id.indexOf(ruleTag + '-') === 0;
+    }
+
+    // The finalize gate's own scope check (ai-service.js computeIssuanceGate)
+    // has no ReportIntegrity rule id — it's a plain string pushed onto
+    // gate.gateBlockers and given a synthetic 'GATE-Bn' id below. Recognise it
+    // by the same message text the "Set audit scope" fix action matches on.
+    const GATE_SCOPE_MESSAGE_RE = /scope\/criteria is not recorded/i;
+
+    function classifyQaDimension(it) {
+        const id = String((it && it.id) || '');
+        if (GATE_SCOPE_MESSAGE_RE.test(String((it && it.message) || ''))) return 'Scope & Applicability';
+        for (let i = 0; i < QA_DIMENSION_RULES.length; i++) {
+            const row = QA_DIMENSION_RULES[i];
+            if (row.prefixes.some((tag) => idMatchesRule(id, tag))) return row.dimension;
+        }
+        return null;
+    }
+
+    /**
+     * Pure classification (no DOM): the same blockers+warnings already shown
+     * in the main panel, bucketed per QA dimension. Kept separate from the
+     * HTML builder below so it's unit-testable in isolation — same reasoning
+     * as resolveFindingFromRef/isValidClauseRef/applyCriterionToFinding
+     * elsewhere in this file.
+     */
+    function buildTechnicalReviewQA(blockers, warnings) {
+        const dimensionOrder = QA_DIMENSION_RULES.map((r) => r.dimension).concat([QA_OTHER_DIMENSION]);
+        const buckets = {};
+        dimensionOrder.forEach((d) => { buckets[d] = []; });
+        (blockers || []).concat(warnings || []).forEach((it) => {
+            const dim = classifyQaDimension(it) || QA_OTHER_DIMENSION;
+            buckets[dim].push(it);
+        });
+        return dimensionOrder.map((dim) => ({ dimension: dim, status: buckets[dim].length ? 'REVIEW' : 'PASS', items: buckets[dim] }));
+    }
+
+    /**
+     * Compact reviewer-aid HTML: the dimension PASS/REVIEW grid, then only
+     * the items behind REVIEW dimensions (no repeat of the full blocker/
+     * warning cards already rendered above, and no fix-action buttons — this
+     * is a reviewer aid, not a second gate).
+     */
+    function renderTechnicalReviewQAPanel(qaRows, esc) {
+        const reviewRows = qaRows.filter((r) => r.status === 'REVIEW');
+        const dimensionList = qaRows.map((r) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0.1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem;">
+                <span style="color: #475569;">${esc(r.dimension)}</span>
+                <span style="font-weight: 700; font-size: 0.7rem; letter-spacing: 0.03em; padding: 0.1rem 0.5rem; border-radius: 8px; ${r.status === 'PASS' ? 'background: #ecfdf5; color: #059669;' : 'background: #fff7ed; color: #c2410c;'}">${r.status}${r.status === 'REVIEW' ? ' (' + r.items.length + ')' : ''}</span>
+            </div>`).join('');
+
+        const exceptions = reviewRows.length ? `
+            <div style="margin-top: 0.75rem; padding-top: 0.6rem; border-top: 1px dashed #e2e8f0;">
+                <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.4rem;">Exceptions requiring a reviewer decision:</div>
+                ${reviewRows.map((r) => `
+                    <div style="margin-bottom: 0.5rem;">
+                        <div style="font-size: 0.78rem; font-weight: 700; color: #334155; margin-bottom: 0.15rem;">${esc(r.dimension)}</div>
+                        <ul style="margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.2rem;">
+                            ${r.items.map((it) => `<li style="font-size: 0.78rem; color: #475569;">${esc((it && it.message) || '')}</li>`).join('')}
+                        </ul>
+                    </div>`).join('')}
+            </div>` : `
+            <div style="margin-top: 0.5rem; font-size: 0.78rem; color: #059669;"><i class="fa-solid fa-circle-check" style="margin-right: 0.3rem;"></i>No cross-dimension exceptions — nothing further for the reviewer to decide.</div>`;
+
+        return `
+            <div style="margin-top: 1.25rem; padding: 0.9rem 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                <div style="font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 0.5rem;">
+                    <i class="fa-solid fa-user-check" style="margin-right: 0.4rem; color: #64748b;"></i>Technical Review QA
+                    <span style="font-weight: 400; color: #94a3b8; font-size: 0.72rem; margin-left: 0.4rem;">(reviewer aid, derived from the checks above — not a second gate)</span>
+                </div>
+                ${dimensionList}
+                ${exceptions}
+            </div>`;
+    }
+
     /**
      * Run window.ReportIntegrity.checkById(reportId) (owned by another agent —
      * see report-integrity.js) and render its result into the Finalization
@@ -3027,6 +3153,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const blockers = (Array.isArray(result.blockers) ? result.blockers : []).concat(gateItems.filter(g => g.severity === 'blocker'));
         const warnings = (Array.isArray(result.warnings) ? result.warnings : []).concat(gateItems.filter(g => g.severity === 'warning'));
         const information = Array.isArray(result.information) ? result.information : [];
+        // Editorial (client spec #30) is presentation-only — raw field notes
+        // printed as client-facing evidence, auto-correctable, never a gate
+        // input. Kept out of allItems and rendered in its own visually
+        // distinct block below so it can never be mistaken for a warning.
+        const editorial = Array.isArray(result.editorial) ? result.editorial : [];
         const allItems = [...blockers, ...warnings, ...information];
         const ready = blockers.length === 0;
 
@@ -3047,6 +3178,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <div style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; padding: 0.75rem 1rem; min-width: 100px; text-align: center;">
                     <div style="font-size: 1.5rem; font-weight: 800; color: #2563eb;">${information.length}</div>
                     <div style="font-size: 0.75rem; color: #64748b;">Information</div>
+                </div>
+                <div style="background: #f5f3ff; border: 1px dashed #ddd6fe; border-radius: 8px; padding: 0.75rem 1rem; min-width: 100px; text-align: center;" title="Presentation-only — auto-correctable, never blocks issuance">
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #7c3aed;">${editorial.length}</div>
+                    <div style="font-size: 0.75rem; color: #64748b;">Editorial<br><span style="font-size: 0.65rem; color: #a78bfa;">non-blocking</span></div>
                 </div>
             </div>
             <div style="margin-bottom: 1rem; font-size: 0.95rem;">${statusLine}</div>
@@ -3128,7 +3263,37 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     }).join('')}
             </div>
             ` : '<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">No issues found.</p>'}
+            ${editorial.length ? `
+            <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: #f5f3ff; border: 1px dashed #ddd6fe; border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+                    <span style="background: #7c3aed; color: white; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 10px;">Editorial</span>
+                    <span style="font-size: 0.78rem; color: #6d28d9; font-weight: 600;">${editorial.length} presentation-only item(s) — auto-correctable, does NOT block issuance</span>
+                </div>
+                <ul style="margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                    ${editorial.map(it => `
+                    <li style="font-size: 0.8rem; color: #475569;">
+                        ${esc((it && it.message) || '')}
+                        ${it && it.suggestion ? `<div style="font-size: 0.74rem; color: #7c3aed; margin-top: 0.1rem;"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>${esc(it.suggestion)}</div>` : ''}
+                    </li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
         `;
+
+        // Technical Review QA (client spec #31) — same blockers/warnings the
+        // panel above just rendered, reclassified per reviewer dimension. See
+        // buildTechnicalReviewQA/renderTechnicalReviewQAPanel above. Optional
+        // container: older cached DOM without it just skips this quietly.
+        const qaContainer = document.getElementById('report-integrity-qa-panel');
+        if (qaContainer) {
+            try {
+                const qaRows = buildTechnicalReviewQA(blockers, warnings);
+                qaContainer.innerHTML = renderTechnicalReviewQAPanel(qaRows, esc);
+            } catch (err) {
+                console.warn('Technical Review QA render failed:', err);
+                qaContainer.innerHTML = '';
+            }
+        }
 
         // A manual run needs unmistakable feedback — the re-render is instant
         // and often shows identical totals, which read as "the button did
