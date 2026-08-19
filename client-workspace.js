@@ -1009,27 +1009,36 @@ function renderCertificationCycleWidget(client) {
                     </div>
                     
                     <!-- Mini Timeline -->
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    ${(() => {
+        // Node states: green ✓ = the audit is FINALIZED in Audit360 (never
+        // shown from the calendar alone); amber ! = that stage's period has
+        // already passed on the calendar but no finalized audit is on file —
+        // the milestone is DUE/MISSED, not blank. Grey = genuinely upcoming.
+        const node = (done, dueDate, sym, label, name) => {
+            const overdue = !done && dueDate && today > dueDate;
+            const bg = done ? '#10b981' : overdue ? '#f59e0b' : '#cbd5e1';
+            const title = done ? `${name} audit finalized`
+                : overdue ? `${name} period passed (${window.UTILS.formatDate(dueDate)}) — no finalized audit on file`
+                    : `${name} not yet due`;
+            return `<div style="text-align: center;" title="${title}">
+                            <div style="width: 32px; height: 32px; background: ${bg}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">${done ? '✓' : overdue ? '!' : sym}</div>
+                            <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">${label}</div>
+                        </div>`;
+        };
+        const link = (reached) => `<div style="width: 20px; height: 2px; background: ${reached ? '#10b981' : '#cbd5e1'};"></div>`;
+        return `<div style="display: flex; gap: 0.5rem; align-items: center;">
                         <div style="text-align: center;">
                             <div style="width: 32px; height: 32px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">✓</div>
                             <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">Cert</div>
                         </div>
-                        <div style="width: 20px; height: 2px; background: ${s1Done ? '#10b981' : '#cbd5e1'};"></div>
-                        <div style="text-align: center;" title="${s1Done ? 'Surveillance 1 audit finalized' : 'Surveillance 1 not yet finalized'}">
-                            <div style="width: 32px; height: 32px; background: ${s1Done ? '#10b981' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">${s1Done ? '✓' : '1'}</div>
-                            <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">S1</div>
-                        </div>
-                        <div style="width: 20px; height: 2px; background: ${s2Done ? '#10b981' : '#cbd5e1'};"></div>
-                        <div style="text-align: center;" title="${s2Done ? 'Surveillance 2 audit finalized' : 'Surveillance 2 not yet finalized'}">
-                            <div style="width: 32px; height: 32px; background: ${s2Done ? '#10b981' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">${s2Done ? '✓' : '2'}</div>
-                            <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">S2</div>
-                        </div>
-                        <div style="width: 20px; height: 2px; background: ${recertDone ? '#10b981' : s2Done ? '#f59e0b' : '#cbd5e1'};"></div>
-                        <div style="text-align: center;" title="${recertDone ? 'Recertification audit finalized' : s2Done ? 'Recertification due' : 'Recertification not yet due'}">
-                            <div style="width: 32px; height: 32px; background: ${recertDone ? '#10b981' : s2Done ? '#f59e0b' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">${recertDone ? '✓' : '↻'}</div>
-                            <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">Re</div>
-                        </div>
-                    </div>
+                        ${link(s1Done)}
+                        ${node(s1Done, surv1, '1', 'S1', 'Surveillance 1')}
+                        ${link(s2Done)}
+                        ${node(s2Done, surv2, '2', 'S2', 'Surveillance 2')}
+                        ${link(recertDone)}
+                        ${node(recertDone, recertAudit, '↻', 'Re', 'Recertification')}
+                    </div>`;
+    })()}
                 </div>
             </div>
         `;

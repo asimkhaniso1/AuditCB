@@ -1130,8 +1130,11 @@
                         </div>
                     </div>
                     
-                    <!-- Document Control Footer -->
-                    <div style="position:absolute;bottom:2rem;left:2.5rem;right:2.5rem;border-top:2px solid #e2e8f0;padding-top:1.5rem;">
+                    <!-- Document Control Footer — normal flow, NOT absolutely
+                         positioned: pinned to bottom:2rem it painted straight
+                         over the audit-details grid / revision table whenever
+                         the cover content grew past min-height. -->
+                    <div style="margin-top:2.5rem;border-top:2px solid #e2e8f0;padding-top:1.5rem;">
                         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;font-size:0.8rem;color:#64748b;">
                             <div>
                                 <strong style="color:#1e293b;">Document ID:</strong> ${reportRef(d)}
@@ -1249,7 +1252,26 @@
                 <div class="rp-sec" id="sec-summary">
                     <div class="rp-sec-hdr" style="border-left-color:#059669;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">2</span>EXECUTIVE SUMMARY<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div id="rp-exec-summary" class="rp-edit" contenteditable="true">${d.report.executiveSummary || '<em style="color:#94a3b8;">Click to add executive summary...</em>'}</div>
+                        <div id="rp-exec-summary" class="rp-edit" contenteditable="true">${(function () {
+                            // AI-drafted summaries arrive as one long block; print splits
+                            // them into 2-3 sentence paragraphs, so the editable preview
+                            // should read the same way — seed it with <p> breaks (innerHTML
+                            // is re-read on export and formatRichText strips markup first).
+                            const raw = d.report.executiveSummary || '';
+                            if (!raw) return '<em style="color:#94a3b8;">Click to add executive summary...</em>';
+                            if (/<p[\s>]/i.test(raw) || raw.indexOf('\n') !== -1 || raw.length < 300) return raw;
+                            const sentences = raw.split(/(?<=[.!?])\s+/);
+                            if (sentences.length <= 3) return raw;
+                            const paras = []; let cur = [];
+                            for (let i = 0; i < sentences.length; i++) {
+                                cur.push(sentences[i]);
+                                if (cur.length >= 2 && (cur.length >= 3 || (i < sentences.length - 1 && /^(The |While |Overall|In |During |Furthermore|Additionally|Moreover|However|Based |Addressing|This )/.test(sentences[i + 1])))) {
+                                    paras.push(cur.join(' ')); cur = [];
+                                }
+                            }
+                            if (cur.length) paras.push(cur.join(' '));
+                            return paras.map(p => '<p style="margin:0 0 10px 0;">' + p + '</p>').join('');
+                        })()}</div>
                         
                         <!-- AI-Visual Insights Section -->
                         ${(d.report.positiveObservations || d.report.ofi) ? `
