@@ -192,6 +192,7 @@ function getSettingsSubTabs(mainTab) {
         'policies': [
             { id: 'quality', label: 'Quality Policy', icon: 'fa-star' },
             { id: 'cbpolicies', label: 'CB Policies', icon: 'fa-gavel' },
+            { id: 'capa-timeframes', label: 'CAPA Timeframes', icon: 'fa-clock' },
             { id: 'retention', label: 'Retention', icon: 'fa-archive' }
         ],
         'users': [
@@ -235,6 +236,7 @@ function getSettingsContent(mainTab, subTab) {
         'policies': {
             'quality': () => getQualityPolicyHTML(),
             'cbpolicies': () => getCBPoliciesHTML(),
+            'capa-timeframes': () => getCapaTimeframesHTML(),
             'retention': () => getRetentionHTML()
         },
         'users': {
@@ -1591,6 +1593,219 @@ function getCBPoliciesHTML() {
         </div>
     `;
 }
+
+// ============================================
+// TAB: CORRECTIVE ACTION TIMEFRAMES (client spec #20)
+// ============================================
+// Major/Minor NC correction periods are the CB's own scheme rules, not a
+// requirement of the standard being audited — see window.ReportStats.capaTimeframes()
+// in report-stats.js, which resolves settings.capaTimeframes most-specific-first
+// (byStage > byStandard > default) and falls back to a procedure sentence
+// instead of a hardcoded day count when nothing here is configured. This form
+// is the only writer of that structure; it must match the resolver's shape
+// exactly: { default:{major,minor}, byStandard:{[standard]:{major,minor}}, byStage:{[stage]:{major,minor}} }.
+function getCapaTimeframesHTML() {
+    const settings = window.state.cbSettings || {};
+    const capaCfg = settings.capaTimeframes || {};
+    // A previously-saved flat {major, minor} (no `default` wrapper) is still
+    // valid per the resolver, so fall back to reading the object itself.
+    const defaultCfg = capaCfg.default || ((capaCfg.major || capaCfg.minor) ? capaCfg : {});
+    const byStandard = capaCfg.byStandard || {};
+    const byStage = capaCfg.byStage || {};
+
+    // Reuse the app's existing standards/stage lists rather than hardcoding
+    // a second copy that can drift from the real ones.
+    const standardsList = (settings.standardsOffered && settings.standardsOffered.length)
+        ? settings.standardsOffered
+        : (settings.availableStandards || []);
+    const stageList = (window.CONSTANTS && window.CONSTANTS.AUDIT_TYPES) || [];
+
+    const preview = (window.ReportStats && window.ReportStats.capaTimeframes)
+        ? window.ReportStats.capaTimeframes({ settings })
+        : null;
+
+    const standardRows = standardsList.length ? standardsList.map(std => {
+        const entry = byStandard[std] || {};
+        const on = !!byStandard[std];
+        return `
+            <tr class="capa-standard-row" data-std="${window.UTILS.escapeHtml(std)}">
+                <td style="text-align:center;"><input type="checkbox" class="capa-override-toggle" data-action-change="toggleCapaOverrideRow" data-id="this" ${on ? 'checked' : ''} aria-label="Override for ${window.UTILS.escapeHtml(std)}"></td>
+                <td>${window.UTILS.escapeHtml(std)}</td>
+                <td><input type="number" class="form-control capa-major-input" min="1" step="1" style="width:90px;" value="${entry.major || ''}" ${on ? '' : 'disabled'}></td>
+                <td><input type="number" class="form-control capa-minor-input" min="1" step="1" style="width:90px;" value="${entry.minor || ''}" ${on ? '' : 'disabled'}></td>
+            </tr>
+        `;
+    }).join('') : `<tr><td colspan="4" style="color: var(--text-secondary);">No standards on the masterlist yet — add one under Accreditation &amp; Scope.</td></tr>`;
+
+    const stageRows = stageList.length ? stageList.map(stage => {
+        const entry = byStage[stage] || {};
+        const on = !!byStage[stage];
+        return `
+            <tr class="capa-stage-row" data-stage="${window.UTILS.escapeHtml(stage)}">
+                <td style="text-align:center;"><input type="checkbox" class="capa-override-toggle" data-action-change="toggleCapaOverrideRow" data-id="this" ${on ? 'checked' : ''} aria-label="Override for ${window.UTILS.escapeHtml(stage)}"></td>
+                <td>${window.UTILS.escapeHtml(stage)}</td>
+                <td><input type="number" class="form-control capa-major-input" min="1" step="1" style="width:90px;" value="${entry.major || ''}" ${on ? '' : 'disabled'}></td>
+                <td><input type="number" class="form-control capa-minor-input" min="1" step="1" style="width:90px;" value="${entry.minor || ''}" ${on ? '' : 'disabled'}></td>
+            </tr>
+        `;
+    }).join('') : `<tr><td colspan="4" style="color: var(--text-secondary);">No audit types configured.</td></tr>`;
+
+    return `
+        <div class="fade-in">
+            <h3 style="margin-bottom: 1rem; color: var(--primary-color);">
+                <i class="fa-solid fa-clock" style="margin-right: 0.5rem;"></i>
+                Corrective Action Timeframes
+            </h3>
+
+            <div style="background: #f0f9ff; border-left: 4px solid #0284c7; border-radius: 4px; padding: 0.75rem 1rem; margin-bottom: 1.5rem; font-size: 0.85rem; color: #0c4a6e;">
+                <i class="fa-solid fa-circle-info" style="margin-right: 0.4rem;"></i>
+                Major and Minor NC correction periods are <strong>your certification body's own scheme rules</strong> —
+                the management-system standard being audited does not mandate a day count. Set a default below, plus any
+                per-standard or per-certification-stage exceptions your scheme requires. Reports resolve most specific
+                first: stage override &gt; standard override &gt; default. Leave a field blank to leave that level
+                unconfigured; unconfigured reports state that correction follows the CB's documented procedure instead of
+                printing an invented number.
+                ${preview ? `<div style="margin-top: 0.5rem;">
+                    <strong>Currently:</strong> ${preview.configured
+                    ? `configured (source: ${window.UTILS.escapeHtml(preview.source)}) — Major ${preview.major} / Minor ${preview.minor} days`
+                    : `not configured — reports print the procedure reference, not a day count`}
+                </div>` : ''}
+            </div>
+
+            <form id="capa-timeframes-form" data-action-submit="saveCapaTimeframes">
+                <h4 style="margin: 0 0 0.75rem; color: #0369a1;">Default Timeframe</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 500px; margin-bottom: 1.5rem;">
+                    <div class="form-group">
+                        <label>Major NC Correction (days)</label>
+                        <input type="number" class="form-control" id="capa-default-major" min="1" step="1" value="${defaultCfg.major || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>Minor NC Correction (days)</label>
+                        <input type="number" class="form-control" id="capa-default-minor" min="1" step="1" value="${defaultCfg.minor || ''}">
+                    </div>
+                </div>
+
+                <h4 style="margin: 0 0 0.75rem; color: #0369a1;">Per-Standard Overrides <span style="font-weight:400; color: var(--text-secondary); font-size: 0.8rem;">(optional)</span></h4>
+                <div class="table-container" style="margin-bottom: 1.5rem;">
+                    <table>
+                        <thead>
+                            <tr><th style="width:70px;">Override</th><th>Standard</th><th>Major (days)</th><th>Minor (days)</th></tr>
+                        </thead>
+                        <tbody>${standardRows}</tbody>
+                    </table>
+                </div>
+
+                <h4 style="margin: 0 0 0.75rem; color: #0369a1;">Per-Certification-Stage Overrides <span style="font-weight:400; color: var(--text-secondary); font-size: 0.8rem;">(optional)</span></h4>
+                <div class="table-container" style="margin-bottom: 1.5rem;">
+                    <table>
+                        <thead>
+                            <tr><th style="width:70px;">Override</th><th>Stage / Audit Type</th><th>Major (days)</th><th>Minor (days)</th></tr>
+                        </thead>
+                        <tbody>${stageRows}</tbody>
+                    </table>
+                </div>
+
+                <button type="submit" class="btn btn-primary" aria-label="Save">
+                    <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>
+                    Save Timeframes
+                </button>
+            </form>
+        </div>
+    `;
+}
+
+// Enable/disable an override row's day inputs to match its checkbox — purely
+// visual; saveCapaTimeframes re-reads the checkbox itself to decide whether
+// the row is included, so a stale disabled value is never persisted.
+window.toggleCapaOverrideRow = function (checkboxEl) {
+    const row = checkboxEl.closest('tr');
+    if (!row) return;
+    const disable = !checkboxEl.checked;
+    row.querySelectorAll('.capa-major-input, .capa-minor-input').forEach(inp => { inp.disabled = disable; });
+};
+
+// Positive-whole-number guard for CAPA day inputs — mirrors the resolver's
+// own rule (report-stats.js positiveDays) so the UI never writes what the
+// resolver would silently discard anyway.
+function capaSanitizeDays(raw) {
+    if (raw === '' || raw === null || typeof raw === 'undefined') return { value: null, invalid: false };
+    const n = Number(raw);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return { value: null, invalid: true };
+    return { value: n, invalid: false };
+}
+
+window.saveCapaTimeframes = async function () {
+    const settings = window.state.cbSettings;
+    if (!settings) return;
+
+    const warnings = [];
+
+    function readPair(majorRaw, minorRaw, label) {
+        const maj = capaSanitizeDays(majorRaw);
+        const min = capaSanitizeDays(minorRaw);
+        if (maj.invalid) warnings.push(`${label}: Major value must be a positive whole number of days — ignored.`);
+        if (min.invalid) warnings.push(`${label}: Minor value must be a positive whole number of days — ignored.`);
+        const entry = {};
+        if (maj.value !== null) entry.major = maj.value;
+        if (min.value !== null) entry.minor = min.value;
+        return Object.keys(entry).length ? entry : null;
+    }
+
+    const capa = {};
+
+    const def = readPair(
+        document.getElementById('capa-default-major')?.value,
+        document.getElementById('capa-default-minor')?.value,
+        'Default'
+    );
+    if (def) capa.default = def;
+
+    const byStandard = {};
+    document.querySelectorAll('.capa-standard-row').forEach(row => {
+        const toggle = row.querySelector('.capa-override-toggle');
+        if (!toggle || !toggle.checked) return;
+        const std = row.dataset.std;
+        const entry = readPair(
+            row.querySelector('.capa-major-input')?.value,
+            row.querySelector('.capa-minor-input')?.value,
+            std
+        );
+        if (entry) byStandard[std] = entry;
+    });
+    if (Object.keys(byStandard).length) capa.byStandard = byStandard;
+
+    const byStage = {};
+    document.querySelectorAll('.capa-stage-row').forEach(row => {
+        const toggle = row.querySelector('.capa-override-toggle');
+        if (!toggle || !toggle.checked) return;
+        const stage = row.dataset.stage;
+        const entry = readPair(
+            row.querySelector('.capa-major-input')?.value,
+            row.querySelector('.capa-minor-input')?.value,
+            stage
+        );
+        if (entry) byStage[stage] = entry;
+    });
+    if (Object.keys(byStage).length) capa.byStage = byStage;
+
+    settings.capaTimeframes = capa;
+
+    window.saveData();
+
+    if (window.SupabaseClient?.isInitialized) {
+        await window.DataService.syncSettings({ saveLocal: false, silent: true });
+    }
+
+    if (warnings.length) {
+        window.showNotification('Saved — some values were ignored: ' + warnings.join(' '), 'warning');
+    } else {
+        window.showNotification('Corrective action timeframes saved', 'success');
+    }
+
+    // Re-render in place so the "Currently:" preview and any ignored/blank
+    // fields reflect exactly what was persisted, not what was typed.
+    window.switchSettingsSubTab('policies', 'capa-timeframes');
+};
 
 function backupData() {
     try {
