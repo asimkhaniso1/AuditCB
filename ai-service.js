@@ -263,6 +263,99 @@ window.KB_HELPERS = {
     }
 };
 
+// ============================================
+// AUTHORITATIVE COUNT RESOLUTION + NARRATIVE GUARD
+// ============================================
+// "One authoritative audit dataset -> every report section." ReportStats.build()
+// is that dataset for Major/Minor NC, Observation and OFI figures (see
+// report-integrity.js B13). AI-drafted narrative must state those numbers
+// verbatim, never re-derive or combine them — re-derivation is exactly how a
+// shipped report once summed Observations + OFIs into an invented total
+// ("4 non-conformities and 5 opportunities for improvement" when the audit
+// actually recorded 4 minor NCs, 4 observations and 1 OFI).
+
+// Resolve {majorNC, minorNC, observationCount, ofiCount} from ReportStats.
+// Reads both the flat and resultCounts/advisories-nested shapes defensively —
+// this file doesn't own report-stats.js and shouldn't assume one exact shape.
+// Returns null (never throws) when ReportStats hasn't loaded or the report
+// shape is unexpected, so callers can degrade to their own local tally exactly
+// like every other ReportStats consumer in this repo already does.
+function _resolveAuthoritativeCounts(reportData) {
+    try {
+        if (!window.ReportStats || typeof window.ReportStats.build !== 'function') return null;
+        const plan = (reportData.planId && window.state?.auditPlans)
+            ? window.DataService.findAuditPlan(reportData.planId)
+            : null;
+        const client = (reportData.client && window.state?.clients)
+            ? window.state.clients.find(c => c.name === reportData.client || String(c.id) === String(reportData.clientId))
+            : null;
+        const rs = window.ReportStats.build({
+            report: reportData,
+            hydratedProgress: reportData.checklistProgress || [],
+            auditPlan: plan,
+            client
+        });
+        if (!rs) return null;
+        const counts = rs.resultCounts || {};
+        const advisories = rs.advisories || {};
+        const pick = (flat, nested) => Number(flat != null ? flat : nested) || 0;
+        return {
+            majorNC: pick(rs.majorNC, counts.majorNC),
+            minorNC: pick(rs.minorNC, counts.minorNC),
+            observationCount: pick(rs.observationCount, advisories.observation),
+            ofiCount: pick(rs.ofiCount, advisories.ofi)
+        };
+    } catch (_e) {
+        return null; // degrade gracefully — caller falls back to its own local tally
+    }
+}
+
+// Same regexes report-integrity.js's B13 check uses to parse narrative counts,
+// duplicated deliberately (this file may not load after report-integrity.js) so
+// that whatever this guard leaves uncorrected is exactly what B13 would block.
+const _NARRATIVE_COUNT_PATTERNS = [
+    { key: 'ncTotal', re: /(\d+)(\s+(?:minor\s+)?non-?conformit(?:y|ies))/gi, unitRe: /conformit(y|ies)/i },
+    { key: 'ofiCount', re: /(\d+)(\s+opportunit(?:y|ies)\s+for\s+improvement)/gi, unitRe: /opportunit(y|ies)/i },
+    { key: 'observationCount', re: /(\d+)(\s+observations?)\b/gi, unitRe: /observations?/i }
+];
+
+// Adjust a matched unit word ("conformities", "opportunity", ...) to agree in
+// number with the corrected figure, without touching anything around it (e.g.
+// a "minor " qualifier stays exactly as the model wrote it).
+function _agreeInNumber(word, isPlural) {
+    if (/ies$/i.test(word)) return isPlural ? word : word.replace(/ies$/i, 'y');
+    if (/y$/i.test(word)) return isPlural ? word.replace(/y$/i, 'ies') : word;
+    if (/s$/i.test(word)) return isPlural ? word : word.replace(/s$/i, '');
+    return isPlural ? word + 's' : word;
+}
+
+// Deterministic post-generation guard: correct a stated count in place when it
+// disagrees with the authoritative figure for that exact classification. Never
+// touches wording beyond the numeral and its own unit word — no new facts, no
+// rewritten sentences. If a single classification's phrase can't be resolved
+// safely (unexpected match shape, regex failure), the field is left untouched
+// and logged so report-integrity.js's B13 blocks issuance instead of a guessed
+// rewrite reaching the client document.
+function _reconcileNarrativeCounts(text, authoritative, fieldLabel) {
+    if (!text || typeof text !== 'string' || !authoritative) return text;
+    let result = text;
+    _NARRATIVE_COUNT_PATTERNS.forEach((pattern) => {
+        const expected = authoritative[pattern.key];
+        if (expected == null) return;
+        try {
+            result = result.replace(pattern.re, (full, digits, tail) => {
+                const stated = parseInt(digits, 10);
+                if (isNaN(stated) || stated === expected) return full;
+                const fixedTail = tail.replace(pattern.unitRe, (unit) => _agreeInNumber(unit, expected !== 1));
+                return String(expected) + fixedTail;
+            });
+        } catch (e) {
+            if (window.Logger) window.Logger.warn('AI_SERVICE', `Could not reconcile "${pattern.key}" count in ${fieldLabel} against ReportStats; leaving for report-integrity.js to block.`, e);
+        }
+    });
+    return result;
+}
+
 const AI_SERVICE = {
 
     // Main function to generate agenda
@@ -516,8 +609,23 @@ Return a raw JSON array with 'id' and 'text' fields only:
         }
     },
     draftExecutiveSummary: async (reportData, compliantAreas = [], observationItems = []) => {
-        const ncCount = (reportData.ncrs || []).length + (reportData.checklistProgress || []).filter(i => i.status === 'nc' && i.ncrType && i.ncrType.toLowerCase() !== 'observation' && i.ncrType.toLowerCase() !== 'ofi').length;
-        const obsCount = (reportData.checklistProgress || []).filter(i => i.status === 'nc' && (!i.ncrType || i.ncrType.toLowerCase() === 'observation' || i.ncrType.toLowerCase() === 'ofi')).length;
+        // Authoritative figures come from ReportStats — the same dataset the
+        // finalize gate reconciles narrative against. Fall back to a local
+        // tally, kept split by classification (never combined), only when
+        // ReportStats hasn't loaded — same graceful-degrade every other
+        // consumer in this repo uses.
+        const authoritativeCounts = _resolveAuthoritativeCounts(reportData);
+        const localCounts = {
+            majorNC: (reportData.checklistProgress || []).filter(i => i.status === 'nc' && String(i.ncrType || '').toLowerCase() === 'major').length,
+            minorNC: (reportData.ncrs || []).length + (reportData.checklistProgress || []).filter(i => i.status === 'nc' && String(i.ncrType || '').toLowerCase() === 'minor').length,
+            observationCount: (reportData.checklistProgress || []).filter(i => i.status === 'nc' && String(i.ncrType || '').toLowerCase() === 'observation').length,
+            ofiCount: (reportData.checklistProgress || []).filter(i => i.status === 'nc' && String(i.ncrType || '').toLowerCase() === 'ofi').length
+        };
+        const stats = authoritativeCounts || localCounts;
+        // Combined only for the "N non-conformities" phrase, matching how
+        // report-integrity.js's B13 check reconciles that specific wording.
+        // Observations and OFIs stay separate everywhere else in the prompt.
+        const ncCount = stats.majorNC + stats.minorNC;
 
         let areaText = "No specific compliant areas recorded.";
         if (compliantAreas.length > 0) {
@@ -578,8 +686,11 @@ Context:
 - Client: ${reportData.client}
 - Standard: ${reportData.standard || 'ISO Standard'}
 - Date: ${reportData.date}
-- Total Non-Conformities (Minor/Major): ${ncCount}
-- Observations / OFI Count: ${obsCount}
+- Major Non-Conformities: ${stats.majorNC}
+- Minor Non-Conformities: ${stats.minorNC}
+- Total Non-Conformities (Major + Minor): ${ncCount}
+- Observations: ${stats.observationCount}
+- Opportunities for Improvement (OFI): ${stats.ofiCount}
 - Compliant Clauses/Areas: ${areaText}
 ${orgPlanContext}
 ${openingMeetingContext}
@@ -592,6 +703,10 @@ ${obsText ? `
 Audit Observations & OFI Findings (from checklist):
 ${obsText}
 ` : ''}
+AUTHORITATIVE COUNTS — TREAT AS FACT, DO NOT RECOMPUTE:
+The five figures above (Major NC, Minor NC, Total NC, Observations, OFI) are taken directly from the validated audit dataset. Use them verbatim, exactly as given. Do NOT recount, re-derive, estimate, round, or infer these numbers from the findings text elsewhere in this prompt.
+Observations and Opportunities for Improvement are SEPARATE ISO audit classifications and must NEVER be summed, merged, or reported as a single combined figure — for example, do not write "${stats.observationCount + stats.ofiCount} opportunities for improvement" or "${stats.observationCount + stats.ofiCount} observations/OFIs"; state Observations (${stats.observationCount}) and OFI (${stats.ofiCount}) as two distinct numbers wherever both are mentioned. Nonconformity counts cover Major and Minor only — never fold Observations or OFIs into a nonconformity count either.
+
 CRITICAL RULES — CCI Gold Standard:
 - Do NOT use percentage scoring or compliance percentages anywhere in the report
 - Do NOT mix clauses across different standards — if multiple standards are audited, keep them clearly separated
@@ -605,7 +720,7 @@ CRITICAL RULES — CCI Gold Standard:
 - Prefer plain, objective audit language: requirement, objective evidence, evaluation, finding
 
 Instructions:
-1. Executive Summary: Write a comprehensive, authoritative paragraph (150-250 words) summarizing the audit scope, methodology, and overall conclusion. Open with the audit context (type, standard, dates). ${planScopeContext ? 'Reference the stated audit objectives and methodology from the audit plan.' : ''} Briefly reference the opening meeting (attendees, date). State the overall assessment outcome, mentioning the number of non-conformities (${ncCount}) and observations/OFIs (${obsCount}) raised. Conclude by stating what the sampled evidence showed about conformity with the audit criteria and which processes carry the open findings — a factual closing statement, not an impression, a grade, or a maturity verdict. Keep the register plain and objective: requirement, objective evidence, evaluation, finding.
+1. Executive Summary: Write a comprehensive, authoritative paragraph (150-250 words) summarizing the audit scope, methodology, and overall conclusion. Open with the audit context (type, standard, dates). ${planScopeContext ? 'Reference the stated audit objectives and methodology from the audit plan.' : ''} Briefly reference the opening meeting (attendees, date). State the overall assessment outcome, mentioning the number of non-conformities (${ncCount}), observations (${stats.observationCount}) and opportunities for improvement (${stats.ofiCount}) as three separate figures — never combine observations and OFI into one number. Conclude by stating what the sampled evidence showed about conformity with the audit criteria and which processes carry the open findings — a factual closing statement, not an impression, a grade, or a maturity verdict. Keep the register plain and objective: requirement, objective evidence, evaluation, finding.
 2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 4-6 specific positive observations. Each must reference the specific clause number and title (e.g. "Clause 5.1 Leadership and commitment"). Describe the specific objective evidence of effective implementation observed. Use authoritative language (e.g., "The audit team confirmed that the organization has established a well-embedded approach to...", "Through examination of records and interviews, the assessment confirmed mature implementation of..."). Do NOT use markdown formatting. Each observation MUST be on its own numbered line (1. 2. 3. etc).
 3. OFI: ${obsText ? 'Based on the "Audit Observations & OFI Findings" listed above, write specific, actionable opportunities for improvement that reference the actual observations raised during the audit. Include the relevant clause numbers and reference specific documents, procedures, or records where improvement is recommended.' : 'Write a list of specific, actionable opportunities for improvement referencing relevant clause requirements.'} Use measured, constructive improvement language befitting a senior auditor (e.g., "The organization would benefit from further developing...", "The audit team recommends consideration of...", "The organization may consider strengthening the control described in..."). These are NOT non-conformities.
 
@@ -621,6 +736,26 @@ Return raw JSON:
         try {
             const apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
             const json = JSON.parse(apiResponseText.replace(/```json/g, '').replace(/```/g, '').trim());
+
+            // Deterministic post-generation guard: even with the counts stated
+            // verbatim above, the model can still drift. Correct any stated count
+            // that disagrees with ReportStats for its exact classification;
+            // anything this can't resolve safely is left for report-integrity.js's
+            // B13 check to block at finalize rather than risk an invented rewrite.
+            if (authoritativeCounts) {
+                if (typeof json.executiveSummary === 'string') {
+                    json.executiveSummary = _reconcileNarrativeCounts(json.executiveSummary, authoritativeCounts, 'executiveSummary');
+                }
+                if (typeof json.positiveObservations === 'string') {
+                    json.positiveObservations = _reconcileNarrativeCounts(json.positiveObservations, authoritativeCounts, 'positiveObservations');
+                }
+                if (Array.isArray(json.ofi)) {
+                    json.ofi = json.ofi.map((entry, idx) => typeof entry === 'string'
+                        ? _reconcileNarrativeCounts(entry, authoritativeCounts, `ofi[${idx}]`)
+                        : entry);
+                }
+            }
+
             return json;
         } catch (error) {
             console.error("AI Summary Error:", error);
