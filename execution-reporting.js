@@ -568,6 +568,51 @@
     };
     window._resolveTechnicalReview = resolveTechnicalReview;
 
+    // ─── Corrective-action timeframe display (client spec #20) ────────────────
+    // 30/90 days are the certification body's OWN scheme rules, not ISO's — printing
+    // them unconditionally implied the standard mandated a fixed count, and a CB
+    // running a different scheme had no way to change them. ReportStats.capaTimeframes
+    // resolves the CB's actual configuration (byStage -> byStandard -> default ->
+    // built-in fallback); we only print a day count once the CB has configured one,
+    // otherwise we point at the CB's own procedure instead of inventing "30/90".
+    const resolveCapaTimeframesForReport = (d) => {
+        if (!window.ReportStats || typeof window.ReportStats.capaTimeframes !== 'function') return null;
+        return window.ReportStats.capaTimeframes({
+            settings: d.cbSettings,
+            standard: (d.report && d.report.standard) || d.auditPlan?.standard || '',
+            stage: d.auditPlan?.auditType || (d.report && d.report.auditType) || ''
+        });
+    };
+    // Returns the inner HTML for the "Timeframes" callout (icon lives in the caller's
+    // markup, which differs slightly between preview and export). ReportStats missing
+    // degrades to the previous hardcoded text rather than breaking the callout.
+    const capaTimeframesInnerHtml = (d) => {
+        const t = resolveCapaTimeframesForReport(d);
+        if (!t) return '<strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance';
+        if (!t.configured) return window.ReportStats.CAPA_PROCEDURE_SENTENCE;
+        return '<strong>Timeframes:</strong> Major NC — ' + t.major + ' days | Minor NC — ' + t.minor + ' days from report issuance';
+    };
+    window._capaTimeframesInnerHtml = capaTimeframesInnerHtml;
+
+    // ─── Issue Date resolver (client spec #26) ─────────────────────────────────
+    // A report may be previewed/exported many times before AND after it is formally
+    // issued — "today" (the export moment) is never the issue date. Only a report
+    // that has gone through finalizeAndPublish (ai-service.js) carries issuedSnapshot;
+    // fall back to the latest issueLog entry for older data. Returns '' when the
+    // report has never been issued so callers omit the row rather than inventing one.
+    const resolveIssueDate = (report) => {
+        if (!report) return '';
+        if (report.issuedSnapshot && report.issuedSnapshot.issuedAt) {
+            return new Date(report.issuedSnapshot.issuedAt).toLocaleDateString();
+        }
+        if (Array.isArray(report.issueLog) && report.issueLog.length > 0) {
+            const last = report.issueLog[report.issueLog.length - 1];
+            if (last && last.at) return new Date(last.at).toLocaleDateString();
+        }
+        return '';
+    };
+    window._resolveIssueDate = resolveIssueDate;
+
     // ─── Recommendation single-source ──────────────────────────────────────────
     // report.recommendation (manual radio) is authoritative whenever the auditor has
     // set it. stats.recommendation (auto-derived from NC counts) is shown only as a
@@ -2152,7 +2197,7 @@
                     return allNCs.map(nc => '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;font-family:monospace;color:#be185d;">' + nc.ref + '</td><td style="padding:10px 14px;">' + formalCriterionCell(nc, carStandard) + '</td><td style="padding:10px 14px;"><span style="padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;' + ((nc.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + nc.type + '</span></td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Root cause analysis and corrective action required for: ' + (nc.desc || '').substring(0, 120) + '</td><td style="padding:10px 14px;font-weight:600;color:#be185d;">' + nc.dueDate + '</td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Document review & follow-up audit</td></tr>').join('');
                 })()}</tbody>
                         </table>
-                        <div style="margin-top:1rem;padding:0.75rem;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><i class="fa-solid fa-clock" style="margin-right:0.4rem;"></i><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>
+                        <div style="margin-top:1rem;padding:0.75rem;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><i class="fa-solid fa-clock" style="margin-right:0.4rem;"></i>${capaTimeframesInnerHtml(d)}</div>
                     </div>
                 </div>` : ''}
                 <!-- 8: Meetings -->
@@ -2219,7 +2264,7 @@
                                 <div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:0.5rem;">${d.auditPlan?.team?.[0] || d.report.leadAuditor || 'Lead Auditor Name'}</div>
                                 <div style="border-bottom:2px solid #1e293b;width:100%;margin:1.5rem 0 0.5rem;"></div>
                                 <div style="font-size:0.8rem;color:#64748b;">Signature</div>
-                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Date: <span id="rp-sig-date" contenteditable="true" class="rp-edit" style="font-weight:600;">${new Date().toLocaleDateString('en-GB')}</span></div>
+                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Prepared: <span id="rp-sig-date" contenteditable="true" class="rp-edit" style="font-weight:600;">${new Date().toLocaleDateString('en-GB')}</span></div>
                             </div>
                             <div style="padding:1.5rem;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
                                 <div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;font-weight:600;">Technical Reviewer / Certification Manager</div>
@@ -2240,7 +2285,7 @@
                                 })()}
                                 <div style="border-bottom:2px solid #1e293b;width:100%;margin:1rem 0 0.5rem;"></div>
                                 <div style="font-size:0.8rem;color:#64748b;">Signature</div>
-                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Date: <input type="date" id="rp-reviewer-date" value="${resolveTechnicalReview(d.report).date || ''}" data-action-change="updateTechnicalReview" data-arg1="date" data-arg2="this.value" style="font-weight:600;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;"></div>
+                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Reviewed: <input type="date" id="rp-reviewer-date" value="${resolveTechnicalReview(d.report).date || ''}" data-action-change="updateTechnicalReview" data-arg1="date" data-arg2="this.value" style="font-weight:600;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;"></div>
                             </div>
                         </div>
                         <div style="margin-top:1.5rem;padding:1rem;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:0.5rem;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body.</div>
@@ -4053,22 +4098,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<button data-action="close" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:500;">Close</button></div>'
             // COVER PAGE
             + '<div class="cover">'
-            + '<div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%;position:absolute;top:40px;left:0;right:0;padding:0 50px;">'
-            + (d.cbLogo ? '<img src="' + d.cbLogo + '" style="height:60px;object-fit:contain;" alt="CB Logo">' : '<div></div>')
-            // QR only prints when it resolves to a real, working address. In the
-            // fallback state (no publicReportUrl/live origin/cbWebsite configured)
-            // it encodes the sentinel https://audit-cb.example/ placeholder, which
-            // will never resolve — a dead QR handed to the client is worse than no
-            // QR at all, and the only warning about it (below) is print-hidden.
-            + (d.qrFallback ? '<div></div>' : (function () {
-                let qrHost;
-                try { qrHost = new URL(d.cardUrl).host; } catch (_e) { qrHost = ''; }
-                return '<div style="text-align:center;max-width:160px;">'
-                    + '<img src="' + d.qrCodeUrl + '" style="height:120px;width:120px;display:block;margin:0 auto;" alt="Scan to verify">'
-                    + '<div style="font-size:0.58rem;color:#64748b;margin-top:4px;letter-spacing:0.2px;font-weight:500;">Scan to view report card</div>'
-                    + (qrHost ? '<div style="font-size:0.52rem;color:#94a3b8;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;">' + window.UTILS.escapeHtml(qrHost) + '</div>' : '')
-                    + '</div></div>';
-            })())
+            // Verification QR removed from the client-facing cover (it visually collided
+            // with the AUDIT REPORT title). The former wrapper was a flex row that relied
+            // on the QR branch's own markup to close it — that's gone now too, so the CB
+            // logo gets its own self-contained, self-closed block instead of dangling
+            // scaffolding. qrCodeUrl/cardUrl/qrFallback computation is untouched (report-card.js
+            // '#verify=' route still works) so this can be reinstated without rebuilding it.
+            + (d.cbLogo ? '<div style="position:absolute;top:40px;left:50px;"><img src="' + d.cbLogo + '" style="height:60px;object-fit:contain;" alt="CB Logo"></div>' : '')
             + '<div style="margin-top:40px;"></div>'
             + '<div class="cover-line"></div>'
             + '<h1 style="font-size:2.8rem;font-weight:700;color:#0f172a;letter-spacing:1px;">AUDIT REPORT</h1>'
@@ -4078,7 +4114,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<div style="font-size:2rem;font-weight:700;color:#1d4ed8;">' + d.report.client + '</div>'
             + (d.client.industry ? '<div style="font-size:1rem;color:#64748b;margin-top:6px;">' + d.client.industry + '</div>' : '') + '</div>'
             + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:480px;text-align:left;margin-top:50px;">'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Report Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
+            // Labeled "Audit Date" (not "Report Date") — this is when the on-site audit
+            // happened, not when the report was prepared/issued (client spec #26: the four
+            // dates — Audit, Report Preparation, Technical Review, Issue — must stay distinct).
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + reportRef(d) + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || '—') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
@@ -4258,7 +4297,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     var fallbackDue = function (typ) { var due = new Date(); due.setDate(due.getDate() + ((typ || '').toLowerCase() === 'major' ? 30 : 90)); return due.toISOString().split('T')[0]; };
                     var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typRaw = (item.ncrType || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : typRaw === 'minor' ? 'Minor' : 'Minor †'; var dueStr = item.caDueDate || fallbackDue(item.ncrType); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + formalCriterionCell({ clause: item.clauseRef || item.clause || '', criterionRef: item.criterionRef || null, criterionSource: item.criterionSource || null }, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typRaw = (ncr.type || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : (ncr.type || 'Minor'); var dueStr = ncr.caDueDate || fallbackDue(ncr.type); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + formalCriterionCell(ncr, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
                 + '</tbody></table>'
-                + '<div style="margin-top:12px;padding:10px;background:#f1f5f9;border-radius:8px;font-size:0.82rem;color:#475569;"><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>'
+                + '<div style="margin-top:12px;padding:10px;background:#f1f5f9;border-radius:8px;font-size:0.82rem;color:#475569;">' + capaTimeframesInnerHtml(d) + '</div>'
                 + '</div>' : '')
             // SECTION: CHANGES SINCE LAST AUDIT
             + (secMap['changes'] ? '<div id="sec-changes" class="sh" style="border-left-color:#78716c;">' + sBadge('changes') + 'CHANGES SINCE LAST AUDIT</div><div class="sb">'
@@ -4285,14 +4324,23 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + formatRichText(editedConclusion) + '</div>'
                 + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1d4ed8;"><strong style="color:#1d4ed8;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr><tr><td>Unresolved Issues / Diverging Opinions</td><td>' + editedUnresolved + '</td></tr></table></div>'
                 + '<p style="font-style:italic;font-size:0.8rem;color:#64748b;margin-top:16px;">This audit was conducted through a sampling process of the available information. Consequently, nonconformities may exist which have not been identified within this report.</p>'
-                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;">'
-                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:500;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
-                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
+                + (function () {
+                    // Client-rep signature line only when the CB's own scheme actually requires
+                    // it (cbSettings.requireClientSignature; unset/false = not shown, client spec
+                    // #27). When it's not required, the closing-meeting attendees recorded just
+                    // above already evidence acknowledgement — an unconditional blank line here
+                    // misrepresented an unrequired signature as required.
+                    const showClientSig = !!(d.cbSettings && d.cbSettings.requireClientSignature);
+                    const leadBox = '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:500;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>';
+                    const clientBox = showClientSig ? '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div>' : '';
+                    return '<div style="display:grid;grid-template-columns:' + (showClientSig ? '1fr 1fr' : '1fr') + ';gap:40px;margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;">' + leadBox + clientBox + '</div>';
+                })()
+                + '</div>' : '')
             // SECTION: SIGNATURE & ATTESTATION
             + (secMap['signature'] ? '<div id="sec-signature" class="sh" style="border-left-color:#1e293b;">' + sBadge('signature') + 'SIGNATURE &amp; ATTESTATION</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">'
-                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedSigDate || d.today) + '</div></div>'
-                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (editedReviewerName || (technicalReview.isLegacy && !editedReviewerName ? 'Not recorded' : '____________________')) + '</div>' + (technicalReview.outcome ? '<div style="font-size:0.82rem;font-weight:700;margin-bottom:6px;color:' + (technicalReview.outcome === 'Approved' ? '#15803d' : '#b91c1c') + ';">Outcome: ' + technicalReview.outcome + '</div>' : '') + (technicalReview.notes ? '<div style="font-size:0.78rem;color:#64748b;margin-bottom:6px;">' + window.UTILS.escapeHtml(technicalReview.notes) + '</div>' : '') + '<div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedReviewerDate || '____________________') + '</div></div>'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Prepared: ' + (editedSigDate || d.today) + '</div></div>'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (editedReviewerName || (technicalReview.isLegacy && !editedReviewerName ? 'Not recorded' : '____________________')) + '</div>' + (technicalReview.outcome ? '<div style="font-size:0.82rem;font-weight:700;margin-bottom:6px;color:' + (technicalReview.outcome === 'Approved' ? '#15803d' : '#b91c1c') + ';">Outcome: ' + technicalReview.outcome + '</div>' : '') + (technicalReview.notes ? '<div style="font-size:0.78rem;color:#64748b;margin-bottom:6px;">' + window.UTILS.escapeHtml(technicalReview.notes) + '</div>' : '') + '<div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Reviewed: ' + (editedReviewerDate || '____________________') + '</div></div>'
                 + '</div>'
                 + '<div style="margin-top:20px;padding:12px;background:#eff6ff;border-radius:8px;font-size:0.82rem;color:#475569;text-align:center;">This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
                 + '</div>' : '')
@@ -4442,9 +4490,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     + row('Next Audit', nextStage)
                     + row('Contact', (cbName || '') + (cbEmail ? ' · ' + cbEmail : ''))
                     + '</table>'
-                    + (d.qrCodeUrl && !d.qrFallback ? '<img src="' + d.qrCodeUrl + '" alt="Verification QR" style="width:84px;height:84px;margin-bottom:12px;">' + '<div style="font-size:0.68rem;color:#94a3b8;margin-bottom:26px;">Scan to verify this report</div>' : '')
+                    // Verification QR removed from the closing page (client-facing surface) —
+                    // qrCodeUrl/cardUrl/qrFallback computation is untouched, so this is a
+                    // presentation-only removal, reversible without rebuilding the data.
                     + '<div style="font-size:0.85rem;color:#475569;max-width:440px;line-height:1.6;">Thank you for the professional cooperation extended to the audit team. This report has been prepared in accordance with ' + standard + ' requirements; distribution is limited to authorized recipients listed herein.</div>'
-                    + '<div style="margin-top:26px;font-size:0.72rem;color:#94a3b8;">Doc Ref: ' + reportRef(d) + ' · Issue Date: ' + d.today + '</div>'
+                    // d.today is the moment this PDF was generated, not when the report was
+                    // formally issued — printing it as "Issue Date" implied issuance on every
+                    // reprint. Source from the real issue event (resolveIssueDate) and omit the
+                    // clause entirely for a report that has never been issued (client spec #26).
+                    + '<div style="margin-top:26px;font-size:0.72rem;color:#94a3b8;">Doc Ref: ' + reportRef(d) + (resolveIssueDate(d.report) ? ' · Issue Date: ' + resolveIssueDate(d.report) : '') + '</div>'
                     + '</div>';
             })();
 
