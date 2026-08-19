@@ -189,6 +189,25 @@
     };
     window._reportRef = reportRef;
 
+    // ─── Client logo resolution ────────────────────────────────────────────────
+    // client.logoUrl is only ever set by a manual upload in Account Setup, so
+    // clients with a website on file still printed the dashed "Client Logo"
+    // placeholder. Fall back to the site's favicon (Google's s2 service, 128px)
+    // derived from client.website — CSP img-src allows any https: image, so it
+    // renders both in-app and in the print window. An uploaded logo always wins.
+    const resolveClientLogoUrl = (client) => {
+        if (!client) return '';
+        if (client.logoUrl) return client.logoUrl;
+        const site = String(client.website || '').trim();
+        if (!site) return '';
+        try {
+            const host = new URL(/^https?:\/\//i.test(site) ? site : 'https://' + site).hostname;
+            if (host) return 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(host) + '&sz=128';
+        } catch (_e) { /* malformed website value — no fallback */ }
+        return '';
+    };
+    window._resolveClientLogoUrl = resolveClientLogoUrl;
+
     // Formal criterion cell for CAPA / NCR-register style tables (Corrective
     // Action Requirements, NCR Register) — these list confirmed NCs only, so
     // always finding context. Leads with the real clause in the accreditation-
@@ -336,6 +355,12 @@
         }
         d.report.technicalReview[field] = value;
         if (typeof window.saveData === 'function') window.saveData();
+    };
+    // data-action-input adapter (the input delegation passes (el, dataset, e),
+    // not positional args) — the field name rides on data-tr-field.
+    window.updateTechnicalReviewField = function (el) {
+        if (!el || !el.dataset) return;
+        window.updateTechnicalReview(el.dataset.trField, el.value);
     };
 
     // Resolve the display values for the technical review block, honoring the legacy
@@ -540,8 +565,8 @@
 
         // Attempt to get client details for address/logo if available
         const client = window.state.clients.find(c => c.name === report.client) || {};
-        // Use empty string for missing logo (rendered as blank instead of placeholder image)
-        const _clientLogo = client.logoUrl || '';
+        // Uploaded logo, else favicon derived from client.website, else blank.
+        const _clientLogo = resolveClientLogoUrl(client);
 
         // Get audit plan reference
         const auditPlan = report.planId ? window.DataService.findAuditPlan(report.planId) : null;
@@ -783,7 +808,7 @@
         // Store data for preview & export
         window._reportPreviewData = {
             report, hydratedProgress, client, auditPlan, cbSettings, cbSite,
-            clientLogo: client.logoUrl || '',
+            clientLogo: resolveClientLogoUrl(client),
             cbLogo: cbSettings.logoUrl || '',
             qrCodeUrl,
             cardUrl,
@@ -932,7 +957,7 @@
             // raw item.clause (not the kbMatch-resolved display clause) + department.
             const fsKey = String(item.clause || '') + '|' + String(item.department || '');
             const fsCurrent = (d.report.findingStatus && d.report.findingStatus[fsKey] && d.report.findingStatus[fsKey].status) || 'open';
-            const fsSelect = `<select data-finding-status-key="${window.UTILS.escapeHtml(fsKey)}" onchange="window.updateFindingStatus(this.getAttribute('data-finding-status-key'), this.value)" style="width:100%;padding:5px 6px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.78rem;background:white;">${FINDING_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === fsCurrent ? 'selected' : ''}>${o.label}</option>`).join('')}</select>`;
+            const fsSelect = `<select data-action-change="updateFindingStatus" data-arg1="${window.UTILS.escapeHtml(fsKey)}" data-arg2="this.value" style="width:100%;padding:5px 6px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.78rem;background:white;">${FINDING_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === fsCurrent ? 'selected' : ''}>${o.label}</option>`).join('')}</select>`;
             return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td><td style="padding:10px 14px;">${fsSelect}</td></tr>`;
         }).join('');
         const ncPendingFootnote = d.hydratedProgress.some(i => i.status === 'nc' && !i.ncrType) ? '<div style="margin-top:6px;font-size:0.75rem;color:#94a3b8;">† Pending classification — recorded as NC but severity not yet assigned; shown under Minor pending review.</div>' : '';
@@ -1988,19 +2013,22 @@
                                 <div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;font-weight:600;">Technical Reviewer / Certification Manager</div>
                                 ${(function () {
                                     const tr = resolveTechnicalReview(d.report);
+                                    // CSP has no 'unsafe-inline' for scripts, so inline
+                                    // oninput/onchange never fire in production — these
+                                    // fields silently saved nothing. Delegated instead.
                                     return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0.5rem;">
-                                        <input type="text" id="rp-tr-reviewer" value="${window.UTILS.escapeHtml(tr.reviewer)}" placeholder="Reviewer name" oninput="window.updateTechnicalReview('reviewer', this.value)" style="padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.9rem;font-weight:700;color:#1e293b;">
-                                        <select id="rp-tr-outcome" onchange="window.updateTechnicalReview('outcome', this.value)" style="padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.85rem;">
+                                        <input type="text" id="rp-tr-reviewer" value="${window.UTILS.escapeHtml(tr.reviewer)}" placeholder="Reviewer name" data-action-input="updateTechnicalReviewField" data-tr-field="reviewer" style="padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.9rem;font-weight:700;color:#1e293b;">
+                                        <select id="rp-tr-outcome" data-action-change="updateTechnicalReview" data-arg1="outcome" data-arg2="this.value" style="padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.85rem;">
                                             <option value="" ${!tr.outcome ? 'selected' : ''}>Outcome — pending</option>
                                             <option value="Approved" ${tr.outcome === 'Approved' ? 'selected' : ''}>Approved</option>
                                             <option value="Returned" ${tr.outcome === 'Returned' ? 'selected' : ''}>Returned</option>
                                         </select>
                                     </div>
-                                    <textarea id="rp-tr-notes" placeholder="Technical review notes (optional)" oninput="window.updateTechnicalReview('notes', this.value)" style="width:100%;min-height:44px;padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.82rem;color:#475569;resize:vertical;">${window.UTILS.escapeHtml(tr.notes)}</textarea>`;
+                                    <textarea id="rp-tr-notes" placeholder="Technical review notes (optional)" data-action-input="updateTechnicalReviewField" data-tr-field="notes" style="width:100%;min-height:44px;padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.82rem;color:#475569;resize:vertical;">${window.UTILS.escapeHtml(tr.notes)}</textarea>`;
                                 })()}
                                 <div style="border-bottom:2px solid #1e293b;width:100%;margin:1rem 0 0.5rem;"></div>
                                 <div style="font-size:0.8rem;color:#64748b;">Signature</div>
-                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Date: <input type="date" id="rp-reviewer-date" value="${resolveTechnicalReview(d.report).date || ''}" oninput="window.updateTechnicalReview('date', this.value)" style="font-weight:600;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;"></div>
+                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Date: <input type="date" id="rp-reviewer-date" value="${resolveTechnicalReview(d.report).date || ''}" data-action-change="updateTechnicalReview" data-arg1="date" data-arg2="this.value" style="font-weight:600;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;"></div>
                             </div>
                         </div>
                         <div style="margin-top:1.5rem;padding:1rem;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:0.5rem;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body.</div>
@@ -2842,6 +2870,40 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
     window.exportReportPDF = function () {
         const d = window._reportPreviewData;
         if (!d) return;
+
+        // ─── Build-time evidence thumbnails ─────────────────────────────────
+        // The main report must never embed full-resolution evidence (older
+        // findings predate the capture-time thumb pipeline, so they carry only
+        // 1600px evidenceImages — ~125KB each printed at 80px, and the print-
+        // window downscale pass can lose the race against print). Backfill
+        // item.evidenceThumbs here, once, BEFORE building the HTML —
+        // renderEvThumbsPdf already prefers thumbs, so the print document
+        // simply never contains the full-res versions.
+        if (window.EvidenceUtils && typeof window.EvidenceUtils.thumb === 'function') {
+            const pendingThumbs = [];
+            (d.hydratedProgress || []).forEach(function (item) {
+                if (!item) return;
+                const fulls = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
+                if (!fulls.length) return;
+                if (Array.isArray(item.evidenceThumbs) && item.evidenceThumbs.length) return;
+                pendingThumbs.push(
+                    Promise.all(fulls.slice(0, 4).map(function (u) {
+                        return Promise.resolve(window.EvidenceUtils.thumb(u, { maxPx: 480, quality: 0.72 }))
+                            .then(function (t) { return t || u; })
+                            .catch(function () { return u; });
+                    })).then(function (thumbs) { item.evidenceThumbs = thumbs; })
+                );
+            });
+            if (pendingThumbs.length) {
+                if (window.showNotification) window.showNotification('Optimizing evidence images for export…', 'info');
+                Promise.all(pendingThumbs).then(function () {
+                    if (typeof window.saveData === 'function') window.saveData();
+                    window.exportReportPDF();
+                });
+                return;
+            }
+        }
+
         const en = window._reportSectionState || {};
         // Report status ('draft'|'final') controls the DRAFT watermark. Version bumps no
         // longer happen on export — only finalizeAndPublish (ai-service.js) bumps version,

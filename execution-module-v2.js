@@ -3050,6 +3050,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
             </div>
             <div style="margin-bottom: 1rem; font-size: 0.95rem;">${statusLine}</div>
+            <div style="margin: -0.5rem 0 1rem; font-size: 0.75rem; color: #94a3b8;"><i class="fa-solid fa-clock-rotate-left" style="margin-right: 0.3rem;"></i>Last checked ${esc(new Date().toLocaleTimeString())} — totals match the Finalize &amp; Publish gate.</div>
             ${allItems.length ? `
             <div style="display: flex; flex-direction: column; gap: 0.6rem;">
                 ${allItems.map(it => {
@@ -3063,6 +3064,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // ReportIntegrity build that hasn't attached one yet.
         const ref = it && it.ref;
         const showSetCriterion = !!ref && ref.kind === 'finding' && /^(B1|B4)-/.test(String((it && it.id) || ''));
+        // Second fix action: the technical-review warning demanded an "Approved"
+        // outcome without offering any path to record one (the actual control is
+        // buried in the preview modal's Signature section) — surface it here.
+        const showTechReview = /technical review outcome/i.test(String((it && it.message) || ''));
         const fixBtn = showSetCriterion ? `
                         <button type="button" class="btn btn-sm btn-outline-primary" style="margin-top: 0.45rem;"
                             data-action="setFindingCriterion"
@@ -3074,6 +3079,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             data-item-idx="${ref.itemIdx != null ? esc(String(ref.itemIdx)) : ''}"
                             aria-label="Set criterion">
                             <i class="fa-solid fa-wrench" style="margin-right: 0.3rem;"></i>Set criterion
+                        </button>` : showTechReview ? `
+                        <button type="button" class="btn btn-sm btn-outline-primary" style="margin-top: 0.45rem;"
+                            data-action="recordTechnicalReview" data-id="${esc(String(reportId))}"
+                            aria-label="Record technical review">
+                            <i class="fa-solid fa-user-check" style="margin-right: 0.3rem;"></i>Record technical review
                         </button>` : '';
         return `
                     <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
@@ -3219,6 +3229,60 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     }
                 );
             }
+        });
+    };
+
+    /**
+     * "Record technical review" fix action for the issuance-gate warning
+     * (data-action target — see the button rendered in runReportIntegrityCheck).
+     * Writes report.technicalReview {reviewer, outcome, date, notes} — the same
+     * structure the preview modal's Signature section edits — then persists and
+     * re-runs the check so the warning clears immediately.
+     */
+    window.recordTechnicalReview = function (reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) { window.showNotification('Report not found.', 'error'); return; }
+        const tr = (report.technicalReview && typeof report.technicalReview === 'object')
+            ? report.technicalReview
+            : { reviewer: report.technicalReviewer || '', outcome: '', date: '', notes: '' };
+        const esc = window.UTILS.escapeHtml;
+        const today = new Date().toISOString().split('T')[0];
+
+        window.DataService.openFormModal('Record Technical Review', `
+            <div class="form-group">
+                <label>Technical reviewer <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="tr-reviewer-input" placeholder="Reviewer name" value="${esc(tr.reviewer || '')}">
+            </div>
+            <div class="form-group">
+                <label>Outcome <span style="color: var(--danger-color);">*</span></label>
+                <select class="form-control" id="tr-outcome-input">
+                    <option value="" ${!tr.outcome ? 'selected' : ''}>— pending —</option>
+                    <option value="Approved" ${tr.outcome === 'Approved' ? 'selected' : ''}>Approved</option>
+                    <option value="Returned" ${tr.outcome === 'Returned' ? 'selected' : ''}>Returned (rework required)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Review date</label>
+                <input type="date" class="form-control" id="tr-date-input" value="${esc(tr.date || today)}">
+            </div>
+            <div class="form-group">
+                <label>Notes (optional)</label>
+                <textarea class="form-control" id="tr-notes-input" rows="3">${esc(tr.notes || '')}</textarea>
+            </div>
+            <small id="tr-warning" style="display:none; color: #dc2626;"></small>
+        `, () => {
+            const reviewer = Sanitizer.sanitizeText(document.getElementById('tr-reviewer-input')?.value || '').trim();
+            const outcome = document.getElementById('tr-outcome-input')?.value || '';
+            const date = document.getElementById('tr-date-input')?.value || '';
+            const notes = Sanitizer.sanitizeText(document.getElementById('tr-notes-input')?.value || '').trim();
+            const warning = document.getElementById('tr-warning');
+            if (!reviewer || !outcome) {
+                if (warning) { warning.textContent = 'Reviewer name and outcome are both required.'; warning.style.display = 'block'; }
+                return;
+            }
+            report.technicalReview = { reviewer, outcome, date, notes };
+            window.closeModal();
+            persistAndRefreshIntegrity(reportId, 'Technical review recorded: ' + outcome + ' (' + reviewer + ').');
         });
     };
 
