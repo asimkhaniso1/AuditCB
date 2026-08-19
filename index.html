@@ -283,11 +283,16 @@
     <script src="./report-risk.js?v=31.0_EVPACK" defer></script>
     <script src="./report-executive.js?v=31.0_EVPACK" defer></script>
     <script src="./audit-frameworks.js?v=28.0_UNIVERSAL" defer></script>
+    <!-- Scope-gated clause/control registry and the checklist QA pass. Pure
+         data + pure functions, loaded before checklist-module.js and
+         client-docs-bulk.js, which both read them off window. -->
+    <script src="./checklist-standards.js?v=33.0_SCOPED_CHECKLIST" defer></script>
+    <script src="./checklist-qa.js?v=33.0_SCOPED_CHECKLIST" defer></script>
     <script src="./report-operational.js?v=31.0_EVPACK" defer></script>
     <script src="./report-findings-ops.js?v=31.0_EVPACK" defer></script>
     <script src="./report-frameworks.js?v=31.0_EVPACK" defer></script>
     <script src="./execution-reporting.js?v=31.0_EVPACK" defer></script>
-    <script src="./enhancements.js?v=18.0_DATE_PASTE" defer></script>
+    <script src="./enhancements.js?v=33.0_SCOPED_CHECKLIST" defer></script>
     <script src="./dashboard-module.js?v=30.0_GOVERNANCE" defer></script>
     <script src="./clients-crud.js?v=21.0_SPLIT" defer></script>
     <script src="./clients-import.js?v=31.7_CCI_IMPORT" defer></script>
@@ -297,10 +302,10 @@
     <script src="./clients-detail.js?v=16.3_FINAL" defer></script>
     <script src="./clients-modals.js?v=16.3_FINAL" defer></script>
     <script src="./client-workspace.js?v=19.0_HTML_FIX" defer></script>
-    <script src="./checklist-module.js?v=19.1_UPSERT" defer></script>
+    <script src="./checklist-module.js?v=33.0_SCOPED_CHECKLIST" defer></script>
     <script src="./export-module.js?v=16.3_FINAL" defer></script>
     <script src="./documents-module.js?v=16.3_FINAL" defer></script>
-    <script src="./client-docs-bulk.js?v=32.2_DOC_REFINE" defer></script>
+    <script src="./client-docs-bulk.js?v=33.0_SCOPED_CHECKLIST" defer></script>
     <script src="./client-ai-suggest.js?v=32.2_DOC_REFINE" defer></script>
     <script src="./certifications-module.js?v=30.0_GOVERNANCE" defer></script>
     <script src="./appeals-complaints-module.js?v=16.3_FINAL" defer></script>
@@ -309,7 +314,7 @@
     <script src="./record-retention-module.js?v=16.3_FINAL" defer></script>
     <script src="./ncr-capa-module.js?v=30.0_GOVERNANCE" defer></script>
     <script src="./settings-users.js?v=21.0_SPLIT" defer></script>
-    <script src="./settings-kb.js?v=32.2_DOC_REFINE" defer></script>
+    <script src="./settings-kb.js?v=33.0_SCOPED_CHECKLIST" defer></script>
     <script src="./settings-module.js?v=25.1_CAPA_EVIDENCE" defer></script>
     <script src="./settings-system-defaults.js?v=16.3_FINAL" defer></script>
     <script src="./audit-trail-module.js?v=16.3_FINAL" defer></script>

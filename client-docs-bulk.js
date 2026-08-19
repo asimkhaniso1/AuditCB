@@ -286,7 +286,7 @@
      * @param {string} text - extracted plain text
      */
     function parseContentMeta(text) {
-        const out = { title: '', docNumber: '', revision: '', date: '', headings: [], clauseRefs: [] };
+        const out = { title: '', docNumber: '', revision: '', date: '', headings: [], clauseRefs: [], standards: [] };
         if (!text) return out;
 
         const head = text.slice(0, 2500);
@@ -321,6 +321,10 @@
             if (out.headings.length >= MAX_HEADINGS) break;
         }
         out.clauseRefs = Array.from(new Set(out.headings.flatMap(h => findClauseRefs(h.clause))));
+        // Standards named in the opening pages — scope, purpose and normative
+        // reference sections are where a document declares which system it
+        // belongs to. Used only when the file name itself is silent.
+        out.standards = detectStandards(text.slice(0, 6000));
         return out;
     }
 
@@ -370,6 +374,66 @@
         return sortClauses(filtered);
     }
 
+    // ── Which standard a document belongs to ──────────────────────────
+    // In an integrated management system a bare "6.2" on a document is not
+    // traceable: ISO/IEC 27001 6.2 is information security objectives,
+    // ISO 22301 6.2 is business continuity objectives and ISO/IEC 20000-1 6.2
+    // is service management objectives. Capturing the standard at upload time
+    // is what makes "ITSMS Objectives Procedure -> ISO/IEC 20000-1:2018 6.2"
+    // readable, and what stops a 20000-1 procedure being counted as coverage
+    // of a 27001 clause in the gap analysis.
+    //
+    // `\bSMS\b` on its own is deliberately absent — it collides with too much
+    // ordinary text. ITSMS and the spelled-out system name carry it instead.
+    const STANDARD_SIGNALS = [
+        { id: 'iso27001', label: 'ISO/IEC 27001:2022', re: /\b27001\b|\bISMS\b|information security management system/i },
+        { id: 'iso22301', label: 'ISO 22301:2019', re: /\b22301\b|\bBCMS\b|business continuity management system/i },
+        { id: 'iso20000', label: 'ISO/IEC 20000-1:2018', re: /\b20000(?:[-\s]?1)?\b|\bITSMS\b|service management system/i },
+        { id: 'iso9001', label: 'ISO 9001:2015', re: /\b9001\b|\bQMS\b|quality management system/i },
+        { id: 'iso14001', label: 'ISO 14001:2015', re: /\b14001\b|\bEMS\b|environmental management system/i },
+        { id: 'iso45001', label: 'ISO 45001:2018', re: /\b45001\b|\bOH&SMS\b|occupational health and safety management/i }
+    ];
+
+    /** Every standard named in a piece of text, in registry order. */
+    function detectStandards(text) {
+        const s = String(text || '');
+        return STANDARD_SIGNALS.filter(sig => sig.re.test(s)).map(sig => ({ id: sig.id, label: sig.label }));
+    }
+
+    /**
+     * The standard(s) a document belongs to.
+     *
+     * The document's own name, folder and number decide it when they say
+     * anything at all — a body reference to another standard is usually a
+     * cross-reference, not the document's subject, so it must not re-tag an
+     * ISMS procedure as a BCMS one. The body is read only when the name is
+     * silent, which is where an integrated manual naming several standards
+     * legitimately picks up all of them.
+     *
+     * @returns {{ids: string[], labels: string[]}} empty when nothing is named
+     */
+    function mapStandards(parsed, contentMeta) {
+        const fromName = detectStandards(`${(parsed && parsed.title) || ''} ${(parsed && parsed.folder) || ''} ${(parsed && parsed.docNumber) || ''}`);
+        const hits = fromName.length ? fromName : ((contentMeta && contentMeta.standards) || []);
+        return { ids: hits.map(h => h.id), labels: hits.map(h => h.label) };
+    }
+
+    /**
+     * Does this document evidence `ref` of `stdId`?
+     *
+     * A document that names no standard applies to all of them — that is both
+     * the legacy case and the genuinely shared IMS document (one integrated
+     * policy, one document-control procedure). A document that DOES name its
+     * standard only ever counts toward that standard.
+     */
+    function docCoversRef(doc, stdId, ref) {
+        const linked = String((doc && doc.linkedStandards) || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (stdId && linked.length && linked.indexOf(stdId) === -1) return false;
+        return String((doc && doc.linkedClauses) || '')
+            .split(',').map(s => s.trim()).filter(Boolean)
+            .some(dc => clauseSatisfies(String(ref), dc));
+    }
+
     /** Stable key for spotting the same document twice. */
     function docKey(parsed) {
         const t = (parsed.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -383,12 +447,14 @@
     }
 
     // Conservative keyword -> clause fallback, engaged only when no numeric
-    // clause token was found in the focus text (see deriveCriterionRef below).
-    // Only the Annex SL high-level-structure clauses that are common across the
-    // 9001-family standards this app audits — kept deliberately short so a false
-    // match is unlikely; criterionSource stays 'focus-carryover' either way, so
-    // the auditor still confirms via the existing NCR form field before it's
-    // treated as authoritative.
+    // clause token was found in the focus text (see deriveCriterionSuggestion
+    // below). Only the Annex SL high-level-structure clauses that are common
+    // across the 9001-family standards this app audits — kept deliberately
+    // short so a false match is unlikely. This is the weakest signal the
+    // module produces (a topic word, not even the question's own stated
+    // clause), so deriveCriterionSuggestion always marks a match from this
+    // table 'low' confidence and callers record it as an unconfirmed
+    // suggestion, never as a stamped criterionRef — see deriveCriterionSuggestion.
     const KEYWORD_CLAUSE_FALLBACK = [
         { re: /internal audit/i, clause: '9.2' },
         { re: /management review/i, clause: '9.3' },
@@ -405,9 +471,10 @@
      * True when `standard` is one of the Annex SL / "9001-family" standards
      * that share the clause 4-10 high-level structure (or when no standard is
      * given, in which case there's nothing to contradict). Shared by
-     * deriveCriterionRef and by any caller that wants to gate a hardcoded
-     * Annex-SL clause fallback (e.g. '4.3') the same way — a standard outside
-     * this family should never be handed an invented 4-10 clause number.
+     * deriveCriterionSuggestion and by any caller that wants to gate a
+     * hardcoded Annex-SL clause fallback (e.g. '4.3') the same way — a
+     * standard outside this family should never be handed an invented 4-10
+     * clause number.
      * @param {string} [standard]
      * @returns {boolean}
      */
@@ -416,11 +483,18 @@
     }
 
     /**
-     * Recover a real ISO clause reference from Stage 1 focus-point / mandatory
-     * surveillance-element text so a FOCUS.n or SURV checklist item — whose own
-     * `clause` is an internal pseudo-reference, not a standard clause — can still
-     * carry the actual criterion it addresses. Additive/non-breaking: callers get
-     * '' when nothing plausible is found and just skip displaying a criterion.
+     * Suggest a possible ISO clause for Stage 1 focus-point / mandatory
+     * surveillance-element / org-context / unmapped-document text, WITHOUT
+     * presenting it as a confirmed criterion. This function only ever looks
+     * at the SOURCE AUDIT QUESTION's own text — it has no view of what the
+     * evidence on site actually showed, so its output can never be the
+     * FORMAL FINDING CLAUSE an NC gets raised against. That distinction is
+     * the whole point of returning an object instead of a bare string: a
+     * clause token sitting in a question is, at best, what the question
+     * happens to be about, not what an auditor found unfulfilled. Real
+     * example of the damage a bare string caused: a competence/training
+     * finding was recorded against 9.2 (internal audit) purely because "9.2"
+     * appeared in the source question's text.
      *
      * @param {string} text
      * @param {string} [standard] - e.g. 'ISO 9001:2015'. Annex SL / "9001-family"
@@ -428,26 +502,93 @@
      *   token has to look like a main clause 4-10 (a bare "12.3" or "2.1" picked
      *   up from a document number or date in the text is rejected). Without a
      *   recognised family the first token found is accepted as-is.
-     * @returns {string} the first plausible clause token, or ''.
+     * @returns {{ref: string, confidence: 'medium'|'low'|'none', basis: 'clause-token-in-question'|'keyword-fallback'|'none'}}
      */
-    function deriveCriterionRef(text, standard) {
+    function deriveCriterionSuggestion(text, standard) {
         const matches = String(text || '').match(/\b(\d{1,2}(?:\.\d{1,2}){0,2})\b/g) || [];
         const isAnnexSLFamily = isAnnexSLFamilyStandard(standard);
         if (matches.length) {
             for (const token of matches) {
                 const main = parseInt(token.split('.')[0], 10);
-                if (!isAnnexSLFamily || (main >= 4 && main <= 10)) return token;
+                // 'medium', never 'high': this is the clause the QUESTION names,
+                // not evidence that it's the clause an NC belongs under — only an
+                // auditor (or a future evidence-based suggester) can confirm that.
+                if (!isAnnexSLFamily || (main >= 4 && main <= 10)) {
+                    return { ref: token, confidence: 'medium', basis: 'clause-token-in-question' };
+                }
             }
         }
         // No numeric clause token found in the text — conservative keyword
-        // fallback, Annex-SL family only.
+        // fallback, Annex-SL family only. Weaker than a token found in the
+        // question's own text, so 'low' rather than 'medium'.
         if (isAnnexSLFamily) {
             const t = String(text || '');
             for (const kw of KEYWORD_CLAUSE_FALLBACK) {
-                if (kw.re.test(t)) return kw.clause;
+                if (kw.re.test(t)) {
+                    return kw.clause
+                        ? { ref: kw.clause, confidence: 'low', basis: 'keyword-fallback' }
+                        : { ref: '', confidence: 'none', basis: 'none' };
+                }
             }
         }
-        return '';
+        return { ref: '', confidence: 'none', basis: 'none' };
+    }
+
+    /**
+     * Backwards-compatible string-only view of deriveCriterionSuggestion(),
+     * for existing external callers that only want a candidate to pre-fill a
+     * field the auditor then reviews and confirms themselves — e.g.
+     * execution-module-v2.js's window.setFindingCriterion pre-suggest. That
+     * use is fine: the value is displayed for confirmation, never written
+     * unconfirmed. Callers *inside this file* must not stamp this string
+     * straight onto criterionRef — use applyCriterionSuggestion() instead so
+     * it lands as an unconfirmed suggestion, not a confirmed criterion.
+     *
+     * @param {string} text
+     * @param {string} [standard]
+     * @returns {string} the first plausible clause token, or ''.
+     */
+    function deriveCriterionRef(text, standard) {
+        return deriveCriterionSuggestion(text, standard).ref;
+    }
+
+    /**
+     * Stamp a checklist item with the shared criterion contract every
+     * FOCUS/SURV/ORG/DOC call site in this file uses, so a value scraped or
+     * keyword-guessed from the question's own text is never presented as an
+     * auditor-confirmed criterion. `templateFallback`, when given, is the one
+     * exception: a literal clause chosen deliberately for a fixed,
+     * always-the-same-topic question template (e.g. the ORG "certified scope"
+     * question -> 4.3) rather than pulled from variable text — that's still
+     * written as a confirmed criterionRef, same as before this change, because
+     * it isn't the thing the client's spec calls out (a value obtained by
+     * scraping the question text).
+     *
+     * @param {Object} item - a question() result to mutate
+     * @param {string} text - the question text to derive a suggestion from
+     * @param {string} standard
+     * @param {string} source - criterionSource: 'focus-carryover' | 'org-context' | 'unmapped-doc'
+     * @param {string} [templateFallback] - confirmed clause to fall back to when
+     *   nothing was found in the text (caller pre-gates this to the Annex-SL family)
+     * @returns {Object} item, for chaining
+     */
+    function applyCriterionSuggestion(item, text, standard, source, templateFallback) {
+        const suggestion = deriveCriterionSuggestion(text, standard);
+        if (suggestion.ref) {
+            // Traceable but unconfirmed — criterionRef stays empty until the
+            // auditor sets it explicitly (window.setFindingCriterion in
+            // execution-module-v2.js), which Report Integrity's B1/B14
+            // blockers require before a report with an NC here can issue.
+            item.criterionRef = '';
+            item.criterionSuggestedRef = suggestion.ref;
+            item.criterionConfidence = suggestion.confidence;
+            item.criterionBasis = suggestion.basis;
+            item.criterionConfirmed = false;
+        } else {
+            item.criterionRef = templateFallback || '';
+        }
+        item.criterionSource = source;
+        return item;
     }
 
     function docRef(doc) {
@@ -534,11 +675,12 @@
      *
      * @param {Object} client
      * @param {string} auditType
-     * @param {string} [standard] - passed through to deriveCriterionRef() so
-     *   these ORG items carry a real criterionRef the same way FOCUS/SURV
-     *   items do (see buildClientChecklist). Optional/backward-compatible:
-     *   callers that omit it just get the un-family-restricted fallback in
-     *   deriveCriterionRef, same as passing no standard there directly.
+     * @param {string} [standard] - passed through to
+     *   deriveCriterionSuggestion()/applyCriterionSuggestion() so these ORG
+     *   items carry a criterion the same way FOCUS/SURV items do (see
+     *   buildClientChecklist). Optional/backward-compatible: callers that
+     *   omit it just get the un-family-restricted behaviour, same as passing
+     *   no standard there directly.
      */
     function orgContextQuestions(client, auditType, standard) {
         const out = [];
@@ -550,22 +692,25 @@
         // them was permanently blocked by the Report Integrity validator (its
         // `clause` is the 'ORG' pseudo-tag, and there was no criterionRef to
         // fall back on). These are unambiguous questions, so most are mapped
-        // explicitly below rather than left to the generic keyword guesser;
-        // deriveCriterionRef still runs first and only the explicit clause is
-        // used as a fallback when it finds nothing better in the text. The
-        // hardcoded fallbacks below (4.3 / 8.4 / 8.1) are Annex-SL clause
-        // numbers, so — same rule deriveCriterionRef itself already applies —
-        // they only apply for standards in that family; a standard outside it
-        // gets whatever deriveCriterionRef found in the text, or '' rather
-        // than an invented 4-10 clause that may not even exist in it.
+        // explicitly below via applyCriterionSuggestion()'s templateFallback
+        // rather than left to the generic keyword guesser — that mapping is a
+        // deliberate, reviewed choice for a fixed question template (not text
+        // scraped from client content), so it's still written as a confirmed
+        // criterionRef. If the question's own text resolves to something more
+        // specific, THAT is treated as an unconfirmed suggestion instead (see
+        // applyCriterionSuggestion) rather than silently overridden by the
+        // template default. The hardcoded fallbacks below (4.3 / 8.4 / 8.1)
+        // are Annex-SL clause numbers, so they only apply for standards in
+        // that family; a standard outside it gets whatever was found in the
+        // text, or '' rather than an invented 4-10 clause that may not even
+        // exist in it.
         const annexSLFallback = isAnnexSLFamilyStandard(standard);
         if (goods.length) {
             const names = goods.slice(0, 12).map(g => g.name || g).join(', ');
             const text = `Confirm the certified scope still matches what the organisation actually supplies: ${names}. Note any product or service added, withdrawn or changed since the last audit.`;
             const item = question('ORG', 'Certified scope', text);
             // Certified scope confirmation -> 4.3 (scope of the management system).
-            item.criterionRef = deriveCriterionRef(text, standard) || (annexSLFallback ? '4.3' : '');
-            item.criterionSource = 'org-context';
+            applyCriterionSuggestion(item, text, standard, 'org-context', annexSLFallback ? '4.3' : '');
             out.push(item);
         }
 
@@ -578,8 +723,7 @@
                 // how operations at that site are planned and controlled — it's
                 // a scope-boundary check, so 4.3 rather than 8.1 (which would fit
                 // a question about operational planning/control at the site).
-                item.criterionRef = deriveCriterionRef(text, standard) || (annexSLFallback ? '4.3' : '');
-                item.criterionSource = 'org-context';
+                applyCriterionSuggestion(item, text, standard, 'org-context', annexSLFallback ? '4.3' : '');
                 out.push(item);
             });
         }
@@ -597,15 +741,13 @@
                 const text = `${name} is performed by an external provider${owner}. Verify the controls applied to it, the criteria for selecting and monitoring the provider, and that responsibility for conformity is retained.`;
                 const item = question('ORG', label, text);
                 // Externally provided process/outsourcing -> 8.4.
-                item.criterionRef = deriveCriterionRef(text, standard) || (annexSLFallback ? '8.4' : '');
-                item.criterionSource = 'org-context';
+                applyCriterionSuggestion(item, text, standard, 'org-context', annexSLFallback ? '8.4' : '');
                 out.push(item);
             } else {
                 const text = `Sample the ${name} process end to end${owner} — verify it runs as planned, the required records are produced, and its performance is monitored.`;
                 const item = question('ORG', label, text);
                 // End-to-end process sampling -> 8.1 (operational planning and control).
-                item.criterionRef = deriveCriterionRef(text, standard) || (annexSLFallback ? '8.1' : '');
-                item.criterionSource = 'org-context';
+                applyCriterionSuggestion(item, text, standard, 'org-context', annexSLFallback ? '8.1' : '');
                 out.push(item);
             }
         });
@@ -613,21 +755,685 @@
         return out;
     }
 
+    // ══ Scope-driven checklist engine ═════════════════════════════════
+    //
+    // Everything below answers "what does the audit scope require?" before any
+    // client document is looked at. The old engine did the opposite: it walked
+    // the uploaded documents, asked two boilerplate questions of each on every
+    // clause it happened to be tagged with, and took its clause list from
+    // getBuiltInClauses() — which silently returned the ISO 9001 set for any
+    // standard it did not recognise. A three-standard ISMS/BCMS/SMS
+    // recertification came out as 379 items auditing Design & Development and
+    // measuring equipment.
+    //
+    // The rules this engine holds to:
+    //   1. only a selected, registered standard may generate a question
+    //   2. every citation is checked against that standard before it is used
+    //   3. genuinely common Annex SL requirements are tested once
+    //   4. same clause number != same requirement — consolidation is by concept
+    //   5. Annex A / SoA controls are sampled, not just the clauses
+    //   6. documents attach evidence to a question; they never create one
+    //   7. document control is tested by representative sampling
+    //   8. recertification leads with the previous cycle's evidence
+    //   9. operations are audited as processes, not as paperwork
+    //  10. length follows scope and risk, never document count
+    //  12. no mapping, no citation — the item goes to the auditor instead
+
     /**
-     * Build a client checklist from the documents they supplied and their
-     * organisation context, scoped to the audit type.
+     * Which registered standards this engagement actually covers.
+     * Accepts explicit ids, an array of names, the legacy single `standard`
+     * string, or the client's comma-separated standard field. Anything that
+     * does not match a registered standard is reported in `unresolved` and
+     * generates nothing.
+     */
+    function resolveScope(o, client) {
+        const CS = window.ChecklistStandards;
+        if (!CS) return { standards: [], ids: [], unresolved: [], labels: [] };
+        const raw = (o.standardIds && o.standardIds.length) ? o.standardIds
+            : (Array.isArray(o.standards) && o.standards.length) ? o.standards
+                : (o.standard || (client && client.standard) || '');
+        const r = CS.resolve(raw);
+        return {
+            standards: r.standards,
+            ids: r.standards.map(s => s.id),
+            labels: r.standards.map(s => s.label),
+            unresolved: r.unresolved
+        };
+    }
+
+    /**
+     * Sampling depth for this engagement, derived from audit type, how many
+     * standards are in scope, the man-days sold and the size of the
+     * organisation — deliberately NOT from how many documents were uploaded.
      *
-     * Initial and recertification audits have to cover the whole standard, so
-     * every auditable clause gets an item and clauses with no supporting
-     * document are called out. A surveillance audit is risk-based: the ISO
-     * 17021-1 mandatory elements plus what the documents and core processes
-     * actually cover.
+     * Only the elastic sections move: the requirement coverage an initial or
+     * recertification audit owes the standard is never sampled away.
+     */
+    function riskBasedBudget(auditType, standardIds, manDays, profile, siteCount) {
+        const type = normalizeAuditType(auditType);
+        const n = Math.max(1, (standardIds || []).length);
+        const band = (profile && profile.band) || 'unknown';
+        const sizeFactor = { micro: 0.7, small: 0.85, medium: 1, large: 1.2 }[band] || 1;
+        const md = parseFloat(manDays);
+        // Man-days sold against man-days a scope this wide normally needs.
+        // Clamped so an unusually short or long plan bends the sample rather
+        // than breaking it.
+        const dayFactor = (!isNaN(md) && md > 0)
+            ? Math.min(1.4, Math.max(0.55, md / (n * 3)))
+            : 1;
+        const scale = sizeFactor * dayFactor;
+        const cap = v => Math.max(1, Math.round(v * scale));
+
+        const knobs = {
+            surveillance: { annexA: 8, processes: 5, documents: 3, themesPerStandard: 5, coverAllClauses: false },
+            initial: { annexA: 26, processes: 14, documents: 4, themesPerStandard: null, coverAllClauses: true },
+            recertification: { annexA: 18, processes: 10, documents: 3, themesPerStandard: null, coverAllClauses: true }
+        }[type];
+
+        return {
+            auditType: type,
+            scale: Math.round(scale * 100) / 100,
+            annexASample: cap(knobs.annexA),
+            processSample: cap(knobs.processes),
+            documentSample: knobs.documents,
+            themesPerStandard: knobs.themesPerStandard,
+            coverAllClauses: knobs.coverAllClauses,
+            siteSample: Math.min(siteCount || 0, type === 'surveillance' ? 3 : 10)
+        };
+    }
+
+    /**
+     * The most questions this scope can justify. The QA pass raises
+     * EXCESSIVE_COUNT above it — the check that would have caught 379 items.
+     * Computed from the scope plan, so legitimate full coverage of three
+     * standards is never mistaken for bloat.
+     */
+    function questionCeiling(ids, budget, extras) {
+        const CS = window.ChecklistStandards;
+        if (!CS || !ids.length) return null;
+        const plan = CS.planScope(ids);
+        const themeCount = budget.themesPerStandard
+            ? Math.min(plan.themes.length, budget.themesPerStandard * ids.length)
+            : plan.themes.length;
+        const structural = (budget.coverAllClauses ? plan.common.length + plan.residual.length : plan.common.length)
+            + themeCount
+            + (budget.auditType === 'surveillance' ? SURVEILLANCE_MANDATORY.length : CS.RECERT_PRIORITIES.length);
+        const elastic = budget.annexASample + budget.processSample + budget.documentSample + 4;
+        return Math.round((structural + elastic + (extras || 0)) * 1.25);
+    }
+
+    /**
+     * A checklist item that carries its provenance: which standards it tests
+     * and the exact clause/control of each. `refs` is what the QA pass
+     * validates and what the report prints as the audit criterion, so an item
+     * can never claim a requirement its standard does not contain.
+     */
+    function scopedQuestion(displayRef, title, requirement, refs, opts) {
+        const CS = window.ChecklistStandards;
+        const o = opts || {};
+        const list = (refs || []).filter(r => r && r.stdId && r.ref);
+        const item = {
+            clause: displayRef,
+            title: title || '',
+            requirement,
+            refs: list,
+            standards: Array.from(new Set(list.map(r => r.stdId))),
+            citation: (CS && list.length) ? CS.citation(list) : '',
+            // criterionRef / criterionSource keep the Report Integrity
+            // validator and the checklist -> NCR sync working unchanged: both
+            // read criterionRef when `clause` is a pseudo-reference.
+            criterionRef: list.length ? list[0].ref : '',
+            criterionSource: o.source || 'scoped-standard',
+            auditorReview: !!o.auditorReview,
+            items: [{ clause: displayRef, requirement }]
+        };
+        if (item.auditorReview) { item.criterionRef = ''; item.citation = ''; }
+        return item;
+    }
+
+    /** Distinct clause numbers of a citation set, for the CLAUSE column. */
+    function displayRefFor(refs) {
+        const uniq = [];
+        (refs || []).forEach(r => { if (uniq.indexOf(r.ref) === -1) uniq.push(r.ref); });
+        return uniq.join(' / ');
+    }
+
+    /**
+     * Client documents that should evidence a question, named so the auditor
+     * walks in knowing what to ask for.
+     *
+     * This is the ONLY role a document plays in the new engine: the question
+     * already exists because the standard requires it. A document title can
+     * never create a question or decide its clause.
+     */
+    function evidenceHint(docs, refs, cap) {
+        if (!refs || !refs.length) return '';
+        // Matched per {standard, clause} pair, not on the clause number alone:
+        // an ISO/IEC 20000-1 objectives procedure tagged "6.2" is not evidence
+        // for ISO/IEC 27001 6.2, even though the numbers are identical.
+        const hits = (docs || [])
+            .filter(d => refs.some(r => docCoversRef(d, r.stdId, r.ref)))
+            .slice(0, cap || 3);
+        if (!hits.length) return '';
+        return ` Documented information on file that should support this: ${hits.map(docRef).join('; ')}.`;
+    }
+
+    // A client's key-process names against the standard themes that already
+    // walk them. Matching on the distinctive word rather than the whole name,
+    // because clients name the same process a dozen ways ("Incident
+    // Management", "Service Desk Incident Handling", "IT Incident Response").
+    const PROCESS_THEME_MATCH = [
+        [/incident/i, ['sms-incident', 'isms-incident']],
+        [/\bchange\b/i, ['sms-change']],
+        [/problem/i, ['sms-problem']],
+        [/release|deploy/i, ['sms-release']],
+        [/request|fulfil/i, ['sms-request']],
+        [/config|cmdb|asset/i, ['sms-config']],
+        [/capacity|availabilit/i, ['sms-capacity']],
+        [/service level|\bSLA\b|catalogue/i, ['sms-slm']],
+        [/supplier|vendor|third[- ]part/i, ['sms-supplier', 'isms-supplier']],
+        [/customer|relationship/i, ['sms-brm']],
+        [/report/i, ['sms-reporting']],
+        [/backup|recovery/i, ['isms-backup']],
+        [/continuity|disaster|\bBC\b|\bDR\b/i, ['bcms-plans', 'sms-continuity']],
+        [/patch|vulnerab/i, ['isms-vuln']],
+        [/cloud|azure|m365|\bCSP\b/i, ['isms-cloud']],
+        [/access|identity|joiner|leaver/i, ['isms-access']],
+        [/risk/i, ['isms-risk']]
+    ];
+
+    /** The theme that already audits this named process, or null. */
+    function themeCoveringProcess(name, themes) {
+        for (const [re, ids] of PROCESS_THEME_MATCH) {
+            if (!re.test(String(name || ''))) continue;
+            const hit = (themes || []).find(t => ids.indexOf(t.id) !== -1);
+            if (hit) return hit;
+        }
+        return null;
+    }
+
+    /**
+     * Organisation-context questions, citing only clauses the selected
+     * standards genuinely contain. The old version hardcoded 8.4 for an
+     * outsourced process — a clause that exists in ISO 9001 but in none of
+     * ISO/IEC 27001, ISO 22301 or ISO/IEC 20000-1.
+     */
+    function scopedOrgQuestions(client, standards, docs, budget, themes) {
+        const out = [];
+        const refFor = key => standards
+            .map(s => ({ stdId: s.id, ref: (s.orgRefs || {})[key] }))
+            .filter(r => r.ref);
+
+        const goods = (client.goodsServices || []).filter(g => g && (g.name || typeof g === 'string'));
+        if (goods.length) {
+            const names = goods.slice(0, 12).map(g => g.name || g).join(', ');
+            const refs = refFor('scope');
+            // Deliberately a certificate-reconciliation question. The scope
+            // STATEMENT of each system is examined by the consolidated 4.3
+            // question in the IMS section; asking both the same way produced
+            // two questions that read identically.
+            out.push(scopedQuestion(displayRefFor(refs) || 'ORG', 'Certified scope against the certificate',
+                `Compare the certificate as issued against what the organisation supplies today: ${names}. Identify anything added, withdrawn, renamed or moved since the last certificate was issued, and decide whether the certificate wording still describes the business accurately.`,
+                refs, { source: 'org-context' }));
+        }
+
+        const sites = (client.sites || []).filter(s => s && s.name);
+        if (sites.length > 1) {
+            const refs = refFor('site');
+            const named = sites.slice(0, budget.siteSample || 3)
+                .map(s => `${s.name}${s.city ? ', ' + s.city : ''}`);
+            // One question naming every site in the sample. Asking it site by
+            // site produced questions that differed only by the place name;
+            // which sites are visited and when belongs in the audit plan, not
+            // in a repeated checklist line.
+            out.push(scopedQuestion(displayRefFor(refs) || 'ORG', 'Sites in the sampling plan',
+                `Sites sampled at this audit: ${named.join('; ')}${sites.length > named.length ? ` (of ${sites.length} in the certified scope)` : ''}. For each, establish which activities are performed there, confirm they fall inside the certified scope, and note any activity performed at a site the certificate does not list.`,
+                refs, { source: 'org-context' }));
+        }
+
+        const processes = (client.keyProcesses || []).filter(p => p && (p.name || typeof p === 'string'));
+        const inScope = budget.auditType === 'surveillance'
+            ? processes.filter(p => ['Core', 'Outsourced'].includes(p.category))
+            : processes;
+
+        // A process that a standard's own theme already walks — incident,
+        // change, problem, backup, continuity, cloud, vulnerability — is
+        // audited there, in far more depth than a generic "sample it end to
+        // end". Listing it again here produced a second, blander question for
+        // the same walk. It is named in the coverage note instead.
+        const covered = [];
+        const walk = [];
+        inScope.forEach(p => {
+            const name = String(p.name || p);
+            const owner = themeCoveringProcess(name, themes);
+            if (owner && p.category !== 'Outsourced') covered.push({ name, theme: owner });
+            else walk.push(p);
+        });
+        if (covered.length) {
+            const refs = refFor('process');
+            out.push(scopedQuestion(displayRefFor(refs) || 'ORG', 'Core processes audited under their own standard',
+                `${covered.map(c => `${c.name} (see "${c.theme.label}")`).join('; ')}. Confirm each of these runs as the organisation describes it and that its performance is measured — the detailed walkthrough for each is in the standard-specific section, so record here only what the end-to-end view shows that the individual walkthroughs do not.`,
+                refs, { source: 'org-context' }));
+        }
+
+        walk.slice(0, budget.processSample).forEach(p => {
+            const name = p.name || p;
+            const owner = p.owner ? `, owner ${p.owner}` : '';
+            const label = p.category ? `${name} (${p.category})` : name;
+            if (p.category === 'Outsourced') {
+                const refs = refFor('outsourced');
+                out.push(scopedQuestion(displayRefFor(refs) || 'ORG', label,
+                    `${name} is performed by an external provider${owner}. Verify the controls applied to it, the criteria for selecting and monitoring the provider, the requirements placed on them in the agreement, and that responsibility for conformity is retained.${evidenceHint(docs, refs)}`,
+                    refs, { source: 'org-context', auditorReview: refs.length === 0 }));
+            } else {
+                const refs = refFor('process');
+                out.push(scopedQuestion(displayRefFor(refs) || 'ORG', label,
+                    `Walk the ${name} process end to end${owner} — its inputs, controls, records and handoffs — and verify it runs as planned, produces the required records, and that its performance is measured against a defined target.`,
+                    refs, { source: 'org-context' }));
+            }
+        });
+
+        return out;
+    }
+
+    /**
+     * Annex A control sample. Driven by the Statement of Applicability when one
+     * is available, and by the controls a service-provider ISMS most needs to
+     * evidence otherwise — spread across control themes so the sample is not
+     * all of A.5. Controls a process theme already walks are excluded rather
+     * than asked a second time.
+     */
+    function sampleAnnexAControls(std, plan, budget, soaApplicable) {
+        const pool = (soaApplicable && soaApplicable.length)
+            ? std.controls.filter(c => soaApplicable.indexOf(c.ref) !== -1)
+            : std.controls.filter(c => c.tier === 1);
+        const fresh = pool.filter(c => !plan.themeCovered.has(`${std.id}::${c.ref}`));
+        const byTheme = {};
+        fresh.forEach(c => { (byTheme[c.theme] = byTheme[c.theme] || []).push(c); });
+        const keys = Object.keys(byTheme).sort();
+        const out = [];
+        let i = 0;
+        while (out.length < budget.annexASample && keys.some(k => byTheme[k].length)) {
+            const k = keys[i % keys.length];
+            if (byTheme[k].length) out.push(byTheme[k].shift());
+            i++;
+        }
+        return { sample: out, poolSize: pool.length, soaDriven: !!(soaApplicable && soaApplicable.length) };
+    }
+
+    /**
+     * Documented information tested by representative sampling.
+     *
+     * The old engine asked "is it the current approved issue?" and "is the
+     * process implemented as written?" of every uploaded document — two
+     * questions per document, on every clause it was tagged with. Control of
+     * documented information is one requirement; it is sampled once across a
+     * spread of document types.
+     */
+    function documentSampleQuestions(docs, standards, budget) {
+        const out = [];
+        const list = (docs || []).filter(d => d && d.name);
+        if (!list.length) return out;
+
+        const docRefs = standards
+            .map(s => ({ stdId: s.id, ref: (s.clauses.find(c => c.shared === 'support.documented-information') || {}).ref }))
+            .filter(r => r.ref);
+
+        // Spread the sample across categories so document control is tested on
+        // a policy, a procedure and a record — not three copies of the same
+        // kind of document.
+        const byCategory = {};
+        list.forEach(d => { (byCategory[d.category || 'Uncategorised'] = byCategory[d.category || 'Uncategorised'] || []).push(d); });
+        const cats = Object.keys(byCategory).sort();
+        const sample = [];
+        let i = 0;
+        while (sample.length < budget.documentSample && cats.some(c => byCategory[c].length)) {
+            const c = cats[i % cats.length];
+            if (byCategory[c].length) sample.push(byCategory[c].shift());
+            i++;
+        }
+
+        if (sample.length) {
+            out.push(scopedQuestion(displayRefFor(docRefs) || 'DOC', 'Control of documented information — representative sample',
+                `Test the control of documented information on this representative sample: ${sample.map(docRef).join('; ')}. For each, verify approval before issue, identification and version control, availability where it is needed, protection from loss of integrity, and that superseded issues are not in use. Extend the sample only if a weakness is found.`,
+                docRefs, { source: 'document-sample' }));
+        }
+
+        const records = list.filter(d => d.category === 'Records / Forms Register').slice(0, 2);
+        if (records.length) {
+            out.push(scopedQuestion(displayRefFor(docRefs) || 'DOC', 'Retained records — representative sample',
+                `Sample completed records from ${records.map(docRef).join('; ')} covering the audit period. Verify entries are complete, authorised, legible, traceable and retained for the period the organisation's own retention schedule requires.`,
+                docRefs, { source: 'document-sample' }));
+        }
+        return out;
+    }
+
+    /**
+     * Build a client checklist from the audit scope, the organisation's own
+     * processes and the documents they supplied.
+     *
+     * Dispatches to the scope-driven engine when the selected standards are in
+     * the ChecklistStandards registry. Falls back to the original
+     * document-driven build for a standard the registry does not carry, so
+     * existing 9001 / 14001 / 45001 checklists behave exactly as before.
+     *
+     * @param {Object} client
+     * @param {Array} docs - entries from client.documents
+     * @param {Object} [opts] - { auditType, standard, standardIds, includeMandatory,
+     *   standardClauses, includeOrgContext, focusPoints, maxItems, manDays, soaApplicable }
+     */
+    function buildClientChecklist(client, docs, opts) {
+        const scope = resolveScope(opts || {}, client);
+        if (scope.ids.length) return buildScopedChecklist(client, docs, opts || {}, scope);
+        return buildLegacyChecklist(client, docs, opts);
+    }
+
+    /**
+     * The scope-driven build. Sections, in the order an auditor works them:
+     *   RECERT / SURV  the previous cycle's evidence, or the 17021-1 mandatory set
+     *   FOCUS          what the Stage 1 review said this audit must cover
+     *   ORG            certified scope, sites and the processes actually run
+     *   IMS            requirements genuinely common to the selected standards
+     *   per standard    process-based themes, then that standard's own clauses
+     *   SOA            Annex A control sample
+     *   DOC            documented information, sampled
+     *   REVIEW         anything with no defensible mapping
+     */
+    function buildScopedChecklist(client, docs, o, scope) {
+        const CS = window.ChecklistStandards;
+        const auditType = normalizeAuditType(o.auditType);
+        const list = (docs || []).filter(d => d && d.name);
+        const budget = riskBasedBudget(
+            auditType, scope.ids, o.manDays,
+            typeof orgSizeProfile === 'function' ? orgSizeProfile(client) : null,
+            (client.sites || []).length
+        );
+        const plan = CS.planScope(scope.ids);
+        const systems = CS.systemsPhrase(scope.ids);
+        // Resolved up front: the organisation-context section needs to know
+        // which processes the standard themes already walk so it does not ask
+        // for the same walkthrough a second time in weaker words.
+        const selectedThemes = budget.themesPerStandard
+            ? scope.ids.reduce((acc, id) =>
+                acc.concat(plan.themes.filter(t => t.stdId === id).slice(0, budget.themesPerStandard)), [])
+            : plan.themes;
+        const clauses = [];
+        const review = [];
+
+        // ── Recertification / surveillance priorities ─────────────────
+        if (auditType === 'recertification' || auditType === 'initial') {
+            const subs = CS.RECERT_PRIORITIES.map(p => {
+                let refs = [];
+                if (p.shared) {
+                    const group = plan.common.find(g => g.shared === p.shared);
+                    refs = group
+                        ? group.members.map(m => ({ stdId: m.stdId, ref: m.ref }))
+                        : CS.clausesFor(scope.ids).filter(c => c.shared === p.shared).map(c => ({ stdId: c.stdId, ref: c.ref }));
+                } else if (p.refsBy) {
+                    scope.ids.forEach(id => (p.refsBy[id] || []).forEach(ref => {
+                        if (CS.isKnownRef(id, ref)) refs.push({ stdId: id, ref });
+                    }));
+                }
+                return scopedQuestion(displayRefFor(refs) || 'RECERT', p.label,
+                    p.prompt + evidenceHint(list, refs),
+                    refs, { source: 'recert-priority', auditorReview: refs.length === 0 });
+            });
+            if (auditType === 'recertification') {
+                clauses.push({
+                    mainClause: 'RECERT',
+                    title: 'Recertification Priorities — evidence from the certification cycle',
+                    subClauses: subs
+                });
+            }
+        }
+
+        if (o.includeMandatory !== false && auditType === 'surveillance') {
+            clauses.push({
+                mainClause: 'SURV',
+                title: 'Mandatory Surveillance Elements (ISO/IEC 17021-1 §9.6.2)',
+                subClauses: SURVEILLANCE_MANDATORY.map(([ref, label, text]) => {
+                    // 17021-1 governs the audit, not the client's system, so the
+                    // element reference is kept as the display ref while the
+                    // citation resolves to the client standards it evidences.
+                    // That citation is still only a text-derived SUGGESTION,
+                    // never a confirmed criterion, even once cross-checked
+                    // against the registry (a scraped "9.2" existing in the
+                    // selected standard is not evidence it's the right
+                    // clause for THIS element) — see deriveCriterionSuggestion.
+                    // auditorReview:true keeps scopedQuestion from stamping it
+                    // onto criterionRef; refs/citation still carry the
+                    // candidate through for the auditor to see.
+                    const suggestion = deriveCriterionSuggestion(text, scope.labels.join(' '));
+                    const refs = suggestion.ref
+                        ? scope.ids.filter(id => CS.isKnownRef(id, suggestion.ref)).map(id => ({ stdId: id, ref: suggestion.ref }))
+                        : [];
+                    const item = scopedQuestion(`9.6.2 (${ref})`, label, text, refs,
+                        { source: 'surveillance-mandatory', auditorReview: true });
+                    item.clause = `9.6.2 (${ref})`;
+                    if (suggestion.ref) {
+                        item.criterionSuggestedRef = suggestion.ref;
+                        item.criterionConfidence = suggestion.confidence;
+                        item.criterionBasis = suggestion.basis;
+                        item.criterionConfirmed = false;
+                    }
+                    return item;
+                })
+            });
+        }
+
+        // ── Stage 1 focus points ──────────────────────────────────────
+        const focus = (o.focusPoints || []).filter(p => typeof p === 'string' && p.trim());
+        if (focus.length) {
+            clauses.push({
+                mainClause: 'FOCUS',
+                title: 'Audit Focus — carried over from the Stage 1 document review',
+                subClauses: focus.map((text, i) => {
+                    const suggestion = deriveCriterionSuggestion(text, scope.labels.join(' '));
+                    // A clause number recovered from free text is only used when
+                    // a selected standard actually has it, but that check just
+                    // rules out an impossible clause — it does not turn a
+                    // scraped candidate into an auditor-confirmed finding
+                    // clause (see deriveCriterionSuggestion). So this stays
+                    // auditorReview:true unconditionally, and `clause` stays
+                    // the FOCUS.n pseudo-tag rather than the candidate clause,
+                    // so Report Integrity's B1/B14 gates still see it as
+                    // unresolved until the auditor confirms one explicitly.
+                    const refs = suggestion.ref
+                        ? scope.ids.filter(id => CS.isKnownRef(id, suggestion.ref)).map(id => ({ stdId: id, ref: suggestion.ref }))
+                        : [];
+                    const item = scopedQuestion(`FOCUS.${i + 1}`, 'Stage 1 finding', text, refs,
+                        { source: 'focus-carryover', auditorReview: true });
+                    item.clause = `FOCUS.${i + 1}`;
+                    if (suggestion.ref) {
+                        item.criterionSuggestedRef = suggestion.ref;
+                        item.criterionConfidence = suggestion.confidence;
+                        item.criterionBasis = suggestion.basis;
+                        item.criterionConfirmed = false;
+                    }
+                    return item;
+                })
+            });
+        }
+
+        // ── Organisation context ──────────────────────────────────────
+        if (o.includeOrgContext !== false) {
+            const orgQuestions = scopedOrgQuestions(client, scope.standards, list, budget, selectedThemes);
+            if (orgQuestions.length) {
+                clauses.push({
+                    mainClause: 'ORG',
+                    title: 'Certified Scope, Sites and Key Processes',
+                    subClauses: orgQuestions
+                });
+            }
+        }
+
+        // ── Consolidated common requirements ──────────────────────────
+        // One question per genuinely shared requirement, citing each standard's
+        // own clause number. On surveillance only the governance core is taken.
+        const SURVEILLANCE_CORE = [
+            CS.SHARED.PERF_INTERNAL_AUDIT, CS.SHARED.PERF_MGMT_REVIEW,
+            CS.SHARED.IMP_NONCONFORMITY, CS.SHARED.IMP_CONTINUAL,
+            CS.SHARED.PLAN_OBJECTIVES, CS.SHARED.PLAN_CHANGES, CS.SHARED.CONTEXT_SCOPE
+        ];
+        const commonGroups = budget.coverAllClauses
+            ? plan.common
+            : plan.common.filter(g => SURVEILLANCE_CORE.indexOf(g.shared) !== -1);
+        if (commonGroups.length) {
+            clauses.push({
+                mainClause: 'IMS',
+                title: scope.ids.length > 1
+                    ? `Integrated Management System — requirements common to ${scope.labels.join(', ')}`
+                    : `${scope.labels[0]} — management system requirements`,
+                subClauses: commonGroups.map(g => {
+                    const refs = g.members.map(m => ({ stdId: m.stdId, ref: m.ref }));
+                    const prompt = (CS.SHARED_PROMPT[g.shared] || `Verify the requirements of ${g.label} are met.`)
+                        .replace(/\{systems\}/g, systems);
+                    return scopedQuestion(displayRefFor(refs), g.label,
+                        prompt + evidenceHint(list, refs),
+                        refs, { source: 'ims-consolidated' });
+                })
+            });
+        }
+
+        // ── Per-standard sections ─────────────────────────────────────
+        scope.standards.forEach(std => {
+            const subs = [];
+            const themes = selectedThemes.filter(t => t.stdId === std.id);
+            themes.forEach(t => {
+                const refs = t.refs.filter(r => CS.isKnownRef(std.id, r)).map(r => ({ stdId: std.id, ref: r }));
+                subs.push(scopedQuestion(displayRefFor(refs) || 'THEME', t.label,
+                    t.prompt + evidenceHint(list, refs),
+                    refs, { source: 'process-theme', auditorReview: refs.length === 0 }));
+            });
+            if (budget.coverAllClauses) {
+                plan.residual.filter(c => c.stdId === std.id).forEach(c => {
+                    const refs = [{ stdId: std.id, ref: c.ref }];
+                    subs.push(scopedQuestion(c.ref, c.title,
+                        `Verify the requirements of ${std.label} ${c.ref} (${c.title}) are implemented and evidenced for the services in the certified scope.${evidenceHint(list, refs)}`,
+                        refs, { source: 'standard-specific' }));
+                });
+            }
+            if (subs.length) {
+                clauses.push({
+                    mainClause: std.systemLabel,
+                    title: `${std.label} — requirements specific to this standard`,
+                    subClauses: subs
+                });
+            }
+        });
+
+        // ── Annex A / Statement of Applicability sample ───────────────
+        scope.standards.filter(s => s.hasSoA).forEach(std => {
+            const { sample, poolSize, soaDriven } = sampleAnnexAControls(std, plan, budget, o.soaApplicable);
+            if (!sample.length) return;
+            // Grouped by control theme rather than one question per control.
+            // Controls of the same theme are sampled in one conversation with
+            // one owner — A.5.1, A.5.2 and A.5.35 are all "show me how
+            // information security is governed and reviewed here" — and asking
+            // them separately produced questions that differed only by the
+            // control number.
+            const byTheme = {};
+            sample.forEach(c => { (byTheme[c.theme] = byTheme[c.theme] || []).push(c); });
+            const subs = Object.keys(byTheme).sort().map(theme => {
+                const controls = byTheme[theme];
+                const refs = controls.map(c => ({ stdId: std.id, ref: c.ref }));
+                const named = controls.map(c => `${c.ref} ${c.title}`).join('; ');
+                return scopedQuestion(controls.map(c => c.ref).join(', '),
+                    controls.length > 1 ? `Annex A control sample — ${theme}` : controls[0].title,
+                    `Sample ${named}. ${CS.CONTROL_THEME_PROMPT[theme] || 'Obtain objective evidence that each control operates as the Statement of Applicability and the risk treatment plan describe it.'} Record the evidence seen against each control reference separately.${evidenceHint(list, refs)}`,
+                    refs, { source: 'annex-a-sample' });
+            });
+            clauses.push({
+                mainClause: 'A',
+                title: `${std.label} Annex A — ${sample.length} controls sampled of ${poolSize} ${soaDriven ? 'declared applicable in the SoA' : 'prioritised for this scope'}`,
+                subClauses: subs
+            });
+        });
+
+        // ── Documented information, sampled ───────────────────────────
+        const docQuestions = documentSampleQuestions(list, scope.standards, budget);
+        if (docQuestions.length) {
+            clauses.push({
+                mainClause: 'DOC',
+                title: 'Documented Information — representative sample',
+                subClauses: docQuestions
+            });
+        }
+
+        // ── Auditor review ────────────────────────────────────────────
+        // Documents on file that no selected standard's requirement claims, and
+        // any standard named on the engagement that this registry does not
+        // carry. Both are surfaced for the auditor rather than mapped to a
+        // clause the generator cannot substantiate.
+        const unclaimed = list.filter(d => !String(d.linkedClauses || '').trim());
+        if (unclaimed.length) {
+            review.push(scopedQuestion('REVIEW', 'Unmapped documented information',
+                `${unclaimed.length} document(s) on file are not mapped to a requirement of any standard in this audit scope: ${unclaimed.slice(0, 10).map(d => d.name).join('; ')}${unclaimed.length > 10 ? `; and ${unclaimed.length - 10} more` : ''}. Determine during the audit whether any of them evidences a requirement, and map them before the next audit. No clause has been assigned to them.`,
+                [], { source: 'auditor-review', auditorReview: true }));
+        }
+        if (scope.unresolved.length) {
+            review.push(scopedQuestion('REVIEW', 'Standard not held in the clause registry',
+                `The engagement names ${scope.unresolved.join(', ')}, which this generator does not hold a validated clause set for. No clauses, controls or questions have been generated for it — cover it from the standard itself and add it to the registry before the next audit.`,
+                [], { source: 'auditor-review', auditorReview: true }));
+        }
+        if (review.length) {
+            clauses.push({
+                mainClause: 'REVIEW',
+                title: 'For Auditor Review — no defensible clause mapping established',
+                subClauses: review
+            });
+        }
+
+        const itemCount = clauses.reduce((t, c) => t + c.subClauses.length, 0);
+        const ceiling = questionCeiling(scope.ids, budget, focus.length);
+        const typeLabel = auditType === 'surveillance' ? 'Surveillance'
+            : auditType === 'recertification' ? 'Recertification' : 'Initial';
+
+        const checklist = {
+            id: Date.now(),
+            name: `${client.name} - ${typeLabel} Audit Checklist (Client-Specific)`,
+            standard: scope.labels.join(', ') || o.standard || client.standard || '',
+            standardIds: scope.ids,
+            type: 'custom',
+            auditType,
+            clientName: client.name,
+            clientId: client.id,
+            clauses,
+            itemCount,
+            targetItems: ceiling,
+            documentsUsed: list.length,
+            // Kept on the checklist so the print/export QA pass validates
+            // against the scope the checklist was actually built for, rather
+            // than re-deriving it from a free-text standard field.
+            qaContext: {
+                standardIds: scope.ids,
+                auditType,
+                ceiling,
+                soaApplicable: (o.soaApplicable || []).slice()
+            },
+            generator: 'scope-driven-v2',
+            createdBy: (window.state && window.state.currentUser && window.state.currentUser.name) || 'Admin',
+            createdAt: new Date().toISOString().split('T')[0],
+            updatedAt: new Date().toISOString().split('T')[0],
+            source: 'client-documents'
+        };
+
+        if (window.ChecklistQA) {
+            checklist.qa = window.ChecklistQA.validate(checklist, checklist.qaContext);
+        }
+        return checklist;
+    }
+
+    /**
+     * The original document-driven build, kept for standards the
+     * ChecklistStandards registry does not carry (ISO 9001, 14001, 45001 and
+     * the industry frameworks), which reach it through `standardClauses`.
      *
      * @param {Object} client
      * @param {Array} docs - entries from client.documents
      * @param {Object} [opts] - { auditType, standard, includeMandatory, standardClauses, includeOrgContext }
      */
-    function buildClientChecklist(client, docs, opts) {
+    function buildLegacyChecklist(client, docs, opts) {
         const o = Object.assign({
             auditType: 'surveillance', standard: '', includeMandatory: true,
             standardClauses: null, includeOrgContext: true, focusPoints: [], maxItems: null
@@ -649,16 +1455,19 @@
             clauses.push({
                 mainClause: 'FOCUS',
                 title: 'Audit Focus — carried over from the Stage 1 document review',
-                // clause ('FOCUS.n') is an internal pseudo-reference; criterionRef
-                // carries the actual standard clause when one can be recovered from
-                // the focus-point text (criterionRef:'' when it can't) — see
-                // deriveCriterionRef(). criterionSource flags both cases so a
-                // consumer (execution-module-v2.js's checklist->NCR sync, and the
-                // report engine) knows to display criterionRef, not `clause`.
+                // clause ('FOCUS.n') is an internal pseudo-reference. A Stage 1
+                // focus point is an audit INVESTIGATION PROMPT, not the ISO
+                // clause an eventual NC belongs under, so criterionRef stays
+                // empty here — any clause recovered from the focus-point text
+                // is recorded as criterionSuggestedRef instead, an unconfirmed
+                // hint the auditor still has to confirm via
+                // window.setFindingCriterion. criterionSource flags this so a
+                // consumer (execution-module-v2.js's checklist->NCR sync, and
+                // the report engine) knows to display criterionRef, not `clause`,
+                // once it's set. See applyCriterionSuggestion().
                 subClauses: focus.map((text, i) => {
                     const item = question(`FOCUS.${i + 1}`, 'Stage 1 finding', text);
-                    item.criterionRef = deriveCriterionRef(text, o.standard);
-                    item.criterionSource = 'focus-carryover';
+                    applyCriterionSuggestion(item, text, o.standard, 'focus-carryover');
                     return item;
                 })
             });
@@ -670,8 +1479,9 @@
                 title: 'Mandatory Surveillance Elements (ISO/IEC 17021-1 §9.6.2)',
                 subClauses: SURVEILLANCE_MANDATORY.map(([ref, label, text]) => {
                     const item = question(`9.6.2 (${ref})`, label, text);
-                    item.criterionRef = deriveCriterionRef(text, o.standard);
-                    item.criterionSource = 'focus-carryover';
+                    // Same reasoning as the FOCUS block above: this is a §9.6.2
+                    // mandatory-element prompt, not a confirmed finding clause.
+                    applyCriterionSuggestion(item, text, o.standard, 'focus-carryover');
                     return item;
                 })
             });
@@ -758,20 +1568,20 @@
                 mainClause: 'DOC',
                 title: 'Other Documented Information Supplied by the Client',
                 // DOC items previously carried no criterionRef either, blocking
-                // finalization the same way ORG items did. deriveCriterionRef
-                // runs first in case the document's own name/content resolves to
-                // something more specific; 7.5 (control of documented
-                // information) is a defensible default because that's genuinely
-                // what "review this document's status, control and relevance"
-                // is asking about — but 7.5 is an Annex-SL clause number, so
-                // (same rule as the ORG items above) it only fills in for
-                // Annex-SL-family standards; otherwise leave it to whatever
-                // deriveCriterionRef found in the text, or ''.
+                // finalization the same way ORG items did. 7.5 (control of
+                // documented information) is a defensible template default
+                // because that's genuinely what "review this document's status,
+                // control and relevance" is asking about, so — same reasoning
+                // as the ORG items' templateFallback above — it's still written
+                // as a confirmed criterionRef, but only for Annex-SL-family
+                // standards. If the document's own name/content resolves to
+                // something more specific, that's recorded as an unconfirmed
+                // suggestion instead of overriding the 7.5 default outright —
+                // see applyCriterionSuggestion().
                 subClauses: unmapped.map(d => {
                     const text = `Review ${docRef(d)} and confirm its status, control and relevance to the certified scope.`;
                     const item = question('DOC', d.name, text);
-                    item.criterionRef = deriveCriterionRef(text, o.standard) || (isAnnexSLFamilyStandard(o.standard) ? '7.5' : '');
-                    item.criterionSource = 'unmapped-doc';
+                    applyCriterionSuggestion(item, text, o.standard, 'unmapped-doc', isAnnexSLFamilyStandard(o.standard) ? '7.5' : '');
                     return item;
                 })
             });
@@ -1143,11 +1953,20 @@
 
     /**
      * Clause-by-clause coverage of a standard by the documents on file.
+     *
+     * `stdId` scopes the match to documents that belong to that standard. In an
+     * integrated system this is the difference between a true reading and a
+     * flattering one: without it, an ISO/IEC 20000-1 procedure tagged "4.1"
+     * counted as coverage of ISO/IEC 27001 clause 4.1, because the two clause
+     * numbers happen to be the same. Documents that name no standard still
+     * count for every standard — an integrated policy genuinely does.
+     *
      * @param {Array} clauses - [{clause, title, requirement}] from the KB or built-ins
      * @param {Array} docs - client.documents
+     * @param {string} [stdId] - ChecklistStandards registry id to scope against
      * @returns {{rows: Array, total: number, covered: number, gaps: number, percent: number}}
      */
-    function analyseDocumentGaps(clauses, docs) {
+    function analyseDocumentGaps(clauses, docs, stdId) {
         const list = (docs || []).filter(d => d && d.name);
         // Clauses 1-3 of an Annex SL standard are scope, references and terms —
         // they carry no auditable requirement, so they are not gaps.
@@ -1157,13 +1976,7 @@
         });
 
         const rows = auditable.map(c => {
-            const matches = list.filter(doc =>
-                String(doc.linkedClauses || '')
-                    .split(',')
-                    .map(s => s.trim())
-                    .filter(Boolean)
-                    .some(dc => clauseSatisfies(String(c.clause), dc))
-            );
+            const matches = list.filter(doc => docCoversRef(doc, stdId, String(c.clause)));
             return {
                 clause: String(c.clause),
                 title: c.title || '',
@@ -1195,19 +2008,66 @@
             );
             if (doc) return { clauses: doc.clauses, source: `Knowledge Base — ${doc.name}` };
         }
+        // The scope-gated registry answers for the standards it holds, without
+        // needing settings-kb.js to have been loaded and without the ISO 9001
+        // default that used to stand in for every unrecognised standard.
+        const CS = window.ChecklistStandards;
+        if (CS) {
+            const resolved = CS.resolve(standardName || '').standards;
+            if (resolved.length === 1) {
+                const std = resolved[0];
+                return {
+                    clauses: std.clauses.map(c => ({
+                        clause: c.ref,
+                        title: c.title,
+                        requirement: `${std.label} ${c.ref} — ${c.title}.`
+                    })),
+                    source: `Clause registry — ${std.label}`
+                };
+            }
+        }
         if (typeof window.getBuiltInClauses === 'function') {
-            return { clauses: window.getBuiltInClauses(standardName || ''), source: 'Built-in clause set' };
+            const clauses = window.getBuiltInClauses(standardName || '');
+            if (clauses.length) return { clauses, source: 'Built-in clause set' };
         }
         return { clauses: [], source: 'No clause set available' };
     }
 
     let _gap = null;
 
+    /**
+     * Run the gap analysis for every standard on the engagement at once.
+     *
+     * An integrated management system is not audited one standard at a time, so
+     * it should not be gap-analysed one standard at a time either: the
+     * auditor needs to see that ISO/IEC 27001 4.1 is thin while ISO/IEC 20000-1
+     * 4.1 is covered, which a single-select view actively hides.
+     *
+     * @param {string[]} names - standard names selected for the analysis
+     * @param {Array} docs - client.documents
+     * @returns {Array} one {name, id, label, clauses, source, analysis} per standard
+     */
+    function analyseGapsForStandards(names, docs) {
+        const CS = window.ChecklistStandards;
+        return (names || []).map(name => {
+            const { clauses, source } = clausesForStandard(name);
+            const resolved = CS ? CS.resolve(name).standards[0] : null;
+            const id = resolved ? resolved.id : '';
+            return {
+                name,
+                id,
+                label: resolved ? resolved.label : name,
+                clauses,
+                source,
+                analysis: analyseDocumentGaps(clauses, docs, id)
+            };
+        });
+    }
+
     window.openDocumentGapAnalysis = function (clientId, standardName) {
         const client = window.DataService.findClient(clientId);
         if (!client) return;
         const standards = String(client.standard || '').split(',').map(s => s.trim()).filter(Boolean);
-        const standard = standardName || standards[0] || '';
         const docs = client.documents || [];
 
         if (!docs.length) {
@@ -1215,9 +2075,16 @@
             return;
         }
 
-        const { clauses, source } = clausesForStandard(standard);
-        const analysis = analyseDocumentGaps(clauses, docs);
-        _gap = { clientId, standard, source, analysis, onlyGaps: false };
+        // Every standard on the client by default; `standardName` narrows it to
+        // one when a caller asks for a single-standard view.
+        const selected = standardName
+            ? [standardName]
+            : (standards.length ? standards : ['']);
+        const results = analyseGapsForStandards(selected, docs);
+        const standard = results.map(r => r.name).join(', ');
+        const source = Array.from(new Set(results.map(r => r.source))).join(' · ');
+        const analysis = results[0] ? results[0].analysis : { rows: [], total: 0, covered: 0, gaps: 0, percent: 0 };
+        _gap = { clientId, standard, selected, results, source, analysis, onlyGaps: false };
 
         // Print is the modal's primary action so it stays in the footer rather
         // than sitting below a scrolling clause table.
@@ -1238,6 +2105,22 @@
         window.openDocumentGapAnalysis(clientId, standardName);
     };
 
+    /** Tick/untick a standard in the multi-standard gap analysis. */
+    window.toggleGapStandard = function (name, checked) {
+        if (!_gap) return;
+        const on = checked === true || checked === 'true' || checked === 'on';
+        const set = new Set(_gap.selected);
+        if (on) set.add(name); else set.delete(name);
+        if (!set.size) { notify('Keep at least one standard selected.', 'error'); renderGapAnalysis(); return; }
+        const client = window.DataService.findClient(_gap.clientId);
+        _gap.selected = Array.from(set);
+        _gap.results = analyseGapsForStandards(_gap.selected, (client && client.documents) || []);
+        _gap.standard = _gap.results.map(r => r.name).join(', ');
+        _gap.source = Array.from(new Set(_gap.results.map(r => r.source))).join(' · ');
+        _gap.analysis = _gap.results[0] ? _gap.results[0].analysis : _gap.analysis;
+        renderGapAnalysis();
+    };
+
     window.toggleGapOnly = function (checked) {
         if (!_gap) return;
         _gap.onlyGaps = checked === true || checked === 'true' || checked === 'on';
@@ -1252,31 +2135,27 @@
         </div>`;
     }
 
-    function renderGapAnalysis() {
-        const client = window.DataService.findClient(_gap.clientId);
-        const a = _gap.analysis;
-        const standards = String((client && client.standard) || '').split(',').map(s => s.trim()).filter(Boolean);
-        const shown = _gap.onlyGaps ? a.rows.filter(r => !r.covered) : a.rows;
+    /** Coverage summary across every selected standard. */
+    function gapTotals(results) {
+        return (results || []).reduce((t, r) => ({
+            total: t.total + r.analysis.total,
+            covered: t.covered + r.analysis.covered,
+            gaps: t.gaps + r.analysis.gaps
+        }), { total: 0, covered: 0, gaps: 0 });
+    }
 
-        const body = document.getElementById('gap-body');
-        if (!body) return;
-        body.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; margin-bottom: 0.9rem;">
-            ${gapTile(a.percent + '%', 'Overall clause coverage', a.percent >= 80 ? '#16a34a' : a.percent >= 50 ? '#d97706' : '#dc2626')}
-            ${gapTile(a.total, 'Applicable clauses', '#1e293b')}
-            ${gapTile(a.covered, 'Covered by a document', '#16a34a')}
-            ${gapTile(a.gaps, 'Gaps — no document on file', a.gaps ? '#dc2626' : '#64748b')}
-        </div>
-        <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap;">
-            <select class="form-control" style="width: auto; margin: 0;" data-action-change="setGapStandard" data-arg1="${esc(_gap.clientId)}" data-arg2="this.value">
-                ${(standards.length ? standards : [_gap.standard || 'ISO 9001:2015']).map(s => `<option ${s === _gap.standard ? 'selected' : ''}>${esc(s)}</option>`).join('')}
-            </select>
-            <label style="display: flex; gap: 0.4rem; align-items: center; cursor: pointer; font-size: 0.85rem;">
-                <input type="checkbox" ${_gap.onlyGaps ? 'checked' : ''} data-action-change="toggleGapOnly" data-arg1="this.checked"> Show only gaps
-            </label>
-            <span style="font-size: 0.78rem; color: #94a3b8;">Clauses from: ${esc(_gap.source)}</span>
-        </div>
-        <div class="table-container" style="max-height: 45vh; overflow: auto;">
+    /** One standard's clause table, with the standard named on every row. */
+    function gapTableHTML(result, onlyGaps) {
+        const a = result.analysis;
+        const shown = onlyGaps ? a.rows.filter(r => !r.covered) : a.rows;
+        return `
+        <div style="margin-bottom: 1.1rem;">
+            <div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap;margin-bottom:0.35rem;">
+                <strong style="font-size:0.92rem;">${esc(result.label)}</strong>
+                <span style="font-size:0.8rem;color:${a.percent >= 80 ? '#16a34a' : a.percent >= 50 ? '#d97706' : '#dc2626'};font-weight:600;">${a.percent}% covered</span>
+                <span style="font-size:0.78rem;color:var(--text-secondary);">${a.covered} of ${a.total} clauses · ${a.gaps} gap(s)</span>
+                <span style="font-size:0.75rem;color:#94a3b8;">${esc(result.source)}</span>
+            </div>
             <table style="font-size: 0.84rem;">
                 <thead style="position: sticky; top: 0; background: var(--surface-color); z-index: 1;">
                     <tr><th style="width: 70px;">Clause</th><th>Requirement</th><th style="width: 90px;">Status</th><th style="width: 34%;">Document / action</th></tr>
@@ -1290,18 +2169,61 @@
                 ? '<span style="color:#16a34a;font-weight:600;"><i class="fa-solid fa-circle-check"></i> Covered</span>'
                 : '<span style="color:#dc2626;font-weight:600;"><i class="fa-solid fa-triangle-exclamation"></i> Gap</span>'}</td>
                         <td style="vertical-align: top;">${r.covered
-                ? r.docs.map(d => `<span style="background:#eff6ff;color:#1d4ed8;padding:2px 7px;border-radius:4px;font-size:0.75rem;display:inline-block;margin:1px 2px 1px 0;">${esc(docRef(d))}</span>`).join('')
+                ? r.docs.map(d => `<span style="background:#eff6ff;color:#1d4ed8;padding:2px 7px;border-radius:4px;font-size:0.75rem;display:inline-block;margin:1px 2px 1px 0;" title="${esc(d.linkedStandardLabels || 'No standard recorded — counts for every standard')}">${esc(docRef(d))}</span>`).join('')
                 : '<span style="color:#92400e;font-size:0.8rem;">No documented information supplied — request before Stage 2</span>'}</td>
-                    </tr>`).join('') : '<tr><td colspan="4" style="text-align:center;padding:1.5rem;color:#16a34a;">No gaps — every applicable clause has a supporting document.</td></tr>'}
+                    </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;padding:1.2rem;color:#16a34a;">No gaps for ${esc(result.label)} — every applicable clause has a supporting document.</td></tr>`}
                 </tbody>
             </table>
+        </div>`;
+    }
+
+    function renderGapAnalysis() {
+        const client = window.DataService.findClient(_gap.clientId);
+        const results = _gap.results || [];
+        const t = gapTotals(results);
+        const percent = t.total ? Math.round((t.covered / t.total) * 100) : 0;
+        const standards = String((client && client.standard) || '').split(',').map(s => s.trim()).filter(Boolean);
+        const choices = standards.length ? standards : _gap.selected;
+        const untagged = ((client && client.documents) || []).filter(d => d && d.name && !String(d.linkedStandards || '').trim()).length;
+
+        const body = document.getElementById('gap-body');
+        if (!body) return;
+        body.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; margin-bottom: 0.9rem;">
+            ${gapTile(percent + '%', results.length > 1 ? 'Coverage across all selected standards' : 'Overall clause coverage', percent >= 80 ? '#16a34a' : percent >= 50 ? '#d97706' : '#dc2626')}
+            ${gapTile(t.total, 'Applicable clauses', '#1e293b')}
+            ${gapTile(t.covered, 'Covered by a document', '#16a34a')}
+            ${gapTile(t.gaps, 'Gaps — no document on file', t.gaps ? '#dc2626' : '#64748b')}
+        </div>
+        <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap;">
+            <div style="display:flex;gap:0.9rem;align-items:center;flex-wrap:wrap;">
+                <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);">Standards:</span>
+                ${choices.map(s => `<label style="display:flex;gap:0.35rem;align-items:center;cursor:pointer;font-size:0.85rem;">
+                    <input type="checkbox" ${_gap.selected.indexOf(s) !== -1 ? 'checked' : ''} data-action-change="toggleGapStandard" data-arg1="${esc(s)}" data-arg2="this.checked"> ${esc(s)}
+                </label>`).join('')}
+            </div>
+            <label style="display: flex; gap: 0.4rem; align-items: center; cursor: pointer; font-size: 0.85rem;">
+                <input type="checkbox" ${_gap.onlyGaps ? 'checked' : ''} data-action-change="toggleGapOnly" data-arg1="this.checked"> Show only gaps
+            </label>
+        </div>
+        ${untagged ? `<div style="background:#eff6ff;border-left:3px solid #3b82f6;border-radius:0 6px 6px 0;padding:0.5rem 0.85rem;margin-bottom:0.8rem;font-size:0.82rem;color:#1e3a8a;">
+            ${untagged} document(s) name no standard and are counted toward every standard. Re-run the bulk analysis to have the standard detected, or set it on the document, for a per-standard reading.
+        </div>` : ''}
+        <div class="table-container" style="max-height: 45vh; overflow: auto;">
+            ${results.map(r => gapTableHTML(r, _gap.onlyGaps)).join('')}
         </div>`;
     }
 
     window.printDocumentGapAnalysis = function () {
         if (!_gap) return;
         const client = window.DataService.findClient(_gap.clientId) || {};
-        const a = _gap.analysis;
+        // One clause table per standard selected, so an integrated report shows
+        // each system's real coverage rather than a single blended figure.
+        const printResults = _gap.results || [];
+        const rawTotals = gapTotals(printResults);
+        const printTotals = Object.assign({}, rawTotals, {
+            percent: rawTotals.total ? Math.round((rawTotals.covered / rawTotals.total) * 100) : 0
+        });
         const today = new Date().toISOString().split('T')[0];
 
         const win = window.open('', 'DocumentGapAnalysis', 'width=1000,height=800');
@@ -1334,22 +2256,24 @@
             Clause set: ${esc(_gap.source)}
         </div>
         <div class="tiles">
-            <div class="tile"><div class="n">${a.percent}%</div><div class="l">Clause coverage</div></div>
-            <div class="tile"><div class="n">${a.total}</div><div class="l">Applicable clauses</div></div>
-            <div class="tile"><div class="n">${a.covered}</div><div class="l">Covered by a document</div></div>
-            <div class="tile"><div class="n">${a.gaps}</div><div class="l">Gaps</div></div>
+            <div class="tile"><div class="n">${printTotals.percent}%</div><div class="l">Clause coverage</div></div>
+            <div class="tile"><div class="n">${printTotals.total}</div><div class="l">Applicable clauses</div></div>
+            <div class="tile"><div class="n">${printTotals.covered}</div><div class="l">Covered by a document</div></div>
+            <div class="tile"><div class="n">${printTotals.gaps}</div><div class="l">Gaps</div></div>
         </div>
+        ${printResults.map(result => `
+        <h2 style="font-size:13px;margin:14px 0 4px;">${esc(result.label)} <span style="font-weight:400;color:#64748b;">— ${result.analysis.percent}% covered, ${result.analysis.gaps} gap(s) · ${esc(result.source)}</span></h2>
         <table>
             <thead><tr><th style="width:60px;">Clause</th><th>Requirement</th><th style="width:70px;">Status</th><th style="width:32%;">Document on file / action required</th></tr></thead>
             <tbody>
-                ${a.rows.map(r => `<tr>
+                ${result.analysis.rows.map(r => `<tr>
                     <td>${esc(r.clause)}</td>
                     <td>${esc(r.title || r.requirement.slice(0, 120))}</td>
                     <td class="${r.covered ? 'ok' : 'gap'}">${r.covered ? 'Covered' : 'Gap'}</td>
                     <td>${r.covered ? esc(r.docs.map(d => docRef(d)).join('; ')) : 'No documented information supplied — request before Stage 2'}</td>
                 </tr>`).join('')}
             </tbody>
-        </table>
+        </table>`).join('')}
         <div class="foot">
             Prepared for pre-audit document review under ISO/IEC 17021-1. Coverage reflects the documents supplied by the client
             and their clause mapping in ISOXPERT Audit360; it is not by itself a conformity assessment.
@@ -1711,6 +2635,11 @@
                 fileDate,
                 category: parsed.category,
                 clauses: mapClauses(parsed, content).join(', '),
+                // Captured at upload so a clause number stays traceable in an
+                // integrated system: "6.2" alone is ambiguous across three
+                // standards, "ISO/IEC 20000-1:2018 6.2" is not.
+                standardIds: mapStandards(parsed, content).ids.join(', '),
+                standardLabels: mapStandards(parsed, content).labels.join(', '),
                 headings: (content && content.headings) || [],
                 notes: buildNotes(parsed, content, text),
                 // Kept in memory only (never persisted to the client record) so
@@ -1780,7 +2709,12 @@
                 </td>
                 <td><input type="text" class="form-control" style="margin: 0; font-size: 0.82rem; padding: 4px 6px; width: 80px;" value="${esc(r.revision)}" data-action-change="updateBulkDocField" data-arg1="${i}" data-arg2="revision" data-arg3="this.value"></td>
                 <td><input type="date" class="form-control" style="margin: 0; font-size: 0.8rem; padding: 4px 6px;" value="${esc(r.date)}" data-action-change="updateBulkDocField" data-arg1="${i}" data-arg2="date" data-arg3="this.value"></td>
-                <td><input type="text" class="form-control" style="margin: 0; font-size: 0.82rem; padding: 4px 6px; min-width: 110px;" value="${esc(r.clauses)}" placeholder="e.g. 8.4, 8.5" data-action-change="updateBulkDocField" data-arg1="${i}" data-arg2="clauses" data-arg3="this.value"></td>
+                <td>
+                    <input type="text" class="form-control" style="margin: 0; font-size: 0.82rem; padding: 4px 6px; min-width: 110px;" value="${esc(r.clauses)}" placeholder="e.g. 8.4, 8.5" data-action-change="updateBulkDocField" data-arg1="${i}" data-arg2="clauses" data-arg3="this.value">
+                    ${r.standardLabels
+                ? `<div style="margin-top:3px;">${r.standardLabels.split(',').map(l => `<span style="background:#f1f5f9;color:#334155;padding:1px 6px;border-radius:4px;font-size:0.68rem;display:inline-block;margin:1px 2px 0 0;">${esc(l.trim())}</span>`).join('')}</div>`
+                : '<div style="margin-top:3px;font-size:0.68rem;color:#94a3b8;">No standard detected — applies to all</div>'}
+                </td>
                 <td style="text-align: center;"><span style="background: ${st[0]}; color: ${st[1]}; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; white-space: nowrap;">${st[2]}</span></td>
             </tr>`;
         }).join('');
@@ -1811,7 +2745,7 @@
                         <th style="width: 165px;">Category</th>
                         <th style="width: 90px;">Revision</th>
                         <th style="width: 140px;">Date</th>
-                        <th style="width: 130px;">ISO Clauses</th>
+                        <th style="width: 150px;">ISO Clauses &amp; Standard</th>
                         <th style="width: 110px;">Status</th>
                     </tr>
                 </thead>
@@ -1890,6 +2824,11 @@
                 category: r.category,
                 revision: r.revision || '',
                 linkedClauses: r.clauses || '',
+                // Registry ids for logic, display labels for the auditor. An
+                // empty value means the document names no standard and is
+                // treated as applying to all of them.
+                linkedStandards: r.standardIds || '',
+                linkedStandardLabels: r.standardLabels || '',
                 notes: r.notes || '',
                 type: (r.ext || 'file').toUpperCase(),
                 date: r.date || new Date().toISOString().split('T')[0],
@@ -2309,6 +3248,17 @@
         const standards = presetStandard && !clientStandards.includes(presetStandard)
             ? [presetStandard].concat(clientStandards)
             : clientStandards;
+        // An integrated engagement is audited against every standard on the
+        // certificate, so the scope is a multi-select. The old single-select
+        // meant a three-standard IMS was built from one standard's clause list
+        // — or, when the whole comma-separated string was passed through as one
+        // value, from no recognised standard at all.
+        const scopeSource = [presetStandard].concat(clientStandards).filter(Boolean).join(', ');
+        const scopeResolved = window.ChecklistStandards
+            ? window.ChecklistStandards.resolve(scopeSource)
+            : { standards: [], unresolved: [] };
+        const registry = window.ChecklistStandards ? window.ChecklistStandards.all() : [];
+        const preselected = new Set(scopeResolved.standards.map(s => s.id));
         const audit = normalizeAuditType(presetAuditType || 'surveillance');
         const mappedCount = docs.filter(d => d.linkedClauses).length;
         const context = [
@@ -2338,8 +3288,19 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>Standard</label>
-                <select class="form-control" id="cldoc-standard">
+                <label>Audit scope — standards</label>
+                ${registry.length ? `<div style="display:flex;flex-direction:column;gap:0.35rem;padding:0.5rem 0.1rem;">
+                    ${registry.map(s => `<label style="display:flex;gap:0.5rem;align-items:center;cursor:pointer;">
+                        <input type="checkbox" class="cldoc-std" value="${esc(s.id)}" ${preselected.has(s.id) ? 'checked' : ''}>
+                        <span>${esc(s.label)} <span style="color:var(--text-secondary);font-size:0.82rem;">— ${esc(s.systemNoun)}${s.hasSoA ? ', incl. Annex A / SoA sampling' : ''}</span></span>
+                    </label>`).join('')}
+                </div>
+                <small style="color: var(--text-secondary);">Only the standards ticked here can generate clauses, controls or questions. Nothing is inferred from another standard.</small>` : ''}
+                ${scopeResolved.unresolved.length ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;border-radius:0 6px 6px 0;padding:0.55rem 0.85rem;margin-top:0.6rem;font-size:0.83rem;">
+                    <strong>${esc(scopeResolved.unresolved.join(', '))}</strong> ${scopeResolved.unresolved.length > 1 ? 'have' : 'has'} no validated clause set in the registry.
+                    ${standards.length ? 'The document-driven builder will be used for it and the checklist will flag it for auditor review.' : ''}
+                </div>` : ''}
+                <select class="form-control" id="cldoc-standard" style="${registry.length ? 'display:none;' : ''}margin-top:0.5rem;">
                     ${standards.length ? standards.map(s => `<option ${s === presetStandard ? 'selected' : ''}>${esc(s)}</option>`).join('') : '<option value="">(not set on client)</option>'}
                 </select>
             </div>
@@ -2353,8 +3314,13 @@
                     <option value="75" ${suggestedBudget === 75 ? 'selected' : ''}>Longer — about 75 questions</option>
                     <option value="">No limit — every mapped document and clause</option>
                 </select>
-                <small style="color: var(--text-secondary);">${manDays ? `Plan is ${esc(manDays)} man-day(s).` : 'Man-days not set on the plan.'} Focus points and the ISO 17021-1 mandatory elements are never trimmed. Ignored for initial and recertification audits, which must cover the standard.</small>
+                <small style="color: var(--text-secondary);">${manDays ? `Plan is ${esc(manDays)} man-day(s).` : 'Man-days not set on the plan.'} Focus points and the ISO 17021-1 mandatory elements are never trimmed. Ignored for initial and recertification audits, which must cover the standard.${registry.length ? ' For the standards ticked above, length is set by scope and risk — man-days and organisation size move the sampling depth, not the requirement coverage.' : ''}</small>
             </div>
+            ${registry.some(s => s.hasSoA) ? `<div class="form-group">
+                <label>Statement of Applicability — applicable controls <span style="font-weight:400;color:var(--text-secondary);font-size:0.82rem;">— optional, ISO/IEC 27001 only</span></label>
+                <textarea class="form-control" id="cldoc-soa" rows="2" placeholder="A.5.1, A.5.9, A.5.15, A.8.8, A.8.13 …"></textarea>
+                <small style="color: var(--text-secondary);">Paste the control references the SoA declares applicable and the Annex A sample is drawn from them. Left empty, the sample is drawn from the controls prioritised for this scope.</small>
+            </div>` : ''}
             <label style="display: flex; gap: 0.5rem; align-items: center; cursor: pointer; margin-bottom: 0.4rem;">
                 <input type="checkbox" id="cldoc-org" checked>
                 <span>Include scope, sites and key processes from Account Setup</span>
@@ -2366,8 +3332,13 @@
         </div>`, () => {
             const auditType = document.getElementById('cldoc-audit-type').value;
             const standard = document.getElementById('cldoc-standard').value;
+            const standardIds = Array.from(document.querySelectorAll('.cldoc-std:checked')).map(el => el.value);
             const includeMandatory = document.getElementById('cldoc-mandatory').checked;
             const includeOrgContext = document.getElementById('cldoc-org').checked;
+            const soaField = document.getElementById('cldoc-soa');
+            const soaApplicable = soaField
+                ? (soaField.value.match(/A\.\d{1,2}\.\d{1,2}/g) || [])
+                : [];
             const standardClauses = normalizeAuditType(auditType) === 'surveillance'
                 ? null
                 : clausesForStandard(standard).clauses;
@@ -2377,7 +3348,11 @@
             const maxItems = normalizeAuditType(auditType) === 'surveillance' && lengthValue
                 ? parseInt(lengthValue, 10)
                 : null;
-            createChecklist(client, docs, { auditType, standard, includeMandatory, includeOrgContext, standardClauses, focusPoints, maxItems }, planId);
+            createChecklist(client, docs, {
+                auditType, standard, standardIds, includeMandatory, includeOrgContext,
+                standardClauses, focusPoints, maxItems, soaApplicable,
+                manDays: (plan && (plan.manDays || plan.man_days)) || manDays || ''
+            }, planId);
         });
     };
 
@@ -2475,11 +3450,20 @@
 
         setWideModal(false);
         window.closeModal();
+        const qa = checklist.qa;
+        const scopeNote = checklist.standardIds && checklist.standardIds.length
+            ? ` against ${checklist.standardIds.length} standard(s) in scope`
+            : ` from ${docs.length} client document(s)`;
         notify(
-            `Created "${checklist.name}" — ${checklist.itemCount} items from ${docs.length} client document(s)` +
-            (assigned ? ' and assigned to this audit plan' : ''),
-            'success'
+            `Created "${checklist.name}" — ${checklist.itemCount} items${scopeNote}` +
+            (assigned ? ' and assigned to this audit plan' : '') +
+            (qa ? `. ${window.ChecklistQA.summarize(qa)}` : ''),
+            qa && qa.blocking ? 'warning' : 'success'
         );
+        if (qa && qa.blocking && window.Logger) {
+            qa.issues.filter(i => i.severity === 'critical')
+                .forEach(i => window.Logger.warn('ChecklistQA', `${i.code} @ ${i.itemRef}: ${i.message}`));
+        }
 
         // Coming from a plan, stay on its Configure Checklists screen so the new
         // checklist appears in place rather than dumping the user in the library.
@@ -2499,15 +3483,32 @@
         parseContentMeta,
         inferCategory,
         mapClauses,
+        // Standard attribution — what makes a clause number traceable in an IMS.
+        detectStandards,
+        mapStandards,
+        docCoversRef,
+        analyseGapsForStandards,
+        STANDARD_SIGNALS,
         findDate,
         findRevision,
         findDocNumber,
         findClauseRefs,
         docKey,
         buildClientChecklist,
+        buildLegacyChecklist,
+        buildScopedChecklist,
         buildSurveillanceChecklist,
         normalizeAuditType,
         checklistBudget,
+        // Scope-driven engine internals, exposed for the checklist QA tests and
+        // for the Configure Checklists screen's length estimate.
+        resolveScope,
+        riskBasedBudget,
+        questionCeiling,
+        scopedOrgQuestions,
+        sampleAnnexAControls,
+        documentSampleQuestions,
+        evidenceHint,
         trimToBudget,
         orgContextQuestions,
         clausesForStandard,
@@ -2545,8 +3546,15 @@
         ANNEX_SL,
         // Exposed so the Report Integrity panel can pre-suggest a real clause
         // when an auditor maps a legacy FOCUS/SURV finding to its criterion —
-        // one keyword map, not a second copy living in the UI layer.
+        // one keyword map, not a second copy living in the UI layer. Callers
+        // outside this file only ever get a candidate string to display for
+        // the auditor's own confirmation (see deriveCriterionRef's doc
+        // comment) — never something to stamp straight onto criterionRef.
         deriveCriterionRef,
+        // The richer { ref, confidence, basis } form, exported for testing
+        // and for any future consumer that wants the confidence/basis instead
+        // of just the bare candidate string.
+        deriveCriterionSuggestion,
         isAnnexSLFamilyStandard
     };
 

@@ -1610,6 +1610,75 @@ function deleteChecklist(id) {
     }
 }
 
+/**
+ * Run the automated QA pass over a checklist about to be printed or exported.
+ *
+ * Uses the scope the checklist was generated against (`qaContext`) when it has
+ * one. For an older checklist that predates the scope-driven generator, the
+ * scope is recovered from its `standard` field — a checklist whose standard
+ * resolves to nothing in the registry is left unvalidated rather than checked
+ * against a scope that was guessed for it.
+ *
+ * @param {Object} checklist
+ * @returns {Object|null} the QA result, or null when QA cannot be run
+ */
+function runChecklistQA(checklist) {
+    if (!window.ChecklistQA) return null;
+    let ctx = checklist.qaContext;
+    if (!ctx) {
+        if (!window.ChecklistStandards) return null;
+        const resolved = window.ChecklistStandards.resolve(checklist.standard || '');
+        if (!resolved.standards.length) return null;
+        ctx = {
+            standardIds: resolved.standards.map(s => s.id),
+            auditType: checklist.auditType || '',
+            ceiling: checklist.targetItems || null,
+            soaApplicable: []
+        };
+    }
+    try {
+        return window.ChecklistQA.validate(checklist, ctx);
+    } catch (err) {
+        if (window.Logger) window.Logger.error('ChecklistQA', 'Validation failed: ' + err.message);
+        return null;
+    }
+}
+
+/**
+ * The QA result rendered onto the printed checklist. A clean pass is stated
+ * explicitly — an auditor reading the checklist on site should be able to see
+ * that it was validated, not just that nothing was reported.
+ *
+ * @param {Object|null} qa - result from runChecklistQA
+ * @returns {string} HTML, or '' when QA could not run
+ */
+function qaPanelHTML(qa) {
+    if (!qa) return '';
+    const esc = window.UTILS.escapeHtml;
+    if (qa.ok) {
+        return `<div class="qa-panel qa-pass">
+            <h2>Checklist QA Validation</h2>
+            <p><strong>Passed.</strong> ${qa.itemCount} questions. Every clause and control cited belongs to a standard in the audit scope; no duplicate, contradictory or out-of-scope requirements were found.</p>
+        </div>`;
+    }
+    const cls = qa.blocking ? 'qa-fail' : 'qa-warn';
+    // Criticals first, then warnings, then the notes — the order an auditor
+    // needs to act on them.
+    const order = { critical: 0, warning: 1, info: 2 };
+    const rows = qa.issues.slice()
+        .sort((a, b) => order[a.severity] - order[b.severity])
+        .slice(0, 25)
+        .map(i => `<li><span class="qa-tag qa-tag-${i.severity}">${esc(i.severity)}</span>${i.itemRef ? `<strong>${esc(i.itemRef)}</strong> — ` : ''}${esc(i.message)}</li>`)
+        .join('');
+    const hidden = qa.issues.length - Math.min(qa.issues.length, 25);
+    return `<div class="qa-panel ${cls}">
+        <h2>Checklist QA Validation</h2>
+        <p><strong>${esc(window.ChecklistQA.summarize(qa))}</strong>${qa.blocking ? ' Resolve the critical items before the checklist is used as an audit record.' : ''}</p>
+        <ul>${rows}</ul>
+        ${hidden > 0 ? `<p style="margin-top:6px;">…and ${hidden} further item(s).</p>` : ''}
+    </div>`;
+}
+
 function printChecklist(id) {
     const checklist = state.checklists.find(c => String(c.id) === String(id));
     if (!checklist) return;
@@ -1627,9 +1696,14 @@ function printChecklist(id) {
                     return obj.items[0].requirement || obj.items[0].text || obj.items[0].title;
                 };
                 if (sub.items && sub.items.length > 0) {
-                    // Sub-clause header (Level 2)
+                    // Sub-clause header (Level 2). A scope-driven item carries
+                    // the exact standard(s) and clause(s) it tests in
+                    // `citation` — printed here so the audit criterion is on
+                    // the record and not inferred from a bare clause number
+                    // that means different things in different standards.
                     const subTitle = sub.title || sub.requirement || sub.text || '';
-                    printItems.push({ clause: sub.clause, requirement: subTitle, isHeader: true, level: 2 });
+                    const cited = sub.citation ? `${subTitle} — ${sub.citation}` : subTitle;
+                    printItems.push({ clause: sub.clause, requirement: cited, isHeader: true, level: 2 });
                     // Individual items (Level 3+)
                     sub.items.forEach(item => {
                         printItems.push({ clause: item.clause, requirement: item.requirement || item.text || item.title || '' });
@@ -1646,6 +1720,23 @@ function printChecklist(id) {
     }
 
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://audit.companycertification.com/#/verify/checklist/${checklist.id}`)}`;
+
+    // ── Automated QA validation, before anything is rendered ──────────
+    // The checklist that goes to an auditor has to be defensible: no clauses
+    // from standards outside the audit scope, no invented references, no
+    // duplicate questions, and a length that follows scope rather than the
+    // number of documents someone uploaded. Anything the pass finds is printed
+    // with the checklist so it travels with the document, and criticals are
+    // confirmed with the user before the print window opens.
+    const qa = runChecklistQA(checklist);
+    if (qa && qa.blocking && typeof window.confirm === 'function') {
+        const detail = qa.issues.filter(i => i.severity === 'critical').slice(0, 6)
+            .map(i => `• ${i.itemRef ? i.itemRef + ' — ' : ''}${i.message}`).join('\n');
+        const proceed = window.confirm(
+            `QA validation found ${qa.counts.critical} critical issue(s) in this checklist:\n\n${detail}` +
+            `\n\nPrint it anyway? The issues will be listed on the printed checklist.`);
+        if (!proceed) return;
+    }
 
     let content = `
         <html>
@@ -1686,6 +1777,18 @@ function printChecklist(id) {
                 .sig-line { border-bottom: 1px solid #94a3b8; margin-top: 30px; }
                 .sig-label { font-size: 11px; color: #64748b; margin-top: 4px; }
                 .footer-note { font-size: 10px; color: #94a3b8; text-align: center; margin-top: 20px; }
+                .qa-panel { margin-top: 16px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; page-break-inside: avoid; }
+                .qa-panel.qa-pass { border-left: 4px solid #059669; background: #f0fdf4; }
+                .qa-panel.qa-warn { border-left: 4px solid #f59e0b; background: #fffbeb; }
+                .qa-panel.qa-fail { border-left: 4px solid #dc2626; background: #fef2f2; }
+                .qa-panel h2 { font-size: 12px; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.6px; color: #334155; }
+                .qa-panel p { margin: 0 0 6px 0; font-size: 12px; color: #475569; }
+                .qa-panel ul { margin: 6px 0 0 0; padding-left: 18px; }
+                .qa-panel li { font-size: 11.5px; color: #475569; margin-bottom: 3px; }
+                .qa-tag { display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: 0.4px; padding: 1px 6px; border-radius: 8px; margin-right: 6px; text-transform: uppercase; }
+                .qa-tag-critical { background: #fee2e2; color: #991b1b; }
+                .qa-tag-warning { background: #fef3c7; color: #92400e; }
+                .qa-tag-info { background: #e0f2fe; color: #075985; }
                 @media print {
                     .print-bar { display: none !important; }
                     body { padding: 15px; }
@@ -1724,6 +1827,7 @@ function printChecklist(id) {
                     </div>
                 </div>
             </div>
+            ${qaPanelHTML(qa)}
 
             <table>
                 <thead>
@@ -1809,6 +1913,9 @@ window.archiveChecklist = archiveChecklist;
 window.restoreChecklist = restoreChecklist;
 window.permanentDeleteChecklist = permanentDeleteChecklist;
 window.printChecklist = printChecklist;
+// Exposed so the PDF export path in enhancements.js runs the same QA gate.
+window.runChecklistQA = runChecklistQA;
+window.qaPanelHTML = qaPanelHTML;
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {

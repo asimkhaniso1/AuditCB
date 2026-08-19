@@ -816,14 +816,24 @@ describe('ClientDocsBulk', () => {
             expect(docSection.subClauses[0].criterionSource).toBe('unmapped-doc');
         });
 
-        it('still prefers a clause found in the text over the explicit ORG/DOC default', () => {
+        // A clause number sitting in the question's own text is a SUGGESTION,
+        // not a confirmed criterion (this is the exact defect the client
+        // reported: a competence finding got formally recorded against 9.2
+        // purely because "9.2" appeared in the source question text). So a
+        // text-derived clause no longer overrides the ORG/DOC template
+        // default in criterionRef — it's recorded separately, unconfirmed.
+        it('records a clause found in the text as an unconfirmed suggestion, not a confirmed criterion', () => {
             const clientWithClause = {
                 ...client,
                 goodsServices: [{ name: 'Assemblies certified under clause 8.2 of the manual' }]
             };
             const cl = B.buildClientChecklist(clientWithClause, docs, { auditType: 'surveillance' });
             const scope = cl.clauses.find(c => c.mainClause === 'ORG').subClauses[0];
-            expect(scope.criterionRef).toBe('8.2');
+            expect(scope.criterionRef).toBe('');
+            expect(scope.criterionSuggestedRef).toBe('8.2');
+            expect(scope.criterionConfidence).toBe('medium');
+            expect(scope.criterionBasis).toBe('clause-token-in-question');
+            expect(scope.criterionConfirmed).toBe(false);
         });
 
         it('does not invent an Annex-SL clause number for a non-Annex-SL-family standard', () => {
@@ -835,6 +845,82 @@ describe('ClientDocsBulk', () => {
             const docSection = cl.clauses.find(c => c.mainClause === 'DOC');
             expect(scope.criterionRef).toBe('');
             expect(docSection.subClauses[0].criterionRef).toBe('');
+        });
+    });
+
+    // deriveCriterionSuggestion() is the honest contract: it never claims
+    // more than "here is a candidate, and here is how sure we are". A clause
+    // token literally present in the question text is 'medium' at best (it's
+    // the question's clause, not necessarily the unfulfilled requirement);
+    // the keyword table is 'low'; nothing found is 'none'. 'high' never
+    // appears — only an auditor (or an evidence-based suggester) can confirm.
+    describe('deriveCriterionSuggestion — confidence-graded, never a confirmed criterion', () => {
+        it('grades an explicit clause token in the text as medium confidence', () => {
+            const s = B.deriveCriterionSuggestion('Verify the 8.2.1 sales process is followed.', 'ISO 9001:2015');
+            expect(s).toEqual({ ref: '8.2.1', confidence: 'medium', basis: 'clause-token-in-question' });
+        });
+
+        it('grades a keyword-table match as low confidence', () => {
+            const s = B.deriveCriterionSuggestion('Verify the 2026 internal audit was completed.', 'ISO 9001:2015');
+            expect(s).toEqual({ ref: '9.2', confidence: 'low', basis: 'keyword-fallback' });
+        });
+
+        it('returns none when nothing plausible is found — never invents a clause', () => {
+            const s = B.deriveCriterionSuggestion('Confirm the canteen rota is up to date.', 'ISO 9001:2015');
+            expect(s).toEqual({ ref: '', confidence: 'none', basis: 'none' });
+        });
+
+        it('still resolves the ambiguous legal/statutory keyword entry to none, not a guess', () => {
+            const s = B.deriveCriterionSuggestion('Confirm legal and regulatory obligations are tracked.', 'ISO 9001:2015');
+            expect(s).toEqual({ ref: '', confidence: 'none', basis: 'none' });
+        });
+
+        it('deriveCriterionRef stays a thin string-only wrapper for existing external callers', () => {
+            expect(B.deriveCriterionRef('Verify the 8.2.1 sales process is followed.', 'ISO 9001:2015')).toBe('8.2.1');
+            expect(B.deriveCriterionRef('Confirm the canteen rota is up to date.', 'ISO 9001:2015')).toBe('');
+        });
+    });
+
+    // FOCUS (Stage 1 carry-over) and SURV (mandatory §9.6.2) items have no
+    // template default at all — every non-empty result comes straight from
+    // the question's own text, so per the client's spec none of it may be
+    // presented as a confirmed criterion.
+    describe('FOCUS/SURV items never get an auto-confirmed criterionRef', () => {
+        const client = { id: 'c1', name: 'KTD Select', standard: 'ISO 9001:2015' };
+        const docs = [{ name: 'Quality Manual', category: 'System Manual', linkedClauses: '4.3' }];
+
+        it('records a FOCUS item\'s text-derived clause as an unconfirmed suggestion', () => {
+            const cl = B.buildClientChecklist(client, docs, {
+                auditType: 'surveillance',
+                focusPoints: ['Verify the 8.2.1 sales process is followed.']
+            });
+            const focusItem = cl.clauses.find(c => c.mainClause === 'FOCUS').subClauses[0];
+            expect(focusItem.criterionRef).toBe('');
+            expect(focusItem.criterionSuggestedRef).toBe('8.2.1');
+            expect(focusItem.criterionConfidence).toBe('medium');
+            expect(focusItem.criterionConfirmed).toBe(false);
+            expect(focusItem.criterionSource).toBe('focus-carryover');
+        });
+
+        it('leaves a FOCUS item with no plausible clause fully empty, with no invented suggestion', () => {
+            const cl = B.buildClientChecklist(client, docs, {
+                auditType: 'surveillance',
+                focusPoints: ['Confirm the canteen rota is up to date.']
+            });
+            const focusItem = cl.clauses.find(c => c.mainClause === 'FOCUS').subClauses[0];
+            expect(focusItem.criterionRef).toBe('');
+            expect(focusItem.criterionSuggestedRef).toBeUndefined();
+            expect(focusItem.criterionConfirmed).toBeUndefined();
+        });
+
+        it('records a SURV mandatory-element clause the same way, as an unconfirmed suggestion', () => {
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance', includeMandatory: true });
+            const survClause = cl.clauses.find(c => c.mainClause === 'SURV');
+            expect(survClause).toBeTruthy();
+            survClause.subClauses.forEach(item => {
+                expect(item.criterionRef).toBe('');
+                if (item.criterionSuggestedRef) expect(item.criterionConfirmed).toBe(false);
+            });
         });
     });
 
