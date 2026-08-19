@@ -675,6 +675,282 @@
         ));
     }
 
+    // ── Phase A rules: one authoritative dataset -> every report section ─────
+    // These enforce that what the printed report SAYS agrees with the validated
+    // findings dataset, and that internal machinery never reaches the client.
+
+    // Text an auditor wrote that is printed verbatim in the client report.
+    function clientFacingComments(report) {
+        return safeArr(report && report.checklistProgress)
+            .map((i) => trim(i && (i.comment || i.ncrDescription)))
+            .filter(Boolean);
+    }
+
+    // Internal machinery that must never appear in a client-facing document:
+    // system provenance captions, AI/mapping confidence, defensibility scoring.
+    const INTERNAL_METADATA_PATTERNS = [
+        /system-derived/i,
+        /mapping confidence/i,
+        /defensibility/i,
+        /\bAI[-\s]?(generated|confidence|suggested)\b/i,
+        /confidence\s*[:=]\s*(high|medium|low)\b/i
+    ];
+
+    function checkB11InternalMetadata(report, results) {
+        const narrative = narrativeFields(report);
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            const hit = INTERNAL_METADATA_PATTERNS.find((re) => re.test(text));
+            if (!hit) return;
+            const phrase = (text.match(hit) || [''])[0];
+            results.blockers.push(item(
+                'B11-' + key,
+                'blocker',
+                'narrative',
+                `Narrative (${key}) exposes internal system metadata ("${phrase}") in client-facing text.`,
+                'report.' + key,
+                'Remove the internal caption — provenance, AI/mapping confidence and defensibility scoring are internal QA data, not client report content.'
+            ));
+        });
+    }
+
+    // An affirmative claim of on-site activity. Negated mentions ("no on-site
+    // verification was performed") are legitimate on a remote audit, so the
+    // preceding words are checked before flagging.
+    const ONSITE_CLAIM_RE = /\b(?:on[-\s]?site\s+(?:observation|verification|visit|inspection|walkthrough|tour|review|audit)|observation of activities and work environment on[-\s]?site|conducted on[-\s]?site|attended on[-\s]?site)\b/gi;
+    const ONSITE_NEGATION_RE = /\b(?:no|not|without|never|excluded|remote(?:ly)?|in lieu of|instead of)\b[^.]{0,40}$/i;
+
+    function checkB12AuditMethodContradiction(input, results) {
+        const { report, auditPlan } = input;
+        const method = lower((auditPlan && auditPlan.auditMethod) || (report && report.auditMethod));
+        if (!method || !/remote/.test(method) || /hybrid/.test(method)) return;
+        const narrative = narrativeFields(report);
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            let m;
+            ONSITE_CLAIM_RE.lastIndex = 0;
+            while ((m = ONSITE_CLAIM_RE.exec(text)) !== null) {
+                const preceding = text.slice(Math.max(0, m.index - 60), m.index);
+                if (ONSITE_NEGATION_RE.test(preceding)) continue;
+                results.blockers.push(item(
+                    'B12-' + key,
+                    'blocker',
+                    'narrative',
+                    `Audit method is recorded as Remote, but the narrative (${key}) claims on-site activity ("${trim(m[0])}").`,
+                    'report.' + key + ' vs auditPlan.auditMethod',
+                    'State the methodology actually used — interviews, remote review of documented information and objective evidence, and remote observation through ICT where applicable.'
+                ));
+                break; // one finding per narrative field is enough to act on
+            }
+        });
+    }
+
+    // Counts asserted in prose must match the validated findings dataset.
+    // Observations and OFIs are distinct classifications and are never summed.
+    function checkB13NarrativeCounts(input, results) {
+        const { report, stats } = input;
+        if (!stats) return;
+        const ncTotal = (Number(stats.majorNC) || 0) + (Number(stats.minorNC) || 0);
+        const expectations = [
+            { re: /(\d+)\s+(?:minor\s+)?non-?conformit(?:y|ies)/gi, actual: ncTotal, label: 'nonconformities' },
+            { re: /(\d+)\s+opportunit(?:y|ies)\s+for\s+improvement/gi, actual: Number(stats.ofiCount) || 0, label: 'opportunities for improvement' },
+            { re: /(\d+)\s+observations?\b/gi, actual: Number(stats.observationCount) || 0, label: 'observations' }
+        ];
+        const narrative = narrativeFields(report);
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            expectations.forEach((exp) => {
+                let m;
+                exp.re.lastIndex = 0;
+                while ((m = exp.re.exec(text)) !== null) {
+                    const stated = parseInt(m[1], 10);
+                    if (isNaN(stated) || stated === exp.actual) continue;
+                    results.blockers.push(item(
+                        'B13-' + key + '-' + exp.label.replace(/\s+/g, '-'),
+                        'blocker',
+                        'narrative',
+                        `Narrative (${key}) states ${stated} ${exp.label}, but the validated findings dataset records ${exp.actual}.`,
+                        'report.' + key + ' vs ReportStats',
+                        'Restate the counts from the audit dataset. Observations and opportunities for improvement are separate classifications and must not be combined.'
+                    ));
+                    break;
+                }
+            });
+        });
+    }
+
+    // Every NC must be attributable to a real clause, otherwise the Clause Area
+    // Performance table cannot account for it and its totals silently disagree
+    // with the report's own NC count.
+    function checkB14ClauseReconciliation(ncrs, results) {
+        if (!ncrs.length) return;
+        const unattributable = ncrs.filter((ncr) => {
+            const resolved = trim(ncr.criterionRef) || trim(ncr.clause);
+            if (!resolved) return true;
+            return !trim(ncr.criterionRef) && FOCUS_CLAUSE_RE.test(trim(ncr.clause));
+        });
+        if (!unattributable.length) return;
+        results.blockers.push(item(
+            'B14',
+            'blocker',
+            'findings',
+            `Clause-level totals cannot reconcile: ${unattributable.length} of ${ncrs.length} nonconformity(ies) have no real standard clause, so the Clause Area Performance table cannot account for them.`,
+            'checklistProgress[] / report.ncrs[] vs clause performance table',
+            'Assign a validated standard clause to every nonconformity so the sum of clause-level NCs equals the report NC total.'
+        ));
+    }
+
+    // Controlled organization data must not be contradicted by field notes.
+    function controlledEmployeeCount(client) {
+        if (!client) return null;
+        const siteTotal = safeArr(client.sites).reduce((acc, s) => acc + (parseInt(s && s.employees, 10) || 0), 0);
+        if (siteTotal > 0) return siteTotal;
+        const direct = parseInt(client.employees, 10);
+        return isNaN(direct) ? null : direct;
+    }
+
+    function checkW12EmployeeCount(report, client, results) {
+        const controlled = controlledEmployeeCount(client);
+        if (!controlled) return;
+        // Tolerates the misspellings common in field notes ("emplyees").
+        const re = /\b(\d{1,6})\s+(?:now\s+)?(?:total\s+)?empl\w*/gi;
+        const sources = clientFacingComments(report).concat(Object.keys(narrativeFields(report)).map((k) => narrativeFields(report)[k]));
+        const seen = {};
+        sources.forEach((text) => {
+            if (!text) return;
+            let m;
+            re.lastIndex = 0;
+            while ((m = re.exec(text)) !== null) {
+                const stated = parseInt(m[1], 10);
+                if (isNaN(stated) || stated === controlled || seen[stated]) continue;
+                seen[stated] = true;
+                results.warnings.push(item(
+                    'W12-' + stated,
+                    'warning',
+                    'client-data',
+                    `Audit evidence refers to ${stated} employees, but the controlled organization profile records ${controlled}.`,
+                    'checklistProgress[].comment / report narrative vs client.sites[].employees',
+                    'Confirm the current headcount with the auditee and update the organization profile, or correct the note — controlled organization data and the report must agree.'
+                ));
+            }
+        });
+    }
+
+    // Design/development activity in the certified scope alongside an 8.3
+    // exclusion is a scope/applicability conflict the auditor must justify.
+    const DESIGN_SCOPE_RE = /\b(design|development|engineering|new product)\b/i;
+    const DESIGN_EXCLUDED_RE = /\bno\s+design\b|design\s*(&|and)?\s*development\s+(is\s+)?not\s+applicable|not\s+applicable[^.]{0,20}\bdesign\b/i;
+
+    function checkW13DesignApplicability(report, client, auditPlan, results) {
+        const scopeText = [
+            client && client.certificationScope,
+            client && client.industry,
+            safeArr(client && client.goodsServices).map((g) => (g && (g.name || g)) || '').join(', '),
+            auditPlan && auditPlan.scope,
+            report && report.scope
+        ].filter(Boolean).join(' ');
+        if (!DESIGN_SCOPE_RE.test(scopeText)) return;
+
+        const excludedInComments = clientFacingComments(report).some((c) => DESIGN_EXCLUDED_RE.test(c));
+        const excludedInChecklist = safeArr(report && report.checklistProgress).some((i) => {
+            if (!i) return false;
+            const cl = trim(i.clause) || trim(i.criterionRef);
+            return /^8\.3(\.|$)/.test(cl) && /^(na|n\/a|not[_\s-]?applicable|excluded)$/i.test(trim(i.status));
+        });
+        const excludedInScope = DESIGN_EXCLUDED_RE.test(trim(report && report.exclusions));
+        if (!excludedInComments && !excludedInChecklist && !excludedInScope) return;
+
+        results.warnings.push(item(
+            'W13',
+            'warning',
+            'applicability',
+            'Potential scope/applicability conflict: the certified activities indicate design and development activity while clause 8.3 has been treated as not applicable.',
+            'client.certificationScope / goodsServices vs clause 8.3 applicability',
+            'Record the auditor\'s explicit justification for the exclusion, or assess clause 8.3 — applicability is an auditor decision and cannot be inferred automatically.'
+        ));
+    }
+
+    // A surveillance/recertification report must say something meaningful about
+    // the previous cycle's findings; a blank or dash is not a status.
+    const EMPTY_STATUS_RE = /^(—|-{1,3}|n\/?a|none|nil|\.)?$/i;
+
+    function checkW14PreviousFindings(report, auditPlan, results) {
+        const auditTypeStr = lower((auditPlan && auditPlan.auditType) || (report && report.auditType));
+        if (!/surveillance|recert|follow/.test(auditTypeStr)) return;
+        const status = trim(report && report.previousFindingsStatus);
+        if (status && !EMPTY_STATUS_RE.test(status)) return;
+        results.warnings.push(item(
+            'W14',
+            'warning',
+            'previous-findings',
+            'Previous Findings Status is blank on a surveillance/recertification report, where the status of the previous cycle\'s nonconformities is expected.',
+            'report.previousFindingsStatus',
+            'State the actual position — no previous nonconformities requiring follow-up, previous NCs verified and closed, previous NC(s) remain open, or records unavailable for reviewer attention.'
+        ));
+    }
+
+    // The next audit event must be described as the stage the certification
+    // programme actually schedules next.
+    function checkW15NextAuditType(input, results) {
+        const { report, auditPlan, client } = input;
+        try {
+            if (!(global.ReportStats && typeof global.ReportStats.buildProgramme === 'function')) return;
+            const allReports = safeArr(global.state && global.state.auditReports);
+            const programme = global.ReportStats.buildProgramme({ client, auditPlan, report, allReports });
+            const nextLabel = lower((programme && programme.nextAudit && (programme.nextAudit.label || programme.nextAudit.type)) || '');
+            if (!/recert/.test(nextLabel)) return;
+            const narrative = narrativeFields(report);
+            Object.keys(narrative).forEach((key) => {
+                const text = narrative[key];
+                if (!text || !/next\s+surveillance\s+audit/i.test(text)) return;
+                results.warnings.push(item(
+                    'W15-' + key,
+                    'warning',
+                    'programme',
+                    `Narrative (${key}) refers to the next event as a surveillance audit, but the certification programme schedules recertification next.`,
+                    'report.' + key + ' vs ReportStats.buildProgramme',
+                    'Refer to the next audit by the stage the certification cycle actually schedules.'
+                ));
+            });
+        } catch (_e) { /* skip */ }
+    }
+
+    // ── Editorial rules ─────────────────────────────────────────────────────
+    // Presentation-only issues that never block issuance: they mark text that
+    // still reads as a raw field note rather than a client-facing statement.
+    const RAW_NOTE_MAX_WORDS = 6;
+    const EDITORIAL_SAMPLE_LIMIT = 8;
+
+    function looksLikeRawNote(text) {
+        const t = trim(text);
+        if (!t || t.length > 120) return false;
+        const words = t.split(/\s+/).filter(Boolean);
+        if (words.length > RAW_NOTE_MAX_WORDS) return false;
+        // A short line that never resolves into a sentence.
+        return !/[.!?]$/.test(t) || /^[a-z]/.test(t);
+    }
+
+    function checkE1RawAuditorNotes(report, results) {
+        let emitted = 0;
+        safeArr(report && report.checklistProgress).forEach((i, idx) => {
+            if (emitted >= EDITORIAL_SAMPLE_LIMIT) return;
+            const text = trim(i && (i.comment || i.ncrDescription));
+            if (!looksLikeRawNote(text)) return;
+            emitted++;
+            results.editorial.push(item(
+                'E1-' + idx,
+                'editorial',
+                'narrative',
+                `Checklist item ${idx + 1} prints the raw field note "${text}" as client-facing evidence.`,
+                'checklistProgress[' + idx + '].comment',
+                'Rewrite as a client-facing evidence statement describing what was reviewed and what it demonstrated, without adding facts the evidence does not support.'
+            ));
+        });
+    }
+
     // I1-I4 information items
 
     function checkInformation(report, results) {
@@ -703,7 +979,9 @@
         const auditPlan = safeInput.auditPlan || null;
         const stats = safeInput.stats || null;
 
-        const results = { blockers: [], warnings: [], information: [] };
+        // `editorial` is presentation-only (spelling, raw notes, formatting): it
+        // is reported for correction but never blocks issuance.
+        const results = { blockers: [], warnings: [], information: [], editorial: [] };
         const ncrs = allNCRs(report);
 
         try { checkB1FocusCriterion(ncrs, results); } catch (_e) { /* skip */ }
@@ -730,10 +1008,28 @@
         try { checkW10MaturityLanguage(report, results); } catch (_e) { /* skip */ }
         try { checkW11NarrativeLocation(report, client, results); } catch (_e) { /* skip */ }
 
+        // Phase A — report says what the validated dataset says, and internal
+        // machinery stays out of the client document.
+        try { checkB11InternalMetadata(report, results); } catch (_e) { /* skip */ }
+        try { checkB12AuditMethodContradiction({ report, auditPlan }, results); } catch (_e) { /* skip */ }
+        try { checkB13NarrativeCounts({ report, stats }, results); } catch (_e) { /* skip */ }
+        try { checkB14ClauseReconciliation(ncrs, results); } catch (_e) { /* skip */ }
+        try { checkW12EmployeeCount(report, client, results); } catch (_e) { /* skip */ }
+        try { checkW13DesignApplicability(report, client, auditPlan, results); } catch (_e) { /* skip */ }
+        try { checkW14PreviousFindings(report, auditPlan, results); } catch (_e) { /* skip */ }
+        try { checkW15NextAuditType({ report, auditPlan, client }, results); } catch (_e) { /* skip */ }
+        try { checkE1RawAuditorNotes(report, results); } catch (_e) { /* skip */ }
+
         try { checkInformation(report, results); } catch (_e) { /* skip */ }
 
         const status = results.blockers.length === 0 ? 'READY FOR AUDITOR REVIEW' : 'BLOCKED';
-        return { blockers: results.blockers, warnings: results.warnings, information: results.information, status };
+        return {
+            blockers: results.blockers,
+            warnings: results.warnings,
+            information: results.information,
+            editorial: results.editorial,
+            status
+        };
     }
 
     function checkById(reportId) {
@@ -742,7 +1038,7 @@
                 ? global.DataService.findAuditReport(reportId)
                 : safeArr(global.state && global.state.auditReports).find((r) => String(r.id) === String(reportId));
             if (!report) {
-                return { blockers: [item('B0', 'blocker', 'report', 'Report not found.', 'window.state.auditReports', 'Verify the report ID.')], warnings: [], information: [], status: 'BLOCKED' };
+                return { blockers: [item('B0', 'blocker', 'report', 'Report not found.', 'window.state.auditReports', 'Verify the report ID.')], warnings: [], information: [], editorial: [], status: 'BLOCKED' };
             }
 
             const planId = report.planId || report.audit_plan_id;
@@ -779,7 +1075,7 @@
 
             return check({ report, auditPlan, client, stats });
         } catch (_e) {
-            return { blockers: [], warnings: [], information: [], status: 'READY FOR AUDITOR REVIEW' };
+            return { blockers: [], warnings: [], information: [], editorial: [], status: 'READY FOR AUDITOR REVIEW' };
         }
     }
 
