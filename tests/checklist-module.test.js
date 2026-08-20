@@ -218,9 +218,6 @@ describe('renderChecklistLibrary — client scoping', () => {
     beforeEach(() => {
         window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
         window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s) };
-        // CERTIFICATION_MANAGER must be present: renderChecklistLibrary reads
-        // window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase() without a
-        // `?.` guard, so a ROLES object missing it throws before any render.
         window.CONSTANTS = { AUDIT_TYPES: [], AUDIT_SCOPES: [], ROLES: { CERTIFICATION_MANAGER: 'Certification Manager' } };
         // renderChecklistLibrary writes to window.contentArea (script.js caches
         // the element there), not via getElementById.
@@ -287,5 +284,48 @@ describe('renderChecklistLibrary — client scoping', () => {
         expect(html()).not.toContain('KTD Select - Surveillance');
         expect(html()).not.toContain('PC Connection - Recertification');
         expect(html()).toContain('Global ISO 9001 Baseline');
+    });
+});
+
+// A CONSTANTS.ROLES object present but missing CERTIFICATION_MANAGER used to
+// throw before any markup was produced — window.CONSTANTS.ROLES was truthy, so
+// the guard passed, then .CERTIFICATION_MANAGER.toLowerCase() blew up on
+// undefined and the whole Checklist Library failed to render. Two sibling call
+// sites in the same file already used `?.`; all five now agree.
+describe('renderChecklistLibrary — tolerates an incomplete CONSTANTS.ROLES', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+        window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s) };
+        document.body.innerHTML = '<div id="content-area"></div>';
+        window.contentArea = document.getElementById('content-area');
+        window.state = {
+            currentUser: { role: 'Auditor' },
+            settings: {},
+            cbSettings: { availableStandards: ['ISO 9001:2015'] },
+            clients: [{ id: 'c-1', name: 'KTD Select' }],
+            checklists: [{ id: 1, name: 'Global Baseline', standard: 'ISO 9001:2015', type: 'global', clauses: [] }],
+            auditReports: [], executions: []
+        };
+        loadModule('./checklist-module.js');
+    });
+
+    it('renders when ROLES exists but has no CERTIFICATION_MANAGER key', () => {
+        window.CONSTANTS = { AUDIT_TYPES: [], AUDIT_SCOPES: [], ROLES: {} };
+        expect(() => window.renderChecklistLibrary(null)).not.toThrow();
+        expect(document.getElementById('content-area').innerHTML).toContain('Global Baseline');
+    });
+
+    it('renders when CONSTANTS has no ROLES at all', () => {
+        window.CONSTANTS = { AUDIT_TYPES: [], AUDIT_SCOPES: [] };
+        expect(() => window.renderChecklistLibrary(null)).not.toThrow();
+        expect(document.getElementById('content-area').innerHTML).toContain('Global Baseline');
+    });
+
+    it('still recognises a certification manager when the key IS present', () => {
+        window.CONSTANTS = { AUDIT_TYPES: [], AUDIT_SCOPES: [], ROLES: { CERTIFICATION_MANAGER: 'Certification Manager' } };
+        window.state.currentUser = { role: 'Certification Manager' };
+        window.renderChecklistLibrary(null);
+        // The cert-manager/admin banner is the observable signal of that branch.
+        expect(document.getElementById('content-area').innerHTML).toContain('Certification Manager');
     });
 });

@@ -52,7 +52,7 @@ function renderChecklistLibrary(clientId) {
     const _contentArea = document.getElementById('content-area');
     const userRole = (window.state.currentUser?.role || '').toLowerCase();
     const isAdmin = userRole === 'admin' || window.state.settings?.isAdmin || false;
-    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
     // Filtering keys on the ID, never on whether the client record resolves —
     // an unknown id must still scope (a scoped route falling back to every
@@ -1375,7 +1375,7 @@ function openEditChecklistModal(id) {
 
     const userRole = (state.currentUser?.role || '').toLowerCase();
     const isAdmin = userRole === 'admin' || state.settings?.isAdmin || false;
-    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 
     // Check permission for global checklists
@@ -1607,7 +1607,7 @@ function deleteChecklist(id) {
 
     const userRole = (window.state.currentUser?.role || '').toLowerCase();
     const isAdmin = userRole === 'admin' || window.state.settings?.isAdmin || false;
-    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 
     if (checklist.type === 'global' && !canEditGlobal) {
