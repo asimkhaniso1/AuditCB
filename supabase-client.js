@@ -1945,6 +1945,11 @@ const SupabaseClient = {
         if (!this.isInitialized || !checklists?.length) return;
 
         try {
+            // client_id / client_name MUST be written: syncChecklistsFromSupabase
+            // reads both back, so omitting them here silently orphaned every
+            // client-specific checklist on its first cloud round-trip — the
+            // checklist survived, but its owner did not, so it vanished from the
+            // client's own Checklists view while still showing in the global one.
             const batch = checklists.map(checklist => ({
                 id: checklist.id,
                 name: checklist.name,
@@ -1953,6 +1958,8 @@ const SupabaseClient = {
                 audit_type: checklist.auditType || null,
                 audit_scope: checklist.auditScope || null,
                 created_by: checklist.createdBy || null,
+                client_id: checklist.clientId || null,
+                client_name: checklist.clientName || null,
                 clauses: checklist.clauses || [],
                 updated_at: new Date().toISOString()
             }));

@@ -62,10 +62,51 @@ function renderChecklistLibrary(clientId) {
     const scopedClient = scopeId
         ? (window.state.clients || []).find(c => String(c.id) === scopeId)
         : null;
+    // Standards this client is actually certified to. A global checklist is
+    // only relevant to them if it targets one of these — showing every global
+    // put ISO 14001, 27001, 50001 and 20000-1 checklists in front of a client
+    // certified to ISO 9001 alone, which is noise at best and an invitation to
+    // audit against an unsubscribed standard at worst.
+    const clientStandards = String((scopedClient && scopedClient.standard) || '')
+        .split(',').map(s => s.trim()).filter(Boolean);
+    const normStd = (s) => String(s || '').toLowerCase().replace(/iso\/iec/g, 'iso').replace(/[\s:_-]/g, '');
+    const clientStandardKeys = clientStandards.map(normStd);
+    // A checklist can name several standards (an integrated-system checklist),
+    // so it is relevant when ANY of its standards is one the client holds.
+    const targetsClientStandard = (c) => {
+        if (!clientStandardKeys.length) return true; // client has none recorded — don't hide everything
+        return String(c.standard || '').split(',').map(s => normStd(s)).filter(Boolean)
+            .some(k => clientStandardKeys.some(ck => k === ck || k.includes(ck) || ck.includes(k)));
+    };
+
+    // Does this checklist belong to the scoped client?
+    //
+    // clientId is authoritative — but it was silently dropped on every cloud
+    // round-trip until the checklist upsert paths were fixed to write
+    // client_id (syncChecklistsFromSupabase always READ it back). Rows written
+    // before that fix come back with clientId null, so a client-specific
+    // checklist showed in the global library and nowhere else. clientName, and
+    // then the client's name appearing in the checklist's own title — which is
+    // how buildClientChecklist names them ("<Client> - Surveillance Audit
+    // Checklist (Client-Specific)") — recover those existing rows without a
+    // migration.
+    const clientNameKey = String((scopedClient && scopedClient.name) || '').trim().toLowerCase();
+    const belongsToClient = (c) => {
+        if (c.clientId != null && String(c.clientId) === scopeId) return true;
+        if (!clientNameKey) return false;
+        if (String(c.clientName || '').trim().toLowerCase() === clientNameKey) return true;
+        // Title match is the last resort and deliberately requires the full
+        // client name, so "PC CONNECTION, INC." never matches another client.
+        return String(c.name || '').toLowerCase().includes(clientNameKey);
+    };
+
     // Scope first, so every count, filter and section below is computed over
     // the same set the view actually shows.
-    const checklists = (state.checklists || []).filter(c =>
-        !scopeId || c.type === 'global' || String(c.clientId) === scopeId);
+    const checklists = (state.checklists || []).filter(c => {
+        if (!scopeId) return true;
+        if (belongsToClient(c)) return true;
+        return c.type === 'global' && targetsClientStandard(c);
+    });
 
     // Apply filters
     let filtered = checklists.filter(c => {
@@ -90,12 +131,30 @@ function renderChecklistLibrary(clientId) {
     const _auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
     const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
 
+    // "In use" badge — whether this checklist is referenced by any audit plan,
+    // report or execution. Reuses isChecklistUsedInAudits (the same check the
+    // delete guard runs) so the badge can never disagree with what happens when
+    // you try to delete it. The tooltip names what it is linked to, so "Yes" is
+    // actionable rather than just a colour.
+    const usageBadge = (c) => {
+        let usage = { used: false, linkedTo: [] };
+        try {
+            if (typeof isChecklistUsedInAudits === 'function') usage = isChecklistUsedInAudits(c.id) || usage;
+        } catch (_e) { /* never let the badge break the library render */ }
+        const title = usage.used
+            ? 'Linked to: ' + usage.linkedTo.slice(0, 6).join('; ') + (usage.linkedTo.length > 6 ? `; and ${usage.linkedTo.length - 6} more` : '')
+            : 'Not referenced by any audit plan, report or execution — safe to edit or delete';
+        return usage.used
+            ? `<span title="${window.UTILS.escapeHtml(title)}" style="background:#dcfce7;color:#166534;padding:2px 9px;border-radius:12px;font-size:0.78rem;font-weight:600;white-space:nowrap;">Yes${usage.linkedTo.length > 1 ? ` · ${usage.linkedTo.length}` : ''}</span>`
+            : `<span title="${window.UTILS.escapeHtml(title)}" style="background:#f1f5f9;color:#64748b;padding:2px 9px;border-radius:12px;font-size:0.78rem;font-weight:600;">No</span>`;
+    };
+
     const html = `
         <div class="fade-in">
             ${scopedClient ? `
             <div style="background:#eff6ff;border-left:4px solid #1d4ed8;border-radius:0 8px 8px 0;padding:0.75rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
                 <i class="fa-solid fa-building" style="color:#1d4ed8;"></i>
-                <span style="font-size:0.9rem;color:#1e3a8a;">Showing checklists for <strong>${window.UTILS.escapeHtml(scopedClient.name)}</strong>, plus global checklists that apply to every client.</span>
+                <span style="font-size:0.9rem;color:#1e3a8a;">Showing checklists for <strong>${window.UTILS.escapeHtml(scopedClient.name)}</strong>${clientStandards.length ? `, plus global checklists for ${window.UTILS.escapeHtml(clientStandards.join(', '))}` : ', plus global checklists'}.</span>
                 <a href="#checklists" style="margin-left:auto;font-size:0.82rem;color:#1d4ed8;">View all checklists</a>
             </div>` : ''}
             <!-- Header -->
@@ -178,6 +237,7 @@ function renderChecklistLibrary(clientId) {
                                     <th>Checklist Name</th>
                                     <th>Standard</th>
                                     <th>Total Questions</th>
+                                    <th title="Referenced by an audit plan, report or execution">In Use</th>
                                     <th>Last Updated</th>
                                     <th>Actions</th>
                                 </tr>
@@ -188,6 +248,7 @@ function renderChecklistLibrary(clientId) {
                                         <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
                                         <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.standard)}</span></td>
                                         <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses || []).reduce((s2, sub) => s2 + (sub.items ? sub.items.length : 1), 0), 0) : (c.items?.length || 0)}</td>
+                                        <td>${usageBadge(c)}</td>
                                         <td>${_fmtDate(c.updatedAt || c.createdAt)}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;" aria-label="View">
@@ -232,6 +293,7 @@ function renderChecklistLibrary(clientId) {
                                     <th>Checklist Name</th>
                                     <th>Standard</th>
                                     <th>Total Questions</th>
+                                    <th title="Referenced by an audit plan, report or execution">In Use</th>
                                     <th>Created By</th>
                                     <th>Actions</th>
                                 </tr>
@@ -242,6 +304,7 @@ function renderChecklistLibrary(clientId) {
                                         <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
                                         <td><span style="background: #d1fae5; color: #059669; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.standard)}</span></td>
                                         <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses || []).reduce((s2, sub) => s2 + (sub.items ? sub.items.length : 1), 0), 0) : (c.items?.length || 0)}</td>
+                                        <td>${usageBadge(c)}</td>
                                         <td>${window.UTILS.escapeHtml(c.createdBy || 'Unknown')}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;" aria-label="View">

@@ -277,6 +277,59 @@ function findSiblingFindingsByClause(report, resolved, clause) {
 }
 window.NCRSyncUtils.findSiblingFindingsByClause = findSiblingFindingsByClause;
 
+/**
+ * Rewrite the headcount inside ONE note so it states `newCount`.
+ *
+ * Confirming a headcount corrects the controlled profile; it cannot correct
+ * a field note that states a different number, and that note keeps its own
+ * W12 warning. Only the auditor can decide which note is wrong, so this is
+ * driven per-note from the review dialog rather than applied wholesale.
+ *
+ * Replaces only the numeral in the "<n> employees" phrase, leaving the rest
+ * of the sentence exactly as the auditor wrote it — no rewording, no
+ * regenerated text.
+ *
+ * @param {Object} report
+ * @param {{kind:'checklist'|'narrative', index?:number, field:string}} ref
+ * @param {number} oldCount
+ * @param {number} newCount
+ * @returns {boolean} true when something was actually changed
+ */
+function correctHeadcountInNote(report, ref, oldCount, newCount) {
+    if (!report || !ref) return false;
+    const pattern = new RegExp('\\b' + oldCount + '(\\s+(?:now\\s+)?(?:total\\s+)?empl\\w*)', 'gi');
+    const rewrite = (text) => String(text || '').replace(pattern, String(newCount) + '$1');
+
+    if (ref.kind === 'checklist') {
+        const item = (report.checklistProgress || [])[ref.index];
+        if (!item) return false;
+        const before = item[ref.field];
+        const after = rewrite(before);
+        if (after === before) return false;
+        item[ref.field] = after;
+        return true;
+    }
+    // Narrative. report.ofi may be an array (one entry per OFI) — rewrite
+    // each entry rather than flattening it to a string, which would destroy
+    // the structure the OFI section and B17 both read.
+    if (ref.field === 'ofi' && Array.isArray(report.ofi)) {
+        let changed = false;
+        report.ofi = report.ofi.map((entry) => {
+            if (typeof entry !== 'string') return entry;
+            const after = rewrite(entry);
+            if (after !== entry) changed = true;
+            return after;
+        });
+        return changed;
+    }
+    const before = report[ref.field];
+    const after = rewrite(before);
+    if (after === before) return false;
+    report[ref.field] = after;
+    return true;
+}
+window.NCRSyncUtils.correctHeadcountInNote = correctHeadcountInNote;
+
 // eslint-disable-next-line no-unused-vars
 function renderExecutionTab(report, tabName, contextData = {}) {
     const tabContent = document.getElementById('tab-content');
@@ -3839,25 +3892,35 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     function findEvidenceEmployeeCounts(report, controlled) {
         const re = /\b(\d{1,6})\s+(?:now\s+)?(?:total\s+)?empl\w*/gi;
         const sources = [];
-        ((report && report.checklistProgress) || []).forEach((i) => {
+        // `ref` locates the text so a caller can correct the note in place —
+        // confirming a headcount fixes the PROFILE, but a note stating a
+        // different number keeps its own warning, and until this existed there
+        // was no path from the warning to the note that caused it.
+        ((report && report.checklistProgress) || []).forEach((i, index) => {
             const text = String((i && (i.comment || i.ncrDescription)) || '').trim();
-            if (text) sources.push({ text, label: 'checklist comment' });
+            if (text) {
+                sources.push({
+                    text, label: 'checklist comment',
+                    ref: { kind: 'checklist', index, field: (i && i.comment) ? 'comment' : 'ncrDescription' }
+                });
+            }
         });
         const narrative = {
-            'executive summary': report && report.executiveSummary,
-            'positive observations': report && report.positiveObservations,
-            'opportunities for improvement': Array.isArray(report && report.ofi) ? report.ofi.join('\n') : (report && report.ofi),
-            'conclusion': report && (report.editedConclusion || report.conclusion),
-            'previous findings status': report && report.previousFindingsStatus
+            'executive summary': { text: report && report.executiveSummary, field: 'executiveSummary' },
+            'positive observations': { text: report && report.positiveObservations, field: 'positiveObservations' },
+            'opportunities for improvement': { text: Array.isArray(report && report.ofi) ? report.ofi.join('\n') : (report && report.ofi), field: 'ofi' },
+            'conclusion': { text: report && (report.editedConclusion || report.conclusion), field: (report && report.editedConclusion) ? 'editedConclusion' : 'conclusion' },
+            'previous findings status': { text: report && report.previousFindingsStatus, field: 'previousFindingsStatus' }
         };
         Object.keys(narrative).forEach((label) => {
-            const text = String(narrative[label] || '').trim();
-            if (text) sources.push({ text, label });
+            const entry = narrative[label];
+            const text = String(entry.text || '').trim();
+            if (text) sources.push({ text, label, ref: { kind: 'narrative', field: entry.field } });
         });
 
         const found = [];
         const seen = {};
-        sources.forEach(({ text, label }) => {
+        sources.forEach(({ text, label, ref }) => {
             re.lastIndex = 0;
             let m;
             while ((m = re.exec(text)) !== null) {
@@ -3866,7 +3929,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const key = stated + '|' + label;
                 if (seen[key]) continue;
                 seen[key] = true;
-                found.push({ stated, label });
+                // `excerpt` gives the auditor the sentence they are about to
+                // change, so a blind find-and-replace is never what they confirm.
+                const start = Math.max(0, m.index - 60);
+                const excerpt = (start > 0 ? '…' : '') + text.slice(start, Math.min(text.length, m.index + m[0].length + 60)).trim()
+                    + (m.index + m[0].length + 60 < text.length ? '…' : '');
+                found.push({ stated, label, ref, excerpt, matched: m[0] });
             }
         });
         return found;
@@ -3911,6 +3979,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         }
         client.employees = sites.reduce((acc, s) => acc + (parseInt(s && s.employees, 10) || 0), 0);
     }
+
 
     /**
      * "Review employee count" fix action for a Report Integrity W12 warning
@@ -3975,7 +4044,23 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <input type="number" min="0" class="form-control" id="employee-count-input" value="${esc(String(suggested))}">
                 <small id="employee-count-warning" style="display:none; color: #dc2626; margin-top: 0.35rem;"></small>
             </div>
-            <small style="color: var(--text-secondary); display: block; margin-top: 0.35rem;">Confirming updates the client's controlled organization profile everywhere it is used. If this note is not a real change, close this dialog without confirming and correct the field note instead.</small>
+            <div class="form-group" style="margin-top: 0.9rem;">
+                <label>Notes stating a different figure</label>
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.4rem;">
+                    Tick a note to rewrite its headcount to the confirmed figure above. Only the number changes — the wording stays exactly as written. Untick to leave a note alone.
+                </div>
+                <div style="max-height:34vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:0.25rem 0.5rem;">
+                    ${evidence.map((e, i) => `
+                    <label style="display:flex;gap:0.55rem;align-items:flex-start;padding:0.5rem 0.25rem;border-bottom:1px solid #f1f5f9;cursor:pointer;">
+                        <input type="checkbox" class="ec-fix" data-idx="${i}" style="margin-top:0.2rem;">
+                        <span style="font-size:0.82rem;line-height:1.45;">
+                            <strong>${esc(String(e.stated))}</strong> in <em>${esc(e.label)}</em>
+                            <span style="display:block;color:#475569;margin-top:0.15rem;">“${esc(e.excerpt || '')}”</span>
+                        </span>
+                    </label>`).join('')}
+                </div>
+            </div>
+            <small style="color: var(--text-secondary); display: block; margin-top: 0.35rem;">Confirming updates the client's controlled organization profile everywhere it is used. Ticked notes are rewritten to agree with it.</small>
         `, () => {
             const input = document.getElementById('employee-count-input');
             const warning = document.getElementById('employee-count-warning');
@@ -3985,23 +4070,35 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 return;
             }
 
+            // Rewrite the notes the auditor ticked, BEFORE persisting, so the
+            // profile write and the note edits land in one save.
+            const ticked = Array.from(document.querySelectorAll('.ec-fix:checked'))
+                .map(el => evidence[parseInt(el.getAttribute('data-idx'), 10)])
+                .filter(Boolean);
+            let notesFixed = 0;
+            ticked.forEach((e) => {
+                if (e.stated === value) return; // already agrees; nothing to rewrite
+                if (correctHeadcountInNote(report, e.ref, e.stated, value)) notesFixed++;
+            });
+
             propagateEmployeeCount(client, value);
             window.closeModal();
             window.DataService.syncClient(client);
 
             // Report honestly on what this confirmation could and could not
-            // resolve. Any evidence figure that still differs from the confirmed
-            // headcount will keep its own W12 warning — the profile is now
-            // correct, the note is not, and only the auditor can decide which
-            // note is wrong.
-            const stillConflicting = distinctFigures.filter(n => n !== value);
-            if (stillConflicting.length) {
+            // resolve. Any evidence figure still differing from the confirmed
+            // headcount keeps its own W12 warning — the profile is now correct,
+            // that note is not, and only the auditor can decide which is wrong.
+            const untouched = distinctFigures.filter(n =>
+                n !== value && !ticked.some(t => t.stated === n));
+            const fixedNote = notesFixed ? ` ${notesFixed} note(s) rewritten to match.` : '';
+            if (untouched.length) {
                 persistAndRefreshIntegrity(reportId,
-                    `Profile updated to ${value}. ${stillConflicting.length} note(s) still state ${stillConflicting.join(', ')} — correct those notes to clear the remaining warning(s).`,
+                    `Profile updated to ${value}.${fixedNote} ${untouched.length} note(s) still state ${untouched.join(', ')} — tick them here, or edit the text, to clear the remaining warning(s).`,
                     'warning');
             } else {
                 persistAndRefreshIntegrity(reportId,
-                    `Employee count confirmed at ${value} and updated on the organization profile.`);
+                    `Employee count confirmed at ${value}.${fixedNote}`);
             }
         });
     };

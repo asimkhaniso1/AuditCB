@@ -3444,11 +3444,18 @@
 
         if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
             try {
+                // client_id / client_name are what make this a CLIENT-specific
+                // checklist; syncChecklistsFromSupabase reads them back, so
+                // omitting them here orphaned the checklist on the first cloud
+                // round-trip and it disappeared from the client's own view.
                 await window.SupabaseClient.client.from('checklists').upsert({
                     id: String(checklist.id),
                     name: checklist.name,
                     standard: checklist.standard,
                     type: checklist.type,
+                    audit_type: checklist.auditType || null,
+                    client_id: checklist.clientId || null,
+                    client_name: checklist.clientName || null,
                     clauses: checklist.clauses,
                     created_by: checklist.createdBy,
                     created_at: new Date().toISOString(),
