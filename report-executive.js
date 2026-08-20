@@ -511,6 +511,55 @@ ${data.forwardOutlook ? `
         return `The ${labelParts.join(' and ')} ${noun} ${verb} corrective action and satisfactory closure in accordance with the certification body's corrective-action process.`;
     }
 
+    // Join a list of strings in prose form: "A", "A and B", "A, B and C".
+    function joinProse(items) {
+        const list = safeArr(items).filter(Boolean);
+        if (list.length <= 1) return list[0] || '';
+        return list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+    }
+
+    // Deterministic "Key Findings" — one bullet per severity present, each
+    // naming EVERY distinct clause carrying a finding of that severity. This
+    // replaced an AI-authored bullet list that would legitimately (per its own
+    // prompt, which only asked for "genuinely distinct" points capped at a
+    // few bullets) compress "4 minor non-conformities" into a count sentence
+    // plus a single cited example clause — accurate in isolation, but a
+    // client reading it would reasonably assume that ONE clause was the whole
+    // story. A finding count is only useful to a reader alongside every
+    // clause it covers, so this is generated directly from the same
+    // major/minor nonconformity list buildFactualConclusion's totals come
+    // from — never re-derived, never summarized away.
+    //
+    // Grouped by clause (not printed once per finding) so 2 findings against
+    // the same clause in different departments read as one bullet, not two
+    // near-duplicates — the underlying reason report-integrity.js's
+    // duplicate-finding check exists is exactly this kind of near-repeat.
+    function buildKeyFindingsSummary(d, stats) {
+        const bySeverity = { major: [], minor: [] };
+        getRealNCs(d).forEach((item) => {
+            const sev = String(item.ncrType || '').toLowerCase();
+            if (sev !== 'major' && sev !== 'minor') return;
+            const label = clauseText(item);
+            const dept = normalizeDept(item.department);
+            const key = label + '|' + dept;
+            const bucket = bySeverity[sev];
+            let entry = bucket.find((e) => e.key === key);
+            if (!entry) { entry = { key, label, dept, count: 0 }; bucket.push(entry); }
+            entry.count++;
+        });
+
+        const sentences = [];
+        ['major', 'minor'].forEach((sev) => {
+            const entries = bySeverity[sev];
+            if (!entries.length) return;
+            const count = sev === 'major' ? (stats.majorNC || entries.length) : (stats.minorNC || entries.length);
+            const noun = count === 1 ? 'nonconformity' : 'nonconformities';
+            const clauseList = joinProse(entries.map((e) => `${e.label} (${e.dept})`));
+            sentences.push(`${count} ${sev} ${noun} identified: ${clauseList}.`);
+        });
+        return sentences;
+    }
+
     function buildAuditOutcomeSummary(d, data) {
         const stats = getStats(d);
         const report = (d && d.report) || {};
@@ -520,8 +569,8 @@ ${data.forwardOutlook ? `
         let strengths = dedupeCap(data.strengths, 3).map(s => truncate(cleanFindingText(s, 140), 140));
         if (!strengths.length) strengths = ['No specific strengths were separately highlighted during this surveillance audit.'];
 
-        let findings = dedupeCap(data.findings, 4).map(s => truncate(cleanFindingText(s, 140), 140));
-        if (!findings.length) findings = ['No significant findings identified in this audit cycle.'];
+        let findings = buildKeyFindingsSummary(d, stats);
+        if (!findings.length) findings = ['No nonconformities were identified during this audit.'];
 
         const previousFindingsStatus = (report.previousFindingsStatus && String(report.previousFindingsStatus).trim()) || '—';
 
@@ -2016,7 +2065,15 @@ h1, h2, h3, h4, .b4-page-title, .b4-section-title, .b4-card-heading, .b4-highlig
         renderAssistantPanel,
         handleAsk,
         bigFourCss,
-        icon
+        icon,
+        // Exposed for direct testing of the deterministic Key Findings
+        // generation (client spec: Key Findings must summarize every NC, not
+        // just one) — every other export above is either async/AI-backed or a
+        // full-page render; this and buildAuditOutcomeSummary are the pure,
+        // synchronous pieces worth unit-testing directly rather than only via
+        // the AI-fallback path of generateExecutiveSummary.
+        buildKeyFindingsSummary,
+        buildAuditOutcomeSummary
     };
 
     // CSP-safe wiring: inline handlers are blocked (no 'unsafe-inline' in script-src),

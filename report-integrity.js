@@ -24,6 +24,24 @@
     const safeArr = (a) => (Array.isArray(a) ? a : []);
     const lower = (s) => trim(s).toLowerCase();
 
+    // Spelled-out numerals a narrative might use instead of digits ("Four minor
+    // non-conformities were identified"). Kept identical to ai-service.js's
+    // _NUMBER_WORDS — that file's guard corrects a stated count in place before
+    // this one runs as the hard block, so both must recognise the same forms or
+    // a spelled-out count could slip past both. Covers 0-20, the realistic
+    // range for a finding count.
+    const NUMBER_WORDS = {
+        zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+        eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
+        eighteen: 18, nineteen: 19, twenty: 20
+    };
+    const NUMBER_WORD_RE = Object.keys(NUMBER_WORDS).join('|');
+    function parseStatedNumber(raw) {
+        if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+        const n = NUMBER_WORDS[String(raw || '').toLowerCase()];
+        return n == null ? NaN : n;
+    }
+
     function item(id, severity, section, message, source, suggestion, ref) {
         const out = { id, severity, section, message, source, suggestion };
         // `ref` locates the offending record so a UI can offer a direct fix
@@ -782,9 +800,9 @@
         if (!counts) return;
         const ncTotal = counts.major + counts.minor;
         const expectations = [
-            { re: /(\d+)\s+(?:minor\s+)?non-?conformit(?:y|ies)/gi, actual: ncTotal, label: 'nonconformities' },
-            { re: /(\d+)\s+opportunit(?:y|ies)\s+for\s+improvement/gi, actual: counts.ofi, label: 'opportunities for improvement' },
-            { re: /(\d+)\s+observations?\b/gi, actual: counts.observations, label: 'observations' }
+            { re: new RegExp(`(\\d+|${NUMBER_WORD_RE})\\s+(?:minor\\s+)?non-?conformit(?:y|ies)`, 'gi'), actual: ncTotal, label: 'nonconformities' },
+            { re: new RegExp(`(\\d+|${NUMBER_WORD_RE})\\s+opportunit(?:y|ies)\\s+for\\s+improvement`, 'gi'), actual: counts.ofi, label: 'opportunities for improvement' },
+            { re: new RegExp(`(\\d+|${NUMBER_WORD_RE})\\s+observations?\\b`, 'gi'), actual: counts.observations, label: 'observations' }
         ];
         const narrative = narrativeFields(report);
         Object.keys(narrative).forEach((key) => {
@@ -794,7 +812,7 @@
                 let m;
                 exp.re.lastIndex = 0;
                 while ((m = exp.re.exec(text)) !== null) {
-                    const stated = parseInt(m[1], 10);
+                    const stated = parseStatedNumber(m[1]);
                     if (isNaN(stated) || stated === exp.actual) continue;
                     results.blockers.push(item(
                         'B13-' + key + '-' + exp.label.replace(/\s+/g, '-'),
@@ -829,6 +847,82 @@
             'checklistProgress[] / report.ncrs[] vs clause performance table',
             'Assign a validated standard clause to every nonconformity so the sum of clause-level NCs equals the report NC total.'
         ));
+    }
+
+    // Structural safety net for the Clause Area Performance table: its own
+    // computation (ReportStats.byClauseArea) sums every assessed item exactly
+    // once across its rows plus the "Criterion not assigned" bucket, so this
+    // total is defined to equal resultCounts.conform + majorNC + minorNC +
+    // pendingClassification + advisories.total by construction — but "by
+    // construction" is exactly the assumption client spec #33 asks not to be
+    // trusted blindly. If a future change to either computation lets them
+    // drift, this is what catches it instead of an auditor noticing the table
+    // and the headline figures disagree.
+    function checkB16ClauseAreaReconciliation(stats, results) {
+        const areaData = stats && stats.byClauseArea;
+        if (!areaData || !areaData.totals) return;
+        const rc = (stats && stats.resultCounts) || {};
+        const adv = (stats && stats.advisories) || {};
+        const expectedChecked = (rc.conform || 0) + (rc.majorNC || 0) + (rc.minorNC || 0)
+            + (rc.pendingClassification || 0) + (adv.total || 0);
+        const t = areaData.totals;
+        if (t.checked !== expectedChecked) {
+            results.blockers.push(item(
+                'B16-checked',
+                'blocker',
+                'findings',
+                `Clause Area Performance table accounts for ${t.checked} item(s), but ${expectedChecked} are assessed per the validated dataset — the table and the report's headline figures would disagree.`,
+                'ReportStats.byClauseArea.totals.checked vs resultCounts/advisories',
+                'This indicates a computation bug, not a data-entry issue — do not publish until report-stats.js reconciles.'
+            ));
+        }
+        [['conform', rc.conform], ['majorNC', rc.majorNC], ['minorNC', (rc.minorNC || 0) + (rc.pendingClassification || 0)],
+            ['observation', adv.observation], ['ofi', adv.ofi]].forEach(([key, expected]) => {
+            const actual = t[key] || 0;
+            const exp = expected || 0;
+            if (actual !== exp) {
+                results.blockers.push(item(
+                    'B16-' + key,
+                    'blocker',
+                    'findings',
+                    `Clause Area Performance table's ${key} column totals ${actual}, but the validated dataset records ${exp}.`,
+                    'ReportStats.byClauseArea.totals.' + key,
+                    'This indicates a computation bug, not a data-entry issue — do not publish until report-stats.js reconciles.'
+                ));
+            }
+        });
+    }
+
+    // The OFI narrative (report.ofi — one paragraph per opportunity for
+    // improvement) must name exactly as many items as the validated dataset
+    // records, never more. This is the specific failure mode client spec #33
+    // reported: the section read as 4-5 paragraphs (restating every
+    // Observation as if each were an OFI) while the structured OFI table
+    // below it correctly listed 1. A paragraph count higher than ofiCount
+    // means Observations (or something else) bled into the OFI narrative.
+    function checkB17OfiNarrativeCount(input, results) {
+        const { report, stats } = input;
+        const ofiText = report && report.ofi;
+        if (!ofiText) return;
+        const counts = normalizedCounts(stats);
+        if (!counts) return;
+        const lines = String(ofiText).split(/\r?\n/).map((l) => trim(l)).filter(Boolean)
+            // Numbered-list markers ("1.", "2)") don't each start a new
+            // paragraph when the model wrapped one item across lines — but a
+            // blank-line-joined field (report.ofi is built by joining an
+            // array with '\n', one element per line) has exactly one line per
+            // item, so counting non-empty lines is the correct measure here.
+            .filter((l) => l.length > 3);
+        if (lines.length > counts.ofi) {
+            results.blockers.push(item(
+                'B17',
+                'blocker',
+                'narrative',
+                `Opportunities for Improvement narrative states ${lines.length} item(s), but the validated findings dataset records ${counts.ofi} OFI. Observations must never be restated as OFIs.`,
+                'report.ofi vs ReportStats',
+                'Regenerate or edit the OFI narrative so it names exactly the OFI-classified findings — remove any paragraph describing an Observation.'
+            ));
+        }
     }
 
     // Controlled organization data must not be contradicted by field notes.
@@ -1258,6 +1352,8 @@
         try { checkB12AuditMethodContradiction({ report, auditPlan }, results); } catch (_e) { /* skip */ }
         try { checkB13NarrativeCounts({ report, stats }, results); } catch (_e) { /* skip */ }
         try { checkB14ClauseReconciliation(ncrs, results); } catch (_e) { /* skip */ }
+        try { checkB16ClauseAreaReconciliation(stats, results); } catch (_e) { /* skip */ }
+        try { checkB17OfiNarrativeCount({ report, stats }, results); } catch (_e) { /* skip */ }
         try { checkW12EmployeeCount(report, client, results); } catch (_e) { /* skip */ }
         try { checkW13DesignApplicability(report, client, auditPlan, results); } catch (_e) { /* skip */ }
         try { checkW14PreviousFindings(report, auditPlan, results); } catch (_e) { /* skip */ }

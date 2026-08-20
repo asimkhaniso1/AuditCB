@@ -694,6 +694,86 @@
         };
     }
 
+    // ─── Clause Area Performance — single computation for the whole report ────
+    // The report used to build this table with its OWN clause-resolution rule
+    // (criterionRef-only for NCs, kbMatch.clause-only for everything else) in
+    // execution-reporting.js, entirely separate from resultCounts/uniqueFindings
+    // above. Two rules over the same items meant the table's own "Checked"
+    // total could silently disagree with the report's headline assessed-item
+    // count. This is the ONE clause attribution used for every item type here,
+    // via formatCriterion() — the same function every other report module
+    // already trusts to decide whether a reference is a real standard clause.
+    const CLAUSE_AREA_NAMES = { '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning', '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation', '10': 'Improvement' };
+    const CLAUSE_AREA_ORDER = ['4', '5', '6', '7', '8', '9', '10'];
+
+    function emptyAreaRow(mainClause) {
+        return { clause: mainClause, area: CLAUSE_AREA_NAMES[mainClause] || null, checked: 0, conform: 0, majorNC: 0, minorNC: 0, observation: 0, ofi: 0 };
+    }
+
+    /**
+     * Per-clause-area (4-10) breakdown of every ASSESSED item (conform, NC of
+     * any severity, observation, ofi — notAssessed/na items carry no result to
+     * attribute). Items whose resolved criterion isn't a real clause 4-10 (an
+     * internal FOCUS/SURV/ORG/DOC reference, a surveillance-programme
+     * criterion, or nothing at all) land in `unresolved` instead of being
+     * silently dropped, so `totals` below can be checked against
+     * resultCounts/advisories and a discrepancy is a bug, not a rounding
+     * artefact.
+     *
+     * pendingClassification items (status 'nc', no ncrType) fold into the
+     * minorNC column — the finalize gate blocks issuance while any exist, so a
+     * printed report should never carry one, but a table cell silently
+     * dropping an assessed item would defeat the whole point of this function.
+     *
+     * @param {Array} items - hydratedProgress-shaped items
+     * @param {Object} [opts] - passed through to formatCriterion (e.g. standardClauses)
+     * @returns {{rows: Array, unresolved: Object, totals: Object}}
+     */
+    function computeClauseAreaBreakdown(items, opts) {
+        const areas = {};
+        const unresolved = emptyAreaRow(null);
+        CLAUSE_AREA_ORDER.forEach((c) => { areas[c] = emptyAreaRow(c); });
+
+        safeArr(items).forEach((item) => {
+            if (!item) return;
+            const bucket = classifyItem(item);
+            if (bucket === 'notAssessed' || bucket === 'na') return;
+
+            // formatCriterion().real is truthy for a surveillance-programme
+            // criterion too (e.g. "9.6.2(b)") — it just echoes clause/criterionRef
+            // back verbatim outside the internal-ref branch, with no opinion on
+            // whether that's actually a clause of the STANDARD. classifyCriterion's
+            // kind is what actually distinguishes them: only 'standard' belongs in
+            // a numbered clause area — 'programme' (17021-1 surveillance elements),
+            // 'internal' (FOCUS/SURV/ORG/DOC), 'unverified' and 'none' all go to
+            // unresolved, same as an NC with no clause at all.
+            const classified = classifyCriterion(item, opts);
+            const resolved = classified.kind === 'standard' ? classified.ref : null;
+            const mainC = resolved ? String(resolved).split('.')[0] : null;
+            const row = (mainC && areas[mainC]) ? areas[mainC] : unresolved;
+
+            row.checked++;
+            if (bucket === 'conform') row.conform++;
+            else if (bucket === 'majorNC') row.majorNC++;
+            else if (bucket === 'minorNC' || bucket === 'pendingClassification') row.minorNC++;
+            else if (bucket === 'observation') row.observation++;
+            else if (bucket === 'ofi') row.ofi++;
+        });
+
+        const rows = CLAUSE_AREA_ORDER.map((c) => areas[c]).filter((r) => r.checked > 0);
+        const all = rows.concat(unresolved.checked > 0 ? [unresolved] : []);
+        const totals = all.reduce((t, r) => ({
+            checked: t.checked + r.checked,
+            conform: t.conform + r.conform,
+            majorNC: t.majorNC + r.majorNC,
+            minorNC: t.minorNC + r.minorNC,
+            observation: t.observation + r.observation,
+            ofi: t.ofi + r.ofi
+        }), { checked: 0, conform: 0, majorNC: 0, minorNC: 0, observation: 0, ofi: 0 });
+
+        return { rows, unresolved: unresolved.checked > 0 ? unresolved : null, totals };
+    }
+
     function safeMinimalDataset() {
         return {
             resultCounts: { conform: 0, majorNC: 0, minorNC: 0, na: 0, notAssessed: 0, pendingClassification: 0 },
@@ -709,6 +789,7 @@
             carRollup: { raised: 0, confirmed: 0, awaitingResponse: 0, carsCreated: 0, inProgress: 0, awaitingVerification: 0, verified: 0, closed: 0 },
             byDepartment: {},
             byClauseTop: {},
+            byClauseArea: { rows: [], unresolved: null, totals: { checked: 0, conform: 0, majorNC: 0, minorNC: 0, observation: 0, ofi: 0 } },
             auditStatus: 'Insufficient Data',
             statusColor: 'neutral',
             recommendation: null,
@@ -1063,6 +1144,7 @@
             carRollup,
             byDepartment,
             byClauseTop,
+            byClauseArea: computeClauseAreaBreakdown(items, { standardClauses: input.standardClauses }),
             auditStatus,
             statusColor,
             recommendation,
@@ -1221,7 +1303,9 @@
         formatCriterion,
         classifyCriterion,
         cleanEvidenceText,
-        effectivenessStatements
+        effectivenessStatements,
+        computeClauseAreaBreakdown,
+        CLAUSE_AREA_NAMES
     };
 
     if (typeof module !== 'undefined' && module.exports) {

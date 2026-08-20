@@ -236,9 +236,17 @@
                 // Extract positional args like click handler does
                 let args = extractArgs(target);
                 if (args.length > 0) {
-                    // Resolve 'this' / 'this.value' placeholders to the element / its value
+                    // Resolve 'this' / 'this.value' / 'this.checked' placeholders to the
+                    // element / its value / its checked state — same resolution the click
+                    // delegator already applies (see its comment above). Without
+                    // 'this.checked' here, a checkbox's data-arg="this.checked" arrived as
+                    // the literal string "this.checked", which is neither true/'true'/'on'
+                    // nor falsy, so a handler comparing it against those always read it as
+                    // unchecked (e.g. the checklist Gap Analysis screen's "Show only gaps"
+                    // and per-standard checkboxes never registered a checked state).
                     args = args.map(function (a) {
                         if (a === 'this.value') return target.value;
+                        if (a === 'this.checked') return target.checked;
                         if (a === 'this') return target;
                         return a;
                     });

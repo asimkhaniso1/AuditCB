@@ -354,3 +354,95 @@ describe('ReportStats.capaTimeframes', () => {
         expect(window.ReportStats.CAPA_PROCEDURE_SENTENCE).toMatch(/corrective-action procedure/i);
     });
 });
+
+// The Clause Area Performance table used to be a second, independent
+// computation in execution-reporting.js with its own clause-resolution rule
+// per item type (criterionRef for NCs, kbMatch.clause for everything else) —
+// so its own Checked/Conform/NC totals could silently disagree with the
+// report's own headline counts. This is the single computation both the
+// table and any future consumer read from.
+describe('ReportStats.build — byClauseArea', () => {
+    beforeEach(() => {
+        window.state = { ncrs: [] };
+    });
+
+    it('uses ONE clause-resolution rule for every item type — a conform item with only criterionRef is attributed the same as an NC with only criterionRef', () => {
+        const hydratedProgress = [
+            item({ status: 'conform', clause: 'FOCUS.1', criterionRef: '5.1' }),
+            item({ status: 'nc', ncrType: 'minor', clause: 'FOCUS.2', criterionRef: '5.2' })
+        ];
+        const d = window.ReportStats.build({ report: {}, hydratedProgress });
+        const row5 = d.byClauseArea.rows.find((r) => r.clause === '5');
+        expect(row5).toBeTruthy();
+        expect(row5.conform).toBe(1);
+        expect(row5.minorNC).toBe(1);
+        expect(row5.checked).toBe(2);
+        expect(d.byClauseArea.unresolved).toBeNull();
+    });
+
+    it('splits Minor NC, Observation and OFI into separate columns', () => {
+        const hydratedProgress = [
+            item({ status: 'nc', ncrType: 'minor', clause: '8.4' }),
+            item({ status: 'nc', ncrType: 'observation', clause: '8.4' }),
+            item({ status: 'nc', ncrType: 'ofi', clause: '8.4' }),
+            item({ status: 'conform', clause: '8.4' })
+        ];
+        const d = window.ReportStats.build({ report: {}, hydratedProgress });
+        const row8 = d.byClauseArea.rows.find((r) => r.clause === '8');
+        expect(row8).toMatchObject({ checked: 4, conform: 1, majorNC: 0, minorNC: 1, observation: 1, ofi: 1 });
+    });
+
+    it('surfaces items with no resolvable clause as "unresolved" instead of dropping them', () => {
+        const hydratedProgress = [
+            item({ status: 'nc', ncrType: 'minor', clause: 'FOCUS.1' }), // no criterionRef -> internal, unresolved
+            item({ status: 'nc', ncrType: 'observation', clause: '9.6.2(b)' }), // surveillance-programme criterion, unresolved
+            item({ status: 'conform', clause: '4.1' })
+        ];
+        const d = window.ReportStats.build({ report: {}, hydratedProgress });
+        expect(d.byClauseArea.unresolved).toMatchObject({ checked: 2, minorNC: 1, observation: 1 });
+        expect(d.byClauseArea.rows.find((r) => r.clause === '4').conform).toBe(1);
+    });
+
+    it('excludes notAssessed and na items — they carry no result to attribute', () => {
+        const hydratedProgress = [
+            item({ status: '', clause: '7.1' }),
+            item({ status: 'na', clause: '7.2' }),
+            item({ status: 'conform', clause: '7.3' })
+        ];
+        const d = window.ReportStats.build({ report: {}, hydratedProgress });
+        expect(d.byClauseArea.totals.checked).toBe(1);
+    });
+
+    it('folds a pendingClassification NC into Minor NC rather than dropping it', () => {
+        const hydratedProgress = [item({ status: 'nc', clause: '9.1' })]; // no ncrType
+        const d = window.ReportStats.build({ report: {}, hydratedProgress });
+        const row9 = d.byClauseArea.rows.find((r) => r.clause === '9');
+        expect(row9.minorNC).toBe(1);
+    });
+
+    it('totals always reconcile with resultCounts/advisories — the structural invariant B16 checks', () => {
+        const hydratedProgress = [
+            item({ status: 'conform', clause: '4.1' }),
+            item({ status: 'conform', clause: 'FOCUS.9' }), // unresolved conform
+            item({ status: 'nc', ncrType: 'major', clause: '8.5' }),
+            item({ status: 'nc', ncrType: 'minor', clause: '9.2' }),
+            item({ status: 'nc', ncrType: 'observation', clause: '9.6.2(d)' }), // unresolved
+            item({ status: 'nc', ncrType: 'ofi', clause: '6.1' }),
+            item({ status: '', clause: '10.1' }), // notAssessed — excluded
+            item({ status: 'na', clause: '10.2' }) // na — excluded
+        ];
+        const d = window.ReportStats.build({ report: {}, hydratedProgress });
+        const t = d.byClauseArea.totals;
+        expect(t.checked).toBe(d.totals.assessed);
+        expect(t.conform).toBe(d.resultCounts.conform);
+        expect(t.majorNC).toBe(d.resultCounts.majorNC);
+        expect(t.minorNC).toBe(d.resultCounts.minorNC);
+        expect(t.observation).toBe(d.advisories.observation);
+        expect(t.ofi).toBe(d.advisories.ofi);
+    });
+
+    it('names the seven Annex-SL clause areas by number', () => {
+        expect(window.ReportStats.CLAUSE_AREA_NAMES['4']).toBe('Context of the Organization');
+        expect(window.ReportStats.CLAUSE_AREA_NAMES['9']).toBe('Performance Evaluation');
+    });
+});

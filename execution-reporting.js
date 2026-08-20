@@ -3172,6 +3172,45 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             }
         }
 
+        // ─── Final cross-report validation, before PDF generation ─────────────
+        // finalizeAndPublish's issuance gate runs report-integrity.js's checks
+        // once, at finalize time — but the PDF is generated separately, and can
+        // be re-exported after finalize (a re-issue, or a plain reprint) without
+        // ever going back through that gate. A report can also simply never be
+        // finalized and just get exported as a draft. Either way, the printed
+        // PDF is the document that actually reaches the client, so THIS is the
+        // point that must never let contradictory finding counts, clause
+        // attribution or narrative-vs-dataset mismatches through silently.
+        //
+        // A 'final' report (already issued) hard-blocks on any blocker-level
+        // finding — re-printing an issued report with a contradiction is
+        // exactly the failure this exists to prevent, and there is no
+        // legitimate reason to override it (fix the report and re-export). A
+        // 'draft' report warns instead: the auditor is still assembling the
+        // report and needs to preview/iterate through gaps that will be
+        // resolved before finalize enforces them for real.
+        if (window.ReportIntegrity && typeof window.ReportIntegrity.check === 'function') {
+            let integrityResult = null;
+            try {
+                integrityResult = window.ReportIntegrity.check({
+                    report: d.report,
+                    auditPlan: d.auditPlan,
+                    client: d.client,
+                    stats: (d.stats && d.stats.rs) || null
+                });
+            } catch (_e) { /* never let the validator itself block export */ }
+            if (integrityResult && integrityResult.blockers.length) {
+                const preview = integrityResult.blockers.slice(0, 6).map(function (b) { return '- ' + b.message; }).join('\n');
+                const more = integrityResult.blockers.length > 6 ? '\n… and ' + (integrityResult.blockers.length - 6) + ' more.' : '';
+                if (d.report.reportStatus === 'final') {
+                    alert('REPORT INTEGRITY — ' + integrityResult.blockers.length + ' blocker(s) found. This report has already been issued and cannot be re-exported with contradictory figures:\n\n' + preview + more + '\n\nCorrect the report and use Finalize & Publish to re-issue before exporting again.');
+                    return;
+                }
+                const proceed = confirm('REPORT INTEGRITY — ' + integrityResult.blockers.length + ' issue(s) found in this draft:\n\n' + preview + more + '\n\nThese will block Finalize & Publish. Export the draft PDF anyway?');
+                if (!proceed) return;
+            }
+        }
+
         const en = window._reportSectionState || {};
         // Report status ('draft'|'final') controls the DRAFT watermark. Version bumps no
         // longer happen on export — only finalizeAndPublish (ai-service.js) bumps version,
@@ -3420,73 +3459,58 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
-        // Build clause/area performance analysis. NC attribution (major/minor,
-        // including unclassified-NC-as-minor) resolves the SAME way as
-        // d.stats.ncByClause — resolved criterion (criterionRef when present,
-        // else clause) — off the same d.hydratedProgress dataset the rest of the
-        // report uses, so this table's NC column can never silently disagree with
-        // the report's own major+minor NC total. Conform/OBS/OFI keep the
-        // pre-existing kbMatch-based attribution — reconciliation is an NC-only
-        // requirement (B14), and OBS/OFI are advisory, never part of the NC sum.
-        const clauseAreaNames = { '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning', '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation', '10': 'Improvement' };
-        const areaStats = {};
-        // NCs whose resolved criterion doesn't land in one of the seven areas above
-        // (no real clause resolved, per B14's own test) — kept instead of dropped,
-        // so the table can still visibly account for every nonconformity.
-        let unplacedNC = { major: 0, minor: 0 };
-        (d.hydratedProgress || []).forEach(function (item) {
-            if (item.status === 'conform') {
-                let clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || '';
-                let mainC = clause.split('.')[0];
-                if (!mainC || !clauseAreaNames[mainC]) return;
-                if (!areaStats[mainC]) areaStats[mainC] = { conform: 0, minor: 0, major: 0, obs: 0, ofi: 0 };
-                areaStats[mainC].conform++;
-                return;
-            }
-            if (item.status !== 'nc') return;
-            let t = (item.ncrType || '').toLowerCase();
-            if (t === 'observation' || t === 'ofi') {
-                let clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || '';
-                let mainC = clause.split('.')[0];
-                if (!mainC || !clauseAreaNames[mainC]) return;
-                if (!areaStats[mainC]) areaStats[mainC] = { conform: 0, minor: 0, major: 0, obs: 0, ofi: 0 };
-                if (t === 'observation') areaStats[mainC].obs++; else areaStats[mainC].ofi++;
-                return;
-            }
-            // Major/minor/pending-classification NC — resolved-criterion attribution
-            // (same rule as B14: a bare criterionRef is always trusted as real).
-            const sevKey = t === 'major' ? 'major' : 'minor';
-            const criterionRef = String(item.criterionRef || '').trim();
-            const rawClause = String(item.clause || '').trim();
-            const resolved = criterionRef || rawClause;
-            const unattributable = !resolved || (!criterionRef && INTERNAL_REF_PREFIX_RE.test(rawClause));
-            const mainC = unattributable ? null : resolved.split('.')[0];
-            if (!mainC || !clauseAreaNames[mainC]) { unplacedNC[sevKey]++; return; }
-            if (!areaStats[mainC]) areaStats[mainC] = { conform: 0, minor: 0, major: 0, obs: 0, ofi: 0 };
-            areaStats[mainC][sevKey]++;
-        });
-        let areaSortedKeys = Object.keys(areaStats).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); });
-        let areaTableRows = areaSortedKeys.map(function (k) {
-            let s = areaStats[k]; var total = s.conform + s.minor + s.major + s.obs + s.ofi;
-            let hasIssue = s.major > 0 || s.minor > 0;
-            let statusBg = hasIssue ? (s.major > 0 ? '#fee2e2' : '#fef3c7') : '#dcfce7';
-            let statusFg = hasIssue ? (s.major > 0 ? '#991b1b' : '#92400e') : '#166534';
-            let statusTxt = hasIssue ? (s.major > 0 ? 'Needs Action' : 'Minor Issues') : 'Satisfactory';
-            return '<tr><td style="padding:8px 12px;font-weight:600;">Clause ' + k + '</td><td style="padding:8px 12px;">' + clauseAreaNames[k] + '</td><td style="padding:8px 12px;text-align:center;">' + total + '</td><td style="padding:8px 12px;text-align:center;color:#166534;">' + s.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;">' + (s.major + s.minor) + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">' + statusTxt + '</span></td></tr>';
-        }).join('');
-        // Surface unplaced NCs as their own labelled row rather than a silent drop —
-        // "Criterion not assigned" mirrors displayCriterion()'s finding-row wording
-        // for the identical condition. This keeps Major+Minor across ALL rows
-        // (including this one) equal to the report's formal NC total.
-        let unplacedNCTotal = unplacedNC.major + unplacedNC.minor;
-        if (unplacedNCTotal > 0) {
-            let statusBg = unplacedNC.major > 0 ? '#fee2e2' : '#fef3c7';
-            let statusFg = unplacedNC.major > 0 ? '#991b1b' : '#92400e';
-            areaTableRows += '<tr style="background:#fff7ed;"><td style="padding:8px 12px;font-weight:600;">—</td><td style="padding:8px 12px;font-style:italic;color:#92400e;">Criterion not assigned</td><td style="padding:8px 12px;text-align:center;">' + unplacedNCTotal + '</td><td style="padding:8px 12px;text-align:center;color:#166534;">0</td><td style="padding:8px 12px;text-align:center;color:#dc2626;">' + unplacedNCTotal + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">Needs Attribution</span></td></tr>';
+        // Build clause/area performance analysis from ReportStats.byClauseArea —
+        // the ONE clause-resolution computation the whole report uses (see
+        // report-stats.js computeClauseAreaBreakdown). This used to be a second,
+        // independent tally with its own rule for NC attribution (criterionRef)
+        // vs conform/OBS/OFI attribution (kbMatch.clause), which meant the
+        // table's own "Checked" total could silently disagree with the report's
+        // headline assessed-item count — exactly the client-reported defect.
+        // Columns: Clause | Checked | Conform | Minor NC | Observation | OFI |
+        // Status. Major NCs (0 in the common case) drive Status severity rather
+        // than getting their own column, per spec; the area name is folded into
+        // the Clause cell rather than a separate column, same reason.
+        const areaBreakdown = (rs && rs.byClauseArea) || { rows: [], unresolved: null, totals: { checked: 0, conform: 0, majorNC: 0, minorNC: 0, observation: 0, ofi: 0 } };
+        function areaStatusCell(r) {
+            const bg = r.majorNC > 0 ? '#fee2e2' : (r.minorNC > 0 ? '#fef3c7' : '#dcfce7');
+            const fg = r.majorNC > 0 ? '#991b1b' : (r.minorNC > 0 ? '#92400e' : '#166534');
+            const txt = r.majorNC > 0 ? 'Critical' : (r.minorNC > 0 ? 'Minor Issues' : 'Satisfactory');
+            return '<span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + bg + ';color:' + fg + ';">' + txt + '</span>';
         }
-        let areaTableHtml = (areaSortedKeys.length > 0 || unplacedNCTotal > 0) ? '<div style="margin-top:16px;page-break-before:always;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:left;">Area</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">NC</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table>' + (unplacedNCTotal > 0 ? '<div style="margin-top:6px;font-size:0.72rem;color:#64748b;">† Criterion not assigned = nonconformity(ies) with no real standard clause resolved; not attributable to a clause area above.</div>' : '') + '</div>' : '';
-        // Serialize area stats for chart script
-        let areaChartData = JSON.stringify({ keys: areaSortedKeys, names: areaSortedKeys.map(function (k) { return clauseAreaNames[k]; }), conform: areaSortedKeys.map(function (k) { return areaStats[k].conform; }), nc: areaSortedKeys.map(function (k) { return areaStats[k].major + areaStats[k].minor; }), obs: areaSortedKeys.map(function (k) { return areaStats[k].obs; }), ofi: areaSortedKeys.map(function (k) { return areaStats[k].ofi; }) });
+        function areaRowHtml(r, clauseCell) {
+            return '<tr><td style="padding:8px 12px;font-weight:600;">' + clauseCell + '</td>'
+                + '<td style="padding:8px 12px;text-align:center;">' + r.checked + '</td>'
+                + '<td style="padding:8px 12px;text-align:center;color:#166534;">' + r.conform + '</td>'
+                + '<td style="padding:8px 12px;text-align:center;color:' + (r.minorNC > 0 ? '#92400e' : '#94a3b8') + ';">' + r.minorNC + '</td>'
+                + '<td style="padding:8px 12px;text-align:center;color:' + (r.observation > 0 ? '#1d4ed8' : '#94a3b8') + ';">' + r.observation + '</td>'
+                + '<td style="padding:8px 12px;text-align:center;color:' + (r.ofi > 0 ? '#b45309' : '#94a3b8') + ';">' + r.ofi + '</td>'
+                + '<td style="padding:8px 12px;text-align:center;">' + areaStatusCell(r) + '</td></tr>';
+        }
+        let areaTableRows = areaBreakdown.rows.map(function (r) {
+            return areaRowHtml(r, 'Clause ' + r.clause + ' — ' + r.area);
+        }).join('');
+        // Surface items whose criterion couldn't be resolved to a real clause 4-10
+        // (an internal FOCUS/SURV/ORG/DOC reference, or a surveillance-programme
+        // criterion like 9.6.2(x)) as their own labelled row rather than a silent
+        // drop — this is what keeps every column's total equal to the report's
+        // own resultCounts/advisories, whatever mix of conform/NC/OBS/OFI items
+        // land there.
+        if (areaBreakdown.unresolved) {
+            areaTableRows += areaRowHtml(areaBreakdown.unresolved, '<span style="font-style:italic;color:#92400e;">Criterion not assigned</span>')
+                .replace('<tr>', '<tr style="background:#fff7ed;">');
+        }
+        let areaTableHtml = areaTableRows ? '<div style="margin-top:16px;page-break-before:always;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">Minor NC</th><th style="padding:8px 12px;text-align:center;">Observation</th><th style="padding:8px 12px;text-align:center;">OFI</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table>' + (areaBreakdown.unresolved ? '<div style="margin-top:6px;font-size:0.72rem;color:#64748b;">† Criterion not assigned = item(s) with no real standard clause resolved (an internal tracking reference or surveillance-programme criterion); not attributable to a clause area above.</div>' : '') + '</div>' : '';
+        // Serialize area stats for chart script — 'nc' combines major+minor,
+        // matching the table's own Status column (which treats any major as
+        // Critical and folds both severities together for the bar chart).
+        let areaChartData = JSON.stringify({
+            keys: areaBreakdown.rows.map(function (r) { return r.clause; }),
+            names: areaBreakdown.rows.map(function (r) { return r.area; }),
+            conform: areaBreakdown.rows.map(function (r) { return r.conform; }),
+            nc: areaBreakdown.rows.map(function (r) { return r.majorNC + r.minorNC; }),
+            obs: areaBreakdown.rows.map(function (r) { return r.observation; }),
+            ofi: areaBreakdown.rows.map(function (r) { return r.ofi; })
+        });
 
         // Fold a set of internal tracking refs (FOCUS.1, FOCUS.2, … ORG, DOC) into
         // a compact display string, collapsing consecutive numeric runs per prefix
