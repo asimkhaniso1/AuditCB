@@ -1192,7 +1192,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (ncr.evidenceImage) window._evidenceCache[`ncr-${idx}`] = ncr.evidenceImage;
             });
 
-            const isReadyToSubmit = allFindings.length === 0 || allFindings.every(f => f.type !== 'pending');
+            const pendingFindings = allFindings.filter(f => f.type === 'pending');
+            const isReadyToSubmit = pendingFindings.length === 0;
+            const notReadyReason = pendingFindings.length
+                ? pendingFindings.length + ' finding(s) are still unclassified. Set each one to major, minor, observation or OFI before the report can be issued.'
+                : '';
             const currentUserRole = window.state.currentUser?.role || 'Auditor';
             const finalizeRoles = ['Lead Auditor', 'Admin', 'Certification Manager'];
             const canOneClickFinalize = (typeof window.AuthManager?.hasRole === 'function')
@@ -1209,13 +1213,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 `;
             } else if (canOneClickFinalize) {
                 primaryActionBtn = `
-                    <button id="btn-finalize-publish" class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);" data-action="finalizeAndPublish" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled' : ''}>
+                    <button id="btn-finalize-publish" class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);" data-action="finalizeAndPublish" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled title="' + window.UTILS.escapeHtml(notReadyReason) + '"' : ''}>
                         <i class="fa-solid fa-check-double" style="margin-right: 0.5rem;"></i> Finalize & Publish
                     </button>
                 `;
             } else {
                 primaryActionBtn = `
-                   <button class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;" data-action="submitToLeadAuditor" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled' : ''} aria-label="Send">
+                   <button class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;" data-action="submitToLeadAuditor" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled title="' + window.UTILS.escapeHtml(notReadyReason) + '"' : ''} aria-label="Send">
                         <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i> Submit for Review
                     </button>
                 `;
@@ -1230,6 +1234,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <i class="fa-solid fa-flag-checkered" style="color: var(--primary-color); -webkit-text-fill-color: initial; margin-right: 0.5rem;"></i> Audit Finalization
                             </h3>
                             <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary); font-size: 0.95rem;">Review findings, generate AI summaries, and finalize the report.</p>
+                            ${notReadyReason ? '<p style="margin: 0.5rem 0 0 0; color: #92400e; font-size: 0.9rem;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.4rem;"></i>' + window.UTILS.escapeHtml(notReadyReason) + '</p>' : ''}
                         </div>
                         <div style="display: flex; gap: 0.75rem;">
                              <button class="btn btn-outline-secondary" data-action="saveChecklist" data-id="${report.id}" aria-label="Save">

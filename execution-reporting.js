@@ -472,6 +472,25 @@
     // (from the old +0.1-per-export scheme) is still honored for older reports.
     // If neither is present, synthesize a single placeholder row so the table is never
     // empty (draft reports show a "not yet issued" row, final reports show 1.0).
+    // Single source of truth for whether THIS report prints as FINAL or DRAFT.
+    // report.reportStatus ('draft'|'final') is the field finalizeAndPublish
+    // (ai-service.js) sets atomically alongside report.status when it issues a
+    // report — and the ONLY field toggleReportStatus (below) writes when
+    // reverting an already-issued report back to draft. report.status
+    // (window.CONSTANTS.STATUS — 'Draft'/'In Review'/'Published'/'Finalized',
+    // the general certification-workflow field) is deliberately NOT read here:
+    // toggleReportStatus clears reportStatus on revert without touching
+    // report.status, so the two fields can legitimately disagree in practice
+    // (report.status still reads 'Finalized' while reportStatus reads
+    // 'draft') — only reportStatus reflects what was actually last issued.
+    // Every place that expresses draft-vs-final state to the reader — cover
+    // status, watermark, running header/footer, document-control block — in
+    // BOTH the preview path (showReportPreviewModal) and the export path
+    // (exportReportPDF) must call this rather than re-testing
+    // report.reportStatus directly, so the two paths can never disagree.
+    const isReportFinal = (report) => !!(report && report.reportStatus === 'final');
+    window._isReportFinal = isReportFinal;
+
     const getRevisionRows = (report, todayStr) => {
         if (Array.isArray(report.revisionHistory) && report.revisionHistory.length > 0) {
             return report.revisionHistory;
@@ -484,7 +503,7 @@
                 desc: entry.action === 'reissued' ? 'Revised and re-issued' : 'Initial issue'
             }));
         }
-        const isFinal = report.reportStatus === 'final';
+        const isFinal = isReportFinal(report);
         return [{
             ver: isFinal ? '1.0' : 'Draft',
             date: report.date || todayStr,
@@ -537,9 +556,21 @@
             window.showNotification && window.showNotification('You do not have permission to change report status.', 'error');
             return;
         }
-        if (d.report.reportStatus === 'final') {
+        if (isReportFinal(d.report)) {
             if (!confirm('Revert this report to DRAFT? Re-issuing afterwards will require finalizing again.')) return;
+            // Both fields move together, mirroring finalizeAndPublish which sets
+            // reportStatus AND status when it issues.
+            //
+            // Reverting only reportStatus left report.status reading 'Finalized'
+            // on a report that is now a draft, and the execution screen picks its
+            // primary action from report.status: a reverted report offered
+            // "Download PDF" and never rendered Finalize & Publish at all. The
+            // auditor was told to use a button that the same revert had removed,
+            // with no way back to issuance.
             d.report.reportStatus = 'draft';
+            if (window.CONSTANTS && window.CONSTANTS.STATUS) {
+                d.report.status = window.CONSTANTS.STATUS.DRAFT;
+            }
         } else {
             window.showNotification && window.showNotification('Use "Finalize & Publish" to issue this report as FINAL.', 'info');
             return;
@@ -683,7 +714,7 @@
     // fingerprint exposed by ai-service.js (window._reportContentHash).
     window._isModifiedSinceIssue = function (d) {
         try {
-            if (!d || !d.report || d.report.reportStatus !== 'final') return false;
+            if (!d || !d.report || !isReportFinal(d.report)) return false;
             const snap = d.report.issuedSnapshot;
             if (!snap || !snap.contentHash || typeof window._reportContentHash !== 'function') return false;
             const rs = d.stats && d.stats.rs;
@@ -1422,7 +1453,7 @@
                                 <strong style="color:#1e293b;">Document ID:</strong> ${reportRef(d)}
                             </div>
                             <div style="text-align:center;">
-                                <strong style="color:#1e293b;">Status:</strong> ${d.report.recommendation || 'Draft'}
+                                <strong style="color:#1e293b;">Status:</strong> ${isReportFinal(d.report) ? 'Final' : 'Draft'}
                             </div>
                             <div style="text-align:right;">
                                 <strong style="color:#1e293b;">Classification:</strong> Confidential
@@ -2381,7 +2412,7 @@
                 <div style="display:flex;gap:10px;align-items:center;">
                     <button data-action="removeElement" data-id="report-preview-overlay" style="padding:10px 20px;border-radius:8px;border:1px solid #cbd5e1;background:white;font-weight:600;cursor:pointer;color:#475569;">Cancel</button>
                     <button id="ai-polish-btn" data-action="polishNotesWithAI" style="padding:10px 20px;border-radius:8px;border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);font-weight:600;cursor:pointer;color:#0369a1;" aria-label="Auto-generate"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>Polish Notes with AI</button>
-                    <button data-action="toggleReportStatus" id="rp-status-toggle" style="padding:10px 16px;border-radius:20px;border:2px solid ${(d.report.reportStatus === 'final') ? '#059669' : '#f59e0b'};background:${(d.report.reportStatus === 'final') ? '#ecfdf5' : '#fffbeb'};color:${(d.report.reportStatus === 'final') ? '#059669' : '#b45309'};font-weight:700;cursor:pointer;" aria-label="Toggle report status" title="Click to switch between Draft and Final. Draft exports show a DRAFT watermark and do not advance the revision history."><i class="fa-solid ${(d.report.reportStatus === 'final') ? 'fa-circle-check' : 'fa-pen'}" style="margin-right:6px;"></i>${(d.report.reportStatus === 'final') ? 'FINAL' : 'DRAFT'}</button>
+                    <button data-action="toggleReportStatus" id="rp-status-toggle" style="padding:10px 16px;border-radius:20px;border:2px solid ${isReportFinal(d.report) ? '#059669' : '#f59e0b'};background:${isReportFinal(d.report) ? '#ecfdf5' : '#fffbeb'};color:${isReportFinal(d.report) ? '#059669' : '#b45309'};font-weight:700;cursor:pointer;" aria-label="Toggle report status" title="Click to switch between Draft and Final. Draft exports show a DRAFT watermark and do not advance the revision history."><i class="fa-solid ${isReportFinal(d.report) ? 'fa-circle-check' : 'fa-pen'}" style="margin-right:6px;"></i>${isReportFinal(d.report) ? 'FINAL' : 'DRAFT'}</button>
                     <button data-action="exportEvidencePack" data-arg1="${d.report.id}" style="padding:10px 20px;border-radius:8px;border:1px solid #c2410c;background:#fff7ed;color:#c2410c;font-weight:600;cursor:pointer;" aria-label="Evidence Pack PDF"><i class="fa-solid fa-images" style="margin-right:6px;"></i>Evidence Pack (PDF)</button>
                     <button data-action="exportReportPDF" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Export PDF"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
                 </div>
@@ -3283,7 +3314,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             if (integrityResult && integrityResult.blockers.length) {
                 const preview = integrityResult.blockers.slice(0, 6).map(function (b) { return '- ' + b.message; }).join('\n');
                 const more = integrityResult.blockers.length > 6 ? '\n… and ' + (integrityResult.blockers.length - 6) + ' more.' : '';
-                if (d.report.reportStatus === 'final') {
+                if (isReportFinal(d.report)) {
                     alert('REPORT INTEGRITY — ' + integrityResult.blockers.length + ' blocker(s) found. This report has already been issued and cannot be re-exported with contradictory figures:\n\n' + preview + more + '\n\nCorrect the report and use Finalize & Publish to re-issue before exporting again.');
                     return;
                 }
@@ -4068,7 +4099,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // A forced break on a box already at a page boundary is ignored by
             // the fragmentation spec, so this cannot introduce blank pages.
             +   '#sec-objectives,#sec-summary,#sec-conclusion,#sec-signature{page-break-before:always;break-before:page;}'
-            +   (d.report.reportStatus === 'draft' ? '.watermark{display:flex !important;}' : '')
+            +   (!isReportFinal(d.report) ? '.watermark{display:flex !important;}' : '')
             +   '.toc-item{break-inside:avoid;page-break-inside:avoid;}'
             // Print-quality guarantees: no orphan/widow lines, headings keep their
             // first block, tables never leave a lone header row, charts never clip.
@@ -4194,7 +4225,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.watermark{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;justify-content:center;align-items:center;overflow:hidden;}.watermark span{transform:rotate(-35deg);font-size:72pt;font-weight:700;color:rgba(148,163,184,0.05);letter-spacing:8px;white-space:nowrap;font-family:Inter,"Segoe UI",Helvetica,Arial,sans-serif;text-align:center;user-select:none;}body{position:relative;z-index:1;}'
             + ((window.ReportExecutive && window.ReportExecutive.bigFourCss) ? window.ReportExecutive.bigFourCss() : '')
             + '</style></head><body>'
-            + (d.report.reportStatus === 'draft'
+            + (!isReportFinal(d.report)
                 ? '<div class="watermark"><span style="color:rgba(220,38,38,0.14);">DRAFT</span></div>'
                 : (modifiedSinceIssue
                     ? '<div class="watermark"><span style="color:rgba(220,38,38,0.16);font-size:48pt;">MODIFIED SINCE ISSUE</span></div>'
@@ -4205,7 +4236,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<table class="rpt-running"><thead><tr><td>'
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">Audit360 &mdash; ' + reportRef(d) + '</div></div>'
             + '</td></tr></thead><tfoot><tr><td>'
-            + '<div class="rpt-ftr"><div class="rpt-ftr-left">Confidential &mdash; ' + (d.report.reportStatus === 'draft' ? 'Draft' : 'Final') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">Generated by Audit360</div></div>'
+            + '<div class="rpt-ftr"><div class="rpt-ftr-left">Confidential &mdash; ' + (isReportFinal(d.report) ? 'Final' : 'Draft') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">Generated by Audit360</div></div>'
             + '</td></tr></tfoot><tbody><tr><td>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
             + '<button data-action="print" style="background:linear-gradient(135deg,#1d4ed8,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:500;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Download"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
@@ -4238,7 +4269,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
             + '</div>'
             + '<div class="cover-doc" style="position:absolute;bottom:50px;left:50px;right:50px;border-top:2px solid #cbd5e1;padding-top:16px;">'
-            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;"><span><strong>Doc ID:</strong> ' + reportRef(d) + '</span><span><strong>Status:</strong> ' + ((d.report.reportStatus === 'final') ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
+            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;"><span><strong>Doc ID:</strong> ' + reportRef(d) + '</span><span><strong>Status:</strong> ' + (isReportFinal(d.report) ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
             + '</div>'
             + '</div>'
             // TABLE OF CONTENTS — formal report first, then each enabled annex under
@@ -4599,7 +4630,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     })()
                     + '<table style="border-collapse:collapse;width:100%;max-width:460px;text-align:left;border-top:1px solid #e7ecf1;border-bottom:1px solid #e7ecf1;margin-bottom:32px;">'
                     + row('Audit Reference', String(d.report.id))
-                    + row('Report Status', (d.report.reportStatus === 'final' ? 'Final — Issued' : 'Draft — not yet issued'))
+                    + row('Report Status', (isReportFinal(d.report) ? 'Final — Issued' : 'Draft — not yet issued'))
                     + row('Lead Auditor', d.report.leadAuditor || '')
                     + row('Next Audit', nextStage)
                     + row('Contact', (cbName || '') + (cbEmail ? ' · ' + cbEmail : ''))
