@@ -684,3 +684,145 @@ describe('markChecklistReadyForAudit — the release gate', () => {
         expect(cl.readyForAudit).toBeUndefined();
     });
 });
+
+// Supplying an SoA against an existing checklist (window.pasteChecklistSoA /
+// window.pickChecklistSoADocument). Before this, the only route onto
+// `checklist.qaContext.soaApplicable` was the build modal at checklist
+// creation (cldoc-soa in client-docs-bulk.js) — once a checklist existed
+// there was no way back to it, so the Annex A row stayed on the assumed
+// tier-1 pool for the checklist's lifetime.
+describe('pasteChecklistSoA / pickChecklistSoADocument — supplying an SoA onto an existing checklist', () => {
+    let notes;
+
+    function checklistWithoutSoA(overrides) {
+        return Object.assign({
+            id: 'cl-2', name: 'Surveillance Audit Checklist', standard: 'ISO/IEC 27001:2022',
+            standardIds: ['iso27001'], auditType: 'surveillance', type: 'custom',
+            clientId: 'c-1', clientName: 'Acme',
+            qaContext: { standardIds: ['iso27001'], auditType: 'surveillance', soaApplicable: [] },
+            clauses: []
+        }, overrides || {});
+    }
+
+    beforeEach(() => {
+        notes = [];
+        window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
+        window.showNotification = (m) => notes.push(String(m));
+        window.saveData = () => { };
+        window.contentArea = document.body;
+        loadModule('./validation.js');
+        loadModule('./checklist-standards.js');
+        loadModule('./checklist-qa.js');
+        loadModule('./checklist-coverage.js');
+        window.state = {
+            currentUser: { name: 'Lead Auditor' },
+            // No documents on file by default — checklist-coverage.js's own
+            // buildContext falls back to scanning client.documents for
+            // something that reads as an SoA when nothing is supplied, and
+            // the paste/refuse/withdraw tests below need the checklist to
+            // start genuinely assumed rather than accidentally auto-detected.
+            // The document-picking tests attach documents themselves.
+            clients: [{ id: 'c-1', name: 'Acme', keyProcesses: [], documents: [] }],
+            auditPlans: [], ncrs: [], complaints: [], appeals: [], auditReports: [],
+            checklists: [checklistWithoutSoA()]
+        };
+        loadModule('./checklist-module.js');
+    });
+
+    it('starts assumed: no SoA supplied, coverage reports the tier-1 pool', () => {
+        const cov = window.runChecklistCoverage(window.state.checklists[0]);
+        const ctl = cov.coverage.controls.find(c => c.stdId === 'iso27001');
+        expect(ctl.soaDriven).toBe(false);
+        expect(cov.issues.some(i => i.code === 'SOA_NOT_SUPPLIED')).toBe(true);
+    });
+
+    it('lands pasted references in qaContext.soaApplicable and coverage then reports the SoA as supplied', () => {
+        window.prompt = () => 'A.5.1, A.5.9, A.8.13';
+        window.pasteChecklistSoA('cl-2', 'iso27001');
+
+        const cl = window.state.checklists[0];
+        expect(cl.qaContext.soaApplicable).toEqual(['A.5.1', 'A.5.9', 'A.8.13']);
+        expect(cl.qaContext.soaSupplied).toBeTruthy();
+        expect(cl.qaContext.soaSupplied.source).toBe('pasted');
+        expect(cl.qaContext.soaSupplied.by).toBe('Lead Auditor');
+
+        const cov = window.runChecklistCoverage(cl);
+        const ctl = cov.coverage.controls.find(c => c.stdId === 'iso27001');
+        expect(ctl.soaDriven).toBe(true);
+        expect(ctl.soaSource).toBe('supplied');
+        expect(cov.issues.some(i => i.code === 'SOA_NOT_SUPPLIED')).toBe(false);
+        expect(notes.join(' ')).toMatch(/recorded/i);
+    });
+
+    it('refuses an unparseable reference list, naming the reason, and stores nothing', () => {
+        window.prompt = () => 'The current policy set is under review; nothing final yet.';
+        window.pasteChecklistSoA('cl-2', 'iso27001');
+
+        const cl = window.state.checklists[0];
+        expect(cl.qaContext.soaApplicable).toEqual([]);
+        expect(cl.qaContext.soaSupplied).toBeUndefined();
+        expect(notes.join(' ')).toMatch(/no annex a control references were recognised/i);
+    });
+
+    it('refuses an empty paste the same way', () => {
+        window.prompt = () => '';
+        window.pasteChecklistSoA('cl-2', 'iso27001');
+
+        const cl = window.state.checklists[0];
+        expect(cl.qaContext.soaApplicable).toEqual([]);
+        expect(notes.join(' ')).toMatch(/no annex a control references were recognised/i);
+    });
+
+    it('withdraws an existing Ready-for-Audit release when the SoA changes, same precedent as recountChecklist', () => {
+        const cl = window.state.checklists[0];
+        cl.readyForAudit = { by: 'Lead Auditor', at: '2024-01-01' };
+
+        window.prompt = () => 'A.5.1';
+        window.pasteChecklistSoA('cl-2', 'iso27001');
+
+        expect(cl.readyForAudit).toBeUndefined();
+    });
+
+    it('cancelling the prompt (null) leaves the checklist untouched', () => {
+        window.prompt = () => null;
+        window.pasteChecklistSoA('cl-2', 'iso27001');
+
+        const cl = window.state.checklists[0];
+        expect(cl.qaContext.soaApplicable).toEqual([]);
+        expect(notes).toHaveLength(0);
+    });
+
+    it('picks the most recent document on file, reads its references, and records provenance', () => {
+        // Two documents are on file; v3 (2024) must win over v2 (2022).
+        window.state.clients[0].documents = [
+            { id: 'd1', name: 'Statement of Applicability v3', category: 'Policy', revision: '3', date: '2024-01-10', linkedClauses: 'A.5.1, A.5.9, A.8.13' },
+            { id: 'd2', name: 'Statement of Applicability v2', category: 'Policy', revision: '2', date: '2022-01-01', linkedClauses: 'A.5.1' }
+        ];
+        window.prompt = () => '1';
+        window.pickChecklistSoADocument('cl-2', 'iso27001');
+
+        const cl = window.state.checklists[0];
+        expect(cl.qaContext.soaApplicable).toEqual(['A.5.1', 'A.5.9', 'A.8.13']);
+        expect(cl.qaContext.soaSupplied.source).toBe('document');
+        expect(cl.qaContext.soaSupplied.document.name).toBe('Statement of Applicability v3');
+        expect(cl.qaContext.soaSupplied.document.revision).toBe('3');
+    });
+
+    it('falls back to asking for the reference list when the chosen document carries none on its own record', () => {
+        window.state.clients[0].documents = [{ id: 'd3', name: 'Undated Notes', revision: '', date: '' }];
+        let call = 0;
+        window.prompt = () => {
+            call += 1;
+            // 1st prompt: which document (only one is on file).
+            if (call === 1) return '1';
+            // 2nd prompt: it carries no refs, so the auditor is asked to type them.
+            return 'A.8.13';
+        };
+        window.pickChecklistSoADocument('cl-2', 'iso27001');
+
+        const cl = window.state.checklists[0];
+        expect(cl.qaContext.soaApplicable).toEqual(['A.8.13']);
+        expect(cl.qaContext.soaSupplied.source).toBe('document');
+        expect(cl.qaContext.soaSupplied.document.name).toBe('Undated Notes');
+    });
+});

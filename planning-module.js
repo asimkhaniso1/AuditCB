@@ -2318,7 +2318,7 @@ window.printAuditPlanDetails = function (planId) {
                     <td><span class="meta-label">Audit Type</span>${window.UTILS.escapeHtml(plan.type)}</td>
                 </tr>
                 <tr>
-                    <td><span class="meta-label">Audit Method</span>${window.UTILS.escapeHtml(plan.auditMethod || 'On-site')}</td>
+                    <td><span class="meta-label">Audit Method</span>${window.UTILS.escapeHtml(plan.auditMethod || 'Not recorded')}</td>
                     <td><span class="meta-label">Impartiality Risk</span>${window.UTILS.escapeHtml(plan.impartialityAssessment?.risk || 'None Identified')}${plan.impartialityAssessment?.notes ? ' — ' + window.UTILS.escapeHtml(plan.impartialityAssessment.notes) : ''}</td>
                 </tr>
                  <tr>

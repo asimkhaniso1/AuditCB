@@ -489,3 +489,225 @@ describe('ReportIntegrity — W13 respects a recorded applicability decision', (
         expect(result.warnings.some((w) => w.id === 'W13')).toBe(true);
     });
 });
+
+// Phase B — classification, clause reference/title, audit mode, conclusion
+// and previous-findings contradictions. Counts-vs-prose (requirement class 1
+// of the cross-report validation pass) is already covered by B13 above,
+// including the exact live defect (4 minor / 4 observations / 1 OFI with
+// prose stating "5 opportunities for improvement" — see the B13 tests).
+describe('ReportIntegrity — Phase B cross-report contradictions', () => {
+    beforeEach(() => {
+        window.state = { auditReports: [], ncrs: [], clients: [], auditPlans: [] };
+    });
+
+    it('B12: on-site wording in the audit plan\'s own methodology text blocks a Remote audit too', () => {
+        const report = baseReport({});
+        const auditPlan = { auditMethod: 'Remote', auditMethodology: 'The audit included on-site observation of production activities.' };
+        const result = window.ReportIntegrity.check({ report, auditPlan, client: baseClient() });
+
+        expect(result.blockers.some((b) => b.id === 'B12-auditPlan.auditMethodology')).toBe(true);
+    });
+
+    it('B12: remote-only methodology text on a Remote audit does not block', () => {
+        const report = baseReport({});
+        const auditPlan = { auditMethod: 'Remote', auditMethodology: 'Interviews were conducted via video conferencing; no on-site verification was possible.' };
+        const result = window.ReportIntegrity.check({ report, auditPlan, client: baseClient() });
+
+        expect(result.blockers.some((b) => b.id.startsWith('B12-'))).toBe(false);
+    });
+
+    it('B12r: an On-site audit method contradicted by remote-only methodology text blocks', () => {
+        const report = baseReport({
+            executiveSummary: 'The audit was conducted entirely remotely due to travel restrictions.'
+        });
+        const result = window.ReportIntegrity.check({
+            report, auditPlan: { auditMethod: 'On-site' }, client: baseClient()
+        });
+
+        expect(result.blockers.some((b) => b.id.startsWith('B12r-'))).toBe(true);
+    });
+
+    it('B12r: an On-site audit method with on-site narrative does not block', () => {
+        const report = baseReport({
+            executiveSummary: 'The audit included on-site observation of production activities.'
+        });
+        const result = window.ReportIntegrity.check({
+            report, auditPlan: { auditMethod: 'On-site' }, client: baseClient()
+        });
+
+        expect(result.blockers.some((b) => b.id.startsWith('B12r-'))).toBe(false);
+    });
+
+    it('W21: an unset Audit Method with an on-site narrative claim warns', () => {
+        const report = baseReport({
+            executiveSummary: 'The audit included on-site observation of production activities.'
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W21-'))).toBe(true);
+    });
+
+    it('W21: does not fire once the Audit Method is recorded', () => {
+        const report = baseReport({
+            executiveSummary: 'The audit included on-site observation of production activities.'
+        });
+        const result = window.ReportIntegrity.check({
+            report, auditPlan: { auditMethod: 'On-site' }, client: baseClient()
+        });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W21-'))).toBe(false);
+    });
+
+    it('B18: a finding described in prose under a different classification than its record blocks', () => {
+        const report = baseReport({
+            executiveSummary: 'Clause 8.5.2 was raised as a minor nonconformity during the visit.',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'observation', clause: '8.5.2', comment: 'Traceability records were incomplete for the sampled batch during the review.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        const b18 = result.blockers.find((b) => b.id.startsWith('B18-'));
+        expect(b18).toBeTruthy();
+        expect(b18.message).toContain('8.5.2');
+    });
+
+    it('B18: narrative classification matching the finding record does not block', () => {
+        const report = baseReport({
+            executiveSummary: 'Clause 8.5.2 remains an observation for management review.',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'observation', clause: '8.5.2', comment: 'Traceability records were incomplete for the sampled batch during the review.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.blockers.some((b) => b.id.startsWith('B18-'))).toBe(false);
+    });
+
+    it('W23: a clause cited with a classification in prose but no matching finding record warns', () => {
+        const report = baseReport({
+            executiveSummary: 'Clause 9.2 was raised as a minor nonconformity during the visit.'
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W23-'))).toBe(true);
+    });
+
+    it('W23: does not fire when the cited clause has a matching finding record', () => {
+        const report = baseReport({
+            executiveSummary: 'Clause 9.2 was raised as a minor nonconformity during the visit.',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: '9.2', evidence: 'Photograph on file.', comment: 'Internal audit records were incomplete for the sampled department during the review.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W23-'))).toBe(false);
+    });
+
+    it('B19: a clause title that is actually a client department name blocks', () => {
+        const report = baseReport({
+            executiveSummary: 'The finding under Clause 8.5.2 (Management) was closed after review.'
+        });
+        const client = baseClient({ departments: [{ name: 'Management', head: 'J. Smith' }] });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client });
+
+        const b19 = result.blockers.find((b) => b.id.startsWith('B19-'));
+        expect(b19).toBeTruthy();
+        expect(b19.message).toContain('department');
+    });
+
+    it('B19: the real clause title does not block', () => {
+        const report = baseReport({
+            executiveSummary: 'Clause 8.5.2: Identification and traceability, was found non-conforming.'
+        });
+        const client = baseClient({ departments: [{ name: 'Management', head: 'J. Smith' }] });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client });
+
+        expect(result.blockers.some((b) => b.id.startsWith('B19-'))).toBe(false);
+    });
+
+    it('W22: the same clause given two different titles in the report warns', () => {
+        const report = baseReport({
+            executiveSummary: 'Clause 8.5.2: Identification and traceability, was found non-conforming.',
+            conclusion: 'The finding under Clause 8.5.2 (Process Control) remains open.'
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W22-'))).toBe(true);
+    });
+
+    it('W22: the same title repeated for a clause does not warn', () => {
+        const report = baseReport({
+            executiveSummary: 'Clause 8.5.2: Identification and traceability, was found non-conforming.',
+            conclusion: 'Clause 8.5.2 (Identification and traceability) remains open pending closure.'
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.warnings.some((w) => w.id.startsWith('W22-'))).toBe(false);
+    });
+
+    it('B20: an unqualified certification statement with an open Major NC blocks', () => {
+        const report = baseReport({
+            conclusion: 'Certification is confirmed based on the audit results.',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'major', clause: '8.5.2', evidence: 'Photograph on file.', comment: 'A significant nonconformity was identified in the traceability process during the review.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.blockers.some((b) => b.id === 'B20')).toBe(true);
+    });
+
+    it('B20: a conclusion stating the closure contingency does not block', () => {
+        const report = baseReport({
+            conclusion: 'Certification is confirmed subject to satisfactory closure and verification of the major nonconformity raised.',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'major', clause: '8.5.2', evidence: 'Photograph on file.', comment: 'A significant nonconformity was identified in the traceability process during the review.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: {}, client: baseClient() });
+
+        expect(result.blockers.some((b) => b.id === 'B20')).toBe(false);
+    });
+
+    it('W24: claiming previous findings were verified closed while prior records show follow-up only planned warns', () => {
+        window.state.auditReports = [{
+            id: 'report-0',
+            clientId: 'client-1',
+            client: 'Acme Manufacturing',
+            status: 'Finalized',
+            date: '2025-01-10',
+            checklistProgress: [{ status: 'nc', ncrType: 'minor', clause: '7.1', department: 'Production' }],
+            findingStatus: { '7.1|Production': { status: 'planned' } }
+        }];
+        const report = baseReport({
+            executiveSummary: 'Previous nonconformities were verified and closed during this cycle.'
+        });
+        const result = window.ReportIntegrity.check({
+            report, auditPlan: { auditType: 'Surveillance' }, client: baseClient()
+        });
+
+        expect(result.warnings.some((w) => w.id === 'W24')).toBe(true);
+    });
+
+    it('W24: does not fire when the prior records genuinely show closure', () => {
+        window.state.auditReports = [{
+            id: 'report-0',
+            clientId: 'client-1',
+            client: 'Acme Manufacturing',
+            status: 'Finalized',
+            date: '2025-01-10',
+            checklistProgress: [{ status: 'nc', ncrType: 'minor', clause: '7.1', department: 'Production' }],
+            findingStatus: { '7.1|Production': { status: 'closed' } }
+        }];
+        const report = baseReport({
+            executiveSummary: 'Previous nonconformities were verified and closed during this cycle.'
+        });
+        const result = window.ReportIntegrity.check({
+            report, auditPlan: { auditType: 'Surveillance' }, client: baseClient()
+        });
+
+        expect(result.warnings.some((w) => w.id === 'W24')).toBe(false);
+    });
+});

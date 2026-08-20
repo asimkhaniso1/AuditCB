@@ -893,4 +893,127 @@ describe('KTD acceptance #33 — the corrected report issues cleanly', () => {
             expect(s.findings).toEqual(['No nonconformities were identified during this audit.']);
         });
     });
+
+    // Regression test for the shipped defect this module's report-back names
+    // directly: page 8 read "5 opportunities for improvement" for an audit
+    // that actually recorded 4 Observations + 1 OFI (Observations summed into
+    // the OFI figure). That specific phrase was AI-authored narrative text in
+    // report.executiveSummary (drafted in ai-service.js, guarded there and by
+    // report-integrity.js's B13 — see the "still catches the real defect"
+    // test above). This suite instead locks down report-executive.js's OWN
+    // deterministic Overall Conclusion sentence (buildFactualConclusion, via
+    // buildAuditOutcomeSummary) so the same failure mode can never reappear
+    // in a sentence this module builds itself.
+    describe('Overall Conclusion — Observations and OFI are never merged (Task A)', () => {
+        it('states 4 minor nonconformities, 4 observations and 1 opportunity for improvement — singular OFI, never combined', () => {
+            const d = { report: correctedReport(), hydratedProgress: correctedProgress(), stats: {} };
+            const s = window.ReportExecutive.buildAuditOutcomeSummary(d, { findings: [], strengths: [] });
+            expect(s.conclusion).toMatch(/\b4 minor nonconformities\b/);
+            expect(s.conclusion).toMatch(/\b4 observations\b/);
+            expect(s.conclusion).toMatch(/\b1 opportunity for improvement\b/);
+            // The exact defect: 4 Observations + 1 OFI must never read as "5
+            // opportunities for improvement" (digit or spelled out), and Observations
+            // must never be folded into the OFI count under either label.
+            expect(s.conclusion).not.toMatch(/\b5 opportunit/i);
+            expect(s.conclusion).not.toMatch(/\bfive opportunit/i);
+            expect(s.conclusion).not.toMatch(/\b5 observation/i);
+            expect(s.conclusion).not.toMatch(/opportunities for improvement/); // plural form must not appear when OFI = 1
+        });
+
+        it('pluralizes "observation(s)" and "opportunit(y|ies)" independently — each count keeps its own grammar and its own label', () => {
+            const progress = [
+                { status: 'nc', ncrType: 'minor', clause: '9.2', department: 'Quality', comment: 'x' },
+                { status: 'nc', ncrType: 'observation', clause: '8.1', department: 'Production', comment: 'x' },
+                { status: 'nc', ncrType: 'ofi', clause: '6.1', department: 'Quality', comment: 'x' },
+                { status: 'nc', ncrType: 'ofi', clause: '7.1', department: 'Human Resources', comment: 'x' },
+                { status: 'conform', clause: '4.1', department: 'Management', comment: 'x' }
+            ];
+            const report = Object.assign(correctedReport(), { checklistProgress: progress });
+            const d = { report, hydratedProgress: progress, stats: {} };
+            const s = window.ReportExecutive.buildAuditOutcomeSummary(d, { findings: [], strengths: [] });
+            // 1 observation (singular, no trailing "s") ...
+            expect(s.conclusion).toMatch(/\b1 observation\b/);
+            expect(s.conclusion).not.toMatch(/\b1 observations\b/);
+            // ... and 2 opportunities for improvement (plural "ies"), never summed
+            // with the 1 observation into "3 opportunities for improvement".
+            expect(s.conclusion).toMatch(/\b2 opportunities for improvement\b/);
+            expect(s.conclusion).not.toMatch(/\b2 opportunity for improvement\b/);
+            expect(s.conclusion).not.toMatch(/\b3 opportunit/);
+        });
+
+        it('sources counts from the canonical ReportStats dataset, never a stale/wrong d.stats — single counting path (Task B)', () => {
+            // A deliberately wrong legacy stats object, as if an upstream caller's
+            // own local tally had drifted from the checklist data. buildAuditOutcomeSummary
+            // must not trust it for any count — every figure must come from
+            // window.ReportStats.build() over d.hydratedProgress instead.
+            const staleStats = {
+                majorNC: 9, minorNC: 9, observationCount: 0, ofiCount: 9,
+                totalItems: 999, applicableCount: 999, conformCount: 0,
+                recommendation: 'Should never be seen'
+            };
+            const d = { report: correctedReport(), hydratedProgress: correctedProgress(), stats: staleStats };
+            const s = window.ReportExecutive.buildAuditOutcomeSummary(d, { findings: [], strengths: [] });
+            expect(s.conclusion).toMatch(/\b4 minor nonconformities\b/);
+            expect(s.conclusion).toMatch(/\b4 observations\b/);
+            expect(s.conclusion).toMatch(/\b1 opportunity for improvement\b/);
+            expect(s.conclusion).not.toMatch(/\b9 (major|minor)/);
+            expect(s.conclusion).not.toMatch(/\b9 opportunit/);
+            expect(s.conclusion).not.toMatch(/\b999\b/);
+            expect(s.recommendation).not.toBe('Should never be seen');
+        });
+    });
+
+    // Task C: an ISO clause title (sourced only from the Knowledge Base via
+    // item.kbMatch.title) and a Process/Department name are different things
+    // and must never be interchanged. Real example: clause 8.5.2's genuine
+    // title is "Identification and traceability"; "Management" is the
+    // Process/Department for that finding, shown in its own column/field —
+    // never as a substitute clause title when kbMatch is unavailable.
+    describe('Clause title never substitutes a department/process name (Task C)', () => {
+        it('shows the genuine KB clause title, distinct from the department, when kbMatch is present', () => {
+            const progress = [{
+                status: 'nc', ncrType: 'minor', clause: '8.5.2', department: 'Management',
+                comment: 'Traceability records were incomplete for the sampled batch.',
+                evidenceImage: 'data:image/png;base64,AAA',
+                kbMatch: { clause: '8.5.2', title: 'Identification and traceability' }
+            }];
+            const d = { report: correctedReport(), hydratedProgress: progress };
+            const intel = window.ReportExecutive.computeEvidenceIntel(d);
+            expect(intel.evidenced[0].title).toBe('Identification and traceability');
+            expect(intel.evidenced[0].department).toBe('Management');
+            expect(intel.evidenced[0].title).not.toBe(intel.evidenced[0].department);
+        });
+
+        it('renders no title — never a department name pulled from requirement/description — when kbMatch is absent', () => {
+            const progress = [{
+                status: 'nc', ncrType: 'minor', clause: '8.5.2', department: 'Management',
+                // Simulates the real defect: the checklist item's own requirement/
+                // description text (a DIFFERENT field from the KB clause title)
+                // happens to hold the department name. It must never leak into
+                // the title slot merely because kbMatch is missing.
+                requirement: 'Management', description: 'Management',
+                comment: 'Traceability records were incomplete for the sampled batch.',
+                evidenceImage: 'data:image/png;base64,AAA'
+            }];
+            const d = { report: correctedReport(), hydratedProgress: progress };
+            const intel = window.ReportExecutive.computeEvidenceIntel(d);
+            expect(intel.evidenced[0].title).toBe('');
+            expect(intel.evidenced[0].title).not.toBe('Management');
+            expect(intel.evidenced[0].department).toBe('Management');
+        });
+
+        it('uses the explicit "Untitled item" placeholder — never requirement/description — in the missing-evidence table', () => {
+            const progress = [{
+                status: 'nc', ncrType: 'minor', clause: '8.5.2', department: 'Management',
+                requirement: 'Management', description: 'Management',
+                comment: 'Traceability records were incomplete for the sampled batch.'
+                // no evidenceImage(s) -> falls into missingEvidence, not evidenced
+            }];
+            const d = { report: correctedReport(), hydratedProgress: progress };
+            const intel = window.ReportExecutive.computeEvidenceIntel(d);
+            expect(intel.missingEvidence[0].item).toBe('Untitled item');
+            expect(intel.missingEvidence[0].item).not.toBe('Management');
+            expect(intel.missingEvidence[0].department).toBe('Management');
+        });
+    });
 });

@@ -86,3 +86,64 @@ describe('ReportFindingsOps.criterionCell (fallback) — clause-only default', (
         }
     });
 });
+
+// TASK B — ground truth: a clause's official title comes ONLY from the KB
+// match; item.requirement (the auditor's free-text checklist question) and
+// item.department (the Process/Department field) are different fields and
+// must never stand in for a missing title.
+describe('ReportFindingsOps reqMatrix — a clause title is never substituted from another field (TASK B)', () => {
+    it('renders an honest em dash, never item.requirement or item.department, when no kbMatch title exists', () => {
+        const d = {
+            hydratedProgress: [
+                // requirement and department are deliberately set to the SAME
+                // string a real department name would take, so any leak from
+                // either field into the title slot is caught by the assertion.
+                { status: 'nc', ncrType: 'minor', clause: '8.5.2', department: 'Management', requirement: 'Management', comment: 'x' }
+            ]
+        };
+        const sec = fopsSection('reqMatrix', d);
+        expect(sec).toBeTruthy();
+        expect(sec.bodyHtml).toContain('8.5.2');
+        expect(sec.bodyHtml).toContain('<td>—</td>');
+        expect(sec.bodyHtml).not.toMatch(/>Management</);
+    });
+
+    it('renders the real KB clause title (e.g. 8.5.2 -> "Identification and traceability") when a kbMatch is present, still never the department', () => {
+        const d = {
+            hydratedProgress: [
+                {
+                    status: 'nc', ncrType: 'minor', clause: '8.5.2', department: 'Management',
+                    requirement: 'Are finished goods labelled with a batch reference?',
+                    kbMatch: { title: 'Identification and traceability' }, comment: 'x'
+                }
+            ]
+        };
+        const sec = fopsSection('reqMatrix', d);
+        expect(sec.bodyHtml).toContain('Identification and traceability');
+        expect(sec.bodyHtml).not.toMatch(/>Management</);
+    });
+});
+
+// TASK A — a finding whose criterion is still an internal working reference
+// (FOCUS/SURV/ORG/DOC — see NCR_PSEUDO_CLAUSE_PATTERN / ReportStats.classifyCriterion)
+// must be shown honestly as pending assignment in the Applicable Requirements
+// Matrix, never printed as if it were a real, plausible-looking clause number.
+describe('ReportFindingsOps reqMatrix — internal/pseudo clause never shown as a real clause (TASK A)', () => {
+    it('labels a working reference "internal ref FOCUS.8", never the bare pseudo-clause, in the matrix Ref column', () => {
+        const savedRS = window.ReportStats;
+        window.ReportStats = undefined; // exercise the local fallback (see matrixRefLabel)
+        try {
+            const d = {
+                hydratedProgress: [
+                    { status: 'nc', ncrType: 'major', clause: 'FOCUS.8', department: 'Quality', requirement: 'Ad-hoc working note', comment: 'x' }
+                ]
+            };
+            const sec = fopsSection('reqMatrix', d);
+            expect(sec).toBeTruthy();
+            expect(sec.bodyHtml).toContain('internal ref FOCUS.8');
+            expect(sec.bodyHtml).not.toMatch(/<td[^>]*>FOCUS\.8<\/td>/);
+        } finally {
+            window.ReportStats = savedRS;
+        }
+    });
+});

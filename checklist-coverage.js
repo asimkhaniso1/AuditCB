@@ -22,10 +22,12 @@
 //
 // Risk drivers are taken from data that actually exists on the client record:
 // the Statement of Applicability, the risk-assessment documents on file,
-// changes recorded for this audit, incidents (complaints/appeals) raised in
-// the cycle, and previous audit results (the NCR/CAPA register). A driver with
-// no data behind it is reported as unavailable rather than assumed — an
-// invented driver is worse than a missing one, because it reads as evidence.
+// changes logged against the client during the cycle (ISO 17021-1 9.6.2) or
+// flagged by this audit's own pre-audit review, incidents (complaints/
+// appeals) raised in the cycle, and previous audit results (the NCR/CAPA
+// register). A driver with no data behind it is reported as unavailable
+// rather than assumed — an invented driver is worse than a missing one,
+// because it reads as evidence.
 //
 // CONTRACT
 //   window.ChecklistCoverage.buildContext(checklist, opts) -> cycle context
@@ -292,6 +294,14 @@
         const forClient = function (rec) {
             if (!client) return false;
             if (rec.clientId != null) return String(rec.clientId) === String(client.id);
+            // Complaints carry no clientId at all — the "Related Client" field
+            // on the Log Complaint form (appeals-complaints-module.js
+            // openNewComplaintModal) writes the client's NAME into clientName,
+            // never an id. Appeals do carry clientId, so this branch is a
+            // fallback for the one record shape that genuinely lacks one, not
+            // a loosening of scope: it is still an exact name match against
+            // THIS client, so one client's records still cannot match another.
+            if (rec.clientName && rec.clientName === client.name) return true;
             return !!rec.client && rec.client === client.name;
         };
 
@@ -326,8 +336,14 @@
         });
 
         const docs = arr(client && client.documents).filter(function (d) { return d && d.name; });
+        // Matched on name, category AND notes — a client document never carries
+        // a `summary` field (client-docs-bulk.js and the manual upload form in
+        // clients-module.js both write `notes`, not `summary`; see docText()
+        // above, which reads the same field). Testing a field that is never
+        // populated silently drops the one place a generically-named document
+        // ("Q3 Review.xlsx") says what it actually is.
         const riskDocs = docs.filter(function (d) {
-            return RISK_DOC.test(str(d.name) + ' ' + str(d.category) + ' ' + str(d.summary));
+            return RISK_DOC.test(str(d.name) + ' ' + str(d.category) + ' ' + str(d.notes));
         });
 
         // ── Statement of Applicability ────────────────────────────────
@@ -360,10 +376,30 @@
             }
         }
 
+        // ── Changes since the previous audit ──────────────────────────
+        // Two independent sources, neither a substitute for the other.
+        // client.compliance.changesLog is ISO 17021-1 9.6.2's own record of
+        // significant client changes — dated, typed, written by the "Log
+        // Change" action on the client's Compliance tab (clients-module.js
+        // addClientChangeLog) — and is on file whether or not this audit ever
+        // ran an AI document review. plan.preAudit.focusPoints is a narrower,
+        // audit-specific source: the free-text output of the optional Stage 1
+        // AI review (client-docs-bulk.js aiReviewPreAuditDocuments), which
+        // only exists once that review has been run for THIS plan. A change
+        // logged mid-cycle but never fed back into an AI review must still
+        // count, so the log is read directly rather than only via the plan.
         const focusPoints = arr(plan && plan.preAudit && plan.preAudit.focusPoints);
-        const changes = focusPoints.filter(function (f) {
+        const changeLogEntries = arr(client && client.compliance && client.compliance.changesLog)
+            .filter(function (log) { return log && inCycle(log.date); })
+            // Every entry here was deliberately logged as a change — unlike
+            // focusPoints (free AI text that may talk about anything), it is
+            // not run through CHANGE_WORDS: that heuristic exists to find
+            // change signal in unstructured text, not to second-guess a
+            // record whose entire purpose is recording a change.
+            .map(function (log) { return str([log.type, log.description].filter(Boolean).join(': ')); });
+        const changes = changeLogEntries.concat(focusPoints.filter(function (f) {
             return CHANGE_WORDS.test(str(typeof f === 'string' ? f : (f.text || f.point || f.title)));
-        }).map(function (f) { return str(typeof f === 'string' ? f : (f.text || f.point || f.title)); });
+        }).map(function (f) { return str(typeof f === 'string' ? f : (f.text || f.point || f.title)); }));
 
         return {
             standardIds: standardIds,
@@ -377,6 +413,12 @@
             // and the auditor can go look at it. Null only when no document on
             // file reads as an SoA at all.
             soaDocument: soaDocument,
+            // How many of the client's documents were actually searched for an
+            // SoA — lets assess() say "checked N documents, none looked like
+            // an SoA" instead of a generic "none was supplied" that reads the
+            // same whether the client has one undiscoverable document or none
+            // on file at all.
+            soaDocsChecked: docs.length,
             client: client,
             cycle: {
                 start: anchor.toISOString().slice(0, 10),
@@ -405,7 +447,10 @@
                 return { text: [r.subject, r.description, r.summary, r.details].filter(Boolean).join(' ') };
             }),
             changes: changes,
-            riskDocs: riskDocs.map(function (d) { return { name: d.name, summary: str(d.summary) }; })
+            // `summary` here is this context object's own field name (read by
+            // riskDrivenControls' `text` accessor below) — it is populated
+            // from the document's real `notes` field, per the fix above.
+            riskDocs: riskDocs.map(function (d) { return { name: d.name, summary: str(d.notes) }; })
         };
     }
 
@@ -601,19 +646,27 @@
                 // being on file at all, and treating it as such would send the
                 // auditor to paste references that already exist somewhere,
                 // rather than to the actual problem: the document could not be
-                // read.
+                // read. Either way the message names exactly what was checked
+                // (document name/category to find it; linked-clauses, headings
+                // and notes to read it) so "no SoA on file" and "SoA on file
+                // but unreadable" are never reported in the same words.
                 if (c.soaDocument) {
                     issues.push(issue('SOA_DOCUMENT_UNREADABLE', 'warning',
                         std.label + ': "' + c.soaDocument.name + '"'
                         + (c.soaDocument.revision ? ' (' + c.soaDocument.revision + ')' : '')
-                        + ' reads as the Statement of Applicability but no Annex A control references could be extracted from it, so the applicable set is assumed to be the '
-                        + sel.pool.length + ' controls prioritised for this scope. Paste the SoA references, or replace the document with one the extractor can read.',
+                        + ' reads as the Statement of Applicability by name, but its linked-clauses, extracted headings and notes carried no Annex A control reference (e.g. "A.5.1") to read, so the applicable set is assumed to be the '
+                        + sel.pool.length + ' controls prioritised for this scope. Document import only auto-extracts numbered body clauses (4–10), never Annex A references, so re-uploading the same file will not fix this — instead paste the applicable control list (e.g. "A.5.1, A.5.9, A.8.13…") into this document\'s Linked ISO Clause(s) or Notes field, or paste it directly into the checklist\'s SoA field.',
                         { stdId: id }));
                 } else {
+                    const checked = c.soaDocsChecked || 0;
                     issues.push(issue('SOA_NOT_SUPPLIED', 'warning',
-                        std.label + ': no Statement of Applicability was supplied, so the applicable set is assumed to be the '
-                        + sel.pool.length + ' controls prioritised for this scope. Paste the SoA references, or upload the current SoA as a client document, to make the sample defensible.',
-                        { stdId: id }));
+                        std.label + ': no Statement of Applicability was supplied, and '
+                        + (checked
+                            ? 'none of the ' + checked + ' client document(s) on file is named or categorised as one (searched each document\'s name and category for "Statement of Applicability" or "SoA")'
+                            : 'this client has no documents on file at all')
+                        + ', so the applicable set is assumed to be the ' + sel.pool.length
+                        + ' controls prioritised for this scope. Paste the SoA references directly into the checklist, or upload the current SoA as a client document named "Statement of Applicability" or "SoA" (then paste its applicable control list into the document\'s Linked ISO Clause(s) or Notes field — import does not read Annex A references off the file itself) to make the sample defensible.',
+                        { stdId: id, docsChecked: checked }));
                 }
             } else if (c.soaSource === 'document') {
                 issues.push(issue('SOA_FROM_DOCUMENT', 'info',
@@ -820,6 +873,8 @@
         riskDrivenControls: riskDrivenControls,
         coverageOf: coverageOf,
         flatten: flatten,
+        refsInText: refsInText,
+        docText: docText,
         DRIVERS: DRIVERS,
         BLOCKING_CODES: BLOCKING_CODES
     };
