@@ -242,6 +242,30 @@ describe('ReportIntegrity — report/dataset agreement', () => {
         expect(w12.message).toContain('10');
     });
 
+    // Reported from the field as "employee count field is not updating". It
+    // was updating — but the auditor's own notes stated TWO different
+    // headcounts, so no single controlled figure can satisfy W12 and a warning
+    // always survived the fix action, which read as a failed save. Pinning the
+    // behaviour so the per-figure warning stays (it is correct) and the fix
+    // action's own messaging keeps having something honest to report.
+    it('W12: two contradictory headcounts in evidence raise one warning EACH — confirming one cannot clear the other', () => {
+        const report = baseReport({
+            positiveObservations: 'The team confirmed 4 employees are trained.\nRecords show 5 employees in total.'
+        });
+        const atEight = window.ReportIntegrity.check({
+            report, auditPlan: {}, client: baseClient({ sites: [{ city: 'Springfield', employees: 8 }] })
+        }).warnings.filter((w) => w.id.startsWith('W12'));
+        expect(atEight).toHaveLength(2);
+
+        // Confirming 5 resolves that note and leaves the 4 — the profile is now
+        // right, the other note is wrong, and only the auditor can say which.
+        const atFive = window.ReportIntegrity.check({
+            report, auditPlan: {}, client: baseClient({ sites: [{ city: 'Springfield', employees: 5 }] })
+        }).warnings.filter((w) => w.id.startsWith('W12'));
+        expect(atFive).toHaveLength(1);
+        expect(atFive[0].message).toContain('4');
+    });
+
     it('W13: design activity in scope with clause 8.3 treated as not applicable warns', () => {
         const report = baseReport({
             checklistProgress: [{ status: 'conform', clause: '8.1', comment: 'No Design Development applicable.' }]

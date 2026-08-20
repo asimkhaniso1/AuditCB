@@ -9,6 +9,10 @@ let checklistFilterType = 'all';
 let checklistFilterAuditType = 'all';
 let checklistFilterScope = 'all';
 let checklistSearchTerm = '';
+// Client the library is currently scoped to (Client Workspace → Checklists),
+// or null for the global Checklists module. Held here so the module's own
+// re-render calls keep the scope the user is actually looking at.
+let _checklistScopeClientId = null;
 
 // Format ISO/UTC date to local readable date
 function _fmtDate(raw) {
@@ -20,13 +24,48 @@ function _fmtDate(raw) {
     } catch { return raw; }
 }
 
-function renderChecklistLibrary() {
+/**
+ * Checklist Library.
+ *
+ * @param {string} [clientId] - when given, scopes the library to that client's
+ *   own checklists (the Client Workspace's "Checklists" nav item passes it).
+ *   A client-specific checklist carries `clientId` from the moment it is built
+ *   (see client-docs-bulk.js buildClientChecklist), so this is a real
+ *   attribute, not a name match. Global checklists are shown in the scoped
+ *   view too — they apply to every client — but the custom section holds only
+ *   this client's. Omitted from the global Checklists module, which is
+ *   unchanged.
+ */
+function renderChecklistLibrary(clientId) {
+    // Several in-module actions (restore/delete/permanent-delete) re-render by
+    // calling this with no argument. In the client-scoped view that would
+    // silently widen the list back to every client's checklists, so the active
+    // scope is remembered and reused for those refreshes. The global
+    // Checklists route passes an explicit null to clear it — see script.js.
+    if (clientId === null) {
+        _checklistScopeClientId = null;
+    } else if (clientId !== undefined) {
+        _checklistScopeClientId = clientId;
+    }
+    clientId = _checklistScopeClientId;
+
     const _contentArea = document.getElementById('content-area');
     const userRole = (window.state.currentUser?.role || '').toLowerCase();
     const isAdmin = userRole === 'admin' || window.state.settings?.isAdmin || false;
-    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
-    const checklists = state.checklists || [];
+    // Filtering keys on the ID, never on whether the client record resolves —
+    // an unknown id must still scope (a scoped route falling back to every
+    // client's checklists would leak the cross-client list into a per-client
+    // view). The record is looked up only to name the client in the banner.
+    const scopeId = clientId != null && clientId !== '' ? String(clientId) : null;
+    const scopedClient = scopeId
+        ? (window.state.clients || []).find(c => String(c.id) === scopeId)
+        : null;
+    // Scope first, so every count, filter and section below is computed over
+    // the same set the view actually shows.
+    const checklists = (state.checklists || []).filter(c =>
+        !scopeId || c.type === 'global' || String(c.clientId) === scopeId);
 
     // Apply filters
     let filtered = checklists.filter(c => {
@@ -53,6 +92,12 @@ function renderChecklistLibrary() {
 
     const html = `
         <div class="fade-in">
+            ${scopedClient ? `
+            <div style="background:#eff6ff;border-left:4px solid #1d4ed8;border-radius:0 8px 8px 0;padding:0.75rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+                <i class="fa-solid fa-building" style="color:#1d4ed8;"></i>
+                <span style="font-size:0.9rem;color:#1e3a8a;">Showing checklists for <strong>${window.UTILS.escapeHtml(scopedClient.name)}</strong>, plus global checklists that apply to every client.</span>
+                <a href="#checklists" style="margin-left:auto;font-size:0.82rem;color:#1d4ed8;">View all checklists</a>
+            </div>` : ''}
             <!-- Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 1;">
@@ -1330,7 +1375,7 @@ function openEditChecklistModal(id) {
 
     const userRole = (state.currentUser?.role || '').toLowerCase();
     const isAdmin = userRole === 'admin' || state.settings?.isAdmin || false;
-    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 
     // Check permission for global checklists
@@ -1562,7 +1607,7 @@ function deleteChecklist(id) {
 
     const userRole = (window.state.currentUser?.role || '').toLowerCase();
     const isAdmin = userRole === 'admin' || window.state.settings?.isAdmin || false;
-    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 
     if (checklist.type === 'global' && !canEditGlobal) {

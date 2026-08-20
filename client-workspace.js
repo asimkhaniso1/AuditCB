@@ -221,6 +221,9 @@ function renderClientSidebarMenu(clientId) {
         <li data-hash="client/${clientId}/plans">
             <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
         </li>
+        <li data-hash="client/${clientId}/checklists">
+            <i class="fa-solid fa-list-check"></i> Checklists
+        </li>
         <li data-hash="client/${clientId}/execution">
             <i class="fa-solid fa-tasks"></i> Execution
         </li>
@@ -325,6 +328,18 @@ window.renderClientModule = function (clientId, moduleName) {
             break;
         case 'execution':
             contentArea.innerHTML = renderClientExecution(client);
+            break;
+        case 'checklists':
+            // Same Checklist Library the global module renders, scoped to this
+            // client (its own custom checklists plus the global ones that apply
+            // to everyone) — the client-specific ones are built right here from
+            // the client's documents, so this is where an auditor looks for
+            // them rather than filtering the global list by hand.
+            if (typeof renderChecklistLibrary === 'function') {
+                renderChecklistLibrary(client.id);
+            } else {
+                contentArea.innerHTML = 'Checklist module not loaded';
+            }
             break;
 
         case 'findings':

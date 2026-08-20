@@ -1633,16 +1633,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     // Helper functions for execution module
 
     // Accordion toggle for clause sections
-    window.toggleAccordion = function (sectionId) {
-        const content = document.getElementById(sectionId);
-        const icon = document.getElementById('icon-' + sectionId);
-        if (content) {
-            const isVisible = content.style.display === 'block';
-            content.style.display = isVisible ? 'none' : 'block';
-            if (icon) {
-                icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
-            }
+    // Accepts EITHER a section id (this view: data-action="toggleAccordion"
+    // data-id="<id>") or the clicked header element (checklist-module.js's
+    // Checklist Library, which sets no data-id, so the delegator passes the
+    // element itself). csp-adapters.js defines the same action for that
+    // element-based markup and loads BEFORE this file, so this definition wins
+    // at runtime — meaning it has to understand both shapes or the library's
+    // accordions stop opening. Kept byte-for-byte equivalent to the
+    // csp-adapters.js copy so load order is irrelevant.
+    window.toggleAccordion = function (target) {
+        let content = null;
+        let icon = null;
+        if (typeof target === 'string') {
+            content = document.getElementById(target);
+            icon = document.getElementById('icon-' + target);
+        } else if (target && target.nodeType === 1) {
+            content = target.nextElementSibling;
+            icon = target.querySelector('.accordion-icon');
         }
+        if (!content) return;
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+        if (icon) icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
     };
 
     // Collapse/Expand ALL accordion sections at once
@@ -3434,11 +3446,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     // to be callable in isolation from a unit test, not only after
     // renderExecutionTab() has run.
 
-    /** Persist the current in-memory report state and refresh the panel. */
-    function persistAndRefreshIntegrity(reportId, message) {
+    /**
+     * Persist the current in-memory report state and refresh the panel.
+     * `severity` defaults to 'success'; pass 'warning' when the action only
+     * partially resolved what it was opened for, so the toast doesn't claim a
+     * clean result the panel is about to contradict.
+     */
+    function persistAndRefreshIntegrity(reportId, message, severity) {
         if (typeof window.saveChecklist === 'function') window.saveChecklist(reportId);
         if (typeof window.runReportIntegrityCheck === 'function') window.runReportIntegrityCheck(reportId);
-        if (message && typeof window.showNotification === 'function') window.showNotification(message, 'success');
+        if (message && typeof window.showNotification === 'function') window.showNotification(message, severity || 'success');
     }
 
     /**
@@ -3925,7 +3942,23 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // figure; the auditor can still adjust it before confirming.
         const suggested = evidence[evidence.length - 1].stated;
         const esc = window.UTILS.escapeHtml;
-        const evidenceListHtml = evidence.map(e => `<li>${esc(String(e.stated))} employees — <em>${esc(e.label)}</em></li>`).join('');
+        const evidenceListHtml = evidence.map(e => `<li><strong>${esc(String(e.stated))}</strong> employees — <em>${esc(e.label)}</em></li>`).join('');
+
+        // How many DIFFERENT headcounts the evidence states. When there is more
+        // than one, no single controlled figure can satisfy the check: confirming
+        // 5 still leaves a note saying 4. Saying "may have changed from 8 to 5"
+        // in that case is misleading — it reads as one pending change, so an
+        // auditor confirms it, sees the warning persist, and reasonably concludes
+        // the field did not save. It did; the contradiction is between the NOTES.
+        const distinctFigures = Array.from(new Set(evidence.map(e => e.stated)));
+        const conflictingNotes = distinctFigures.length > 1;
+
+        const leadIn = conflictingNotes
+            ? `<div style="background:#fffbeb;border-left:3px solid #d97706;border-radius:0 6px 6px 0;padding:0.6rem 0.85rem;font-size:0.88rem;color:#92400e;line-height:1.5;">
+                   <strong>The evidence contradicts itself.</strong> It states ${distinctFigures.length} different headcounts (${esc(distinctFigures.join(', '))}), so they disagree with each other, not only with the profile.
+                   Confirming one figure here <strong>cannot clear the others</strong> — the remaining warning(s) will stay until the note(s) stating a different number are corrected in the checklist or narrative.
+               </div>`
+            : `<p style="font-size: 0.9rem; color: #1e293b;">Auditor evidence indicates employee count may have changed from ${esc(String(controlled))} to ${esc(String(suggested))}. Update organization profile?</p>`;
 
         window.DataService.openFormModal('Review Employee Count', `
             <div class="form-group">
@@ -3936,8 +3969,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <label>Figure(s) found in audit evidence</label>
                 <ul style="margin: 0.25rem 0 0; padding-left: 1.25rem; font-size: 0.85rem;">${evidenceListHtml}</ul>
             </div>
-            <p style="font-size: 0.9rem; color: #1e293b;">Auditor evidence indicates employee count may have changed from ${esc(String(controlled))} to ${esc(String(suggested))}. Update organization profile?</p>
-            <div class="form-group">
+            ${leadIn}
+            <div class="form-group" style="margin-top: 0.85rem;">
                 <label>Confirmed headcount <span style="color: var(--danger-color);">*</span></label>
                 <input type="number" min="0" class="form-control" id="employee-count-input" value="${esc(String(suggested))}">
                 <small id="employee-count-warning" style="display:none; color: #dc2626; margin-top: 0.35rem;"></small>
@@ -3955,7 +3988,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             propagateEmployeeCount(client, value);
             window.closeModal();
             window.DataService.syncClient(client);
-            persistAndRefreshIntegrity(reportId, 'Employee count confirmed at ' + value + ' and updated on the organization profile.');
+
+            // Report honestly on what this confirmation could and could not
+            // resolve. Any evidence figure that still differs from the confirmed
+            // headcount will keep its own W12 warning — the profile is now
+            // correct, the note is not, and only the auditor can decide which
+            // note is wrong.
+            const stillConflicting = distinctFigures.filter(n => n !== value);
+            if (stillConflicting.length) {
+                persistAndRefreshIntegrity(reportId,
+                    `Profile updated to ${value}. ${stillConflicting.length} note(s) still state ${stillConflicting.join(', ')} — correct those notes to clear the remaining warning(s).`,
+                    'warning');
+            } else {
+                persistAndRefreshIntegrity(reportId,
+                    `Employee count confirmed at ${value} and updated on the organization profile.`);
+            }
         });
     };
 
