@@ -1,5 +1,30 @@
 # AuditCB360 - Recent Enhancements Summary
 
+## ✅ Recertification Coverage Validation & Ready-for-Audit Gate (v34.0) - August 20, 2026
+
+### Recertification Coverage Validation (`checklist-coverage.js`)
+- **Judged over the whole cycle**: coverage is assessed against this audit *plus* the completed visits in the three-year audit programme, per ISO/IEC 17021-1 §9.6.3 — a requirement covered at Surveillance 1 counts as covered at recertification
+- **Risk-based Annex A selection**: controls are chosen from the SoA-applicable set using previous audit results, incidents/complaints, recorded changes and the risk assessment on file. Auditing every control at every audit is *not* required
+- **Cycle closure check**: applicable controls sampled at no audit in the cycle are flagged only at the audit that closes the cycle, not at every surveillance
+- **Critical-process coverage**: key processes from Account Setup that are audited nowhere in the cycle are flagged
+- **Honest about missing evidence**: a risk driver with no data behind it is reported as unavailable rather than assumed — an invented driver reads as evidence
+
+### Ready-for-Audit gate
+- A checklist cannot be marked **Ready for Audit** while duplicate questions, unmapped/no-clause items, out-of-scope requirements or cycle coverage gaps stand
+- Each blocker carries the action that clears it: **Remove question**, **Assign clause** (validated against the same rule the authoring screen uses), or **Record justification**
+- Justifications are stored on the checklist with author and date, and print with it
+- A release is withdrawn automatically as soon as the checklist changes
+- A checklist neither pass can validate cannot be silently released — it needs a recorded justification
+
+### Checklist print sheet
+- **Print / Save PDF now works**: the button is wired from the opener, because the print pop-up is a separate document the app's event delegator never reached and the site CSP forbids an inline script in it
+- **Brand colours**: the sheet takes its palette from Settings → CB Profile → Brand Colors instead of the hardcoded emerald green; pass/warn/fail keeps its green/amber/red, which is status rather than branding
+- Coverage figures and recorded dispositions print with the checklist
+
+### Checklist length control
+- Disabled, with the reason stated, for initial and recertification audits — those must cover the standard, so the budget was always discarded. Choosing "75 questions" or "no limit" for a recertification produced the identical checklist, which read as a bug
+
+
 ## 🎨 Real-Time Audit Progress Dashboard (v6.0) - December 21, 2025
 
 ### Visual Progress Tracking
