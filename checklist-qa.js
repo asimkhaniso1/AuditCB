@@ -118,6 +118,7 @@
                     refs: Array.isArray(sub.refs) ? sub.refs : null,
                     standards: Array.isArray(sub.standards) ? sub.standards : null,
                     auditorReview: !!sub.auditorReview,
+                    documentNote: !!sub.documentNote,
                     raw: sub
                 });
             });
@@ -126,17 +127,43 @@
             checklist.items.forEach(it => out.push({
                 section: '', sectionTitle: '', clause: it.clause, title: it.title || '',
                 requirement: it.requirement || it.text || '', refs: null, standards: null,
-                auditorReview: false, raw: it
+                auditorReview: false, documentNote: false, raw: it
             }));
         }
         return out;
     }
 
     /** A ref the generator uses as a section tag rather than a standard citation. */
-    const PSEUDO_REFS = new Set(['ORG', 'DOC', 'IMS', 'RECERT', 'REVIEW', 'FOCUS', 'SURV', 'THEME', 'SOA', '']);
+    const PSEUDO_REFS = new Set(['ORG', 'DOC', 'DOCNOTE', 'IMS', 'RECERT', 'REVIEW', 'FOCUS', 'SURV', 'THEME', 'SOA', '']);
     function isPseudoRef(ref) {
         const r = String(ref || '').trim();
-        return PSEUDO_REFS.has(r) || /^(FOCUS|SURV|DOC|ORG|IMS|RECERT|REVIEW|THEME|SOA)[.\d]*$/i.test(r);
+        return PSEUDO_REFS.has(r) || /^(FOCUS|SURV|DOCNOTE|DOC|ORG|IMS|RECERT|REVIEW|THEME|SOA)[.\d]*$/i.test(r);
+    }
+
+    /**
+     * Two items asking about genuinely different requirements.
+     *
+     * Similar wording between items that test DIFFERENT requirements is a
+     * wording problem, not a duplicated question: ISO/IEC 20000-1 8.2.1
+     * "Service delivery" and 8.2.2 "Plan the services" are separate
+     * requirements that a shared question template makes read alike. Removing
+     * either would leave the standard uncovered, so that pair is reported as
+     * wording to tighten rather than as a duplicate to delete.
+     *
+     * Requirement identity is the bare clause reference, NOT the standard it
+     * belongs to. One question asked once per standard — "9.2" for the ISMS and
+     * "9.2" again for the BCMS — is the same requirement asked twice and stays a
+     * duplicate: in an integrated audit it should be consolidated into a single
+     * question citing both standards, which is what the generator's IMS section
+     * already does.
+     */
+    function citeDifferentRequirements(a, b) {
+        const key = it => new Set((it.refs || []).map(r => String(r.ref).trim()));
+        const A = key(a), B = key(b);
+        if (!A.size || !B.size) return false;
+        let shared = 0;
+        A.forEach(k => { if (B.has(k)) shared++; });
+        return shared === 0;
     }
 
     function issue(code, severity, message, item, extra) {
@@ -209,24 +236,39 @@
 
         // ── 3. Duplicate and near-duplicate questions ─────────────────
         const seen = new Map();
+        const seenIdx = new Map();
         const tokenSets = items.map(it => new Set(tokens(`${it.title} ${it.requirement}`)));
         items.forEach((it, i) => {
             const key = normalizeText(it.requirement);
             if (!key) return;
             if (seen.has(key)) {
-                issues.push(issue('DUPLICATE_QUESTION', 'warning',
-                    `Identical to the question at ${seen.get(key)}.`, it, { duplicateOf: seen.get(key) }));
+                const other = items[seenIdx.get(key)];
+                if (other && citeDifferentRequirements(it, other)) {
+                    issues.push(issue('SIMILAR_WORDING', 'info',
+                        `Worded identically to "${seen.get(key)}", which tests a different requirement. Both are needed for coverage; tighten the wording so the two are told apart on site.`,
+                        it, { similarTo: seen.get(key) }));
+                } else {
+                    issues.push(issue('DUPLICATE_QUESTION', 'warning',
+                        `Identical to the question at ${seen.get(key)}.`, it, { duplicateOf: seen.get(key) }));
+                }
             } else {
                 seen.set(key, it.clause || `#${i + 1}`);
+                seenIdx.set(key, i);
             }
         });
         for (let i = 0; i < items.length; i++) {
             for (let j = i + 1; j < items.length; j++) {
                 const sim = jaccard(tokenSets[i], tokenSets[j]);
                 if (sim >= 0.82 && normalizeText(items[i].requirement) !== normalizeText(items[j].requirement)) {
-                    issues.push(issue('NEAR_DUPLICATE', 'warning',
-                        `Reads as the same question as "${items[j].clause}" (${Math.round(sim * 100)}% overlap).`,
-                        items[i], { nearRef: items[j].clause, similarity: Math.round(sim * 100) }));
+                    if (citeDifferentRequirements(items[i], items[j])) {
+                        issues.push(issue('SIMILAR_WORDING', 'info',
+                            `Reads like "${items[j].clause}" (${Math.round(sim * 100)}% overlap) but tests a different requirement. Both are needed for coverage; tighten the wording so the two are told apart on site.`,
+                            items[i], { nearRef: items[j].clause, similarity: Math.round(sim * 100) }));
+                    } else {
+                        issues.push(issue('NEAR_DUPLICATE', 'warning',
+                            `Reads as the same question as "${items[j].clause}" (${Math.round(sim * 100)}% overlap).`,
+                            items[i], { nearRef: items[j].clause, similarity: Math.round(sim * 100) }));
+                    }
                 }
             }
         }
@@ -337,11 +379,22 @@
         }
 
         // ── 8. Deliberate auditor hand-offs ───────────────────────────
-        const handoffs = items.filter(it => it.auditorReview);
+        // A QUESTION the generator could not map is a hand-off the auditor has
+        // to close. A DOCUMENT on file that maps to no requirement is neither a
+        // hand-off nor a deficiency — an organisation is entitled to hold
+        // documents its management system does not require — so it is reported
+        // separately, as intelligence about the document set.
+        const docNotes = items.filter(it => it.documentNote);
+        const handoffs = items.filter(it => it.auditorReview && !it.documentNote);
         if (handoffs.length) {
             issues.push(issue('AUDITOR_REVIEW', 'info',
                 `${handoffs.length} item(s) carry no clause citation and are marked for auditor review — a reliable mapping could not be established, so none was invented.`,
                 null, { count: handoffs.length }));
+        }
+        if (docNotes.length) {
+            issues.push(issue('DOCUMENT_INTELLIGENCE_NOTE', 'info',
+                `${docNotes.length} document intelligence note(s) on the checklist. Documents on file that map to no requirement are listed for the auditor's awareness only — they imply no nonconformity and are not an audit finding.`,
+                null, { count: docNotes.length }));
         }
 
         const counts = { critical: 0, warning: 0, info: 0 };

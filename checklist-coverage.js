@@ -72,6 +72,12 @@
     // Words that mark a document as risk-assessment evidence, and words in a
     // finding or incident that point at a control theme.
     const RISK_DOC = /risk (assessment|register|treatment|methodolog)|statement of applicability|\bsoa\b|risk treatment plan|\brtp\b/i;
+    // Deliberately narrower than RISK_DOC: a risk assessment or treatment plan
+    // routinely cites the SoA without being one, and RISK_DOC exists precisely
+    // to catch that wider set as risk evidence. This is the test for "IS the
+    // current Statement of Applicability", used only to pick the document that
+    // Annex A applicability is read FROM.
+    const SOA_DOC = /\bstatement of applicability\b|\bsoa\b/i;
     const CHANGE_WORDS = /\bchange[sd]?\b|\bnew\b|migrat|transition|acquisi|restructur|re-?organis|onboard|decommission|upgrade|replatform/i;
     const THEME_WORDS = [
         [/access|password|credential|identity|privileg|joiner|leaver/i, 'hr-access'],
@@ -117,6 +123,46 @@
             if (pair[0].test(t) && out.indexOf(pair[1]) === -1) out.push(pair[1]);
         });
         return out;
+    }
+
+    /**
+     * Free text still available on a client document record after import.
+     * The full body is deliberately never retained (see client-docs-bulk.js —
+     * a whole manual would bloat the row that syncs to Supabase), so this is
+     * everything identification and reference extraction have to work with:
+     * the title, its category, the clause refs the importer captured, the
+     * numbered headings it read, and any notes an auditor typed.
+     */
+    function docText(d) {
+        const headings = arr(d && d.headings).map(function (h) {
+            return str(h && h.clause) + ' ' + str(h && h.text);
+        }).join(' ');
+        return [d && d.name, d && d.category, d && d.linkedClauses, d && d.docNumber, headings, d && d.notes]
+            .map(str).join(' ');
+    }
+
+    /** Sortable rank for a "Rev 4" / "Rev B" marker; no marker sorts last. */
+    function revisionRank(v) {
+        const s = str(v);
+        const num = s.match(/(\d+(?:\.\d+)?)/);
+        if (num) return parseFloat(num[1]);
+        const letter = s.match(/([A-Za-z])\s*$/);
+        return letter ? letter[1].toUpperCase().charCodeAt(0) : -Infinity;
+    }
+
+    /**
+     * The current version among several candidate documents — by issue date,
+     * falling back to the revision marker when neither carries a usable date.
+     * "Current" is what applicability has to be read from; an outdated SoA
+     * left on file from a prior cycle would misstate what is applicable now.
+     */
+    function latestDocument(list) {
+        return list.slice().sort(function (a, b) {
+            const ad = parseDate(a.date), bd = parseDate(b.date);
+            if (ad && bd) return bd.getTime() - ad.getTime();
+            if (ad || bd) return ad ? -1 : 1;
+            return revisionRank(b.revision) - revisionRank(a.revision);
+        })[0];
     }
 
     /**
@@ -284,6 +330,36 @@
             return RISK_DOC.test(str(d.name) + ' ' + str(d.category) + ' ' + str(d.summary));
         });
 
+        // ── Statement of Applicability ────────────────────────────────
+        // A pasted SoA is the auditor looking at the current document right
+        // now, so it always wins and the document set is never even searched.
+        // Failing that, the current SoA on file — if the client has uploaded
+        // one — is the only other source of applicability that is not an
+        // assumption. Several SoA documents can be on file across a cycle's
+        // worth of uploads; only the most recent is current.
+        const suppliedSoa = arr(o.soaApplicable).length
+            ? arr(o.soaApplicable)
+            : arr(checklist && checklist.qaContext && checklist.qaContext.soaApplicable);
+        let soaApplicable = suppliedSoa;
+        let soaSource = suppliedSoa.length ? 'supplied' : null;
+        let soaDocument = null;
+        if (!suppliedSoa.length) {
+            // Identification is deliberately narrower than extraction: it
+            // tests only what the document IS — its name and category — not
+            // its full text. A risk assessment routinely cites "the SoA" in
+            // its notes without being one; matching on notes here would read
+            // that mention as the document declaring itself the SoA.
+            const soaDocs = docs.filter(function (d) { return SOA_DOC.test(str(d.name) + ' ' + str(d.category)); });
+            if (soaDocs.length) {
+                const chosen = latestDocument(soaDocs);
+                const refs = Array.from(new Set(refsInText(docText(chosen))));
+                // Identify the document either way — found-but-unreadable has
+                // to be reported too, not treated as if nothing was found.
+                soaDocument = { name: chosen.name, revision: chosen.revision || '', date: chosen.date || '', refCount: refs.length };
+                if (refs.length) { soaApplicable = refs; soaSource = 'document'; }
+            }
+        }
+
         const focusPoints = arr(plan && plan.preAudit && plan.preAudit.focusPoints);
         const changes = focusPoints.filter(function (f) {
             return CHANGE_WORDS.test(str(typeof f === 'string' ? f : (f.text || f.point || f.title)));
@@ -292,9 +368,15 @@
         return {
             standardIds: standardIds,
             auditType: (checklist && checklist.auditType) || (plan && plan.auditType) || '',
-            soaApplicable: arr(o.soaApplicable).length
-                ? arr(o.soaApplicable)
-                : arr(checklist && checklist.qaContext && checklist.qaContext.soaApplicable),
+            soaApplicable: soaApplicable,
+            // 'supplied' (pasted into the checklist), 'document' (read off the
+            // current SoA on file), or null (neither — assess() assumes tier 1).
+            soaSource: soaSource,
+            // Identifies the SoA document that was used, or the one that was
+            // found but yielded no control references, so assess() can name it
+            // and the auditor can go look at it. Null only when no document on
+            // file reads as an SoA at all.
+            soaDocument: soaDocument,
             client: client,
             cycle: {
                 start: anchor.toISOString().slice(0, 10),
@@ -504,15 +586,41 @@
 
             coverage.controls.push({
                 stdId: id, label: std.label, pool: sel.pool.length, soaDriven: sel.soaDriven,
+                // 'supplied' | 'document' | null — lets the printed panel and
+                // the detail card say where the applicable set came from,
+                // rather than only whether one was found.
+                soaSource: c.soaSource || null, soaDocument: c.soaDocument || null,
                 required: sel.required.length, thisAudit: sampledHere.length, cycle: sampledCycle.length,
                 neverSampled: neverSampled.map(function (ct) { return ct.ref; }),
                 driversUsed: sel.driversUsed, driversMissing: sel.driversMissing
             });
 
             if (!sel.soaDriven) {
-                issues.push(issue('SOA_NOT_SUPPLIED', 'warning',
-                    std.label + ': no Statement of Applicability was supplied, so the applicable set is assumed to be the '
-                    + sel.pool.length + ' controls prioritised for this scope. Paste the SoA references to make the sample defensible.',
+                // A document was found and read as the SoA but yielded no
+                // Annex A references — that is not the same failure as no SoA
+                // being on file at all, and treating it as such would send the
+                // auditor to paste references that already exist somewhere,
+                // rather than to the actual problem: the document could not be
+                // read.
+                if (c.soaDocument) {
+                    issues.push(issue('SOA_DOCUMENT_UNREADABLE', 'warning',
+                        std.label + ': "' + c.soaDocument.name + '"'
+                        + (c.soaDocument.revision ? ' (' + c.soaDocument.revision + ')' : '')
+                        + ' reads as the Statement of Applicability but no Annex A control references could be extracted from it, so the applicable set is assumed to be the '
+                        + sel.pool.length + ' controls prioritised for this scope. Paste the SoA references, or replace the document with one the extractor can read.',
+                        { stdId: id }));
+                } else {
+                    issues.push(issue('SOA_NOT_SUPPLIED', 'warning',
+                        std.label + ': no Statement of Applicability was supplied, so the applicable set is assumed to be the '
+                        + sel.pool.length + ' controls prioritised for this scope. Paste the SoA references, or upload the current SoA as a client document, to make the sample defensible.',
+                        { stdId: id }));
+                }
+            } else if (c.soaSource === 'document') {
+                issues.push(issue('SOA_FROM_DOCUMENT', 'info',
+                    std.label + ': applicability was read from "' + (c.soaDocument && c.soaDocument.name) + '"'
+                    + (c.soaDocument && c.soaDocument.revision ? ' (' + c.soaDocument.revision + ')' : '')
+                    + (c.soaDocument && c.soaDocument.date ? ', dated ' + c.soaDocument.date : '')
+                    + ' — ' + sel.pool.length + ' control(s) declared applicable.',
                     { stdId: id }));
             }
             if (missingRequired.length) {
@@ -678,7 +786,17 @@
             if (resolved[key]) { notes.push(Object.assign({ resolved: resolved[key] }, i)); return; }
             blockers.push({
                 code: i.code, label: label, severity: i.severity,
-                detail: i.message, itemRef: i.itemRef || '', key: key
+                detail: i.message, itemRef: i.itemRef || '', key: key,
+                // RISK_CONTROL_GAP and CYCLE_CONTROL_GAP name the standard and
+                // the exact controls their gap is about (assess() puts them on
+                // the issue as `controls` / `missing`). Carried through here,
+                // rather than discarded with the rest of the issue, so a
+                // caller can offer "add these to the audit" instead of only
+                // "record why they're missing" — the other blocker codes carry
+                // no controls and these fields are simply absent for them.
+                stdId: i.stdId || '',
+                controls: i.controls || null,
+                missing: i.missing || null
             });
         });
 

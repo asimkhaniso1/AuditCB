@@ -3252,8 +3252,38 @@ function renderExecutionTab(report, tabName, contextData = {}) {
      */
     window.runReportIntegrityCheck = async function (reportId, opts) {
         const silent = !!(opts && opts.silent);
-        const container = document.getElementById('report-integrity-results');
-        if (!container) return;
+        let container = document.getElementById('report-integrity-results');
+        if (!container) {
+            // The panel only exists inside the 'review' (Audit Finalization) tab's
+            // markup. A fix-it modal (Set criterion, Record technical review, Set
+            // audit scope, ...) opens FROM that tab, but its Save button can fire
+            // well after the auditor has switched to another tab underneath the
+            // still-open modal — the container is gone by the time this runs,
+            // and returning here used to do so silently: the fix really saved, but
+            // the panel that should show the result had vanished with no route
+            // back to it (reported as "on save it jumps to another page" —
+            // nothing navigates, the modal just closes onto a tab that never had
+            // this panel). The silent background check (the auto-run inside the
+            // 'review' case itself) has no such user-facing gap to paper over, so
+            // it keeps its original quiet no-op.
+            if (silent) return;
+            const reviewTabBtn = document.querySelector('.tab-btn[data-tab="review"]');
+            if (document.getElementById('tab-content') && reviewTabBtn) {
+                // Re-render via the tab button's own click handler (execution-list.js)
+                // instead of calling renderExecutionTab directly here — that
+                // handler still closes over the full contextData (assignedChecklists,
+                // plan, clientPersonnel, ...) this function has no other way to
+                // rebuild, and it also restores the 'review' tab's active state.
+                reviewTabBtn.click();
+                container = document.getElementById('report-integrity-results');
+            }
+            if (!container) {
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification('Saved — but the Report Integrity panel could not be refreshed here. Reopen this report\'s Finalization tab to see the latest result.', 'warning');
+                }
+                return;
+            }
+        }
         const esc = window.UTILS.escapeHtml;
 
         if (!window.ReportIntegrity || typeof window.ReportIntegrity.checkById !== 'function') {
@@ -3638,12 +3668,43 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     }
 
     /**
+     * Badge for an AI-sourced proposal — a different palette and basis text
+     * ("AI — mapped from...") from criterionConfidenceBadge above so an AI
+     * suggestion can never be mistaken for the heuristic's own proposal, let
+     * alone for something the auditor typed. `reason` rides along as a title
+     * (tooltip) so the proposal can be judged, not just trusted.
+     */
+    function aiCriterionBadge(confidence, reason) {
+        const esc = window.UTILS.escapeHtml;
+        const isStrong = confidence === 'high' || confidence === 'medium';
+        const bg = isStrong ? '#ede9fe' : '#f1f5f9';
+        const fg = isStrong ? '#5b21b6' : '#475569';
+        const reasonAttr = esc(reason || 'No reason returned.');
+        return '<span style="background:' + bg + ';color:' + fg + ';font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9px;text-transform:uppercase;" title="' + reasonAttr + '">'
+            + '<i class="fa-solid fa-wand-magic-sparkles" style="margin-right:3px;"></i>' + esc(confidence || 'ai') + '</span>'
+            + '<span style="font-size:0.7rem;color:#7c3aed;margin-left:0.4rem;" title="' + reasonAttr + '">AI — mapped from the question wording</span>';
+    }
+
+    /**
+     * Row note when the AI call answered but had nothing safe to propose (its
+     * `insufficient` contract) — the returned reason stays visible in place
+     * of a proposal; nothing is ever guessed to fill the gap.
+     */
+    function aiInsufficientNote(reason) {
+        const esc = window.UTILS.escapeHtml;
+        return '<span style="font-size:0.7rem;color:#64748b;" title="' + esc(reason || '') + '">AI checked — no suggestion (' + esc(reason || 'insufficient information') + ')</span>';
+    }
+
+    /**
      * "Review all criteria" — one screen to confirm every unassigned criterion.
      *
      * Every row starts BLANK unless the auditor ticks "use" for that row; the
      * suggestion is shown as a proposal with its confidence and basis, never
      * pre-accepted. Rows left untouched are skipped, not cleared, so a partial
-     * pass is safe and repeatable.
+     * pass is safe and repeatable. This applies identically to AI-sourced
+     * proposals (see "Suggest clauses with AI" below) — they fill the same
+     * checkbox+badge proposal shape and are never written into the input until
+     * the auditor ticks "use" and presses Save.
      *
      * @param {string} reportId
      */
@@ -3659,6 +3720,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         const esc = window.UTILS.escapeHtml;
         const blocking = entries.filter(e => e.blocksIssuance).length;
+        // Rows the heuristic left with nothing — the only ones "Suggest
+        // clauses with AI" is allowed to touch (rows that already carry a
+        // heuristic proposal keep it; AI never overwrites one).
+        const aiTargets = entries.map((e, i) => i).filter(i => !entries[i].suggestedRef);
 
         const rows = entries.map((e, i) => {
             const sevLabel = e.blocksIssuance
@@ -3669,12 +3734,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <td style="padding:0.55rem 0.5rem;vertical-align:top;white-space:nowrap;font-family:monospace;font-weight:700;font-size:0.82rem;">${esc(e.clause)}</td>
                 <td style="padding:0.55rem 0.5rem;vertical-align:top;">
                     <div style="font-size:0.82rem;color:#334155;line-height:1.45;">${esc(e.requirement.slice(0, 220))}${e.requirement.length > 220 ? '…' : ''}</div>
-                    <div style="margin-top:0.3rem;display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">${sevLabel}${criterionConfidenceBadge(e)}</div>
+                    <div style="margin-top:0.3rem;display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">${sevLabel}<span class="rac-conf-badge" data-row="${i}">${criterionConfidenceBadge(e)}</span></div>
                 </td>
                 <td style="padding:0.55rem 0.5rem;vertical-align:top;white-space:nowrap;">
-                    ${e.suggestedRef ? `<label style="display:flex;gap:0.35rem;align-items:center;font-size:0.78rem;cursor:pointer;margin-bottom:0.3rem;">
+                    <div class="rac-proposal-slot" data-row="${i}">${e.suggestedRef ? `<label style="display:flex;gap:0.35rem;align-items:center;font-size:0.78rem;cursor:pointer;margin-bottom:0.3rem;">
                         <input type="checkbox" class="rac-use" data-row="${i}" data-suggested="${esc(e.suggestedRef)}"> use ${esc(e.suggestedRef)}
-                    </label>` : ''}
+                    </label>` : ''}</div>
                     <input type="text" class="form-control rac-input" data-row="${i}" data-index="${e.index}"
                         style="margin:0;font-size:0.82rem;padding:4px 8px;width:120px;font-family:monospace;"
                         placeholder="e.g. 8.5.2" value="">
@@ -3690,7 +3755,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 A suggestion is only ever a proposal from the question’s own wording — confirm or correct each one.
                 Leave a row blank to skip it.
             </div>
-            <div style="max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;">
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;padding:0.6rem 0.8rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;">
+                <button type="button" id="rac-ai-suggest-btn" class="btn btn-sm" style="background:linear-gradient(135deg,#a855f7 0%,#7c3aed 100%);color:white;border:none;" ${aiTargets.length ? '' : 'disabled title="Every row already has a suggestion — nothing for AI to fill in."'}>
+                    <i class="fa-solid fa-wand-magic-sparkles" style="margin-right:0.35rem;"></i>Suggest clauses with AI${aiTargets.length ? ' (' + aiTargets.length + ')' : ''}
+                </button>
+                <span id="rac-ai-progress" style="font-size:0.78rem;color:#6d28d9;"></span>
+                <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.78rem;color:#5b21b6;cursor:pointer;margin-left:auto;" title="Run &quot;Suggest clauses with AI&quot; first.">
+                    <input type="checkbox" id="rac-ai-toggle-all" disabled> use all AI proposals
+                </label>
+            </div>
+            <div id="rac-table-wrap" style="max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;">
                 <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
                     <thead><tr style="background:#f8fafc;position:sticky;top:0;">
                         <th style="padding:0.5rem;text-align:left;font-size:0.72rem;text-transform:uppercase;color:#64748b;">Ref</th>
@@ -3753,16 +3827,151 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         });
 
         // "use <suggestion>" ticks copy the proposal into that row's input.
-        // Wired here rather than as a data-action because these controls live
-        // only inside this modal's lifetime.
-        document.querySelectorAll('.rac-use').forEach((box) => {
-            box.addEventListener('change', function () {
-                const row = this.getAttribute('data-row');
+        // Delegated on the table wrapper (rather than one listener per
+        // checkbox) because AI proposals inject NEW .rac-use checkboxes into
+        // the DOM after this modal has already opened — a per-element
+        // listener attached only here, once, would never see them.
+        const tableWrap = document.getElementById('rac-table-wrap');
+        if (tableWrap) {
+            tableWrap.addEventListener('change', (evt) => {
+                const box = evt.target.closest('.rac-use');
+                if (!box) return;
+                const row = box.getAttribute('data-row');
                 const input = document.querySelector('.rac-input[data-row="' + row + '"]');
                 if (!input) return;
-                input.value = this.checked ? (this.getAttribute('data-suggested') || '') : '';
+                input.value = box.checked ? (box.getAttribute('data-suggested') || '') : '';
             });
-        });
+        }
+
+        // -- "Suggest clauses with AI" -------------------------------------
+        // Fills a proposal for exactly the rows collectUnconfirmedCriteria left
+        // with no suggestedRef (aiTargets, computed above from the frozen
+        // entries snapshot — never re-evaluated against what the auditor has
+        // ticked since). Each row renders through the same checkbox +
+        // confidence-badge proposal shape as the heuristic; AI never writes
+        // rac-input directly — only ticking "use" and pressing Save does that.
+        // Modest concurrency (3 in flight) so a review with dozens of blank
+        // rows doesn't fire them all at once, but also doesn't wait on each
+        // one serially.
+        const aiBtn = document.getElementById('rac-ai-suggest-btn');
+        const aiProgress = document.getElementById('rac-ai-progress');
+        const aiToggleAll = document.getElementById('rac-ai-toggle-all');
+
+        const resolveStandardForAI = () => {
+            try {
+                if (typeof AI_SERVICE.resolveStandardName === 'function') return AI_SERVICE.resolveStandardName(report) || '';
+            } catch (_e) { /* fall through to report.standard */ }
+            if (window.KB_HELPERS && typeof window.KB_HELPERS.resolveStandardName === 'function') {
+                try { return window.KB_HELPERS.resolveStandardName(report) || ''; } catch (_e) { /* fall through */ }
+            }
+            return report.standard || '';
+        };
+
+        // Only pass along a note the auditor actually wrote — an empty
+        // auditorNotes string would read to the AI as "the auditor said
+        // nothing relevant" rather than "no notes exist yet".
+        const collectAuditorNotesForAI = (item) => {
+            const parts = [item && item.comment, item && item.ncrDescription, item && item.transcript]
+                .filter((t) => t && String(t).trim());
+            return parts.length ? parts.join('\n') : undefined;
+        };
+
+        if (aiBtn) {
+            aiBtn.addEventListener('click', async () => {
+                if (!aiTargets.length) return;
+                if (typeof AI_SERVICE === 'undefined' || typeof AI_SERVICE.suggestQuestionClause !== 'function') {
+                    window.showNotification('AI clause suggestions are not available in this build.', 'error');
+                    return;
+                }
+
+                aiBtn.disabled = true;
+                const standard = resolveStandardForAI();
+                const total = aiTargets.length;
+                let done = 0;
+                let succeeded = 0;
+                if (aiProgress) aiProgress.textContent = 'Suggesting… 0 / ' + total;
+
+                const runOne = async (i) => {
+                    const e = entries[i];
+                    const payload = { question: e.requirement, sourceClause: e.clause, standard, status: e.status };
+                    const notes = collectAuditorNotesForAI(e.item);
+                    if (notes) payload.auditorNotes = notes;
+
+                    const badgeSlot = document.querySelector('.rac-conf-badge[data-row="' + i + '"]');
+                    const proposalSlot = document.querySelector('.rac-proposal-slot[data-row="' + i + '"]');
+
+                    try {
+                        const suggestion = await AI_SERVICE.suggestQuestionClause(payload);
+                        if (!suggestion || suggestion.insufficient || !suggestion.clause) {
+                            // Honest "we looked and found nothing safe" — never a
+                            // guessed clause standing in for a real answer.
+                            if (badgeSlot) badgeSlot.innerHTML = aiInsufficientNote(suggestion && suggestion.reason);
+                            return;
+                        }
+                        if (badgeSlot) badgeSlot.innerHTML = aiCriterionBadge(suggestion.confidence, suggestion.reason);
+                        if (proposalSlot) {
+                            const reasonAttr = esc(suggestion.reason || 'No reason returned.');
+                            proposalSlot.innerHTML = '<label style="display:flex;gap:0.35rem;align-items:center;font-size:0.78rem;cursor:pointer;margin-bottom:0.3rem;color:#5b21b6;" title="' + reasonAttr + '">'
+                                + '<input type="checkbox" class="rac-use rac-use-ai" data-row="' + i + '" data-suggested="' + esc(suggestion.clause) + '"> use ' + esc(suggestion.clause)
+                                + ' <i class="fa-solid fa-wand-magic-sparkles" style="font-size:0.65rem;"></i></label>';
+                            succeeded++;
+                        }
+                    } catch (err) {
+                        console.warn('suggestQuestionClause failed for row', i, err);
+                        if (badgeSlot) badgeSlot.innerHTML = '<span style="font-size:0.7rem;color:#dc2626;">AI suggestion failed for this row — try again or enter it manually.</span>';
+                    } finally {
+                        done++;
+                        if (aiProgress) aiProgress.textContent = 'Suggesting… ' + done + ' / ' + total;
+                    }
+                };
+
+                // Bounded-concurrency pool: a handful of workers pulling from a
+                // shared cursor — not Promise.all(aiTargets.map(...)) (unbounded,
+                // fires every row at once) and not a for-await loop (serial, slow
+                // for a review with dozens of blank rows).
+                let cursor = 0;
+                const worker = async () => {
+                    while (cursor < aiTargets.length) {
+                        const idx = aiTargets[cursor++];
+                        await runOne(idx);
+                    }
+                };
+
+                try {
+                    await Promise.all(Array.from({ length: Math.min(3, aiTargets.length) }, worker));
+                } catch (err) {
+                    // runOne catches its own row's rejection, so only a bug in the
+                    // pool machinery itself lands here — nothing has been
+                    // silently mis-filled, so just report it and stop.
+                    console.error('AI clause suggestion batch failed:', err);
+                    window.showNotification('AI clause suggestions failed to run: ' + (err && err.message ? err.message : 'unknown error'), 'error');
+                    aiBtn.disabled = false;
+                    if (aiProgress) aiProgress.textContent = '';
+                    return;
+                }
+
+                aiBtn.disabled = false;
+                if (aiProgress) aiProgress.textContent = '';
+                window.showNotification('AI suggested ' + succeeded + ' of ' + total + ' clause(s) — review and tick “use” to accept.', succeeded ? 'success' : 'info');
+                if (aiToggleAll) {
+                    aiToggleAll.disabled = succeeded === 0;
+                    aiToggleAll.title = succeeded ? 'Tick every AI proposal at once — still requires Save to apply.' : 'Run "Suggest clauses with AI" first.';
+                }
+            });
+        }
+
+        // Convenience for a review with dozens of AI proposals: tick/untick
+        // them all at once. Dispatches a real bubbling 'change' event so the
+        // delegated .rac-use listener above (which fills rac-input) fires the
+        // same way it would for a manual click — this never bypasses that path.
+        if (aiToggleAll) {
+            aiToggleAll.addEventListener('change', () => {
+                document.querySelectorAll('.rac-use-ai').forEach((box) => {
+                    box.checked = aiToggleAll.checked;
+                    box.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            });
+        }
     };
 
     /**

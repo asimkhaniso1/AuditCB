@@ -3470,7 +3470,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // Status. Major NCs (0 in the common case) drive Status severity rather
         // than getting their own column, per spec; the area name is folded into
         // the Clause cell rather than a separate column, same reason.
-        const areaBreakdown = (rs && rs.byClauseArea) || { rows: [], unresolved: null, totals: { checked: 0, conform: 0, majorNC: 0, minorNC: 0, observation: 0, ofi: 0 } };
+        // Reached through d.stats.rs, the way every other ReportStats read in this
+        // function does. A bare `rs` here was an undeclared identifier — nothing in
+        // exportReportPDF's scope chain defines it — so the whole export threw
+        // "rs is not defined" on the first click and no PDF was ever produced.
+        const areaBreakdown = (d.stats && d.stats.rs && d.stats.rs.byClauseArea) || { rows: [], unresolved: null, totals: { checked: 0, conform: 0, majorNC: 0, minorNC: 0, observation: 0, ofi: 0 } };
         function areaStatusCell(r) {
             const bg = r.majorNC > 0 ? '#fee2e2' : (r.minorNC > 0 ? '#fef3c7' : '#dcfce7');
             const fg = r.majorNC > 0 ? '#991b1b' : (r.minorNC > 0 ? '#92400e' : '#166534');

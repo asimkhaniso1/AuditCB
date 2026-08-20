@@ -1864,6 +1864,27 @@ function checklistReadiness(checklist) {
 }
 
 /**
+ * Where the Annex A applicable set came from, for a coverage.controls row.
+ *
+ * A pasted SoA, a document-derived SoA and an assumed tier-1 pool are three
+ * different levels of defensibility, and only the document case can name a
+ * specific document — this is the one place both callers (the printed panel
+ * and the detail-view card) get that distinction from, so it reads the same
+ * everywhere it appears. Returns plain text; callers escape it themselves
+ * since one of them embeds it directly into HTML and the other lets its
+ * whole row string get escaped later.
+ */
+function annexACoverageLabel(ct) {
+    if (!ct.soaDriven) {
+        return ct.soaDocument ? 'assumed — SoA document on file could not be read' : 'assumed, no SoA supplied';
+    }
+    if (ct.soaSource === 'document') {
+        return 'per SoA — ' + (ct.soaDocument && ct.soaDocument.name ? ct.soaDocument.name : 'document on file');
+    }
+    return 'per SoA';
+}
+
+/**
  * The cycle-coverage panel printed onto the checklist.
  *
  * Prints the coverage figures even when there is nothing to fix: an assessor
@@ -1884,7 +1905,7 @@ function coveragePanelHTML(cov, checklist) {
         rows.push(`<tr><td>${esc(cl.label)} — requirements</td><td>${cl.thisAudit} / ${cl.total}</td><td>${cl.cycle} / ${cl.total}</td></tr>`);
     });
     (c.controls || []).forEach(ct => {
-        rows.push(`<tr><td>${esc(ct.label)} — Annex A applicable${ct.soaDriven ? ' (per SoA)' : ' (assumed, no SoA supplied)'}</td><td>${ct.thisAudit} / ${ct.pool}</td><td>${ct.cycle} / ${ct.pool}</td></tr>`);
+        rows.push(`<tr><td>${esc(ct.label)} — Annex A applicable (${esc(annexACoverageLabel(ct))})</td><td>${ct.thisAudit} / ${ct.pool}</td><td>${ct.cycle} / ${ct.pool}</td></tr>`);
     });
     if (c.processes && c.processes.total) {
         rows.push(`<tr><td>Critical processes</td><td>&mdash;</td><td>${c.processes.covered} / ${c.processes.total}</td></tr>`);
@@ -1928,8 +1949,10 @@ function readinessBadge(checklist) {
  *
  * A gate with no resolution path is a dead end, so each blocker carries the
  * actions that can genuinely resolve it — remove the question, give it a real
- * clause, or record why it stands as it is. Recording a justification is a
- * disposition, not a dismissal: it is stored with the checklist and printed.
+ * clause, or record why it stands as it is. A control-coverage gap has one
+ * more: the blocker already names the exact controls it is about, so it can
+ * be sampled directly instead of only justified. Recording a justification is
+ * a disposition, not a dismissal: it is stored with the checklist and printed.
  */
 function readinessCardHTML(checklist, res) {
     const esc = window.UTILS.escapeHtml;
@@ -1948,8 +1971,17 @@ function readinessCardHTML(checklist, res) {
         const removable = b.code === 'DUPLICATE_QUESTION' || b.code === 'NEAR_DUPLICATE'
             || b.code === 'IRRELEVANT_REQUIREMENT' || b.code === 'AUDITOR_REVIEW' || b.code === 'INVALID_REF';
         const mappable = b.code === 'IRRELEVANT_REQUIREMENT' || b.code === 'AUDITOR_REVIEW' || b.code === 'INVALID_REF';
+        // RISK_CONTROL_GAP names the controls this audit's risk drivers point
+        // at; CYCLE_CONTROL_GAP names the ones sampled nowhere in the cycle.
+        // Either way `readiness()` carried the refs through as `controls` /
+        // `missing` (see checklist-coverage.js), so the fix can be offered
+        // directly rather than only as something to justify away.
+        const addRefs = b.code === 'RISK_CONTROL_GAP' ? (b.controls || []).map(ctl => ctl.ref)
+            : b.code === 'CYCLE_CONTROL_GAP' ? (b.missing || [])
+                : [];
         return `${removable ? `<button class="btn btn-sm btn-secondary" data-action="removeChecklistQuestion" data-arg1="${esc(id)}" data-arg2="${esc(b.itemRef)}" data-arg3="${esc(b.key)}" title="Delete this question from the checklist"><i class="fa-solid fa-trash" style="margin-right:0.3rem;"></i>Remove question</button>` : ''}
             ${mappable ? `<button class="btn btn-sm btn-secondary" data-action="assignChecklistClause" data-arg1="${esc(id)}" data-arg2="${esc(b.itemRef)}" data-arg3="${esc(b.key)}" title="Give this question a real clause reference"><i class="fa-solid fa-link" style="margin-right:0.3rem;"></i>Assign clause</button>` : ''}
+            ${addRefs.length ? `<button class="btn btn-sm btn-secondary" data-action="addChecklistControls" data-arg1="${esc(id)}" data-arg2="${esc(b.stdId)}" data-arg3="${esc(addRefs.join(','))}" data-arg4="${esc(b.key)}" title="Sample these controls in this audit"><i class="fa-solid fa-plus" style="margin-right:0.3rem;"></i>Add to this audit</button>` : ''}
             <button class="btn btn-sm btn-secondary" data-action="justifyChecklistIssue" data-arg1="${esc(id)}" data-arg2="${esc(b.key)}" title="Record why this stands as it is"><i class="fa-solid fa-pen" style="margin-right:0.3rem;"></i>Record justification</button>`;
     };
 
@@ -2017,7 +2049,7 @@ function coverageCardHTML(cov) {
     };
     const rows = []
         .concat((c.clauses || []).map(cl => [`${cl.label} — requirements`, cl.thisAudit, cl.cycle, cl.total]))
-        .concat((c.controls || []).map(ct => [`${ct.label} — Annex A applicable${ct.soaDriven ? ' (per SoA)' : ' (assumed)'}`, ct.thisAudit, ct.cycle, ct.pool]));
+        .concat((c.controls || []).map(ct => [`${ct.label} — Annex A applicable (${annexACoverageLabel(ct)})`, ct.thisAudit, ct.cycle, ct.pool]));
     if (c.processes && c.processes.total) rows.push(['Critical processes', null, c.processes.covered, c.processes.total]);
 
     const drivers = (c.controls || [])[0];
@@ -2184,6 +2216,80 @@ function justifyChecklistIssue(id, key) {
     checklist.updatedAt = new Date().toISOString().split('T')[0];
     persistChecklist(checklist);
     window.showNotification('Justification recorded.', 'success');
+    viewChecklistDetail(id);
+}
+
+/**
+ * Sample the controls a RISK_CONTROL_GAP or CYCLE_CONTROL_GAP blocker names,
+ * by adding them to the checklist as real questions.
+ *
+ * "Record justification" is the right answer when the auditor has a genuine
+ * reason to leave the gap; it is a dead end when what they actually want is
+ * to sample the control. This is that second path, and unlike a
+ * justification it does not paper over the finding — it makes the finding no
+ * longer true, because the next coverage pass sees the control sampled.
+ *
+ * Appends into the checklist's own Annex A / SoA section (mirroring how
+ * buildClientChecklist groups a control sample by theme under `mainClause:
+ * 'A'` — see client-docs-bulk.js), creating one only if the checklist has
+ * none. Matched by standard label rather than by mainClause alone, since an
+ * integrated checklist can carry one such section per ISMS-family standard.
+ */
+function addChecklistControls(id, stdId, refsCsv, key) {
+    const checklist = state.checklists?.find(c => String(c.id) === String(id));
+    if (!checklist) return;
+    const std = window.ChecklistStandards && window.ChecklistStandards.byId(stdId);
+    if (!std) {
+        window.showNotification('That standard is not in the clause registry, so the controls cannot be added.', 'error');
+        return;
+    }
+    const byRef = {};
+    (std.controls || []).forEach(ctl => { byRef[ctl.ref] = ctl; });
+    const refs = String(refsCsv || '').split(',').map(r => r.trim()).filter(r => r && byRef[r]);
+    if (!refs.length) return;
+
+    const sampled = new Set();
+    (checklist.clauses || []).forEach(main => (main.subClauses || []).forEach(sub => {
+        (sub.refs || []).forEach(r => sampled.add(r.stdId + '::' + r.ref));
+    }));
+    const toAdd = refs.filter(r => !sampled.has(stdId + '::' + r));
+    if (!toAdd.length) {
+        window.showNotification('Those controls are already sampled in this checklist.', 'warning');
+        return;
+    }
+
+    const label = toAdd.map(r => `${r} ${byRef[r].title}`).join('\n');
+    if (!confirm(`Add ${toAdd.length} control(s) to this audit's Annex A sample?\n\n${label}`)) return;
+
+    const prompts = window.ChecklistStandards.CONTROL_THEME_PROMPT || {};
+    const newSubs = toAdd.map(r => {
+        const ctl = byRef[r];
+        const requirement = `Sample ${r} ${ctl.title}. ${prompts[ctl.theme]
+            || 'Obtain objective evidence that the control operates as the Statement of Applicability and the risk treatment plan describe it.'} Record the evidence seen against ${r} separately.`;
+        return {
+            clause: r, title: ctl.title, requirement,
+            refs: [{ stdId, ref: r }], standards: [stdId],
+            citation: window.ChecklistStandards.citation([{ stdId, ref: r }]),
+            criterionRef: r, criterionSource: 'coverage-gap-added',
+            auditorReview: false, documentNote: false,
+            items: [{ clause: r, requirement }]
+        };
+    });
+
+    let section = (checklist.clauses || []).find(main => main.mainClause === 'A'
+        && (String(main.title || '').indexOf(std.label) === 0
+            || (main.subClauses || []).some(sub => (sub.refs || []).some(r => r.stdId === stdId))));
+    if (!section) {
+        section = { mainClause: 'A', title: `${std.label} Annex A — controls added from coverage gaps`, subClauses: [] };
+        if (!checklist.clauses) checklist.clauses = [];
+        checklist.clauses.push(section);
+    }
+    section.subClauses = (section.subClauses || []).concat(newSubs);
+
+    recountChecklist(checklist);
+    clearResolution(checklist, key);
+    persistChecklist(checklist);
+    window.showNotification(`${toAdd.length} control(s) added to the checklist.`, 'success');
     viewChecklistDetail(id);
 }
 
@@ -2531,6 +2637,7 @@ window.unmarkChecklistReadyForAudit = unmarkChecklistReadyForAudit;
 window.removeChecklistQuestion = removeChecklistQuestion;
 window.assignChecklistClause = assignChecklistClause;
 window.justifyChecklistIssue = justifyChecklistIssue;
+window.addChecklistControls = addChecklistControls;
 // Exposed so the plan and execution screens can run the same coverage pass the
 // checklist was released under, rather than re-deriving one of their own.
 window.runChecklistCoverage = runChecklistCoverage;
