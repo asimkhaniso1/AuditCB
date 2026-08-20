@@ -409,3 +409,61 @@ describe('renderChecklistLibrary — globals are filtered to the client\'s stand
         expect(html()).toContain('ISO 50001 Initial');
     });
 });
+
+// "Build from Client Documents" was reachable only via Plans & Audits -> a plan
+// -> Configure Checklists, so a plan had to exist before a client checklist
+// could be built at all. The client workspace's own Checklists screen now
+// offers it directly.
+describe('renderChecklistLibrary — Build from Client Documents action', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+        window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s) };
+        window.CONSTANTS = { AUDIT_TYPES: [], AUDIT_SCOPES: [], ROLES: { CERTIFICATION_MANAGER: 'Certification Manager' } };
+        document.body.innerHTML = '<div id="content-area"></div>';
+        window.contentArea = document.getElementById('content-area');
+        window.state = {
+            currentUser: { role: 'Admin' }, settings: {},
+            cbSettings: { availableStandards: [] },
+            clients: [
+                { id: 'c-1', name: 'KTD Select', standard: 'ISO 9001:2015', documents: [{ name: 'Quality Manual' }] },
+                { id: 'c-2', name: 'No Docs Client', standard: 'ISO 9001:2015', documents: [] }
+            ],
+            checklists: [], auditReports: [], executions: []
+        };
+        loadModule('./checklist-module.js');
+    });
+
+    it('offers the build action in a client-scoped view', () => {
+        window.renderChecklistLibrary('c-1');
+        expect(document.getElementById('btn-build-from-docs')).toBeTruthy();
+    });
+
+    it('does NOT offer it in the global library, which has no client context', () => {
+        window.renderChecklistLibrary(null);
+        expect(document.getElementById('btn-build-from-docs')).toBeNull();
+    });
+
+    it('invokes the builder with the scoped client and no plan', () => {
+        const calls = [];
+        window.buildChecklistFromClientDocs = (...args) => calls.push(args);
+        window.showNotification = () => {};
+        window.renderChecklistLibrary('c-1');
+        document.getElementById('btn-build-from-docs').click();
+        expect(calls).toHaveLength(1);
+        expect(calls[0][0]).toBe('c-1');
+        expect(calls[0][3]).toBeNull();   // planId — built into the library, attached later
+        delete window.buildChecklistFromClientDocs;
+    });
+
+    it('refuses, with a reason, when the client has no documents on file', () => {
+        const calls = [];
+        const notes = [];
+        window.buildChecklistFromClientDocs = (...args) => calls.push(args);
+        window.showNotification = (msg) => notes.push(msg);
+        window.renderChecklistLibrary('c-2');
+        document.getElementById('btn-build-from-docs').click();
+        expect(calls).toHaveLength(0);
+        expect(notes.join(' ')).toMatch(/No documents on file/i);
+        delete window.buildChecklistFromClientDocs;
+    });
+});

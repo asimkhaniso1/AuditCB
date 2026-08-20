@@ -185,6 +185,10 @@ function renderChecklistLibrary(clientId) {
                     <button id="btn-import-checklist" class="btn btn-secondary">
                         <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import Checklist
                     </button>
+                    ${scopedClient ? `
+                    <button id="btn-build-from-docs" class="btn btn-primary" style="background:#7c3aed;border-color:#7c3aed;" aria-label="Build from client documents">
+                        <i class="fa-solid fa-file-lines" style="margin-right: 0.5rem;"></i>Build from Client Documents
+                    </button>` : ''}
                     <button id="btn-new-checklist" class="btn btn-primary" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Checklist
                     </button>
@@ -385,6 +389,27 @@ function renderChecklistLibrary(clientId) {
     // Event Listeners
     document.getElementById('btn-new-checklist')?.addEventListener('click', openAddChecklistModal);
     document.getElementById('btn-import-checklist')?.addEventListener('click', openImportChecklistModal);
+    // Build from the client's own uploaded documents. Previously reachable only
+    // via Plans & Audits -> a plan -> Configure Checklists, which meant a plan
+    // had to exist before a client checklist could be built at all. The builder
+    // itself takes an optional planId, so from here it simply builds the
+    // checklist into the client's library and it can be attached to a plan
+    // later from that plan's Configure Checklists screen.
+    document.getElementById('btn-build-from-docs')?.addEventListener('click', () => {
+        if (typeof window.buildChecklistFromClientDocs !== 'function') {
+            window.showNotification?.('Checklist builder is not available in this build.', 'error');
+            return;
+        }
+        const c = (window.state.clients || []).find(x => String(x.id) === String(_checklistScopeClientId));
+        if (!c) { window.showNotification?.('Client not found.', 'error'); return; }
+        if (!((c.documents || []).length)) {
+            window.showNotification?.(`No documents on file for ${c.name}. Upload them from Documents first.`, 'error');
+            return;
+        }
+        // Standard is left unset so the builder offers every standard on the
+        // client record rather than presuming one.
+        window.buildChecklistFromClientDocs(c.id, null, null, null);
+    });
 
     document.getElementById('checklist-search')?.addEventListener('input', (e) => {
         checklistSearchTerm = e.target.value;
