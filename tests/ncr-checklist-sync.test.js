@@ -454,3 +454,67 @@ describe('window.NCRSyncUtils.collectUnconfirmedCriteria', () => {
         expect(window.NCRSyncUtils.collectUnconfirmedCriteria(null)).toEqual([]);
     });
 });
+
+// Confirming a headcount fixes the PROFILE. A field note stating a different
+// number keeps its own W12 warning, and until this existed there was no path
+// from the warning to the note that caused it — the fix action appeared not to
+// work because the warning never cleared.
+describe('window.NCRSyncUtils.correctHeadcountInNote', () => {
+    beforeEach(() => {
+        window.state = { ncrs: [] };
+        loadModule('./execution-module-v2.js');
+    });
+
+    const fix = (report, ref, oldN, newN) =>
+        window.NCRSyncUtils.correctHeadcountInNote(report, ref, oldN, newN);
+
+    it('rewrites the numeral in a checklist comment, leaving the wording alone', () => {
+        const report = { checklistProgress: [{ comment: '8 now total emplyees.' }] };
+        expect(fix(report, { kind: 'checklist', index: 0, field: 'comment' }, 8, 5)).toBe(true);
+        expect(report.checklistProgress[0].comment).toBe('5 now total emplyees.');
+    });
+
+    it('rewrites a narrative field', () => {
+        const report = { positiveObservations: 'The team confirmed 4 employees are trained.' };
+        expect(fix(report, { kind: 'narrative', field: 'positiveObservations' }, 4, 5)).toBe(true);
+        expect(report.positiveObservations).toBe('The team confirmed 5 employees are trained.');
+    });
+
+    it('rewrites every entry of an array-shaped ofi without flattening it', () => {
+        const report = { ofi: ['Consider training all 4 employees.', 'Unrelated improvement.'] };
+        expect(fix(report, { kind: 'narrative', field: 'ofi' }, 4, 5)).toBe(true);
+        expect(Array.isArray(report.ofi)).toBe(true);
+        expect(report.ofi[0]).toBe('Consider training all 5 employees.');
+        expect(report.ofi[1]).toBe('Unrelated improvement.');
+    });
+
+    it('leaves an unrelated number in the same sentence untouched', () => {
+        const report = { positiveObservations: 'Across 3 sites, 8 employees were interviewed.' };
+        fix(report, { kind: 'narrative', field: 'positiveObservations' }, 8, 5);
+        expect(report.positiveObservations).toBe('Across 3 sites, 5 employees were interviewed.');
+    });
+
+    it('reports false when the figure is not actually present', () => {
+        const report = { positiveObservations: 'No headcount stated here.' };
+        expect(fix(report, { kind: 'narrative', field: 'positiveObservations' }, 8, 5)).toBe(false);
+    });
+
+    it('does not throw on a missing target', () => {
+        expect(() => fix(null, { kind: 'narrative', field: 'x' }, 1, 2)).not.toThrow();
+        expect(fix({ checklistProgress: [] }, { kind: 'checklist', index: 9, field: 'comment' }, 1, 2)).toBe(false);
+    });
+
+    // The whole point of the per-note fix: two notes disagreeing with each
+    // other AND with the profile. Correcting both is what finally clears W12,
+    // which confirming a headcount alone can never do.
+    it('correcting every conflicting note is what makes the figures agree', () => {
+        const report = {
+            checklistProgress: [{ comment: '8 now total emplyees.' }],
+            positiveObservations: 'Records show 4 employees hold current certificates.'
+        };
+        expect(fix(report, { kind: 'checklist', index: 0, field: 'comment' }, 8, 5)).toBe(true);
+        expect(fix(report, { kind: 'narrative', field: 'positiveObservations' }, 4, 5)).toBe(true);
+        expect(report.checklistProgress[0].comment).toContain('5 now total');
+        expect(report.positiveObservations).toContain('5 employees');
+    });
+});

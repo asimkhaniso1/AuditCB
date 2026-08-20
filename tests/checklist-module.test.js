@@ -329,3 +329,83 @@ describe('renderChecklistLibrary — tolerates an incomplete CONSTANTS.ROLES', (
         expect(document.getElementById('content-area').innerHTML).toContain('Certification Manager');
     });
 });
+
+// A client scoped view must not offer checklists for standards the client is
+// not certified to. Showing every global put ISO 14001 / 27001 / 50001 /
+// 20000-1 checklists in front of a client certified to ISO 9001 alone.
+describe('renderChecklistLibrary — globals are filtered to the client\'s standards', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+        window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s) };
+        window.CONSTANTS = { AUDIT_TYPES: [], AUDIT_SCOPES: [], ROLES: { CERTIFICATION_MANAGER: 'Certification Manager' } };
+        document.body.innerHTML = '<div id="content-area"></div>';
+        window.contentArea = document.getElementById('content-area');
+        window.state = {
+            currentUser: { role: 'Admin' },
+            settings: {},
+            cbSettings: { availableStandards: [] },
+            clients: [
+                { id: 'ktd', name: 'KTD Select', standard: 'ISO 9001:2015' },
+                { id: 'pcc', name: 'PC Connection', standard: 'ISO 27001:2022, ISO 22301:2019, ISO/IEC 20000-1:2018' },
+                { id: 'noc', name: 'No Standards Recorded' }
+            ],
+            checklists: [
+                { id: 1, name: 'ISO 9001 Initial', standard: 'ISO 9001:2015', type: 'global', clauses: [] },
+                { id: 2, name: 'ISO 14001 Initial', standard: 'ISO 14001:2015', type: 'global', clauses: [] },
+                { id: 3, name: 'ISO 27001 Initial', standard: 'ISO 27001:2022', type: 'global', clauses: [] },
+                { id: 4, name: 'ISO 50001 Initial', standard: 'ISO 50001:2018', type: 'global', clauses: [] },
+                { id: 5, name: 'IMS Recovered', standard: 'ISO 27001:2022, ISO 22301:2019, ISO 20000-1:2018', type: 'global', clauses: [] },
+                { id: 6, name: 'KTD Own Surveillance', standard: 'ISO 9001:2015', type: 'custom', clientId: 'ktd', clauses: [] }
+            ],
+            auditReports: [], executions: []
+        };
+        loadModule('./checklist-module.js');
+    });
+
+    const html = () => document.getElementById('content-area').innerHTML;
+
+    it('a single-standard client sees only globals for that standard', () => {
+        window.renderChecklistLibrary('ktd');
+        expect(html()).toContain('ISO 9001 Initial');
+        expect(html()).toContain('KTD Own Surveillance');
+        expect(html()).not.toContain('ISO 14001 Initial');
+        expect(html()).not.toContain('ISO 27001 Initial');
+        expect(html()).not.toContain('ISO 50001 Initial');
+    });
+
+    it('a multi-standard client sees globals for any standard it holds', () => {
+        window.renderChecklistLibrary('pcc');
+        expect(html()).toContain('ISO 27001 Initial');
+        expect(html()).not.toContain('ISO 9001 Initial');
+        expect(html()).not.toContain('ISO 50001 Initial');
+    });
+
+    it('an integrated global matches when ANY of its standards is held', () => {
+        window.renderChecklistLibrary('pcc');
+        expect(html()).toContain('IMS Recovered');
+    });
+
+    it('ISO/IEC vs ISO spelling does not hide a relevant checklist', () => {
+        // Client holds "ISO/IEC 20000-1:2018"; the global names "ISO 20000-1:2018".
+        window.renderChecklistLibrary('pcc');
+        expect(html()).toContain('IMS Recovered');
+    });
+
+    it('names the standards it filtered to', () => {
+        window.renderChecklistLibrary('ktd');
+        expect(html()).toContain('plus global checklists for');
+        expect(html()).toContain('ISO 9001:2015');
+    });
+
+    it('a client with no standards recorded is not left with an empty library', () => {
+        window.renderChecklistLibrary('noc');
+        expect(html()).toContain('ISO 9001 Initial');
+        expect(html()).toContain('ISO 14001 Initial');
+    });
+
+    it('the unscoped global library is unaffected', () => {
+        window.renderChecklistLibrary(null);
+        expect(html()).toContain('ISO 14001 Initial');
+        expect(html()).toContain('ISO 50001 Initial');
+    });
+});
