@@ -170,6 +170,87 @@ function applyCriterionToFinding(report, resolved, value) {
 window.NCRSyncUtils.applyCriterionToFinding = applyCriterionToFinding;
 
 /**
+ * Every checklist item still waiting on an auditor-assigned criterion.
+ *
+ * A Stage 1 focus point / org-context / unmapped-document question carries an
+ * internal working reference (FOCUS.n, ORG, DOC) as its `clause`, never a
+ * clause of the audited standard. The builder deliberately does NOT stamp one
+ * on from the question's own text — a clause sitting in a question is what the
+ * question is ABOUT, not the requirement an auditor found unfulfilled, and
+ * guessing produced a real defect (a competence finding recorded against 9.2
+ * because "9.2" appeared in the prompt). So `criterionRef` stays empty and any
+ * recovered clause is held as an unconfirmed `criterionSuggestedRef`.
+ *
+ * That is correct, but it left the assignment itself as a per-finding hunt
+ * through the Report Integrity panel, which is why real reports shipped with
+ * items unattributed. This collects them all so one screen can confirm them.
+ *
+ * Deliberately EXCLUDES:
+ *  - items with a confirmed criterionRef — nothing to decide
+ *  - items whose own clause is already a real clause of the standard
+ *  - ISO/IEC 17021-1 surveillance elements ("9.6.2 (b)") — their criterion is
+ *    a certification-PROGRAMME criterion, not a clause of the client's
+ *    standard, so there is nothing to assign and offering one invites exactly
+ *    the cross-framework confusion B15 blocks at issuance.
+ *
+ * @param {Object} report
+ * @returns {Array<{index, item, clause, requirement, status, ncrType, suggestedRef,
+ *   confidence, basis, blocksIssuance}>} ordered blockers-first
+ */
+function collectUnconfirmedCriteria(report) {
+    if (!report) return [];
+    const pseudo = window.NCR_PSEUDO_CLAUSE_PATTERN || /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
+    const isRegisterSeverity = (t) => ['major', 'minor'].includes(String(t || '').toLowerCase());
+    const out = [];
+
+    (report.checklistProgress || []).forEach((item, index) => {
+        if (!item) return;
+        if (String(item.criterionRef || '').trim()) return; // already assigned
+
+        const clause = String(item.clause || '').trim();
+
+        // Canonical decision on what KIND of reference this is, when the
+        // report layer is loaded; a local pseudo-pattern test otherwise so
+        // this stays correct regardless of script load order.
+        let kind = null;
+        if (window.ReportStats && typeof window.ReportStats.classifyCriterion === 'function') {
+            try { kind = window.ReportStats.classifyCriterion(item).kind; } catch (_e) { kind = null; }
+        }
+        if (kind) {
+            // 'standard' needs nothing; 'programme' must never be given a
+            // clause of the audited standard.
+            if (kind !== 'internal' && kind !== 'none') return;
+        } else if (clause && !pseudo.test(clause)) {
+            return;
+        }
+
+        out.push({
+            index,
+            item,
+            clause: clause || '(none)',
+            requirement: item.requirement || item.description || item.text || '',
+            status: item.status || '',
+            ncrType: item.ncrType || '',
+            suggestedRef: item.criterionSuggestedRef || '',
+            confidence: item.criterionConfidence || 'none',
+            basis: item.criterionBasis || 'none',
+            // A major/minor NC with no criterion is what B1/B14 block issuance
+            // on; an observation, OFI or conforming item is attribution quality,
+            // not a gate. Sorting on it puts the ones that actually stop the
+            // report from issuing at the top of the review.
+            blocksIssuance: item.status === 'nc' && isRegisterSeverity(item.ncrType)
+        });
+    });
+
+    const CONF_RANK = { medium: 0, low: 1, none: 2 };
+    return out.sort((a, b) =>
+        (b.blocksIssuance ? 1 : 0) - (a.blocksIssuance ? 1 : 0)
+        || (CONF_RANK[a.confidence] ?? 3) - (CONF_RANK[b.confidence] ?? 3)
+        || a.index - b.index);
+}
+window.NCRSyncUtils.collectUnconfirmedCriteria = collectUnconfirmedCriteria;
+
+/**
  * Other Major/Minor findings on this report (checklist or manual) sharing
  * the same pseudo-clause as the one just fixed — repeated FOCUS.n/SURV items
  * are common on a real checklist, so fixing them one at a time is tedious.
@@ -3186,6 +3267,27 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             </div>
             <div style="margin-bottom: 1rem; font-size: 0.95rem;">${statusLine}</div>
             <div style="margin: -0.5rem 0 1rem; font-size: 0.75rem; color: #94a3b8;"><i class="fa-solid fa-clock-rotate-left" style="margin-right: 0.3rem;"></i>Last checked ${esc(new Date().toLocaleTimeString())} — totals match the Finalize &amp; Publish gate.</div>
+            ${(function () {
+        // Bulk criterion review. Surfaced whenever anything is unassigned —
+        // not only when a blocker fires — because conforming and advisory
+        // items with no criterion still land in the report's "Criterion not
+        // assigned" row and weaken clause-level attribution, they just don't
+        // stop issuance.
+        const panelReport = state.auditReports.find(r => String(r.id) === String(reportId));
+        const unassigned = panelReport ? collectUnconfirmedCriteria(panelReport) : [];
+        if (!unassigned.length) return '';
+        const blocks = unassigned.filter(u => u.blocksIssuance).length;
+        return `<div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;background:${blocks ? '#fef2f2' : '#f8fafc'};border:1px solid ${blocks ? '#fee2e2' : '#e2e8f0'};border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1rem;">
+                    <div style="flex:1;min-width:220px;font-size:0.85rem;color:#334155;">
+                        <strong>${unassigned.length} finding(s)</strong> carry an internal reference (FOCUS/ORG/DOC) with no assigned criterion${blocks ? ` — <strong style="color:#991b1b;">${blocks} block issuance</strong>` : ''}.
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary"
+                        data-action="reviewAllCriteria" data-id="${esc(String(reportId))}"
+                        aria-label="Review all criteria">
+                        <i class="fa-solid fa-list-check" style="margin-right: 0.3rem;"></i>Review all criteria
+                    </button>
+                </div>`;
+    })()}
             ${allItems.length ? `
             <div style="display: flex; flex-direction: column; gap: 0.6rem;">
                 ${allItems.map(it => {
@@ -3432,6 +3534,164 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     }
                 );
             }
+        });
+    };
+
+    // ── "Review all criteria" bulk fix action ─────────────────────────────
+    // window.setFindingCriterion above resolves ONE finding at a time, reached
+    // from one integrity blocker. That is the right shape for fixing a single
+    // flagged item, but it is the wrong shape for the common real case: a
+    // surveillance checklist built from a Stage 1 review carries a whole block
+    // of FOCUS.n / ORG / DOC items, none of which may carry an auto-stamped
+    // criterion (see collectUnconfirmedCriteria's contract). Assigning them one
+    // modal at a time is why issued reports still had items unattributed.
+    //
+    // This keeps the auditor as the decision-maker on every single row — nothing
+    // is written that they did not type or accept — while letting them work the
+    // whole list in one pass.
+
+    /** Colour/label for a suggestion's confidence, matching the panel's palette. */
+    function criterionConfidenceBadge(entry) {
+        const esc = window.UTILS.escapeHtml;
+        if (!entry.suggestedRef) {
+            return '<span style="font-size:0.7rem;color:#64748b;">no suggestion — auditor judgement</span>';
+        }
+        const isMedium = entry.confidence === 'medium';
+        const bg = isMedium ? '#fef3c7' : '#f1f5f9';
+        const fg = isMedium ? '#92400e' : '#475569';
+        const basisText = entry.basis === 'clause-token-in-question'
+            ? 'clause named in the question text'
+            : entry.basis === 'keyword-fallback' ? 'keyword match only' : 'unknown basis';
+        return '<span style="background:' + bg + ';color:' + fg + ';font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9px;text-transform:uppercase;">'
+            + esc(entry.confidence) + ' confidence</span>'
+            + '<span style="font-size:0.7rem;color:#64748b;margin-left:0.4rem;">' + esc(basisText) + '</span>';
+    }
+
+    /**
+     * "Review all criteria" — one screen to confirm every unassigned criterion.
+     *
+     * Every row starts BLANK unless the auditor ticks "use" for that row; the
+     * suggestion is shown as a proposal with its confidence and basis, never
+     * pre-accepted. Rows left untouched are skipped, not cleared, so a partial
+     * pass is safe and repeatable.
+     *
+     * @param {string} reportId
+     */
+    window.reviewAllCriteria = function (reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) { window.showNotification('Report not found.', 'error'); return; }
+
+        const entries = collectUnconfirmedCriteria(report);
+        if (!entries.length) {
+            window.showNotification('Every finding already carries an assigned criterion.', 'success');
+            return;
+        }
+
+        const esc = window.UTILS.escapeHtml;
+        const blocking = entries.filter(e => e.blocksIssuance).length;
+
+        const rows = entries.map((e, i) => {
+            const sevLabel = e.blocksIssuance
+                ? '<span style="background:#fee2e2;color:#991b1b;font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9px;text-transform:uppercase;">blocks issuance</span>'
+                : '<span style="background:#eff6ff;color:#1d4ed8;font-size:0.68rem;font-weight:600;padding:1px 7px;border-radius:9px;">' + esc((e.status === 'nc' ? (e.ncrType || 'finding') : (e.status || 'not assessed'))) + '</span>';
+            return `
+            <tr style="border-bottom:1px solid #e2e8f0;">
+                <td style="padding:0.55rem 0.5rem;vertical-align:top;white-space:nowrap;font-family:monospace;font-weight:700;font-size:0.82rem;">${esc(e.clause)}</td>
+                <td style="padding:0.55rem 0.5rem;vertical-align:top;">
+                    <div style="font-size:0.82rem;color:#334155;line-height:1.45;">${esc(e.requirement.slice(0, 220))}${e.requirement.length > 220 ? '…' : ''}</div>
+                    <div style="margin-top:0.3rem;display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">${sevLabel}${criterionConfidenceBadge(e)}</div>
+                </td>
+                <td style="padding:0.55rem 0.5rem;vertical-align:top;white-space:nowrap;">
+                    ${e.suggestedRef ? `<label style="display:flex;gap:0.35rem;align-items:center;font-size:0.78rem;cursor:pointer;margin-bottom:0.3rem;">
+                        <input type="checkbox" class="rac-use" data-row="${i}" data-suggested="${esc(e.suggestedRef)}"> use ${esc(e.suggestedRef)}
+                    </label>` : ''}
+                    <input type="text" class="form-control rac-input" data-row="${i}" data-index="${e.index}"
+                        style="margin:0;font-size:0.82rem;padding:4px 8px;width:120px;font-family:monospace;"
+                        placeholder="e.g. 8.5.2" value="">
+                    <div class="rac-warning" data-row="${i}" style="display:none;color:#dc2626;font-size:0.7rem;margin-top:0.2rem;"></div>
+                </td>
+            </tr>`;
+        }).join('');
+
+        window.DataService.openFormModal('Review Criteria — ' + entries.length + ' unassigned', `
+            <div style="font-size:0.85rem;color:#475569;margin-bottom:0.75rem;line-height:1.5;">
+                These findings carry an internal working reference (FOCUS/ORG/DOC), not a clause of the audited standard.
+                ${blocking ? '<strong style="color:#991b1b;">' + blocking + ' of them block issuance</strong> and are listed first. ' : ''}
+                A suggestion is only ever a proposal from the question’s own wording — confirm or correct each one.
+                Leave a row blank to skip it.
+            </div>
+            <div style="max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;">
+                <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                    <thead><tr style="background:#f8fafc;position:sticky;top:0;">
+                        <th style="padding:0.5rem;text-align:left;font-size:0.72rem;text-transform:uppercase;color:#64748b;">Ref</th>
+                        <th style="padding:0.5rem;text-align:left;font-size:0.72rem;text-transform:uppercase;color:#64748b;">Audit question</th>
+                        <th style="padding:0.5rem;text-align:left;font-size:0.72rem;text-transform:uppercase;color:#64748b;">Criterion</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            <div style="margin-top:0.6rem;font-size:0.75rem;color:#94a3b8;">
+                ISO/IEC 17021-1 surveillance elements (9.6.2 (a)–(h)) are deliberately excluded — their criterion is a certification-programme criterion, not a clause of the client’s standard.
+            </div>
+        `, () => {
+            const inputs = Array.from(document.querySelectorAll('.rac-input'));
+            let applied = 0;
+            let firstInvalid = null;
+
+            // Validate everything BEFORE writing anything, so a typo halfway
+            // down the list can't leave half the batch applied.
+            const pending = [];
+            inputs.forEach((input) => {
+                const rowKey = input.getAttribute('data-row');
+                const warnEl = document.querySelector('.rac-warning[data-row="' + rowKey + '"]');
+                if (warnEl) { warnEl.style.display = 'none'; warnEl.textContent = ''; }
+                const value = Sanitizer.sanitizeText(input.value || '').trim();
+                if (!value) return; // skipped row
+
+                if (window.NCR_PSEUDO_CLAUSE_PATTERN.test(value)) {
+                    if (warnEl) { warnEl.textContent = 'Internal reference, not a clause.'; warnEl.style.display = 'block'; }
+                    if (!firstInvalid) firstInvalid = input;
+                    return;
+                }
+                if (!isValidClauseRef(value)) {
+                    if (warnEl) { warnEl.textContent = 'Not a valid clause reference.'; warnEl.style.display = 'block'; }
+                    if (!firstInvalid) firstInvalid = input;
+                    return;
+                }
+                pending.push({ index: parseInt(input.getAttribute('data-index'), 10), value });
+            });
+
+            if (firstInvalid) {
+                window.showNotification('Correct the highlighted reference(s) before saving.', 'error');
+                firstInvalid.focus();
+                return;
+            }
+            if (!pending.length) {
+                window.showNotification('No criteria entered — nothing was changed.', 'info');
+                return;
+            }
+
+            pending.forEach(({ index, value }) => {
+                const item = (report.checklistProgress || [])[index];
+                if (!item) return;
+                applyCriterionToFinding(report, { kind: 'checklist', item, index }, value);
+                applied++;
+            });
+
+            window.closeModal();
+            persistAndRefreshIntegrity(reportId, 'Assigned criteria to ' + applied + ' finding(s).');
+        });
+
+        // "use <suggestion>" ticks copy the proposal into that row's input.
+        // Wired here rather than as a data-action because these controls live
+        // only inside this modal's lifetime.
+        document.querySelectorAll('.rac-use').forEach((box) => {
+            box.addEventListener('change', function () {
+                const row = this.getAttribute('data-row');
+                const input = document.querySelector('.rac-input[data-row="' + row + '"]');
+                if (!input) return;
+                input.value = this.checked ? (this.getAttribute('data-suggested') || '') : '';
+            });
         });
     };
 

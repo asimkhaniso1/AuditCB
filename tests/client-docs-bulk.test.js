@@ -5,6 +5,10 @@ window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () 
 
 const fs = await import('fs');
 const path = await import('path');
+// report-stats.js first: the criterion tests assert how the REPORT layer
+// classifies what the checklist builder produced, so both halves of that
+// contract are exercised together rather than assumed.
+eval(fs.readFileSync(path.resolve('./report-stats.js'), 'utf8'));
 const src = fs.readFileSync(path.resolve('./client-docs-bulk.js'), 'utf8');
 eval(src);
 
@@ -913,14 +917,33 @@ describe('ClientDocsBulk', () => {
             expect(focusItem.criterionConfirmed).toBeUndefined();
         });
 
-        it('records a SURV mandatory-element clause the same way, as an unconfirmed suggestion', () => {
+        // A §9.6.2 element is an ISO/IEC 17021-1 PROGRAMME criterion governing
+        // the certification body's own surveillance — it is not a clause of the
+        // client's standard, and its criterion is already known. Running the
+        // ISO-clause suggester over its text produced actively harmful hints:
+        // element (b) ("actions taken on nonconformities … corrective action …")
+        // suggested ISO 9001 10.2, which would invite an auditor to stamp a
+        // client-standard clause onto a CB-programme criterion.
+        it('offers NO ISO-clause suggestion for a SURV mandatory element', () => {
             const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance', includeMandatory: true });
             const survClause = cl.clauses.find(c => c.mainClause === 'SURV');
             expect(survClause).toBeTruthy();
             survClause.subClauses.forEach(item => {
                 expect(item.criterionRef).toBe('');
-                if (item.criterionSuggestedRef) expect(item.criterionConfirmed).toBe(false);
+                expect(item.criterionSuggestedRef).toBeUndefined();
+                expect(item.criterionSource).toBe('surveillance-programme');
             });
+        });
+
+        it('specifically never suggests 10.2 for §9.6.2(b), whose text is all about corrective action', () => {
+            const cl = B.buildClientChecklist(client, docs, { auditType: 'surveillance', includeMandatory: true });
+            const b = cl.clauses.find(c => c.mainClause === 'SURV')
+                .subClauses.find(i => /\(b\)/.test(i.clause));
+            expect(b).toBeTruthy();
+            expect(b.criterionSuggestedRef).toBeUndefined();
+            // And the report layer must label it a programme criterion, never a
+            // clause of the audited standard.
+            expect(window.ReportStats.classifyCriterion(b).kind).toBe('programme');
         });
     });
 
