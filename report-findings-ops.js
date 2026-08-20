@@ -103,6 +103,27 @@
         return esc(clause || '—');
     }
 
+    // Same honesty rule as criterionCell(), but for the Applicable Requirements
+    // Matrix, whose ISO-clause rows carry only a bare ref string (no separate
+    // criterionRef field to prefer) — built either by AuditFrameworks.requirementSourcesFor()
+    // or, when that's unavailable, by this file's own fallback below from raw
+    // hydratedProgress.clause values. Either source can hand back an internal
+    // FOCUS/SURV/ORG/DOC working reference; TASK A requires it never be printed
+    // as if it were a real clause of the standard. Routed through
+    // ReportStats.formatCriterion({clause: ref}) for a single shared definition
+    // of "internal reference" with every other section of this report; local
+    // regex fallback keeps this correct even if ReportStats hasn't loaded.
+    function matrixRefLabel(ref) {
+        try {
+            if (global.ReportStats && typeof global.ReportStats.formatCriterion === 'function') {
+                return global.ReportStats.formatCriterion({ clause: ref }).label || (String(ref || '').trim() || '—');
+            }
+        } catch (_e) { /* noop */ }
+        var r = String(ref == null ? '' : ref).trim();
+        if (/^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i.test(r)) return 'internal ref ' + r;
+        return r || '—';
+    }
+
     // ─── Local CAPA join (replicates report-risk.js linkedCapaRecords) ────────
     // Primary match: register entry's auditId === this report's audit plan id.
     // Secondary match: same clientId + clause matches a finding clause in this
@@ -295,9 +316,20 @@
                 var key = String(item.clause).trim();
                 if (!key || seen[key]) return;
                 seen[key] = true;
+                // TASK B: the Knowledge Base match is the only ground truth for a
+                // clause's official title (e.g. 8.5.2 -> "Identification and
+                // traceability"). item.requirement is a DIFFERENT field — the
+                // auditor's own free-text checklist question for this one sampled
+                // item — and item.department is different again (the Process/
+                // Department field, rendered separately elsewhere; see the Dept
+                // column in the Finding Lifecycle / Evidence Traceability tables
+                // below). Neither may stand in for a missing clause title: with
+                // no kbMatch, title is left '' so the row prints an honest em
+                // dash (see the '<td>' + esc(it.title || '—') below) instead of a
+                // plausible-looking value pulled from a field that isn't a title.
                 items.push({
                     ref: key,
-                    title: (item.kbMatch && item.kbMatch.title) || item.requirement || '',
+                    title: (item.kbMatch && item.kbMatch.title) || '',
                     mandatory: true
                 });
             });
@@ -325,11 +357,18 @@
             var rows = group.items.map(function (it) {
                 if (!it) return '';
                 var applicable = it.mandatory === false ? 'No' : 'Yes';
+                // Matching stays keyed on the raw it.ref — an internal FOCUS/SURV/
+                // ORG/DOC reference still matches its own hydratedProgress rows
+                // fine, since clauseAuditedAndResult() only does string equality/
+                // prefix comparison. Only the printed Ref cell is re-labelled
+                // (matrixRefLabel, ISO rows only — TASK A) so a working reference
+                // is never shown as if it were a real clause of the standard.
                 var auditedInfo = isIso ? clauseAuditedAndResult(hydratedProgress, it.ref) : { audited: false, result: null };
                 var auditedLabel = isIso ? (auditedInfo.audited ? 'Yes' : 'No') : '—';
                 var resultHtml = isIso ? resultBadgeHtml(auditedInfo) : badge('Not sampled', 'neutral');
+                var refDisplay = isIso ? matrixRefLabel(it.ref) : (String(it.ref || '').trim() || '—');
                 return '<tr style="break-inside:avoid;">'
-                    + '<td style="font-weight:700;white-space:nowrap;">' + esc(it.ref || '—') + '</td>'
+                    + '<td style="font-weight:700;white-space:nowrap;">' + esc(refDisplay) + '</td>'
                     + '<td>' + esc(it.title || '—') + '</td>'
                     + '<td style="text-align:center;">' + esc(applicable) + '</td>'
                     + '<td style="text-align:center;">' + esc(auditedLabel) + '</td>'

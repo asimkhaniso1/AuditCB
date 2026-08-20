@@ -1533,7 +1533,7 @@ function viewChecklistDetail(id) {
             </div>
 
             ${readinessCardHTML(checklist, res)}
-            ${coverageCardHTML(res.coverage)}
+            ${coverageCardHTML(res.coverage, checklist)}
 
             <div class="card">
                 <h3 style="margin-bottom: 1rem;">
@@ -2034,12 +2034,37 @@ function readinessCardHTML(checklist, res) {
         </div>`;
 }
 
-/** The cycle-coverage figures, shown in the detail view under readiness. */
-function coverageCardHTML(cov) {
+/**
+ * "Supply SoA" affordance for an Annex A row still running on the assumed
+ * pool — i.e. `!ct.soaDriven`, the exact condition `annexACoverageLabel`
+ * reports as "assumed". Rendered into the row itself rather than a separate
+ * screen: that row is where the auditor reads the assumption, so that is
+ * where the fix belongs. Both legitimate sources are offered side by side —
+ * a document already on file, or a pasted reference list — since neither
+ * subsumes the other (a client may have no SoA document loaded yet, or one
+ * on file the auditor would rather transcribe from directly).
+ */
+function soaSupplyActionsHTML(ct, checklistId) {
+    if (ct.soaDriven || !checklistId) return '';
+    const esc = window.UTILS.escapeHtml;
+    return `<div style="margin-top:0.35rem;display:flex;gap:0.4rem;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-secondary" data-action="pickChecklistSoADocument" data-arg1="${esc(checklistId)}" data-arg2="${esc(ct.stdId)}" title="Use a document already on file for this client"><i class="fa-solid fa-folder-open" style="margin-right:0.3rem;"></i>Use document on file</button>
+        <button class="btn btn-sm btn-secondary" data-action="pasteChecklistSoA" data-arg1="${esc(checklistId)}" data-arg2="${esc(ct.stdId)}" title="Paste the control references the SoA declares applicable"><i class="fa-solid fa-paste" style="margin-right:0.3rem;"></i>Paste SoA references</button>
+    </div>`;
+}
+
+/**
+ * The cycle-coverage figures, shown in the detail view under readiness.
+ *
+ * @param {Object|null} cov - result from runChecklistCoverage
+ * @param {Object} [checklist] - source of the id the SoA-supply buttons act on
+ */
+function coverageCardHTML(cov, checklist) {
     if (!cov || !cov.coverage) return '';
     const esc = window.UTILS.escapeHtml;
     const c = cov.coverage;
     const cycle = c.cycle || {};
+    const checklistId = checklist ? String(checklist.id) : '';
     const bar = (num, den) => {
         const pct = den ? Math.round((num / den) * 100) : 0;
         const color = pct >= 100 ? '#059669' : pct >= 70 ? '#f59e0b' : '#dc2626';
@@ -2048,9 +2073,9 @@ function coverageCardHTML(cov) {
             <span style="font-size:0.8rem;color:#475569;min-width:64px;text-align:right;">${num} / ${den}</span></div>`;
     };
     const rows = []
-        .concat((c.clauses || []).map(cl => [`${cl.label} — requirements`, cl.thisAudit, cl.cycle, cl.total]))
-        .concat((c.controls || []).map(ct => [`${ct.label} — Annex A applicable (${annexACoverageLabel(ct)})`, ct.thisAudit, ct.cycle, ct.pool]));
-    if (c.processes && c.processes.total) rows.push(['Critical processes', null, c.processes.covered, c.processes.total]);
+        .concat((c.clauses || []).map(cl => [`${cl.label} — requirements`, cl.thisAudit, cl.cycle, cl.total, '']))
+        .concat((c.controls || []).map(ct => [`${ct.label} — Annex A applicable (${annexACoverageLabel(ct)})`, ct.thisAudit, ct.cycle, ct.pool, soaSupplyActionsHTML(ct, checklistId)]));
+    if (c.processes && c.processes.total) rows.push(['Critical processes', null, c.processes.covered, c.processes.total, '']);
 
     const drivers = (c.controls || [])[0];
     return `
@@ -2071,7 +2096,7 @@ function coverageCardHTML(cov) {
                 </tr></thead>
                 <tbody>
                     ${rows.map(row => `<tr>
-                        <td style="padding:0.5rem 0.25rem;color:#334155;">${esc(row[0])}</td>
+                        <td style="padding:0.5rem 0.25rem;color:#334155;">${esc(row[0])}${row[4] || ''}</td>
                         <td style="padding:0.5rem 0.25rem;">${row[1] === null ? '<span style="color:#94a3b8;">&mdash;</span>' : bar(row[1], row[3])}</td>
                         <td style="padding:0.5rem 0.25rem;">${bar(row[2], row[3])}</td>
                     </tr>`).join('')}
@@ -2291,6 +2316,154 @@ function addChecklistControls(id, stdId, refsCsv, key) {
     persistChecklist(checklist);
     window.showNotification(`${toAdd.length} control(s) added to the checklist.`, 'success');
     viewChecklistDetail(id);
+}
+
+/**
+ * Control references named anywhere in free text.
+ *
+ * The exact convention `cldoc-soa`'s handler uses when a checklist is first
+ * built (client-docs-bulk.js) — copied rather than shared, since that field
+ * is a plain regex match with nothing to import, but kept byte-identical so
+ * a reference list parses the same way wherever it is supplied.
+ */
+function refsFromSoAText(text) {
+    // Delegates to ChecklistCoverage so the rule for what counts as an Annex A
+    // reference is defined once. The local pattern is the fallback for the case
+    // where that module has not loaded, and must stay identical to it.
+    const refs = window.ChecklistCoverage && typeof window.ChecklistCoverage.refsInText === 'function'
+        ? window.ChecklistCoverage.refsInText(text)
+        : (String(text || '').match(/A\.\d{1,2}\.\d{1,2}/g) || []);
+    return Array.from(new Set(refs));
+}
+
+/**
+ * Free text available on a client document record.
+ *
+ * Same field list checklist-coverage.js reads to identify an SoA document
+ * (name, category, linked clauses, doc number, headings, notes) — kept as an
+ * independent copy here rather than a call into that module, per the note
+ * that its SoA detection is being reworked elsewhere; this only needs the
+ * field list, not its detection behaviour.
+ */
+function soaTextFromDocument(d) {
+    const headings = ((d && d.headings) || []).map(h => `${(h && h.clause) || ''} ${(h && h.text) || ''}`).join(' ');
+    return [d && d.name, d && d.category, d && d.linkedClauses, d && d.docNumber, headings, d && d.notes]
+        .map(v => String(v == null ? '' : v)).join(' ');
+}
+
+/**
+ * Store a supplied SoA onto the checklist and let coverage re-run against it.
+ *
+ * Writes to `checklist.qaContext.soaApplicable` — the exact field
+ * `runChecklistCoverage` reads and the exact field the build modal
+ * populates it with at creation (client-docs-bulk.js) — so a checklist
+ * supplied this way is judged identically to one built with the SoA already
+ * in hand. An empty or unparseable list is refused, with the reason, rather
+ * than silently storing nothing and leaving "assumed" on screen — the
+ * auditor needs to know the paste did not take, not discover it later on
+ * the printed checklist.
+ *
+ * Supplying an SoA changes what the Annex A sample is being judged against,
+ * so it is a substantive change exactly like removing a question or adding
+ * sampled controls: recountChecklist() carries the same release withdrawal
+ * every other substantive change on this checklist goes through.
+ */
+function applyChecklistSoA(checklist, refs, provenance) {
+    if (!refs || !refs.length) {
+        window.showNotification('No Annex A control references were recognised in that text — expected references like A.5.1 or A.8.13. Nothing was stored, and the applicable set is still shown as assumed.', 'error');
+        return;
+    }
+    if (!checklist.qaContext) checklist.qaContext = {};
+    checklist.qaContext.soaApplicable = refs;
+    // Recorded the way the other actions on this card record provenance —
+    // who supplied it, when, and how — so the reasoning travels with the
+    // checklist rather than only the resulting figures.
+    checklist.qaContext.soaSupplied = {
+        by: (window.state?.currentUser?.name) || 'Admin',
+        at: new Date().toISOString().split('T')[0],
+        source: provenance.source,
+        document: provenance.document
+            ? { name: provenance.document.name, revision: provenance.document.revision || '', date: provenance.document.date || '' }
+            : null,
+        refs: refs
+    };
+    recountChecklist(checklist);
+    persistChecklist(checklist);
+    window.showNotification(`Statement of Applicability recorded — ${refs.length} control(s) applicable. Coverage recalculated.`, 'success');
+    viewChecklistDetail(String(checklist.id));
+}
+
+/**
+ * Route (a): attach the SoA to a document already on file for this client.
+ *
+ * Candidates are listed exactly as `client.documents` holds them — name,
+ * revision and date — sorted most-recent-first so the current one is the
+ * one at the top; several revisions of an SoA can be on file across a
+ * cycle's worth of uploads. References are read off the chosen document's
+ * own record first; a client-documents entry rarely carries much more than
+ * its name, category and linked clauses (the full body is deliberately
+ * never retained — see soaTextFromDocument), so when nothing can be read
+ * from it the auditor is asked to type the list themselves, still
+ * attributed to the document they picked.
+ */
+function pickChecklistSoADocument(id, stdId) {
+    const checklist = state.checklists?.find(c => String(c.id) === String(id));
+    if (!checklist) return;
+    const std = window.ChecklistStandards && window.ChecklistStandards.byId(stdId);
+    if (!std) {
+        window.showNotification('That standard is not in the clause registry, so the Statement of Applicability cannot be recorded.', 'error');
+        return;
+    }
+    const client = (state.clients || []).find(c => String(c.id) === String(checklist.clientId))
+        || (state.clients || []).find(c => c.name === checklist.clientName);
+    const docs = ((client && client.documents) || []).filter(d => d && d.name);
+    if (!docs.length) {
+        window.showNotification('No documents are on file for this client. Paste the SoA references directly instead.', 'warning');
+        return;
+    }
+    const sorted = docs.slice().sort((a, b) => {
+        const ad = a.date ? Date.parse(a.date) : NaN;
+        const bd = b.date ? Date.parse(b.date) : NaN;
+        if (!isNaN(ad) && !isNaN(bd)) return bd - ad;
+        if (!isNaN(ad) || !isNaN(bd)) return isNaN(ad) ? 1 : -1;
+        return 0;
+    });
+    const listing = sorted.map((d, i) => `${i + 1}. ${d.name}${d.revision ? ' — Rev ' + d.revision : ''}${d.date ? ' — ' + d.date : ''}`).join('\n');
+    const choice = prompt(`Which document on file is the current Statement of Applicability for ${std.label}?\n\n${listing}\n\nEnter its number.`, '');
+    if (choice === null) return;
+    const idx = parseInt(String(choice).trim(), 10);
+    const doc = idx >= 1 && idx <= sorted.length ? sorted[idx - 1] : null;
+    if (!doc) {
+        window.showNotification(`"${choice}" is not one of the listed documents.`, 'error');
+        return;
+    }
+    let refs = refsFromSoAText(soaTextFromDocument(doc));
+    if (!refs.length) {
+        const entered = prompt(`"${doc.name}" does not carry any recognisable control references on its own record. Paste the references it declares applicable\n\ne.g. A.5.1, A.5.9, A.8.13`, '');
+        if (entered === null) return;
+        refs = refsFromSoAText(entered);
+    }
+    applyChecklistSoA(checklist, refs, { source: 'document', document: doc });
+}
+
+/**
+ * Route (b): paste the reference list directly.
+ *
+ * Same parsing convention `cldoc-soa` uses when a checklist is first built
+ * (client-docs-bulk.js — see refsFromSoAText), so a reference list behaves
+ * identically whichever place it is supplied.
+ */
+function pasteChecklistSoA(id, stdId) {
+    const checklist = state.checklists?.find(c => String(c.id) === String(id));
+    if (!checklist) return;
+    const std = window.ChecklistStandards && window.ChecklistStandards.byId(stdId);
+    if (!std) {
+        window.showNotification('That standard is not in the clause registry, so the Statement of Applicability cannot be recorded.', 'error');
+        return;
+    }
+    const entered = prompt(`Control references the Statement of Applicability declares applicable for ${std.label}\n\ne.g. A.5.1, A.5.9, A.5.15, A.8.8, A.8.13`, '');
+    if (entered === null) return;
+    applyChecklistSoA(checklist, refsFromSoAText(entered), { source: 'pasted' });
 }
 
 /** Locate a sub-clause by its clause reference, with its parent and position. */
@@ -2638,6 +2811,8 @@ window.removeChecklistQuestion = removeChecklistQuestion;
 window.assignChecklistClause = assignChecklistClause;
 window.justifyChecklistIssue = justifyChecklistIssue;
 window.addChecklistControls = addChecklistControls;
+window.pickChecklistSoADocument = pickChecklistSoADocument;
+window.pasteChecklistSoA = pasteChecklistSoA;
 // Exposed so the plan and execution screens can run the same coverage pass the
 // checklist was released under, rather than re-deriving one of their own.
 window.runChecklistCoverage = runChecklistCoverage;

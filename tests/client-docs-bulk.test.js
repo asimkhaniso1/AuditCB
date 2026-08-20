@@ -1078,3 +1078,63 @@ describe('ClientDocsBulk', () => {
         });
     });
 });
+
+// Annex A control references.
+//
+// A Statement of Applicability is the document that decides which ISO/IEC 27001
+// controls apply, and cycle coverage is measured against it. The extractor
+// recognised body clauses 4-10 only, so an uploaded SoA yielded no control
+// references at all — and, because "A.5.1" contains "5.1", it silently produced
+// a BODY clause the document does not cover.
+describe('ClientDocsBulk.findClauseRefs — Annex A control references', () => {
+    it('reads an Annex A control reference', () => {
+        expect(B.findClauseRefs('A.5.1')).toEqual(['A.5.1']);
+        expect(B.findClauseRefs('A.8.13')).toEqual(['A.8.13']);
+    });
+
+    it('does not emit a body clause from inside a control reference', () => {
+        expect(B.findClauseRefs('A.5.1')).not.toContain('5.1');
+        expect(B.findClauseRefs('A.8.13')).not.toContain('8.13');
+    });
+
+    it('still reads ordinary body clauses, alongside controls', () => {
+        expect(B.findClauseRefs('clause 8.5.2')).toEqual(['8.5.2']);
+        expect(B.findClauseRefs('8.4 and A.5.9')).toEqual(['8.4', 'A.5.9']);
+    });
+
+    it('ignores a revision number that merely looks like a clause', () => {
+        expect(B.findClauseRefs('Rev 1.2')).toEqual([]);
+    });
+});
+
+describe('ClientDocsBulk.parseContentMeta — a Statement of Applicability', () => {
+    // 93 controls is the real size of ISO/IEC 27001:2022 Annex A. The heading
+    // cap is 30, which is right for title inference and was throwing away two
+    // thirds of the applicable set when it also bounded the reference list.
+    function soaText(rows) {
+        return ['Statement of Applicability', 'Rev 4.0', '']
+            .concat(rows).join('\n');
+    }
+
+    it('captures every control row, past the heading cap', () => {
+        const rows = [];
+        for (let i = 1; i <= 37; i++) rows.push(`A.5.${i} Organizational control number ${i}`);
+        for (let i = 1; i <= 34; i++) rows.push(`A.8.${i} Technological control number ${i}`);
+        const parsed = B.parseContentMeta(soaText(rows));
+        expect(parsed.clauseRefs).toContain('A.5.1');
+        expect(parsed.clauseRefs).toContain('A.5.35');
+        expect(parsed.clauseRefs).toContain('A.8.13');
+        expect(parsed.clauseRefs).toContain('A.8.34');
+        expect(parsed.clauseRefs.length).toBe(71);
+        // Headings stay capped — they only feed title inference.
+        expect(parsed.headings.length).toBe(30);
+    });
+
+    it('does not map an SoA onto body clauses it never covers', () => {
+        const parsed = B.parseContentMeta(soaText([
+            'A.5.1 Policies for information security',
+            'A.8.13 Information backup'
+        ]));
+        expect(parsed.clauseRefs).toEqual(['A.5.1', 'A.8.13']);
+    });
+});

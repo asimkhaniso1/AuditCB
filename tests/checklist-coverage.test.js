@@ -503,6 +503,216 @@ describe('ChecklistCoverage.buildContext — Statement of Applicability from a d
         expect(ctx.soaApplicable).toEqual(['A.5.1']);
         expect(ctx.soaDocument).toBe(null);
     });
+
+    it('counts how many client documents were actually searched for an SoA', () => {
+        window.state = stateWithDocs([
+            { name: 'Quality Manual', category: 'System Manual' },
+            { name: 'Access Control Procedure', category: 'Quality Procedures' }
+        ]);
+        const ctx = window.ChecklistCoverage.buildContext(checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), {});
+        expect(ctx.soaDocsChecked).toBe(2);
+        expect(ctx.soaDocument).toBe(null);
+    });
+});
+
+describe('ChecklistCoverage.assess — SoA gap messages name what was searched', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
+        loadModule('./checklist-standards.js');
+        loadModule('./checklist-qa.js');
+        loadModule('./checklist-coverage.js');
+    });
+
+    // This is the live spec: real recertification output for a client with no
+    // SoA on file read as generic ("no Statement of Applicability was
+    // supplied") regardless of whether any documents existed to search. The
+    // fix makes the count of documents actually checked part of the message.
+    it('says how many documents were checked and found no match, when documents exist', () => {
+        const res = window.ChecklistCoverage.assess(
+            checklistOf(allMandatory('iso27001')), ctxOf({ soaDocsChecked: 6 }));
+        const w = res.issues.find(i => i.code === 'SOA_NOT_SUPPLIED');
+        expect(w.message).toMatch(/6 client document/);
+        expect(w.message).toMatch(/searched each document's name and category/);
+    });
+
+    it('says there are no documents at all, rather than a generic message, when the client has none', () => {
+        const res = window.ChecklistCoverage.assess(
+            checklistOf(allMandatory('iso27001')), ctxOf({ soaDocsChecked: 0 }));
+        const w = res.issues.find(i => i.code === 'SOA_NOT_SUPPLIED');
+        expect(w.message).toMatch(/no documents on file at all/);
+    });
+
+    it('tells the auditor to paste references into the document, not to re-upload it, when found but unreadable', () => {
+        const res = window.ChecklistCoverage.assess(
+            checklistOf(allMandatory('iso27001')),
+            ctxOf({
+                soaDocsChecked: 1,
+                soaDocument: { name: 'ISO27001 Statement of Applicability', revision: 'Rev 1', date: '2026-01-15', refCount: 0 }
+            }));
+        const w = res.issues.find(i => i.code === 'SOA_DOCUMENT_UNREADABLE');
+        // Re-uploading the same or a different file cannot fix this — the
+        // importer never extracts Annex A refs from a document body — so the
+        // message must not send the auditor chasing a document-format fix.
+        expect(w.message).not.toMatch(/replace the document/);
+        expect(w.message).toMatch(/Linked ISO Clause\(s\) or Notes field/);
+    });
+});
+
+describe('ChecklistCoverage.buildContext — risk documents identified from their real fields', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
+        loadModule('./checklist-standards.js');
+        loadModule('./checklist-qa.js');
+        loadModule('./checklist-coverage.js');
+    });
+
+    function stateWithDocs(documents) {
+        return {
+            clients: [{ id: 'c-1', name: 'Acme ISMS Ltd', certificates: [], keyProcesses: [], documents }],
+            auditPlans: [], checklists: [], ncrs: [], complaints: [], appeals: []
+        };
+    }
+
+    // A client document is never given a `summary` field by either intake
+    // path (client-docs-bulk.js bulk import or the manual upload form in
+    // clients-module.js) — both write `notes`. Testing the wrong field name
+    // means a genuinely-on-file risk assessment reads as absent whenever its
+    // file name doesn't happen to say "risk" itself.
+    it('finds a risk assessment identified only by its notes, not its (generic) name', () => {
+        window.state = stateWithDocs([{
+            name: 'Q3 Review.xlsx', category: 'Other',
+            notes: 'Annual risk assessment and treatment plan for the ISMS.'
+        }]);
+        const ctx = window.ChecklistCoverage.buildContext(checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), {});
+        expect(ctx.riskDocs).toHaveLength(1);
+        expect(ctx.riskDocs[0].summary).toMatch(/risk assessment/);
+    });
+
+    it('does not read a document with no risk signal in name, category or notes as a risk document', () => {
+        window.state = stateWithDocs([{ name: 'Org Chart 2026.pdf', category: 'Org Chart', notes: 'Updated headcount.' }]);
+        const ctx = window.ChecklistCoverage.buildContext(checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), {});
+        expect(ctx.riskDocs).toHaveLength(0);
+    });
+});
+
+describe('ChecklistCoverage.buildContext — incidents scoped by the field complaints really carry', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
+        loadModule('./checklist-standards.js');
+        loadModule('./checklist-qa.js');
+        loadModule('./checklist-coverage.js');
+        window.state = {
+            clients: [
+                { id: 'c-1', name: 'PC CONNECTION, INC.', certificates: [{ standard: 'ISO/IEC 27001:2022', initialDate: '2023-08-01', expiryDate: '2026-07-31' }], keyProcesses: [], documents: [] },
+                { id: 'c-2', name: 'Other Certified Client Ltd', certificates: [], keyProcesses: [], documents: [] }
+            ],
+            auditPlans: [], checklists: [], ncrs: [],
+            // Complaints, per appeals-complaints-module.js openNewComplaintModal,
+            // are logged with `clientName` (the option value is the client's
+            // NAME) and never carry a `clientId` at all. Appeals, per
+            // openNewAppealModal, DO carry clientId (the option value is
+            // c.id). Both shapes are exercised here.
+            complaints: [
+                { clientName: 'PC CONNECTION, INC.', subject: 'Auditor conduct', description: 'Raised about site visit.', dateReceived: '2024-06-01' },
+                { clientName: 'Other Certified Client Ltd', subject: 'Unrelated complaint', description: 'About the other client entirely.', dateReceived: '2024-06-02' }
+            ],
+            appeals: [
+                { clientId: 'c-1', subject: 'NC classification appeal', description: 'Disputes a major finding.', dateReceived: '2024-07-01' }
+            ]
+        };
+    });
+
+    it('finds a complaint logged against this client by clientName, not clientId', () => {
+        const ctx = window.ChecklistCoverage.buildContext(
+            checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), { planId: 'p-none' });
+        const texts = ctx.incidents.map(i => i.text).join(' | ');
+        expect(texts).toMatch(/Auditor conduct/);
+        expect(texts).toMatch(/NC classification appeal/);
+    });
+
+    it('never lets one client\'s complaint reach another client\'s context', () => {
+        const ctxA = window.ChecklistCoverage.buildContext(
+            checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), {});
+        const ctxB = window.ChecklistCoverage.buildContext(
+            checklistOf(['5.1'], { clientId: 'c-2', id: 'cl-2' }), {});
+        expect(ctxA.incidents.map(i => i.text).join(' ')).not.toMatch(/Unrelated complaint/);
+        expect(ctxB.incidents.map(i => i.text).join(' ')).not.toMatch(/Auditor conduct/);
+        expect(ctxB.incidents.map(i => i.text).join(' ')).toMatch(/Unrelated complaint/);
+    });
+});
+
+describe('ChecklistCoverage.buildContext — changes read from the ISO 9.6.2 client change log', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
+        loadModule('./checklist-standards.js');
+        loadModule('./checklist-qa.js');
+        loadModule('./checklist-coverage.js');
+    });
+
+    function stateWithClient(client, plan) {
+        return {
+            clients: [client],
+            auditPlans: plan ? [plan] : [],
+            checklists: [], ncrs: [], complaints: [], appeals: []
+        };
+    }
+
+    // client.compliance.changesLog (written by clients-module.js
+    // addClientChangeLog, the "Log Change" button on the Compliance tab) is
+    // ISO 17021-1 9.6.2's own record and exists independently of whether an
+    // AI Stage 1 review — the only thing that ever wrote
+    // plan.preAudit.focusPoints — was ever run for this audit.
+    it('reads a change logged directly against the client, with no AI review ever run', () => {
+        window.state = stateWithClient({
+            id: 'c-1', name: 'Acme ISMS Ltd',
+            certificates: [{ standard: 'ISO/IEC 27001:2022', initialDate: '2023-08-01', expiryDate: '2026-07-31' }],
+            keyProcesses: [], documents: [],
+            compliance: { changesLog: [{ date: '2024-06-01', type: 'Scope Change', description: 'Added a new cloud hosting provider, AWS eu-west-1.' }] }
+        });
+        const ctx = window.ChecklistCoverage.buildContext(checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), {});
+        expect(ctx.changes.join(' ')).toMatch(/Scope Change/);
+        expect(ctx.changes.join(' ')).toMatch(/AWS eu-west-1/);
+    });
+
+    it('excludes a logged change dated outside the certification cycle', () => {
+        window.state = stateWithClient({
+            id: 'c-1', name: 'Acme ISMS Ltd',
+            certificates: [{ standard: 'ISO/IEC 27001:2022', initialDate: '2023-08-01', expiryDate: '2026-07-31' }],
+            keyProcesses: [], documents: [],
+            compliance: { changesLog: [{ date: '2020-01-01', type: 'Organization Change', description: 'Pre-cycle restructure, out of scope for this cycle.' }] }
+        });
+        const ctx = window.ChecklistCoverage.buildContext(checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), {});
+        expect(ctx.changes.join(' ')).not.toMatch(/Pre-cycle restructure/);
+    });
+
+    it('still reads focus points from an AI Stage 1 review alongside the change log', () => {
+        window.state = stateWithClient({
+            id: 'c-1', name: 'Acme ISMS Ltd',
+            certificates: [{ standard: 'ISO/IEC 27001:2022', initialDate: '2023-08-01', expiryDate: '2026-07-31' }],
+            keyProcesses: [], documents: [],
+            compliance: { changesLog: [{ date: '2024-06-01', type: 'Scope Change', description: 'New AWS hosting.' }] }
+        }, { id: 'p-1', clientId: 'c-1', preAudit: { focusPoints: ['New supplier onboarded for payroll processing.'] } });
+        // buildContext resolves opts.planId to a plan object via
+        // DataService.findAuditPlan — the real app wires this at boot
+        // (data-service.js); tests supply the same lookup directly.
+        window.DataService = { findAuditPlan: (id) => (window.state.auditPlans || []).find(p => String(p.id) === String(id)) };
+        const ctx = window.ChecklistCoverage.buildContext(
+            checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), { planId: 'p-1' });
+        expect(ctx.changes.join(' ')).toMatch(/AWS hosting/);
+        expect(ctx.changes.join(' ')).toMatch(/payroll processing/);
+    });
+
+    it('feeds the risk-driven control selection so a logged cloud change reaches cloud-theme controls', () => {
+        const sel = window.ChecklistCoverage.riskDrivenControls(
+            window.ChecklistStandards.byId('iso27001'),
+            ctxOf({
+                soaApplicable: ['A.5.23', 'A.7.1'],
+                changes: ['Scope Change: Added a new cloud hosting provider, AWS eu-west-1.']
+            }));
+        const refs = sel.required.map(r => r.ref);
+        expect(refs).toContain('A.5.23');
+        expect(refs).not.toContain('A.7.1');
+    });
 });
 
 describe('ChecklistCoverage.readiness — control-gap blockers carry what to add', () => {

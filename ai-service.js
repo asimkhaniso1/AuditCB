@@ -1762,13 +1762,69 @@ Example:
         return data.models || [];
     },
 
-    // Helper: Extract text from Gemini JSON response
+    // Helper: Extract text from Gemini JSON response.
+    //
+    // A 200-OK Gemini response with no usable text is NOT one failure mode —
+    // it's several, and they need different handling by the caller:
+    //   - the whole prompt was rejected (promptFeedback.blockReason, no candidates)
+    //   - a candidate exists but was cut off before producing text
+    //     (finishReason MAX_TOKENS — common on "thinking" models, e.g.
+    //     gemini-2.5-flash/-lite, when the reasoning budget consumes the
+    //     entire token budget before any visible output is written)
+    //   - a candidate was blocked/filtered (finishReason SAFETY/RECITATION/OTHER)
+    //   - the JSON body simply isn't the candidates/content/parts shape we expect
+    // Collapsing all of these into one generic "No content returned from AI"
+    // (the old behavior) is what made a real production failure undiagnosable
+    // from the console. Each thrown Error now carries a stable `.code` so
+    // callers (e.g. execution-reporting.js's polishNotesWithAI) can show the
+    // auditor the real reason instead of silently doing nothing.
+    //
+    // SUCCESS-PATH RETURN SHAPE IS UNCHANGED — still just the plain text
+    // string. Do not change that: extractTextFromResponse is called from
+    // several sites (grep the name) that all destructure/parse the returned
+    // string directly.
     extractTextFromResponse: (data) => {
-        if (data.candidates && data.candidates.length > 0 && data.candidates[0].content) {
-            return data.candidates[0].content.parts[0].text;
-        } else {
-            throw new Error('No content returned from AI');
+        const fail = (code, message) => {
+            const err = new Error(message);
+            err.code = code;
+            throw err;
+        };
+
+        if (!data || typeof data !== 'object') {
+            fail('UNEXPECTED_SHAPE', 'AI response was not valid JSON.');
         }
+
+        if (!data.candidates || data.candidates.length === 0) {
+            // Prompt-level block: Gemini omits `candidates` entirely and reports
+            // the reason at the top level when the INPUT (not a generated
+            // candidate) was rejected by safety filtering.
+            const blockReason = data.promptFeedback && data.promptFeedback.blockReason;
+            if (blockReason) {
+                fail('BLOCKED', `AI request was blocked before generating a response (reason: ${blockReason}).`);
+            }
+            fail('EMPTY_RESPONSE', 'AI returned no candidates in its response.');
+        }
+
+        const candidate = data.candidates[0];
+        const text = candidate.content && candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text;
+
+        if (typeof text === 'string' && text.length > 0) {
+            return text;
+        }
+
+        // Candidate exists but carries no usable text — finishReason says why.
+        const finishReason = candidate.finishReason;
+        if (finishReason === 'MAX_TOKENS') {
+            fail('MAX_TOKENS', 'AI response was cut off before producing any output because it hit the model\'s output token limit (finishReason: MAX_TOKENS).');
+        }
+        if (finishReason === 'SAFETY' || finishReason === 'RECITATION') {
+            fail('BLOCKED', `AI declined to respond because the content was flagged by its filters (finishReason: ${finishReason}).`);
+        }
+        if (finishReason && finishReason !== 'STOP') {
+            fail('BLOCKED', `AI returned no usable text (finishReason: ${finishReason}).`);
+        }
+
+        fail('EMPTY_RESPONSE', 'AI returned an empty response with no text content.');
     },
 
     // Parse the text response into JSON

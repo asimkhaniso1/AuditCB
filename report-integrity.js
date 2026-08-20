@@ -740,13 +740,33 @@
     const ONSITE_CLAIM_RE = /\b(?:on[-\s]?site\s+(?:observation|verification|visit|inspection|walkthrough|tour|review|audit)|observation of activities and work environment on[-\s]?site|conducted on[-\s]?site|attended on[-\s]?site)\b/gi;
     const ONSITE_NEGATION_RE = /\b(?:no|not|without|never|excluded|remote(?:ly)?|in lieu of|instead of)\b[^.]{0,40}$/i;
 
+    // Text sources that print into the formal report and must agree with the
+    // recorded Audit Method: the report's own edited narrative, PLUS
+    // auditPlan.auditMethodology — the free-text methodology paragraph that
+    // execution-reporting.js prints verbatim whenever the auditor has not
+    // overridden it in the report editor (methodologyDefaultText/
+    // METHODOLOGY_NEUTRAL_TEXT only cover a BLANK field; a filled-in but
+    // wrong-mode methodology paragraph on the plan sails straight through to
+    // the printed "Audit Objectives, Criteria & Methodology" section
+    // unchecked). A contradiction living only in that field previously had no
+    // check at all — B12 looked at report narrative only.
+    function methodTextSources(report, auditPlan) {
+        return Object.assign({}, narrativeFields(report), {
+            'auditPlan.auditMethodology': (auditPlan && auditPlan.auditMethodology) || ''
+        });
+    }
+
+    function methodSourceLabel(key) {
+        return key === 'auditPlan.auditMethodology' ? 'the audit plan\'s methodology text' : `the narrative (${key})`;
+    }
+
     function checkB12AuditMethodContradiction(input, results) {
         const { report, auditPlan } = input;
         const method = lower((auditPlan && auditPlan.auditMethod) || (report && report.auditMethod));
         if (!method || !/remote/.test(method) || /hybrid/.test(method)) return;
-        const narrative = narrativeFields(report);
-        Object.keys(narrative).forEach((key) => {
-            const text = narrative[key];
+        const sources = methodTextSources(report, auditPlan);
+        Object.keys(sources).forEach((key) => {
+            const text = sources[key];
             if (!text) return;
             let m;
             ONSITE_CLAIM_RE.lastIndex = 0;
@@ -757,11 +777,76 @@
                     'B12-' + key,
                     'blocker',
                     'narrative',
-                    `Audit method is recorded as Remote, but the narrative (${key}) claims on-site activity ("${trim(m[0])}").`,
-                    'report.' + key + ' vs auditPlan.auditMethod',
+                    `Audit method is recorded as Remote, but ${methodSourceLabel(key)} claims on-site activity ("${trim(m[0])}").`,
+                    (key === 'auditPlan.auditMethodology' ? key : 'report.' + key) + ' vs auditPlan.auditMethod',
                     'State the methodology actually used — interviews, remote review of documented information and objective evidence, and remote observation through ICT where applicable.'
                 ));
-                break; // one finding per narrative field is enough to act on
+                break; // one finding per source is enough to act on
+            }
+        });
+    }
+
+    // B12's mirror image: an On-site Audit Method contradicted by methodology
+    // text that describes the audit as conducted remotely. Gated on the
+    // EXACT structured value 'on-site' (never on Hybrid, which legitimately
+    // mixes both modes, and never on an unset method — that is W21's,
+    // fuzzier, concern below).
+    const REMOTE_ONLY_CLAIM_RE = /\b(?:conducted (?:entirely |wholly |fully )?remotely|(?:entirely|wholly|fully) remote audit|via video[-\s]?conferenc\w*|screen-shared review of (?:records|documented information)|no on-site (?:visit|observation|verification|attendance) (?:was|were) (?:conducted|performed|possible))\b/gi;
+
+    function checkB12RevOnsiteMethodRemoteNarrative(input, results) {
+        const { report, auditPlan } = input;
+        const method = lower((auditPlan && auditPlan.auditMethod) || (report && report.auditMethod));
+        if (!/^on[-\s]?site$/.test(method)) return;
+        const sources = methodTextSources(report, auditPlan);
+        Object.keys(sources).forEach((key) => {
+            const text = sources[key];
+            if (!text) return;
+            REMOTE_ONLY_CLAIM_RE.lastIndex = 0;
+            const m = REMOTE_ONLY_CLAIM_RE.exec(text);
+            if (!m) return;
+            results.blockers.push(item(
+                'B12r-' + key,
+                'blocker',
+                'narrative',
+                `Audit method is recorded as On-site, but ${methodSourceLabel(key)} describes the audit as conducted remotely ("${trim(m[0])}").`,
+                (key === 'auditPlan.auditMethodology' ? key : 'report.' + key) + ' vs auditPlan.auditMethod',
+                'Correct the Audit Method field or the methodology text so they agree on how the audit was actually conducted.'
+            ));
+        });
+    }
+
+    // The historical defect this guards against: an unset Audit Method has
+    // rendered as a bare, invented "On-site" default in report UI elsewhere in
+    // the codebase (planning-module.js's plan-summary and print views still do
+    // this — see report back). report-integrity.js cannot see what got
+    // rendered, only the stored data, so this checks the data-level signature
+    // of that defect: nothing recorded on the plan, yet the report narrative
+    // affirms on-site activity as fact. Unlike B12, there is no known-wrong
+    // structured value to contradict — the auditor may genuinely have audited
+    // on-site and simply left the field blank — so this is a warning asking
+    // the auditor to confirm, not a blocker asserting an error.
+    function checkW21UnsetAuditMethodOnsiteClaim(input, results) {
+        const { report, auditPlan } = input;
+        const rawMethod = trim((auditPlan && auditPlan.auditMethod) || (report && report.auditMethod));
+        if (rawMethod) return;
+        const sources = methodTextSources(report, auditPlan);
+        Object.keys(sources).forEach((key) => {
+            const text = sources[key];
+            if (!text) return;
+            let m;
+            ONSITE_CLAIM_RE.lastIndex = 0;
+            while ((m = ONSITE_CLAIM_RE.exec(text)) !== null) {
+                const preceding = text.slice(Math.max(0, m.index - 60), m.index);
+                if (ONSITE_NEGATION_RE.test(preceding)) { continue; }
+                results.warnings.push(item(
+                    'W21-' + key,
+                    'warning',
+                    'narrative',
+                    `Audit Method is not recorded on the audit plan, but ${methodSourceLabel(key)} asserts on-site activity ("${trim(m[0])}") — an unrecorded Audit Method has elsewhere defaulted to a displayed "On-site" that was never confirmed.`,
+                    (key === 'auditPlan.auditMethodology' ? key : 'report.' + key) + ' vs auditPlan.auditMethod (unset)',
+                    'Set the Audit Method field on the audit plan (On-site / Remote / Hybrid) to match how the audit was actually conducted.'
+                ));
+                break;
             }
         });
     }
@@ -1289,6 +1374,343 @@
         });
     }
 
+    // ── Phase B: cross-report contradiction checks ──────────────────────────
+    // Counts vs prose is already covered by B13 (and the exact live defect —
+    // "5 opportunities for improvement" when 1 OFI + 4 Observations were
+    // recorded — already has a regression test there: observations and OFIs
+    // are read from the same dataset B13 compares against, so a stated OFI
+    // count that is really observations-plus-OFI is just another number
+    // mismatch to it). What follows covers classification, clause
+    // reference/title, and conclusion/previous-findings contradictions that
+    // nothing above catches.
+
+    // Split narrative into sentences so a classification word or clause title
+    // is matched against the ONE clause it is actually next to, never against
+    // every clause mentioned anywhere in a long paragraph. No lookbehind (older
+    // engines), so the terminal punctuation is consumed by the split rather
+    // than kept — these checks only need the sentence body, never the mark.
+    function splitSentences(text) {
+        return String(text || '').split(/[.!?]+\s+(?=[A-Z0-9(])/).filter(Boolean);
+    }
+
+    // "Clause N" cited in running prose (not a structured finding.clause
+    // field) — mirrors NARRATIVE_INTERNAL_CLAUSE_RE's "Clauses? " anchor so a
+    // bare number floating in text (a percentage, a section of a form) is
+    // never mistaken for a clause citation.
+    const PROSE_CLAUSE_RE = /\bClauses?\s+(\d+(?:\.\d+){0,4})\b/gi;
+
+    // The classification word a sentence attaches to its one clause citation.
+    // Longest/most-specific phrase first so "minor nonconformity" is read as
+    // 'minor', not also matched by a separate bare-word alternative.
+    const CLASSIFICATION_WORD_KINDS = [
+        { kind: 'major', re: /\bmajor\s+non-?conformit(?:y|ies)\b/i },
+        { kind: 'minor', re: /\bminor\s+non-?conformit(?:y|ies)\b/i },
+        { kind: 'ofi', re: /\bopportunit(?:y|ies)\s+for\s+improvement\b|\bOFI\b/ },
+        { kind: 'observation', re: /\bobservation\b/i }
+    ];
+    const CLASSIFICATION_LABEL = { major: 'major nonconformity', minor: 'minor nonconformity', observation: 'an observation', ofi: 'an opportunity for improvement' };
+    // Same shape as B12's ONSITE_NEGATION_RE: "no observation was raised
+    // against Clause 6.1" must not read as an affirmative classification.
+    const CLASSIFICATION_NEGATION_RE = /\b(?:no|not|without|never|closed|conforming|compliant|satisfactory|excluded)\b[^.]{0,40}$/i;
+
+    // Every "Clause N" citation paired with the classification word named in
+    // the SAME sentence — deliberately conservative: a sentence naming more
+    // than one clause, or more than one classification word, is skipped
+    // rather than guessed at, because there is no reliable way to tell which
+    // classification belongs to which clause from text alone.
+    function clauseClassificationCitations(text) {
+        const out = [];
+        splitSentences(text).forEach((sentence) => {
+            const clauseRe = new RegExp(PROSE_CLAUSE_RE.source, 'gi');
+            const clauses = [];
+            let cm;
+            while ((cm = clauseRe.exec(sentence)) !== null) clauses.push(cm[1]);
+            if (clauses.length !== 1) return;
+            const kindsFound = CLASSIFICATION_WORD_KINDS.filter((c) => c.re.test(sentence));
+            if (kindsFound.length !== 1) return;
+            const found = kindsFound[0];
+            const wm = sentence.match(found.re);
+            if (CLASSIFICATION_NEGATION_RE.test(sentence.slice(0, wm.index))) return;
+            out.push({ clause: clauses[0], kind: found.kind, sentence: trim(sentence) });
+        });
+        return out;
+    }
+
+    // Observations and OFIs with their clause number attached. advisoryItems()
+    // (the shared helper W17-W19 already use) deliberately omits clause — its
+    // callers key off checklist index, not the standard's clause number — so
+    // this is a separate helper rather than a change to that existing
+    // contract.
+    function allAdvisoriesWithClause(report) {
+        return safeArr(report && report.checklistProgress)
+            .filter((i) => i && lower(i.status) === 'nc' && ['observation', 'ofi'].includes(lower(i.ncrType)))
+            .map((i) => ({ clause: trim(i.clause) || trim(i.criterionRef) || '', kind: lower(i.ncrType) }))
+            .filter((a) => a.clause);
+    }
+
+    // B18 — a finding described in prose under one classification while its
+    // OWN record carries a different one (e.g. called an observation in the
+    // executive summary but recorded as a minor NC). Fires only when exactly
+    // one finding record carries the cited clause — a clause shared by
+    // multiple records is ambiguous and is left to a human, never guessed.
+    function checkB18ClauseClassificationContradiction(report, ncrs, results) {
+        const narrative = narrativeFields(report);
+        const advisories = allAdvisoriesWithClause(report);
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            clauseClassificationCitations(text).forEach((cite) => {
+                const clauseMatches = (n) => trim(n.clause) === cite.clause || trim(n.criterionRef) === cite.clause;
+                const majorMatches = ncrs.filter((n) => lower(n.ncrType) === 'major' && clauseMatches(n));
+                const minorMatches = ncrs.filter((n) => lower(n.ncrType) === 'minor' && clauseMatches(n));
+                const obsMatches = advisories.filter((a) => a.kind === 'observation' && a.clause === cite.clause);
+                const ofiMatches = advisories.filter((a) => a.kind === 'ofi' && a.clause === cite.clause);
+                const total = majorMatches.length + minorMatches.length + obsMatches.length + ofiMatches.length;
+                if (total !== 1) return; // 0 -> W23 below; >1 -> ambiguous, skip
+                const actualKind = majorMatches.length ? 'major' : minorMatches.length ? 'minor' : obsMatches.length ? 'observation' : 'ofi';
+                if (actualKind === cite.kind) return;
+                results.blockers.push(item(
+                    'B18-' + key + '-' + cite.clause,
+                    'blocker',
+                    'narrative',
+                    `Narrative (${key}) describes Clause ${cite.clause} as ${CLASSIFICATION_LABEL[cite.kind]}, but its finding record is classified as ${CLASSIFICATION_LABEL[actualKind]}.`,
+                    'report.' + key + ' vs finding record for Clause ' + cite.clause,
+                    'Align the narrative wording with the classification actually recorded for this finding, or correct the finding record if the narrative is right.'
+                ));
+            });
+        });
+    }
+
+    // W23 — a clause cited in prose as carrying a nonconformity/observation/
+    // OFI, but no finding record for that clause exists anywhere in the
+    // dataset. Kept as a warning, not a blocker: the clause number in the
+    // narrative may simply be mistyped (evidence of a real finding elsewhere),
+    // which a human needs to judge — text alone cannot distinguish that from
+    // a genuinely fabricated citation.
+    function checkW23ClauseCitedNoRecord(report, ncrs, results) {
+        const narrative = narrativeFields(report);
+        const advisories = allAdvisoriesWithClause(report);
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            clauseClassificationCitations(text).forEach((cite) => {
+                const anyMatch = ncrs.some((n) => trim(n.clause) === cite.clause || trim(n.criterionRef) === cite.clause)
+                    || advisories.some((a) => a.clause === cite.clause);
+                if (anyMatch) return;
+                results.warnings.push(item(
+                    'W23-' + key + '-' + cite.clause,
+                    'warning',
+                    'narrative',
+                    `Narrative (${key}) describes Clause ${cite.clause} as having ${CLASSIFICATION_LABEL[cite.kind]}, but no finding record for Clause ${cite.clause} exists in checklistProgress[] or report.ncrs[].`,
+                    'report.' + key + ' vs checklistProgress[] / report.ncrs[]',
+                    'Verify the clause reference — either a finding record is missing, or the clause number stated in the narrative is incorrect.'
+                ));
+            });
+        });
+    }
+
+    // "Clause N <separator> Title" — a title stated immediately next to its
+    // clause number. Deliberately narrow: ordinary prose ("Clause 8.5.2 was
+    // sampled") never matches, only the specific construction that quotes a
+    // title. The verb-stoplist filter throws out an em-dash sentence
+    // fragment the pattern would otherwise over-capture up to the next
+    // comma/period (e.g. "Clause 6.1.2 — Management review commitment WAS
+    // confirmed..." is a sentence, not a title).
+    const CLAUSE_TITLE_RE = /\bClauses?\s+(\d+(?:\.\d+){0,4})\s*[-:–—,(]\s*([A-Z][A-Za-z0-9 /&'-]{2,58})(?=[.,;)\n]|$)/g;
+    const TITLE_LOOKS_LIKE_SENTENCE_RE = /\b(?:was|is|were|are|has|have|will|shall|must|should|would|could|did|does|do|been|being)\b/i;
+
+    function clauseTitleCitations(text) {
+        const out = [];
+        const re = new RegExp(CLAUSE_TITLE_RE.source, 'g');
+        let m;
+        while ((m = re.exec(text)) !== null) {
+            const title = trim(m[2]);
+            if (TITLE_LOOKS_LIKE_SENTENCE_RE.test(title)) continue;
+            out.push({ clause: m[1], title });
+        }
+        return out;
+    }
+
+    // B19 — a clause's stated title is actually a client department or
+    // process name (live example: 8.5.2 given the title "Management", where
+    // "Management" is a department, not the clause's real title
+    // "Identification and traceability"). Checked against the client's own
+    // controlled departments/keyProcesses lists, so this is a verifiable data
+    // match, not a semantic guess — a blocker like B14/B16's other
+    // reconciliation checks, not a wording warning.
+    function checkB19ClauseTitleIsDepartmentName(report, client, results) {
+        const deptNames = safeArr(client && client.departments).map((d) => lower(d && d.name)).filter(Boolean);
+        const procNames = safeArr(client && client.keyProcesses).map((p) => lower(p && p.name)).filter(Boolean);
+        if (!deptNames.length && !procNames.length) return;
+        const narrative = narrativeFields(report);
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            clauseTitleCitations(text).forEach((cite) => {
+                const t = lower(cite.title);
+                const isDept = deptNames.indexOf(t) !== -1;
+                const isProc = !isDept && procNames.indexOf(t) !== -1;
+                if (!isDept && !isProc) return;
+                results.blockers.push(item(
+                    'B19-' + key + '-' + cite.clause,
+                    'blocker',
+                    'narrative',
+                    `Narrative (${key}) gives Clause ${cite.clause} the title "${cite.title}", but that is a client ${isDept ? 'department' : 'process'} name, not a title of the standard's clause.`,
+                    'report.' + key + ' vs client.' + (isDept ? 'departments' : 'keyProcesses'),
+                    'Correct the clause title — a department/process value appears to have been substituted for the clause title.'
+                ));
+            });
+        });
+    }
+
+    // W22 — the same clause number given two different titles in different
+    // places in the report. Free-text title extraction is inherently fuzzy
+    // (paraphrase, a different edition of the standard, a shortened
+    // restatement are all legitimate), so this stays a warning worded as
+    // "verify" rather than an assertion that one of the two is wrong.
+    function checkW22ClauseTitleInconsistent(report, results) {
+        const narrative = narrativeFields(report);
+        const byClause = {};
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            clauseTitleCitations(text).forEach((cite) => {
+                if (!byClause[cite.clause]) byClause[cite.clause] = [];
+                byClause[cite.clause].push({ title: cite.title, key });
+            });
+        });
+        Object.keys(byClause).forEach((clause) => {
+            const distinct = [];
+            byClause[clause].forEach((e) => {
+                if (!distinct.some((d) => lower(d.title) === lower(e.title))) distinct.push(e);
+            });
+            if (distinct.length < 2) return;
+            results.warnings.push(item(
+                'W22-' + clause,
+                'warning',
+                'narrative',
+                `Clause ${clause} is given different titles in the report: "${distinct[0].title}" (${distinct[0].key}) vs "${distinct[1].title}" (${distinct[1].key}).`,
+                'report narrative — multiple fields',
+                'Confirm which title is correct for Clause ' + clause + ' and use it consistently throughout the report.'
+            ));
+        });
+    }
+
+    // B20 — an open Major nonconformity is not compatible with an
+    // unconditional certification statement. ReportStats.recommendationText
+    // always appends a closure-contingency clause once majorNC > 0 ("...
+    // subject to satisfactory closure ... including verification of
+    // implemented corrective actions for major nonconformities"); a
+    // conclusion that grants/confirms certification outright, naming no
+    // contingency anywhere in the same field, contradicts that derivation
+    // even when it never quotes B5's banned GRANTING_RE phrase.
+    const UNQUALIFIED_POSITIVE_RE = /\b(?:certification|recertification)\s+is\s+(?:confirmed|granted|maintained)\b|\bunconditionally\s+recommended\b|\bno\s+barriers?\s+to\s+certification\b|\brecommended\s+for\s+(?:continued\s+)?certification\s+without\s+reservation\b/i;
+    const CONTINGENCY_RE = /subject\s+to|\bpending\b|contingent\s+on|conditional(?:ly)?\s+(?:on|upon)|provided\s+that|upon\s+(?:satisfactory\s+)?(?:verification|closure|completion)|following\s+closure|corrective\s+action[^.]{0,30}(?:closure|verification|completion|review)/i;
+
+    function checkB20ConclusionOmitsContingency(report, ncrs, results) {
+        const hasMajor = ncrs.some((n) => lower(n.ncrType) === 'major');
+        if (!hasMajor) return;
+        const conclusionText = narrativeFields(report).conclusion;
+        if (!conclusionText) return;
+        if (!UNQUALIFIED_POSITIVE_RE.test(conclusionText)) return;
+        if (CONTINGENCY_RE.test(conclusionText)) return; // a caveat is present — not a contradiction
+        results.blockers.push(item(
+            'B20',
+            'blocker',
+            'recommendation',
+            'Conclusion states an unqualified certification recommendation, but an open Major nonconformity requires the recommendation to be conditional on satisfactory closure and verification of corrective action.',
+            'report.conclusion vs findings (major NC open)',
+            'State the recommendation as contingent on satisfactory closure and verification of the major nonconformity, matching ReportStats.recommendationText.'
+        ));
+    }
+
+    // Derives what the previous audit cycle's own records show for THIS
+    // client — same prior-report match as hasPriorFinalizedReport (most
+    // recent finalized report for the client), then reads that report's own
+    // findingStatus/ncr register the same way execution-reporting.js's
+    // _derivePreviousFindingsStatus does, so the validator and the printed
+    // default can never disagree about what "the records" say. Returns
+    // 'unavailable' (no prior report, or one with no resolvable status),
+    // 'none' (no prior NCs to follow up), 'open' (at least one unresolved),
+    // or 'closed' (every prior NC verified/closed).
+    const CLOSED_STATUS_WORDS = ['closed', 'verified', 'effective'];
+
+    function derivedPreviousFindingsState(client, report) {
+        const reports = safeArr(global.state && global.state.auditReports);
+        const clientKey = (report && (report.clientId != null ? String(report.clientId) : null))
+            || (client && client.id != null ? String(client.id) : null);
+        const clientName = (report && report.client) || (client && client.name) || null;
+        const prevReport = reports.filter((r) => {
+            if (!r || String(r.id) === String(report && report.id)) return false;
+            const rClientKey = r.clientId != null ? String(r.clientId) : null;
+            const matchesClient = (clientKey && rClientKey && rClientKey === clientKey)
+                || (clientName && r.client && trim(r.client).toLowerCase() === trim(clientName).toLowerCase());
+            if (!matchesClient) return false;
+            return r.status === (global.CONSTANTS && global.CONSTANTS.STATUS && global.CONSTANTS.STATUS.FINALIZED)
+                || r.status === 'Finalized' || r.reportStatus === 'final';
+        }).sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0))[0];
+        if (!prevReport) return 'unavailable';
+
+        const prevNCs = safeArr(prevReport.checklistProgress)
+            .filter((p) => p && p.status === 'nc' && ['major', 'minor'].includes(lower(p.ncrType)));
+        const prevNCRs = safeArr(prevReport.ncrs)
+            .filter((n) => n && /^major|minor$/i.test(lower(n.type || n.ncrType || n.severity)));
+        if (!prevNCs.length && !prevNCRs.length) return 'none';
+
+        const fsMap = prevReport.findingStatus || {};
+        let anyKnown = false;
+        let anyOpen = false;
+        prevNCs.forEach((nc) => {
+            const key = trim(nc.clause) + '|' + trim(nc.department);
+            const st = fsMap[key] && fsMap[key].status;
+            if (!st) return;
+            anyKnown = true;
+            if (CLOSED_STATUS_WORDS.indexOf(lower(st)) === -1) anyOpen = true;
+        });
+        prevNCRs.forEach((ncr) => {
+            const st = ncr.status || ncr.carStatus;
+            if (!st) return;
+            anyKnown = true;
+            if (CLOSED_STATUS_WORDS.indexOf(lower(st)) === -1) anyOpen = true;
+        });
+        if (!anyKnown) return 'unavailable';
+        return anyOpen ? 'open' : 'closed';
+    }
+
+    // W24 — prose asserting previous findings were verified closed, when the
+    // prior finalized report's own records show follow-up was only planned
+    // (still open) or the records could not be resolved at all (unavailable).
+    // Cross-referencing another report's register is inherently a best-effort
+    // reconciliation (matched by clause+department key, which can miss a
+    // renamed department), so this stays a warning worded as "verify".
+    const CLAIMS_VERIFIED_CLOSED_RE = /previous[^.]{0,40}(?:nonconformit(?:y|ies)|findings?|NCs?)[^.]{0,40}\bverified\b[^.]{0,25}\bclosed\b/i;
+
+    function checkW24PreviousFindingsClosureContradiction(input, results) {
+        const { report, auditPlan, client } = input;
+        const auditTypeStr = lower((auditPlan && auditPlan.auditType) || (report && report.auditType));
+        if (!/surveillance|recert|follow/.test(auditTypeStr)) return;
+        const narrative = narrativeFields(report);
+        let matchedKey = null;
+        Object.keys(narrative).forEach((k) => {
+            if (matchedKey || !narrative[k]) return;
+            if (CLAIMS_VERIFIED_CLOSED_RE.test(narrative[k])) matchedKey = k;
+        });
+        if (!matchedKey) return;
+        const derived = derivedPreviousFindingsState(client, report);
+        if (derived === 'closed' || derived === 'none') return;
+        const derivedText = derived === 'open'
+            ? 'the prior finalized report\'s own records show at least one previous nonconformity was only planned for follow-up, not verified closed'
+            : 'no prior finalized report for this client could be located to verify that claim';
+        results.warnings.push(item(
+            'W24',
+            'warning',
+            'previous-findings',
+            `Narrative (${matchedKey}) claims previous findings were verified closed, but ${derivedText}.`,
+            'report.' + matchedKey + ' vs prior finalized report records',
+            'Verify the actual closure status of previous findings against the prior audit report and CAPA register before stating they were verified closed.'
+        ));
+    }
+
     // I1-I4 information items
 
     function checkInformation(report, results) {
@@ -1350,6 +1772,8 @@
         // machinery stays out of the client document.
         try { checkB11InternalMetadata(report, results); } catch (_e) { /* skip */ }
         try { checkB12AuditMethodContradiction({ report, auditPlan }, results); } catch (_e) { /* skip */ }
+        try { checkB12RevOnsiteMethodRemoteNarrative({ report, auditPlan }, results); } catch (_e) { /* skip */ }
+        try { checkW21UnsetAuditMethodOnsiteClaim({ report, auditPlan }, results); } catch (_e) { /* skip */ }
         try { checkB13NarrativeCounts({ report, stats }, results); } catch (_e) { /* skip */ }
         try { checkB14ClauseReconciliation(ncrs, results); } catch (_e) { /* skip */ }
         try { checkB16ClauseAreaReconciliation(stats, results); } catch (_e) { /* skip */ }
@@ -1364,6 +1788,15 @@
         try { checkW19ConsultancyLanguage(report, results); } catch (_e) { /* skip */ }
         try { checkB15CriterionBelongsToStandard(ncrs, results); } catch (_e) { /* skip */ }
         try { checkE1RawAuditorNotes(report, results); } catch (_e) { /* skip */ }
+
+        // Phase B — classification, clause reference/title, conclusion and
+        // previous-findings contradictions.
+        try { checkB18ClauseClassificationContradiction(report, ncrs, results); } catch (_e) { /* skip */ }
+        try { checkW23ClauseCitedNoRecord(report, ncrs, results); } catch (_e) { /* skip */ }
+        try { checkB19ClauseTitleIsDepartmentName(report, client, results); } catch (_e) { /* skip */ }
+        try { checkW22ClauseTitleInconsistent(report, results); } catch (_e) { /* skip */ }
+        try { checkB20ConclusionOmitsContingency(report, ncrs, results); } catch (_e) { /* skip */ }
+        try { checkW24PreviousFindingsClosureContradiction({ report, auditPlan, client }, results); } catch (_e) { /* skip */ }
 
         try { checkInformation(report, results); } catch (_e) { /* skip */ }
 

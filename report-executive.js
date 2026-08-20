@@ -94,7 +94,83 @@
     // Shared data-derivation helpers
     // ------------------------------------------------------------------
 
-    const getStats = (d) => (d && d.stats) || {};
+    // ------------------------------------------------------------------
+    // getStats(d) — the ONE read path this module uses for headline counts
+    // (Major/Minor NC, Observation/OFI, conform/total/applicable, and the
+    // certification recommendation).
+    //
+    // d.stats is built upstream by execution-reporting.js from its OWN local
+    // tally of hydratedProgress (majorNC/minorNC/observationCount/ofiCount
+    // each independently filtered by ncrType) — a second counting path that
+    // happens to apply the same rules window.ReportStats.build() does today,
+    // so the two currently agree. This module must not depend on that
+    // agreement holding, and must not itself become a THIRD counting path by
+    // reading d.stats directly in a dozen different places. Every count and
+    // the recommendation are therefore always taken from the canonical
+    // window.ReportStats.build() dataset (report-stats.js) when it loads
+    // successfully, overriding whatever d.stats carried for that field.
+    // Fields ReportStats does not compute (rs, ncByClause, ...) pass through
+    // from d.stats unchanged. Falls back to d.stats alone only if ReportStats
+    // failed to load or threw — the same defensive try/catch pattern already
+    // used by computeConformPct/computeCoveragePct/computeNextAuditText below,
+    // so this module degrades the same way everywhere rather than crashing.
+    //
+    // This is also the fix for a real shipped defect: a report once printed
+    // "5 opportunities for improvement" for an audit that actually recorded
+    // 4 Observations + 1 OFI — Observations summed into the OFI figure. That
+    // exact phrase was AI-authored narrative text (report.executiveSummary,
+    // drafted in ai-service.js — outside this module, now guarded there by
+    // its own authoritative-count correction pass; see report-integrity.js's
+    // B13 check). This module's OWN count rendering (buildFactualConclusion
+    // below) already lists Observations and OFI as two separate parts, but it
+    // is only as correct as the numbers getStats() hands it — routing those
+    // numbers through ReportStats here closes the same failure mode for good
+    // in every sentence this module builds, regardless of what any upstream
+    // caller's local tally says.
+    // ------------------------------------------------------------------
+    const getStats = (d) => {
+        const legacy = (d && d.stats) || {};
+        try {
+            if (window.ReportStats && typeof window.ReportStats.build === 'function') {
+                const ds = window.ReportStats.build(d || {});
+                if (ds && ds.resultCounts && ds.advisories && ds.totals) {
+                    const rc = ds.resultCounts;
+                    const adv = ds.advisories;
+                    const ncTotal = rc.majorNC + rc.minorNC + rc.pendingClassification;
+                    return Object.assign({}, legacy, {
+                        totalItems: ds.totals.totalItems,
+                        applicableCount: ds.totals.applicable,
+                        assessedCount: ds.totals.assessed,
+                        conformCount: rc.conform,
+                        majorNC: rc.majorNC,
+                        minorNC: rc.minorNC,
+                        pendingClassificationCount: rc.pendingClassification,
+                        naCount: rc.na,
+                        notAssessedCount: rc.notAssessed,
+                        // Observation and OFI are ALWAYS two separate figures here —
+                        // never combine them into one another. obsOfiCount/advisoryCount
+                        // exist only for contexts that explicitly label a COMBINED
+                        // advisory total (e.g. "N observation(s)/OFI"); they must never
+                        // be printed under an "OFI" or "opportunities for improvement"
+                        // label alone.
+                        observationCount: adv.observation,
+                        ofiCount: adv.ofi,
+                        obsOfiCount: adv.total,
+                        advisoryCount: adv.total,
+                        actualNCCount: ncTotal,
+                        ncCount: ncTotal,
+                        coveragePct: ds.coveragePct,
+                        conformityPct: ds.conformityPct,
+                        auditStatus: ds.auditStatus,
+                        statusColor: ds.statusColor,
+                        recommendation: ds.recommendation,
+                        recColor: ds.recColor
+                    });
+                }
+            }
+        } catch (_e) { /* fall through to legacy-only stats */ }
+        return legacy;
+    };
 
     const getNCList = (d) => safeArr(d && d.hydratedProgress).filter(i => i.status === 'nc');
 
@@ -239,6 +315,7 @@ Voice rules (strict):
 - Banned words — do not use any of these anywhere, in any form, alone or combined with another word: "soundness", "fundamental", "health", "resilience", "verdict", "certifiable". Also banned phrases: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of", "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "in conclusion", "moving forward". Banned: any sentence that could be pasted into a different company's report unchanged.
 - Use plain audit language: requirement -> objective evidence -> evaluation -> finding. State only what the audit evidence supports.
 - EVERY paragraph-level field (businessImpact, risks, forwardOutlook) MUST contain at least one concrete quantified reference — a clause or a named department, pulled from the data below. A sentence with no clause or department name is not acceptable. Do NOT restate the total counts of major/minor non-conformities, conformities, observations, or opportunities for improvement in these three fields — those totals already appear once in the Overall Conclusion elsewhere in the report; cite the specific clause(s)/department(s) instead.
+- Observations and Opportunities for Improvement (OFI) are two SEPARATE classifications with two separate counts below — never add them together, never restate one count under the other's label, and never invent a combined "opportunities for improvement" figure. If you state either count anywhere (which the rule above otherwise discourages), state each number under its own exact label — "N observation(s)" and "M opportunity/opportunities for improvement" — never "N+M opportunities for improvement" and never "N+M observations".
 - Never write the word "Clause" immediately before an internal audit working reference (anything starting with FOCUS, SURV, ORG, or DOC) — those are not final ISO clause citations. Reuse clause/reference text exactly as it already appears in the Non-Conformity Detail list below; never re-derive or reformat a clause reference yourself.
 - Never state or estimate financial figures, revenue, penalties, customer loss, cost, contract exposure, or reputational damage. Consequences may reference ONLY certification-process outcomes — e.g. closure timelines, certification decision status, or the scope of verification at the next audit — never business, commercial, or financial outcomes.
 - Never claim a finding is "recurring", "repeated", "systemic", or a "pattern" — recurrence can only be stated if the data below explicitly identifies that the same clause failed in a prior audit. If no prior-audit data is provided, describe multiple related findings only by count or as a concentration within this audit, never as a trend across audits.
@@ -828,7 +905,19 @@ ${data.forwardOutlook ? `
                 byDepartment[dept].withEvidence++;
                 evidenced.push({
                     clause: clauseLabel(item),
-                    title: clauseTitle(item) || cleanFindingText(item.requirement || '', 90),
+                    // clauseTitle(item) is the ONLY legitimate source for this slot —
+                    // it reads exclusively from item.kbMatch.title, the curated ISO
+                    // clause title from the Knowledge Base (e.g. "Identification and
+                    // traceability" for 8.5.2). item.requirement/item.description are
+                    // a different field entirely — the checklist item's own audit
+                    // question/remark text, which for some records is empty or (per a
+                    // real report defect) can hold a process/department name like
+                    // "Management" rather than a clause title. Falling back to it here
+                    // used to let that name print where a clause title belongs, right
+                    // next to `department` shown separately below — the two must never
+                    // be interchangeable. No fallback: an empty title is simply omitted
+                    // by the render layer (see the `e.title ?` check in renderEvidenceIntelHtml).
+                    title: clauseTitle(item),
                     department: dept,
                     status: item.status,
                     ncrType: item.ncrType || '',
@@ -844,7 +933,12 @@ ${data.forwardOutlook ? `
                 if (hasFinding) {
                     missingEvidence.push({
                         clause: clauseLabel(item),
-                        item: clauseTitle(item) || cleanFindingText(item.requirement || item.description || '', 90) || 'Untitled item',
+                        // Same rule as `title` above: never substitute item.requirement/
+                        // item.description (a different field) for a genuine KB clause
+                        // title. When clauseTitle(item) has nothing, show the explicit
+                        // placeholder — never a department/category name masquerading
+                        // as the finding's title.
+                        item: clauseTitle(item) || 'Untitled item',
                         department: dept,
                         status: item.status,
                         ncrType: item.ncrType || ''
@@ -1183,6 +1277,7 @@ You are an ISO management-system audit reporting assistant generating executive 
 - Never claim a finding, weakness, or clause is "recurring," "repeated," "systemic," or part of a "pattern" across audits unless the Prior-Audit Comparison line below explicitly shows it failed previously too. Absent that, describe same-audit clusters only as a count or "concentration within this audit."
 - Never write the word "Clause" immediately before an internal audit working reference (anything starting with FOCUS, SURV, ORG, or DOC). Reuse clause references exactly as formatted in the Non-conformities list below; never re-derive or reformat one yourself.
 - Never state a corrective-action requirement as an absolute condition of keeping certification (e.g. do not write "is required to maintain certification"). State only that findings require corrective action and closure through the certification body's corrective-action process.
+- Observations and OFI (Opportunities for Improvement) below are two SEPARATE counts — never add them together, never restate one under the other's label, and never report a combined figure as "opportunities for improvement" or as "observations". If a bullet cites either number, use the exact figure and exact label given here.
 
 Context:
 - Client: ${report.client || ''}
@@ -1422,7 +1517,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
         try {
             const context = buildAskContext(d);
             const prompt = `
-You are an audit intelligence assistant embedded in an ISO certification body's report preview tool. Answer the user's question about THIS audit concisely (2-5 sentences, plain text, no markdown symbols), using only the JSON context provided. If the answer requires data not present in the context, say so plainly rather than inventing facts. Never state or estimate financial figures, revenue, penalties, customer loss, cost, or reputational damage. Never describe a finding as "recurring," "repeated," or "systemic" unless the context explicitly shows it also failed in a prior audit. Reuse the "clause" values from the JSON context exactly as given; never prepend the word "Clause" to a value that already reads as an internal audit reference (e.g. "internal audit reference FOCUS.2 (criterion to be assigned)"). Never state a corrective-action requirement as an absolute condition of keeping certification.
+You are an audit intelligence assistant embedded in an ISO certification body's report preview tool. Answer the user's question about THIS audit concisely (2-5 sentences, plain text, no markdown symbols), using only the JSON context provided. If the answer requires data not present in the context, say so plainly rather than inventing facts. Never state or estimate financial figures, revenue, penalties, customer loss, cost, or reputational damage. Never describe a finding as "recurring," "repeated," or "systemic" unless the context explicitly shows it also failed in a prior audit. Reuse the "clause" values from the JSON context exactly as given; never prepend the word "Clause" to a value that already reads as an internal audit reference (e.g. "internal audit reference FOCUS.2 (criterion to be assigned)"). Never state a corrective-action requirement as an absolute condition of keeping certification. Observations and OFI (Opportunities for Improvement) in the context are separate counts under stats.observationCount and stats.ofiCount — never add them together or state one under the other's label.
 
 Audit Context (JSON):
 ${JSON.stringify(context).substring(0, 6000)}

@@ -111,6 +111,10 @@
     const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
     const NOTE_LIMIT = 700;
     const MAX_HEADINGS = 30;
+    // ISO/IEC 27001:2022 Annex A is 93 controls; a Statement of Applicability
+    // listing all of them must survive intact, so the reference bound is set
+    // well clear of it rather than at the heading cap.
+    const MAX_CLAUSE_REFS = 250;
 
     // ── Pure parsing helpers ──────────────────────────────────────────
 
@@ -188,10 +192,11 @@
     function findClauseRefs(str) {
         if (!str) return [];
         const out = [];
-        const re = /\b(4|5|6|7|8|9|10)\.(\d{1,2})(?:\.(\d{1,2}))?\b/g;
+        const re = /\bA\.(\d{1,2})\.(\d{1,2})\b|\b(4|5|6|7|8|9|10)\.(\d{1,2})(?:\.(\d{1,2}))?\b/g;
         let m;
         while ((m = re.exec(str)) !== null) {
-            out.push(m[3] ? `${m[1]}.${m[2]}.${m[3]}` : `${m[1]}.${m[2]}`);
+            if (m[1]) { out.push(`A.${m[1]}.${m[2]}`); continue; }
+            out.push(m[5] ? `${m[3]}.${m[4]}.${m[5]}` : `${m[3]}.${m[4]}`);
         }
         return out;
     }
@@ -309,18 +314,22 @@
             }
         }
 
-        // Numbered headings: "8.4 Control of externally provided processes"
+        // Numbered headings: "8.4 Control of externally provided processes", and
+        // Annex A control rows: "A.5.1 Policies for information security".
         const seen = new Set();
+        const refRows = [];
         for (const line of lines) {
-            const hm = line.match(/^(\d{1,2}(?:\.\d{1,2}){0,2})[\s.):-]+([A-Za-z][^\n]{3,80})$/);
+            const hm = line.match(/^(A\.\d{1,2}\.\d{1,2}|\d{1,2}(?:\.\d{1,2}){0,2})[\s.):-]+([A-Za-z][^\n]{3,80})$/);
             if (!hm) continue;
             const key = hm[1] + '|' + hm[2].toLowerCase();
             if (seen.has(key)) continue;
             seen.add(key);
-            out.headings.push({ clause: hm[1], text: hm[2].trim().replace(/\s+/g, ' ') });
-            if (out.headings.length >= MAX_HEADINGS) break;
+            refRows.push(hm[1]);
+            if (out.headings.length < MAX_HEADINGS) {
+                out.headings.push({ clause: hm[1], text: hm[2].trim().replace(/\s+/g, ' ') });
+            }
         }
-        out.clauseRefs = Array.from(new Set(out.headings.flatMap(h => findClauseRefs(h.clause))));
+        out.clauseRefs = Array.from(new Set(refRows.flatMap(findClauseRefs))).slice(0, MAX_CLAUSE_REFS);
         // Standards named in the opening pages — scope, purpose and normative
         // reference sections are where a document declares which system it
         // belongs to. Used only when the file name itself is silent.

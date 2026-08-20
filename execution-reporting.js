@@ -83,6 +83,27 @@
     };
     window._methodologyDefaultText = methodologyDefaultText;
 
+    // The last-resort methodology paragraph, used only when the auditor recorded
+    // no methodology AND the plan carries no recognised audit method.
+    //
+    // It deliberately claims no audit mode. The previous fallback asserted
+    // "Observation of activities and work environment on-site", so a Remote
+    // audit with no methodology recorded stated on-site observation that never
+    // took place — exactly what report-integrity.js's B12 check blocks on. An
+    // unknown method must degrade to unspecific, never to false.
+    const METHODOLOGY_NEUTRAL_TEXT = '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel at all levels\n• Observation of activities and work environment where applicable\n• Review of documented information and objective evidence\n• Verification of corrective actions from previous audits';
+    window._methodologyNeutralText = METHODOLOGY_NEUTRAL_TEXT;
+
+    // The audit method as it may be STATED in the report. An unrecorded method
+    // was previously rendered as the literal 'On-site', which invented a fact
+    // about how the audit was conducted; a remote audit whose plan simply left
+    // the field blank was reported as on-site. Absent data is now shown as absent.
+    const auditMethodLabel = (auditPlan) => {
+        const method = (auditPlan && auditPlan.auditMethod) ? String(auditPlan.auditMethod).trim() : '';
+        return method || 'Not recorded';
+    };
+    window._auditMethodLabel = auditMethodLabel;
+
     // ─── Criterion display for findings (#7) ───────────────────────────────────
     // Checklist items carried over from a Stage 1 FOCUS item (or other internal
     // tracking refs like SURV./ORG./DOC.) use an internal reference in `clause`
@@ -296,6 +317,29 @@
         return anyOpen ? 'Previous nonconformity(ies) remain open.' : 'Previous nonconformities verified and closed.';
     };
     window._derivePreviousFindingsStatus = _derivePreviousFindingsStatus;
+
+    // Follow-up status for ONE previous finding, from the state the prior
+    // report actually recorded. Shared by the preview and export tables so the
+    // two can never disagree, and deliberately conservative: an unrecorded
+    // state reads as follow-up PLANNED, never as verification completed.
+    // Claiming a verification that did not happen is the most serious error
+    // this report can make.
+    const PREV_CLOSED_STATES = ['closed', 'verified'];
+    const prevFollowUpLabel = (recorded) => {
+        const raw = recorded == null ? '' : String(recorded).trim();
+        if (!raw) {
+            return '<span style="color:#92400e;">Follow-up planned — previous record not available to verify closure</span>';
+        }
+        if (PREV_CLOSED_STATES.indexOf(raw.toLowerCase()) !== -1) {
+            return 'Verified closed — corrective action implemented';
+        }
+        return '<span style="color:#991b1b;">Open — corrective action not yet verified ('
+            + window.UTILS.escapeHtml(raw) + ')</span>';
+    };
+    const prevFollowUpForNC = (prevReport, nc) => prevFollowUpLabel(
+        ((prevReport.findingStatus || {})[String(nc.clause || '') + '|' + String(nc.department || '')] || {}).status);
+    window._prevFollowUpLabel = prevFollowUpLabel;
+    window._prevFollowUpForNC = prevFollowUpForNC;
 
     // ─── Client logo resolution ────────────────────────────────────────────────
     // client.logoUrl is only ever set by a manual upload in Account Setup, so
@@ -1481,7 +1525,7 @@
                             </div>
                             <div>
                                 <h4 style="margin:0 0 0.75rem;font-size:0.9rem;color:#0d9488;"><i class="fa-solid fa-microscope" style="margin-right:0.4rem;"></i>Audit Methodology</h4>
-                                <div id="rp-methodology" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${d.auditPlan?.auditMethodology || methodologyDefaultText(d.auditPlan) || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel at all levels\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence\n• Verification of corrective actions from previous audits'}</div>
+                                <div id="rp-methodology" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${d.auditPlan?.auditMethodology || methodologyDefaultText(d.auditPlan) || METHODOLOGY_NEUTRAL_TEXT}</div>
                             </div>
                         </div>
                     </div>
@@ -2102,10 +2146,10 @@
                             }
                             let rows = '';
                             prevNCs.forEach(function (nc, i) {
-                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">Verified closed — corrective action implemented</td></tr>';
+                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
                             });
                             prevNCRs.forEach(function (ncr, i) {
-                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">Verified closed — corrective action implemented</td></tr>';
+                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpLabel(ncr.status) + '</td></tr>';
                             });
                             return '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i><strong>Previous Audit:</strong> ' + (prevReport.date || '—') + ' | ' + (prevReport.standard || d.report.standard || '') + ' | ' + (prevNCs.length + prevNCRs.length) + ' NC(s) raised</div>'
                                 + '<table style="width:100%;font-size:0.84rem;border-collapse:collapse;"><thead><tr style="background:#eef2ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Ref</th><th style="padding:10px 14px;text-align:left;width:20%;">Clause</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:56%;">Follow-up Status (click to edit)</th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -2777,6 +2821,27 @@
     // ============================================
     // POLISH NOTES WITH AI (Refine raw notes into professional audit language)
     // ============================================
+
+    // Turn an AI_SERVICE failure into a sentence the auditor can act on.
+    // Prefers the specific `.code` set by AI_SERVICE.extractTextFromResponse
+    // (MAX_TOKENS / BLOCKED / EMPTY_RESPONSE / UNEXPECTED_SHAPE) over a raw
+    // stack trace or a generic message — an auditor who sees nothing at all
+    // has no way to know AI polish silently didn't happen, which is the
+    // exact failure this exists to prevent.
+    function describeAiFailure(step, error) {
+        const code = error && error.code;
+        if (code === 'MAX_TOKENS') {
+            return `${step} was cut off — the AI hit its response length limit. Try again, or polish a shorter section at a time.`;
+        }
+        if (code === 'BLOCKED') {
+            return `${step} was blocked by the AI's content filters. Review the wording of the affected notes, then try again.`;
+        }
+        if (code === 'EMPTY_RESPONSE' || code === 'UNEXPECTED_SHAPE') {
+            return `${step} failed — the AI service returned an unexpected response. Please try again; check Settings > AI Configuration if this keeps happening.`;
+        }
+        return `${step} failed: ${(error && error.message) || 'unknown AI error'}.`;
+    }
+
     window.polishNotesWithAI = async function () {
         const d = window._reportPreviewData;
         if (!d) return;
@@ -2829,6 +2894,10 @@
                     }
                 } catch (conformErr) {
                     console.warn('Conformance text generation error (continuing with polish):', conformErr);
+                    // Do not let this fail silently — an auditor seeing no
+                    // notification at all would reasonably assume the empty
+                    // conformance remarks were filled in by AI when they were not.
+                    window.showNotification(describeAiFailure('AI conformance text generation', conformErr), 'warning');
                 }
             }
 
@@ -2891,7 +2960,14 @@ Instructions:
 
 Return ONLY the conclusion text, no JSON, no formatting.`;
 
-                const response = await window.AI_SERVICE.callProxyAPI(conclusionPrompt);
+                // Explicit, generous maxTokens: the model behind this call may be a
+                // "thinking" model (api/gemini.js maps gemini-2.0-flash etc. to the
+                // gemini-2.5/3.5 family) whose internal reasoning tokens share the
+                // same output budget as the visible answer. A short 150-200 word
+                // conclusion can still legitimately hit MAX_TOKENS with zero visible
+                // text if reasoning alone consumes the default budget — give it more
+                // headroom rather than relying on the (currently modest) default.
+                const response = await window.AI_SERVICE.callProxyAPI(conclusionPrompt, { maxTokens: 65536 });
                 const conclusionText = window.AI_SERVICE.extractTextFromResponse ? window.AI_SERVICE.extractTextFromResponse(response) : (typeof response === 'string' ? response : '');
                 if (conclusionText && conclusionText.trim().length > 50) {
                     const conclusionEl = document.getElementById('rp-conclusion');
@@ -2904,6 +2980,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 }
             } catch (conclusionErr) {
                 console.warn('AI conclusion generation error (continuing):', conclusionErr);
+                // This used to be swallowed with only a console.warn — the auditor
+                // would see the "Notes Polished!" success state a few lines below
+                // and reasonably believe the conclusion was AI-reviewed too, when it
+                // silently was not. Tell them plainly, with the specific reason.
+                window.showNotification(describeAiFailure('AI conclusion generation', conclusionErr), 'warning');
             }
 
             // Update the findings table in the preview if visible
@@ -3684,12 +3765,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 .filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; });
             const prevNCRs = prevReport.ncrs || [];
             if (prevNCs.length === 0 && prevNCRs.length === 0) return '';
+
             let rows = '';
             prevNCs.forEach(function (nc, i) {
-                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td>Verified closed — corrective action implemented</td></tr>';
+                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td>' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
             });
             prevNCRs.forEach(function (ncr, i) {
-                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td>Verified closed — corrective action implemented</td></tr>';
+                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td>' + prevFollowUpLabel(ncr.status) + '</td></tr>';
             });
             return rows;
         })();
@@ -4217,7 +4299,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<tr><td>Audit Type</td><td>' + (d.auditPlan?.auditType || 'Initial') + '</td></tr>'
                 + '<tr><td>Audit Dates</td><td>' + (d.report.date || '—') + (d.report.endDate ? ' → ' + d.report.endDate : '') + '</td></tr>'
                 + '<tr><td>Lead Auditor</td><td>' + (d.report.leadAuditor || '—') + '</td></tr>'
-                + '<tr><td>Audit Method</td><td>' + (d.auditPlan?.auditMethod || 'On-site') + '</td></tr>'
+                + '<tr><td>Audit Method</td><td>' + auditMethodLabel(d.auditPlan) + '</td></tr>'
                 + (function () {
                     var s = (d.client.sites && d.client.sites[0]) || {};
                     // Master-data values are hand-entered and frequently carry a
@@ -4266,7 +4348,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">'
                 + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Objectives</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system') + '</div></div>'
                 + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#1d4ed8;">Audit Criteria</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedCriteria || '• ' + standard + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records') + '</div></div>'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedMethodology || methodologyDefaultText(d.auditPlan) || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedMethodology || methodologyDefaultText(d.auditPlan) || METHODOLOGY_NEUTRAL_TEXT) + '</div></div>'
                 + '</div></div>' : '')
             // SECTION: EXECUTIVE SUMMARY
             + (secMap['summary'] ? '<div id="sec-summary" class="sh" style="border-left-color:#059669;">' + sBadge('summary') + 'AUDIT SUMMARY &amp; OPENING MEETING</div><div class="sb">'
@@ -4274,7 +4356,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="padding:10px 14px;background:#eff6ff;border-radius:8px;border-left:3px solid #1d4ed8;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;border-left:3px solid #475569;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#eff6ff;border-radius:8px;border-left:3px solid #1d4ed8;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (function () { var md = d.auditPlan?.manDays || d.auditPlan?.man_days || '—'; var method = (d.auditPlan?.auditMethod || '').toLowerCase(); var suffix = method === 'remote' ? ' (Remote Audit)' : (method === 'hybrid' ? ' (Hybrid)' : (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '')); return md + ' Man-Days' + suffix; })() + '</div></div>'
-                + '<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;border-left:3px solid #475569;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditMethod || 'On-site') + '</div></div></div>'
+                + '<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;border-left:3px solid #475569;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + auditMethodLabel(d.auditPlan) + '</div></div></div>'
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
                 + '<div style="padding:16px;background:#ecfdf5;border-radius:10px;margin-top:14px;border-left:4px solid #475569;"><strong style="color:#475569;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + fmtRemark(editedOpeningNotes) + '</td></tr>' : '') + '</table></div>'
