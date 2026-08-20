@@ -2030,9 +2030,22 @@ const SupabaseClient = {
                 });
                 window.state.checklists = local;
             } else if (cloudCount === 0 && localCount > 0) {
-                // FULL sync returned nothing but local has data — do NOT wipe local
-                // checklists (cloud may be unreachable, RLS-blocked, or never seeded).
-                Logger.warn(`Full checklist sync returned 0 rows but ${localCount} exist locally — keeping local data. Check checklists table / RLS.`);
+                // Local data is never wiped on an empty result — the cloud may be
+                // unreachable, RLS-blocked, or simply unchanged.
+                //
+                // Which of those it is matters, and this branch used to say "Full
+                // checklist sync returned 0 rows … Check checklists table / RLS"
+                // for BOTH cases. An INCREMENTAL sync returning nothing means
+                // nothing has changed since the last one, which is the normal
+                // outcome on any second sign-in — reporting it as a full-sync
+                // failure sent people to investigate a table and RLS policies that
+                // were correct all along. Only a FULL sync returning nothing while
+                // rows are held locally is genuinely suspicious.
+                if (isIncremental) {
+                    Logger.info(`No checklist changes since the last sync (${localCount} held locally).`);
+                } else {
+                    Logger.warn(`Full checklist sync returned 0 rows but ${localCount} exist locally — keeping local data. Check checklists table / RLS.`);
+                }
             } else {
                 // FULL: Supabase is source of truth — replace entirely
                 window.state.checklists = cloudChecklists;
