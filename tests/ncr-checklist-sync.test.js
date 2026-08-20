@@ -356,3 +356,101 @@ describe('window.NCRSyncUtils.applyCriterionToFinding + findSiblingFindingsByCla
         expect(siblings).toContainEqual({ kind: 'manual', item: report.ncrs[0], index: 0 });
     });
 });
+
+// The bulk "Review all criteria" screen's data source. The modal itself is
+// DOM/modal glue (same reasoning as window.setFindingCriterion above), but the
+// decision of WHICH findings still need an auditor-assigned criterion — and
+// which must deliberately never be offered one — is pure and worth pinning.
+describe('window.NCRSyncUtils.collectUnconfirmedCriteria', () => {
+    beforeEach(() => {
+        window.state = { ncrs: [] };
+        loadModule('./report-stats.js');
+        loadModule('./execution-module-v2.js');
+    });
+
+    const collect = (checklistProgress) =>
+        window.NCRSyncUtils.collectUnconfirmedCriteria({ id: 'r1', checklistProgress });
+
+    it('collects a FOCUS item that has no assigned criterion', () => {
+        const out = collect([
+            { clause: 'FOCUS.1', status: 'nc', ncrType: 'observation', requirement: 'Verify management reviews.' }
+        ]);
+        expect(out).toHaveLength(1);
+        expect(out[0].clause).toBe('FOCUS.1');
+    });
+
+    it('skips an item that already carries a confirmed criterionRef', () => {
+        expect(collect([
+            { clause: 'FOCUS.1', criterionRef: '9.3', status: 'nc', ncrType: 'minor' }
+        ])).toEqual([]);
+    });
+
+    it('skips an item whose own clause is already a real clause of the standard', () => {
+        expect(collect([
+            { clause: '9.2', status: 'nc', ncrType: 'minor' }
+        ])).toEqual([]);
+    });
+
+    // The whole point of the exclusion: a §9.6.2 element's criterion is an
+    // ISO/IEC 17021-1 programme criterion. Offering to assign it a clause of
+    // the client's standard is the cross-framework confusion B15 blocks.
+    it('never offers an ISO clause for an ISO/IEC 17021-1 surveillance element', () => {
+        expect(collect([
+            { clause: '9.6.2 (b)', criterionSource: 'surveillance-programme', status: 'conform' },
+            { clause: '9.6.2 (d)', criterionSource: 'surveillance-programme', status: 'nc', ncrType: 'observation' }
+        ])).toEqual([]);
+    });
+
+    it('carries the unconfirmed suggestion through with its confidence and basis', () => {
+        const out = collect([
+            {
+                clause: 'FOCUS.4', status: 'conform', requirement: 'Evaluate competence and training.',
+                criterionSuggestedRef: '7.2', criterionConfidence: 'low', criterionBasis: 'keyword-fallback'
+            }
+        ]);
+        expect(out[0]).toMatchObject({ suggestedRef: '7.2', confidence: 'low', basis: 'keyword-fallback' });
+    });
+
+    it('reports an item with no suggestion at all rather than hiding it', () => {
+        const out = collect([
+            { clause: 'FOCUS.5', status: 'conform', requirement: 'Assess IPC/WHMA-A-620 Class 3 adherence.' }
+        ]);
+        expect(out).toHaveLength(1);
+        expect(out[0].suggestedRef).toBe('');
+        expect(out[0].confidence).toBe('none');
+    });
+
+    it('flags only major/minor NCs as blocking issuance — advisories and conforming items do not', () => {
+        const out = collect([
+            { clause: 'FOCUS.1', status: 'nc', ncrType: 'observation' },
+            { clause: 'FOCUS.2', status: 'nc', ncrType: 'minor' },
+            { clause: 'FOCUS.3', status: 'conform' },
+            { clause: 'FOCUS.4', status: 'nc', ncrType: 'ofi' }
+        ]);
+        const blocking = out.filter(o => o.blocksIssuance).map(o => o.clause);
+        expect(blocking).toEqual(['FOCUS.2']);
+    });
+
+    it('orders blockers first, then by suggestion confidence', () => {
+        const out = collect([
+            { clause: 'FOCUS.1', status: 'conform', criterionSuggestedRef: '9.3', criterionConfidence: 'low' },
+            { clause: 'FOCUS.2', status: 'conform', criterionSuggestedRef: '7.2', criterionConfidence: 'medium' },
+            { clause: 'FOCUS.3', status: 'nc', ncrType: 'minor' }
+        ]);
+        expect(out.map(o => o.clause)).toEqual(['FOCUS.3', 'FOCUS.2', 'FOCUS.1']);
+    });
+
+    it('keeps the checklistProgress index so the modal can write back to the right item', () => {
+        const out = collect([
+            { clause: '4.1', status: 'conform' },
+            { clause: 'FOCUS.9', status: 'nc', ncrType: 'minor' }
+        ]);
+        expect(out).toHaveLength(1);
+        expect(out[0].index).toBe(1);
+    });
+
+    it('returns an empty list for a report with nothing to assign', () => {
+        expect(window.NCRSyncUtils.collectUnconfirmedCriteria({ checklistProgress: [] })).toEqual([]);
+        expect(window.NCRSyncUtils.collectUnconfirmedCriteria(null)).toEqual([]);
+    });
+});

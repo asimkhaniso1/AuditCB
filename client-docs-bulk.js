@@ -1479,9 +1479,20 @@
                 title: 'Mandatory Surveillance Elements (ISO/IEC 17021-1 §9.6.2)',
                 subClauses: SURVEILLANCE_MANDATORY.map(([ref, label, text]) => {
                     const item = question(`9.6.2 (${ref})`, label, text);
-                    // Same reasoning as the FOCUS block above: this is a §9.6.2
-                    // mandatory-element prompt, not a confirmed finding clause.
-                    applyCriterionSuggestion(item, text, o.standard, 'focus-carryover');
+                    // A §9.6.2 element's criterion is ALREADY known and is not a
+                    // clause of the client's standard — it is an ISO/IEC 17021-1
+                    // programme criterion governing the certification body's own
+                    // surveillance. Running the ISO-clause suggester over its text
+                    // produced actively harmful hints: element (b) ("actions taken
+                    // on nonconformities … corrective action …") suggested ISO 9001
+                    // 10.2, inviting an auditor to stamp a client-standard clause
+                    // onto a CB-programme criterion — the exact confusion B15
+                    // exists to block at issuance. criterionSource carries
+                    // 'surveillance' so ReportStats.classifyCriterion resolves
+                    // these to kind 'programme' and they are labelled as
+                    // surveillance criteria, never as clauses of the standard.
+                    item.criterionRef = '';
+                    item.criterionSource = 'surveillance-programme';
                     return item;
                 })
             });
