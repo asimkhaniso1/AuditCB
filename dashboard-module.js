@@ -43,7 +43,6 @@ function renderDashboardEnhanced() {
         stats = window._dashboardStatsCache;
         Logger.info('Dashboard stats served from cache');
     } else {
-        const now = new Date();
         const totalClients = visibleClients.length;
         const activeClients = visibleClients.filter(c => c.status === 'Active').length;
         const inactiveClients = visibleClients.filter(c => c.status === 'Inactive').length;
@@ -69,7 +68,7 @@ function renderDashboardEnhanced() {
         let minorNCRs = 0;
         let openNCRs = 0;
         let closedNCRs = 0;
-        let overdueNCRs = 0;
+        let overdueNCRs;
         let complianceScoreSum = 0;
         let complianceCount = 0;
 

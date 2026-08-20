@@ -486,9 +486,9 @@ function _mechanicalCleanFallback(raw) {
 // are kept so "2024-01-05" isn't fragmented into unrelated single digits.
 function _extractNumericTokens(text) {
     if (!text) return [];
-    const matches = String(text).match(/\d[\d,.:/\-]*%?/g) || [];
+    const matches = String(text).match(/\d[\d,.:/-]*%?/g) || [];
     return matches
-        .map(m => m.replace(/^[,.:/\-]+|[,.:/\-]+$/g, ''))
+        .map(m => m.replace(/^[,.:/-]+|[,.:/-]+$/g, ''))
         .filter(Boolean);
 }
 
@@ -1671,7 +1671,7 @@ window._reportContentHash = function (report, statsSummary) {
             primarySiteAddress
         });
         return _djb2Hash(payload);
-    } catch (e) { return '0'; }
+    } catch (_e) { return '0'; }
 };
 
 // Roles permitted to finalize/re-issue a report. Enforced here (not just at the
@@ -1683,7 +1683,7 @@ function _hasReportIssuanceRole() {
         if (window.AuthManager && typeof window.AuthManager.hasRole === 'function') {
             return !!window.AuthManager.hasRole(REPORT_ISSUANCE_ROLES);
         }
-    } catch (e) { /* fall through */ }
+    } catch (_e) { /* fall through */ }
     return true; // AuthManager not wired in this environment — fail open rather than lock out.
 }
 

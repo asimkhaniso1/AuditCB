@@ -3526,7 +3526,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     if (window.SupabaseClient && typeof window.SupabaseClient.syncAuditPlansToSupabase === 'function') {
                         window.SupabaseClient.syncAuditPlansToSupabase([plan]);
                     }
-                } catch (e) { /* local state persists via saveData either way */ }
+                } catch (_e) { /* local state persists via saveData either way */ }
             }
             window.closeModal();
             persistAndRefreshIntegrity(reportId, 'Audit scope recorded.');

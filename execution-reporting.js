@@ -3071,7 +3071,6 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // ref, not the audit plan's — this was previously pulling getPlanRef
         // directly (a different value from the cover/footer's Report ID).
         const planRef = reportRef(d);
-        const cbName = (d.cbSettings && d.cbSettings.cbName) || '';
         const standard = d.report.standard || (d.auditPlan && d.auditPlan.standard) || 'ISO Standard';
 
         const cards = evIdx.map(function (ev) {

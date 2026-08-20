@@ -43,15 +43,6 @@
 
     function safeArr(a) { return Array.isArray(a) ? a : []; }
 
-    function icon(name, opts) {
-        try {
-            if (global.ReportExecutive && typeof global.ReportExecutive.icon === 'function') {
-                return global.ReportExecutive.icon(name, opts);
-            }
-        } catch (e) { /* noop */ }
-        return '';
-    }
-
     // ─── Empty-column suppression ───────────────────────────────────────────
     // When every row of a rendered column is a "nothing recorded" placeholder
     // ('—', '', 'Not recorded', 'N/A'), the column carries no information and
@@ -85,7 +76,7 @@
         var cut = t.slice(0, maxLen - 1);
         var lastSpace = cut.lastIndexOf(' ');
         if (lastSpace > maxLen * 0.6) cut = cut.slice(0, lastSpace);
-        return cut.replace(/[\s,:;.\-]+$/, '') + '…';
+        return cut.replace(/[\s,:;.-]+$/, '') + '…';
     }
 
     function fmtDate(s) {
@@ -104,7 +95,7 @@
             if (global.ReportStats && typeof global.ReportStats.formatCriterion === 'function') {
                 return esc(global.ReportStats.formatCriterion(item).label || '—');
             }
-        } catch (e) { /* noop */ }
+        } catch (_e) { /* noop */ }
         var clause = String((item && item.clause) || '').trim();
         var ref = String((item && item.criterionRef) || '').trim();
         if (ref) return esc(ref);
@@ -176,7 +167,7 @@
             });
 
             return matched;
-        } catch (e) {
+        } catch (_e) {
             return [];
         }
     }
@@ -293,7 +284,7 @@
                     groups = sources;
                 }
             }
-        } catch (e) { /* fall through to fallback */ }
+        } catch (_e) { /* fall through to fallback */ }
 
         if (!groups.length) {
             usedFallback = true;
@@ -368,7 +359,7 @@
         try {
             var stored = d && d.report && d.report.findingStatus && d.report.findingStatus[storedKey];
             if (stored && stored.status && LIFECYCLE_LABELS[stored.status]) return stored.status;
-        } catch (e) { /* ignore */ }
+        } catch (_e) { /* ignore */ }
 
         var capa = bestCapaFor(capaIndex, item.clause);
         if (!capa) return 'open';
@@ -598,7 +589,7 @@
     function safeSection(fn, d) {
         try {
             return fn(d) || '';
-        } catch (e) {
+        } catch (_e) {
             return '';
         }
     }

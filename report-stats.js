@@ -100,13 +100,13 @@
         text = text.replace(/\s*\[[^\]]*\]\s*/g, ' ');
         text = text.replace(CHECKLIST_LEADIN, '');
         text = text.replace(/\s+/g, ' ').trim();
-        text = text.replace(/^[\s,:;.\-]+/, '');
+        text = text.replace(/^[\s,:;.-]+/, '');
         if (!text) text = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
         if (text) text = text.charAt(0).toUpperCase() + text.slice(1);
         if (maxLen && text.length > maxLen) {
             const cut = text.slice(0, maxLen - 1);
             const lastSpace = cut.lastIndexOf(' ');
-            text = (lastSpace > maxLen * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,:;.\-]+$/, '') + '…';
+            text = (lastSpace > maxLen * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,:;.-]+$/, '') + '…';
         }
         return text;
     }
@@ -145,12 +145,6 @@
         // left alone.
         if (/[A-Za-z0-9]$/.test(text)) text += '.';
         return text;
-    }
-
-    function daysBetween(a, b) {
-        const da = new Date(a), db = new Date(b);
-        if (isNaN(da.getTime()) || isNaN(db.getTime())) return null;
-        return Math.round((db.getTime() - da.getTime()) / 86400000);
     }
 
     // Best-effort audit date window, widened by ±7 days per report-risk.js's
@@ -984,7 +978,7 @@
             if (/progress/.test(status)) return 'inProgress';
             return null;
         }
-        let carsCreated = 0, inProgress = 0, awaitingVerification = 0, verified = 0, closed = 0;
+        let carsCreated, inProgress = 0, awaitingVerification = 0, verified = 0, closed = 0;
         const linkedForFindings = uniqueFindings.filter((f) => f.capaRef != null);
         carsCreated = linkedForFindings.length;
         linkedRegister.forEach((rec) => {

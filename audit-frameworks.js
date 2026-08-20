@@ -408,9 +408,9 @@
 
             return frameworks.filter((fw) => {
                 try { return fw.appliesWhen.test(haystack); }
-                catch (e) { return false; }
+                catch (_e) { return false; }
             });
-        } catch (e) {
+        } catch (_e) {
             return [];
         }
     }
@@ -430,7 +430,7 @@
                 });
             });
             return out;
-        } catch (e) {
+        } catch (_e) {
             return [];
         }
     }

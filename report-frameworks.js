@@ -107,7 +107,7 @@
                 bodyHtml,
                 charts: []
             }];
-        } catch (e) {
+        } catch (_e) {
             return [];
         }
     }
