@@ -57,7 +57,7 @@
                 if (fc.isInternal) return 'Internal ref ' + (f.clause || '') + ' — ';
                 return fc.real ? 'Clause ' + fc.real + ' — ' : '';
             }
-        } catch (e) { /* fall through */ }
+        } catch (_e) { /* fall through */ }
         return f && f.clause ? 'Clause ' + f.clause + ' — ' : '';
     }
 

@@ -235,12 +235,12 @@
                             meta.location = locStr;
                             meta.locationRaw = { lat, lng, accuracy };
                         }
-                    } catch (e) { /* non-fatal, ignore */ }
+                    } catch (_e) { /* non-fatal, ignore */ }
                 },
                 () => { /* denied / unavailable / timeout: proceed silently, no location attached */ },
                 { timeout: 4000, maximumAge: 60000, enableHighAccuracy: false }
             );
-        } catch (e) { /* geolocation API not available in this environment; ignore */ }
+        } catch (_e) { /* geolocation API not available in this environment; ignore */ }
     }
 
     // Resolve idb:// references to displayable blob URLs

@@ -381,6 +381,18 @@
             return;
         }
 
+        // Automated QA validation before the PDF is built — same gate the print
+        // path applies, so a checklist cannot leave the system as a PDF without
+        // having been checked for out-of-scope clauses, invented references,
+        // duplicates and doc-count-driven bloat.
+        const qa = typeof window.runChecklistQA === 'function' ? window.runChecklistQA(checklist) : null;
+        if (qa && qa.blocking) {
+            const detail = qa.issues.filter(i => i.severity === 'critical').slice(0, 6)
+                .map(i => `• ${i.itemRef ? i.itemRef + ' — ' : ''}${i.message}`).join('\n');
+            if (!window.confirm(`QA validation found ${qa.counts.critical} critical issue(s):\n\n${detail}\n\nExport the PDF anyway?`)) return;
+        }
+        if (qa) window.showNotification?.(window.ChecklistQA.summarize(qa), qa.blocking ? 'warning' : 'info');
+
         // Build hierarchical HTML
         let itemsHtml = '';
         let questionNumber = 0;

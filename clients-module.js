@@ -2494,6 +2494,12 @@ window.handleIndustryChange = function (select) {
                 <div><strong style="color: var(--text-secondary); font-size: 0.82rem;">Revision</strong><div style="font-family: monospace;">${window.UTILS.escapeHtml(doc.revision || '-')}</div></div>
                 <div><strong style="color: var(--text-secondary); font-size: 0.82rem;">Linked Clauses</strong><div>${doc.linkedClauses ? '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:4px;font-size:0.85rem;">' + window.UTILS.escapeHtml(doc.linkedClauses) + '</span>' : '—'}</div></div>
                 <div><strong style="color: var(--text-secondary); font-size: 0.82rem;">Date Added</strong><div>${window.UTILS.escapeHtml(doc.date || '-')}</div></div>
+                <div style="grid-column: 1 / -1;">
+                    <strong style="color: var(--text-secondary); font-size: 0.82rem;">Linked Standard</strong>
+                    <div>${doc.linkedStandardLabels
+            ? String(doc.linkedStandardLabels).split(',').map(l => '<span style="background:#ecfdf5;color:#065f46;padding:2px 8px;border-radius:4px;font-size:0.85rem;display:inline-block;margin:2px 4px 2px 0;">' + window.UTILS.escapeHtml(l.trim()) + '</span>').join('')
+            : '<span style="color:#94a3b8;font-size:0.85rem;">Not recorded — this document is treated as applying to every standard in scope. A clause number alone is ambiguous in an integrated system.</span>'}</div>
+                </div>
             </div>
             ${doc.notes ? `<div style="margin-top: 0.5rem;"><strong style="color: var(--text-secondary); font-size: 0.82rem;">Notes / Key Excerpts</strong><div style="margin-top: 0.5rem; padding: 1rem; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 0 6px 6px 0; font-size: 0.9rem; line-height: 1.7; white-space: pre-wrap;">${window.UTILS.escapeHtml(doc.notes)}</div></div>` : '<p style="color: #94a3b8; font-size: 0.9rem;">No notes added for this document.</p>'}
         `);

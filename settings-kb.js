@@ -1158,8 +1158,13 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
     window.showNotification('Switching to offline fallback mode...', 'warning');
     console.warn(`⚠️ [KB Analysis] Falling back to built-in database for ${standardName}`);
     doc.clauses = getBuiltInClauses(standardName);
-    doc.status = 'ready';
+    // No built-in set for this standard: leave it un-analysed rather than
+    // marking an empty (or borrowed) clause list as ready to audit against.
+    doc.status = doc.clauses.length ? 'ready' : 'pending';
     doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+    if (!doc.clauses.length) {
+        window.showNotification(`No built-in clause set for ${standardName}. Upload the standard and analyse it before using it in a checklist.`, 'warning');
+    }
     window.saveData();
 }
 
@@ -1450,7 +1455,31 @@ function getBuiltInClauses(standardName) {
 
     if (standardName.includes('9001')) return iso9001Clauses;
 
-    return iso9001Clauses; // Default fallback
+    // Standards held in the ChecklistStandards registry (ISO/IEC 27001:2022,
+    // ISO 22301:2019, ISO/IEC 20000-1:2018) answer from their own clause set.
+    if (window.ChecklistStandards) {
+        const resolved = window.ChecklistStandards.resolve(standardName).standards;
+        if (resolved.length === 1) {
+            return resolved[0].clauses.map(c => ({
+                clause: c.ref,
+                title: c.title,
+                requirement: `${resolved[0].label} ${c.ref} — ${c.title}. Verify the requirement is implemented and evidenced for the certified scope.`
+            }));
+        }
+    }
+
+    // No validated clause set for this standard.
+    //
+    // This used to `return iso9001Clauses` as a "default fallback", which meant
+    // every standard the list above did not recognise was silently audited
+    // against ISO 9001 — Customer Focus, "QMS processes", Design & Development
+    // (8.3) and monitoring and measuring equipment (7.1.5) turning up in an
+    // ISMS/BCMS/SMS checklist. Returning nothing is the honest answer: callers
+    // surface it for review rather than citing a standard that is not in scope.
+    if (window.Logger) {
+        window.Logger.warn('KB', `No built-in clause set for "${standardName}" — returning none rather than defaulting to ISO 9001.`);
+    }
+    return [];
 }
 
 // Exposed so the document gap analysis can fall back to these when a standard
@@ -2228,11 +2257,14 @@ window.reanalyzeStandard = async function (docId, mode = 'standard', auditType =
 
     // Fallback if AI fails - use built-in detailed clauses
     doc.clauses = getBuiltInClauses(doc.name);
-    doc.status = 'ready';
+    doc.status = doc.clauses.length ? 'ready' : 'pending';
     doc.lastAnalyzed = new Date().toISOString().split('T')[0];
     window.saveData();
 
-    window.showNotification(`Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`, 'info');
+    window.showNotification(doc.clauses.length
+        ? `Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`
+        : `No built-in clause set for ${doc.name} — nothing was assumed from another standard. Upload the standard text and analyse it.`,
+        doc.clauses.length ? 'info' : 'warning');
     if (typeof switchSettingsSubTab === 'function') {
         switchSettingsSubTab('knowledge', 'kb');
     } else {

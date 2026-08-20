@@ -139,7 +139,7 @@
     function cleanFindingText(s, maxLen) {
         let t = String(s == null ? '' : s);
         t = t.replace(/\[Ref:[^\]]*\]/gi, ' ');
-        t = t.replace(/^\s*(show|verify|check|confirm|ensure|demonstrate|provide|review|assess|evaluate)\b[:\s\-]*/i, '');
+        t = t.replace(/^\s*(show|verify|check|confirm|ensure|demonstrate|provide|review|assess|evaluate)\b[:\s-]*/i, '');
         t = t.replace(/\s{2,}/g, ' ').trim();
         const cap = maxLen || 90;
         if (t.length > cap) t = t.slice(0, Math.max(0, cap - 1)).trim() + '…';
@@ -365,7 +365,7 @@ ${data.forwardOutlook ? `
     // Prefers the canonical window.ReportStats conformityPct (blank-status
     // excluded, advisories treated as conforming-with-comment) when the module
     // is available; falls back to conform+advisories over assessed, blank-excluded.
-    function computeConformPct(d, stats) {
+    function computeConformPct(d, _stats) {
         try {
             if (window.ReportStats && typeof window.ReportStats.build === 'function') {
                 const ds = window.ReportStats.build(d || {});
@@ -1419,7 +1419,7 @@ Answer:`;
         try {
             const answer = await askAuditAI(question, d);
             answerEl.textContent = answer;
-        } catch (err) {
+        } catch (_err) {
             answerEl.textContent = 'Sorry, I could not process that question right now.';
         }
     }

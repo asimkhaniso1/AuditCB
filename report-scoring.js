@@ -405,7 +405,7 @@
             else if (r.major > 0) status = 'Critical';
             else if (r.minor > 0) status = 'Attention';
 
-            let priority = 'Low';
+            let priority;
             if (isRecurring || r.major > 0) priority = 'High';
             else if (r.minor >= 2) priority = 'Medium';
             else if (r.minor >= 1) priority = 'Low';
@@ -624,7 +624,7 @@
         return round(curr - prev);
     }
 
-    function computeTrends(report, allReports, family) {
+    function computeTrends(report, allReports, _family) {
         const empty = { labels: [], majorNC: [], minorNC: [], obs: [], ofi: [], auditScore: [], capaOpen: [] };
         try {
             const clientId = report?.clientId;
@@ -831,11 +831,6 @@
     const SEVERITY_SYMBOL = { good: '✓ ', warn: '! ', bad: '✕ ' };
     function sevSymbol(sev) { return SEVERITY_SYMBOL[sev] || ''; }
 
-    function scorePillHtml(score) {
-        if (score == null) return '<span class="b4-badge b4-badge--neutral">—</span>';
-        const sev = scoreSeverity(score);
-        return `<span class="b4-badge b4-badge--${sev}">${sevSymbol(sev)}${score}</span>`;
-    }
 
     function barHtml(valuePct, severity) {
         const v = clamp(valuePct == null ? 0 : valuePct, 0, 100);
