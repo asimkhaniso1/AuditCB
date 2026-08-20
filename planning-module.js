@@ -221,6 +221,65 @@ function deletePlan(planId) {
 let _currentPlanStep = 1;
 window.editingPlanId = null;
 
+// ─── Audit methodology, kept in step with the audit method ─────────────────
+// The methodology textarea used to be hardcoded with on-site wording whatever
+// Method was selected, so a plan saved as Remote carried "Observation of
+// activities and work environment on-site" into the report — which the
+// report-integrity B12 check then correctly refused to issue. The auditor had
+// changed Method to Remote and been told, accurately but confusingly, that the
+// plan still claimed on-site activity.
+//
+// The per-method text is owned by execution-reporting.js so the plan and the
+// report cannot describe the same audit differently; this is the fallback for
+// the case where that module has not loaded.
+const PLAN_METHODOLOGY_NEUTRAL = '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel at all levels\n• Observation of activities and work environment where applicable\n• Review of documented information and objective evidence\n• Verification of corrective actions from previous audits';
+
+function planMethodologyDefault(method) {
+    if (typeof window._methodologyDefaultText === 'function') {
+        const text = window._methodologyDefaultText({ auditMethod: method });
+        if (text) return text;
+    }
+    return PLAN_METHODOLOGY_NEUTRAL;
+}
+
+// The on-site paragraph this form used to hardcode for every plan regardless of
+// method. Plans created before that was fixed carry it verbatim, so it counts as
+// a default too — otherwise the very plans that need correcting are the ones
+// treated as hand-written and left alone.
+const PLAN_METHODOLOGY_LEGACY = '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel at all levels\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence\n• Verification of corrective actions from previous audits';
+
+/** True when the textarea still holds a generated default rather than the auditor's own words. */
+function planMethodologyIsUnedited(value) {
+    const current = String(value || '').trim();
+    if (!current) return true;
+    return ['On-site', 'Remote', 'Hybrid'].some(m => planMethodologyDefault(m).trim() === current)
+        || PLAN_METHODOLOGY_NEUTRAL.trim() === current
+        || PLAN_METHODOLOGY_LEGACY.trim() === current;
+}
+
+/**
+ * Keep the methodology text honest when the Method changes.
+ *
+ * An untouched default is rewritten to match the new method. Text the auditor
+ * has written themselves is never overwritten — but if it still describes
+ * on-site activity on a remote audit, say so now, at the point of change,
+ * rather than letting them discover it from a blocked issuance later.
+ */
+window.planAuditMethodChanged = function (el) {
+    const method = (el && el.value) || '';
+    const box = document.getElementById('plan-methodology');
+    if (!box) return;
+    if (planMethodologyIsUnedited(box.value)) {
+        box.value = planMethodologyDefault(method);
+        return;
+    }
+    if (/remote/i.test(method) && /\bon-?site\b/i.test(box.value) && window.showNotification) {
+        window.showNotification(
+            'Audit Methodology still describes on-site activity. Update it for a remote audit, or the report cannot be issued.',
+            'warning');
+    }
+};
+
 function renderCreateAuditPlanForm(preSelectedClientName = null) {
     window.editingPlanId = null; // Reset edit mode
 
@@ -318,11 +377,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 </div>
                                 <div class="form-group" style="grid-column: 1 / -1; margin: 0;">
                                     <label style="font-size: 0.8rem;">Audit Methodology</label>
-                                    <textarea class="form-control" id="plan-methodology" rows="3" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Describe audit methodology...">• Risk-based sampling of processes, records, and documentation
-• Interviews with management and operational personnel at all levels
-• Observation of activities and work environment on-site
-• Review of documented information and objective evidence
-• Verification of corrective actions from previous audits</textarea>
+                                    <textarea class="form-control" id="plan-methodology" rows="3" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Describe audit methodology...">${planMethodologyDefault('On-site')}</textarea>
                                 </div>
                             </div>
                         </div>
@@ -408,7 +463,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 </div>
                                 <div class="form-group" style="margin: 0;">
                                     <label style="font-size: 0.8rem;">Method</label>
-                                    <select class="form-control" id="plan-audit-method">
+                                    <select class="form-control" id="plan-audit-method" data-action-change="planAuditMethodChanged">
                                         <option value="On-site" selected>On-site</option>
                                         <option value="Remote">Remote</option>
                                         <option value="Hybrid">Hybrid</option>
@@ -2411,7 +2466,7 @@ ${plan.auditCriteria || '• ' + (plan.standard || 'Applicable ISO standard(s)')
 
             <div class="section-title">AUDIT METHODOLOGY</div>
             <div style="white-space: pre-line; color: #333; line-height: 1.8; padding-left: 10px;">
-${plan.auditMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel at all levels\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence\n• Verification of corrective actions from previous audits'}
+${plan.auditMethodology || planMethodologyDefault(plan.auditMethod)}
             </div>
 
             <div class="footer">

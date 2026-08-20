@@ -115,8 +115,13 @@
      * Sync checklists to cloud.
      */
     function syncChecklists(options = {}) {
+        // syncChecklistsToSupabase(checklists) returns immediately on an empty
+        // argument. Calling it with none made every push a silent no-op, so the
+        // checklists table was never seeded from the local library — the cause
+        // of the recurring "Full checklist sync returned 0 rows but N exist
+        // locally" warning at sign-in. The local library is the set to push.
         return syncToCloud('checklists', () =>
-            window.SupabaseClient.syncChecklistsToSupabase(),
+            window.SupabaseClient.syncChecklistsToSupabase((window.state && window.state.checklists) || []),
             options
         );
     }
