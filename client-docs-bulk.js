@@ -1421,6 +1421,23 @@
         if (window.ChecklistQA) {
             checklist.qa = window.ChecklistQA.validate(checklist, checklist.qaContext);
         }
+        // Cycle coverage is assessed at generation time too, so the gap between
+        // what this audit covers and what the three-year programme still owes is
+        // visible on the checklist the moment it is built — not only when
+        // someone opens it to release it for audit.
+        if (window.ChecklistCoverage) {
+            try {
+                checklist.coverage = window.ChecklistCoverage.assess(
+                    checklist,
+                    window.ChecklistCoverage.buildContext(checklist, {
+                        planId: o.planId || null,
+                        soaApplicable: o.soaApplicable || []
+                    })
+                );
+            } catch (err) {
+                if (window.Logger) window.Logger.error('ChecklistCoverage', 'Assessment failed at build: ' + err.message);
+            }
+        }
         return checklist;
     }
 
@@ -3246,6 +3263,45 @@
 
     // ── Checklist generation ──────────────────────────────────────────
 
+    // Context the length note needs after the modal is open, when the closure
+    // that built it is out of reach.
+    let _cldocLength = { manDays: '', hasRegistry: false };
+
+    /**
+     * The note under the checklist-length control.
+     *
+     * Length only ever constrains a surveillance audit. An initial or
+     * recertification audit has to cover the standard, so the budget is
+     * discarded there — which is why picking "75 questions" and "no limit"
+     * produced the identical recertification checklist. The control is now
+     * disabled for those audit types and says so, instead of staying live and
+     * being silently ignored.
+     */
+    function lengthNoteHTML(auditType) {
+        const type = normalizeAuditType(auditType);
+        if (type !== 'surveillance') {
+            return '<strong>Not used for ' + (type === 'recertification' ? 'a recertification' : 'an initial')
+                + ' audit.</strong> This audit has to cover the standard, so the checklist length follows scope and risk '
+                + 'and any budget set here is discarded. Coverage is reported by the Recertification Coverage Validation '
+                + 'on the checklist itself.';
+        }
+        return (_cldocLength.manDays ? 'Plan is ' + esc(_cldocLength.manDays) + ' man-day(s).' : 'Man-days not set on the plan.')
+            + ' Focus points and the ISO 17021-1 mandatory elements are never trimmed.'
+            + (_cldocLength.hasRegistry ? ' For the standards ticked above, length is set by scope and risk — man-days and organisation size move the sampling depth, not the requirement coverage.' : '');
+    }
+
+    /** Keep the length control honest when the audit type changes. */
+    window.cldocAuditTypeChanged = function (el) {
+        const type = normalizeAuditType(el && el.value);
+        const lengthSel = document.getElementById('cldoc-length');
+        const note = document.getElementById('cldoc-length-note');
+        if (lengthSel) {
+            lengthSel.disabled = type !== 'surveillance';
+            lengthSel.style.opacity = lengthSel.disabled ? '0.55' : '';
+        }
+        if (note) note.innerHTML = lengthNoteHTML(type);
+    };
+
     window.buildChecklistFromClientDocs = function (clientId, presetAuditType, presetStandard, planId) {
         const client = window.DataService.findClient(clientId);
         if (!client) return;
@@ -3281,6 +3337,7 @@
         const focusCount = ((planForFocus && planForFocus.preAudit && planForFocus.preAudit.focusPoints) || []).length;
         const manDays = planForFocus ? (planForFocus.manDays || planForFocus.man_days || '') : '';
         const suggestedBudget = checklistBudget(audit, manDays, orgSizeProfile(client));
+        _cldocLength = { manDays: manDays, hasRegistry: registry.length > 0 };
 
         window.DataService.openFormModal(`Build Checklist — ${client.name}`, `
         <div style="font-size: 0.88rem;">
@@ -3292,7 +3349,7 @@
             </div>` : ''}
             <div class="form-group">
                 <label>Audit Type</label>
-                <select class="form-control" id="cldoc-audit-type">
+                <select class="form-control" id="cldoc-audit-type" data-action-change="cldocAuditTypeChanged">
                     <option value="surveillance" ${audit === 'surveillance' ? 'selected' : ''}>Surveillance — ISO 17021-1 mandatory elements + risk-based sampling</option>
                     <option value="initial" ${audit === 'initial' ? 'selected' : ''}>Initial (Stage 2) — full coverage of every clause</option>
                     <option value="recertification" ${audit === 'recertification' ? 'selected' : ''}>Recertification — full coverage of every clause</option>
@@ -3317,7 +3374,7 @@
             </div>
             <div class="form-group">
                 <label>Checklist length <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.82rem;">— a surveillance audit samples, it does not re-audit</span></label>
-                <select class="form-control" id="cldoc-length">
+                <select class="form-control" id="cldoc-length"${audit === 'surveillance' ? '' : ' disabled'} style="${audit === 'surveillance' ? '' : 'opacity:0.55;'}">
                     <option value="25" ${suggestedBudget === 25 ? 'selected' : ''}>Half day — about 25 questions</option>
                     <option value="30" ${suggestedBudget === 30 ? 'selected' : ''}>One day — about 30 questions</option>
                     <option value="45" ${suggestedBudget === 45 ? 'selected' : ''}>Two days — about 45 questions</option>
@@ -3325,7 +3382,7 @@
                     <option value="75" ${suggestedBudget === 75 ? 'selected' : ''}>Longer — about 75 questions</option>
                     <option value="">No limit — every mapped document and clause</option>
                 </select>
-                <small style="color: var(--text-secondary);">${manDays ? `Plan is ${esc(manDays)} man-day(s).` : 'Man-days not set on the plan.'} Focus points and the ISO 17021-1 mandatory elements are never trimmed. Ignored for initial and recertification audits, which must cover the standard.${registry.length ? ' For the standards ticked above, length is set by scope and risk — man-days and organisation size move the sampling depth, not the requirement coverage.' : ''}</small>
+                <small id="cldoc-length-note" style="color: var(--text-secondary);">${lengthNoteHTML(audit)}</small>
             </div>
             ${registry.some(s => s.hasSoA) ? `<div class="form-group">
                 <label>Statement of Applicability — applicable controls <span style="font-weight:400;color:var(--text-secondary);font-size:0.82rem;">— optional, ISO/IEC 27001 only</span></label>
@@ -3430,7 +3487,11 @@
     }
 
     async function createChecklist(client, docs, opts, planId) {
-        const checklist = buildClientChecklist(client, docs, opts);
+        // The plan is what ties a checklist to one audit in the certification
+        // cycle. It travels with the checklist because cycle coverage cannot be
+        // re-assessed later without knowing which audit the checklist belongs to.
+        const checklist = buildClientChecklist(client, docs, Object.assign({}, opts, { planId: planId || null }));
+        if (planId) checklist.planId = String(planId);
         if (!window.state.checklists) window.state.checklists = [];
         window.state.checklists.push(checklist);
 

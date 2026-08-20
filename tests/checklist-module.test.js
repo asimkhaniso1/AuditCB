@@ -467,3 +467,199 @@ describe('renderChecklistLibrary — Build from Client Documents action', () => 
         delete window.buildChecklistFromClientDocs;
     });
 });
+
+// The printed checklist is a client-facing controlled document. Two things had
+// to hold and neither did: its Print / Save PDF button has to actually print
+// (the popup is a separate document, so the app's event delegator never reached
+// it), and the sheet has to carry the CB's brand colour rather than a hardcoded
+// green.
+describe('printChecklist — print button and brand colours', () => {
+    let popup;
+
+    function openPrint() {
+        const doc = document.implementation.createHTMLDocument('');
+        let printed = 0;
+        popup = {
+            document: {
+                write: (html) => { doc.open(); doc.write(html); doc.close(); popup.html = html; },
+                close: () => {},
+                querySelector: (sel) => doc.querySelector(sel)
+            },
+            addEventListener: () => {},
+            focus: () => {},
+            print: () => { printed++; },
+            printCount: () => printed,
+            html: ''
+        };
+        window.open = () => popup;
+        window.printChecklist('cl-1');
+        return popup;
+    }
+
+    beforeEach(() => {
+        window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+        window.showNotification = () => {};
+        window.confirm = () => true;
+        window.state = {
+            cbSettings: { cbName: 'Company Certification International', primaryColor: '#1d4ed8' },
+            checklists: [{
+                id: 'cl-1', name: 'Recertification Audit Checklist', standard: 'ISO/IEC 27001:2022',
+                type: 'custom', items: [{ clause: '6.3', requirement: 'Changes since the previous audit' }]
+            }],
+            clients: []
+        };
+        loadModule('./validation.js');
+        loadModule('./checklist-module.js');
+    });
+
+    it('prints when the Print / Save PDF button is clicked', () => {
+        const win = openPrint();
+        const btn = win.document.querySelector('[data-action="print"]');
+        expect(btn).toBeTruthy();
+        btn.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true }));
+        expect(win.printCount()).toBe(1);
+    });
+
+    it('does not throw when the pop-up is blocked', () => {
+        window.open = () => null;
+        expect(() => window.printChecklist('cl-1')).not.toThrow();
+    });
+
+    it('paints the sheet in the CB brand colour, not the old green', () => {
+        const html = openPrint().html;
+        expect(html).toContain('tr.section-header td { background: #1d4ed8');
+        expect(html).not.toContain('background: #059669');   // former emerald section headers
+        expect(html).not.toContain('#ecfdf5');               // former emerald sub-header tint
+        // Pass/warn/fail stays green/amber/red — that is status, not branding.
+        expect(html).toContain('.qa-panel.qa-pass { border-left: 4px solid #059669');
+    });
+
+    it('derives every tint from whatever hue the CB configured', () => {
+        window.state.cbSettings.primaryColor = '#b91c1c';
+        const html = openPrint().html;
+        expect(html).toContain('tr.section-header td { background: #b91c1c');
+        expect(html).toContain('#f9eded');       // brand mixed 92% toward white
+    });
+
+    it('falls back to the corporate blue when no brand colour is set', () => {
+        delete window.state.cbSettings.primaryColor;
+        expect(openPrint().html).toContain('#1d4ed8');
+    });
+});
+
+// The Ready-for-Audit gate as the UI reaches it: the release is refused while
+// blockers stand, granted once they are resolved, and withdrawn automatically
+// when the checklist changes afterwards.
+describe('markChecklistReadyForAudit — the release gate', () => {
+    let notes;
+
+    function checklistWith(subClauses) {
+        return {
+            id: 'cl-1', name: 'Recertification Audit Checklist', standard: 'ISO/IEC 27001:2022',
+            standardIds: ['iso27001'], auditType: 'recertification', type: 'custom',
+            clientId: 'c-1', clientName: 'Acme',
+            qaContext: { standardIds: ['iso27001'], auditType: 'recertification', soaApplicable: ['A.5.1'] },
+            clauses: [{ mainClause: 'RECERT', title: 'Recertification', subClauses }]
+        };
+    }
+
+    function fullCoverage() {
+        const std = window.ChecklistStandards.byId('iso27001');
+        const rows = std.clauses.filter(c => c.mandatory)
+            .map(c => ({ ref: c.ref, title: c.title }))
+            .concat([{ ref: 'A.5.1', title: 'Policies for information security' }]);
+        // The QA pass compares questions on substance with the digits stripped,
+        // and several registry titles are genuinely near-identical once they are
+        // (4.3 against 4.4, 6.1.2 against 8.2). Spelling the reference out in
+        // words gives each fixture question its own vocabulary, so this fixture
+        // is the clean checklist it is meant to be rather than one that trips
+        // the duplicate check on the titles alone.
+        const spell = ref => ref.replace(/[0-9]/g, d =>
+            ' ' + ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][d] + ' ');
+        return rows.map(row => ({
+            clause: row.ref, title: row.title,
+            requirement: 'Clause' + spell(row.ref) + '— examine how the organisation satisfies '
+                + row.title.toLowerCase() + ', and obtain evidence that it operates as described.',
+            refs: [{ stdId: 'iso27001', ref: row.ref }]
+        }));
+    }
+
+    beforeEach(() => {
+        notes = [];
+        window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
+        window.showNotification = (m) => notes.push(String(m));
+        window.saveData = () => { };
+        window.contentArea = document.body;
+        // The registry has to be loaded before the fixture is built — it is
+        // where the mandatory clause list a "fully covered" checklist needs
+        // comes from.
+        loadModule('./validation.js');
+        loadModule('./checklist-standards.js');
+        loadModule('./checklist-qa.js');
+        loadModule('./checklist-coverage.js');
+        window.state = {
+            currentUser: { name: 'Lead Auditor' },
+            clients: [{ id: 'c-1', name: 'Acme', keyProcesses: [] }],
+            auditPlans: [], ncrs: [], complaints: [], appeals: [], auditReports: [],
+            checklists: [checklistWith(fullCoverage())]
+        };
+        loadModule('./checklist-module.js');
+    });
+
+    /**
+     * Clear the gate the way an auditor does: resolve what can be resolved,
+     * record a justification for what genuinely stands. Two ISO/IEC 27001
+     * clause titles read almost identically (4.3 "Determining the scope of the
+     * ISMS" against 4.4 "Information security management system"), so a
+     * checklist covering both legitimately reaches the duplicate check and the
+     * auditor has to say why both questions stay.
+     */
+    function clearTheGate() {
+        window.prompt = () => '4.3 tests the scope boundary and 4.4 the system established within it; both questions stand.';
+        let r = window.checklistReadiness(window.state.checklists[0]).readiness;
+        for (let guard = 0; !r.ready && guard < 10; guard++) {
+            window.justifyChecklistIssue('cl-1', r.blockers[0].key);
+            r = window.checklistReadiness(window.state.checklists[0]).readiness;
+        }
+        return r;
+    }
+
+    it('releases a checklist once every blocker is resolved or dispositioned', () => {
+        expect(clearTheGate().ready).toBe(true);
+        window.markChecklistReadyForAudit('cl-1');
+        const cl = window.state.checklists[0];
+        expect(cl.readyForAudit).toBeTruthy();
+        expect(cl.readyForAudit.by).toBe('Lead Auditor');
+        expect(notes.join(' ')).toMatch(/released for audit/i);
+    });
+
+    it('records the justification that let an issue stand', () => {
+        clearTheGate();
+        const cl = window.state.checklists[0];
+        const recorded = Object.keys(cl.resolvedIssues || {}).map(k => cl.resolvedIssues[k]);
+        expect(recorded.length).toBeGreaterThan(0);
+        expect(recorded[0].by).toBe('Lead Auditor');
+        expect(recorded[0].note).toMatch(/scope boundary/);
+    });
+
+    it('refuses, naming the reasons, when a question has no clause behind it', () => {
+        const cl = window.state.checklists[0];
+        cl.clauses[0].subClauses.push({
+            clause: 'REVIEW', title: 'Unmapped documented information',
+            requirement: 'Four documents on file map to no requirement of any standard in scope.',
+            refs: [], auditorReview: true
+        });
+        window.markChecklistReadyForAudit('cl-1');
+        expect(cl.readyForAudit).toBeUndefined();
+        expect(notes.join(' ')).toMatch(/must be resolved first/i);
+    });
+
+    it('withdraws the release as soon as the checklist changes', () => {
+        clearTheGate();
+        window.markChecklistReadyForAudit('cl-1');
+        const cl = window.state.checklists[0];
+        expect(cl.readyForAudit).toBeTruthy();
+        window.removeChecklistQuestion('cl-1', cl.clauses[0].subClauses[0].clause, 'k');
+        expect(cl.readyForAudit).toBeUndefined();
+    });
+});
