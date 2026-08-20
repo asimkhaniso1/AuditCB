@@ -710,7 +710,10 @@ async function renderModule(moduleName, syncHash = true) {
                 break;
             case 'checklists':
                 if (typeof renderChecklistLibrary === 'function') {
-                    renderChecklistLibrary();
+                    // Explicit null clears any client scope left over from the
+                    // Client Workspace's own Checklists view — this route is
+                    // the global library and must always show every checklist.
+                    renderChecklistLibrary(null);
                 } else {
                     renderPlaceholder(moduleName);
                 }

@@ -203,3 +203,89 @@ describe('checklist-module.js clause datalist sourcing (window.AuditFrameworks i
         expect(document.getElementById('checklist-clause-options').children.length).toBe(0);
     });
 });
+
+// Client Workspace → Checklists renders the SAME library scoped to one client.
+// A client-specific checklist carries `clientId` from the moment
+// client-docs-bulk.js builds it, so the scope is a real attribute rather than
+// a name match. Global checklists stay visible in the scoped view because they
+// apply to every client.
+//
+// The scope is remembered between renders: several in-module actions
+// (restore/delete/permanent-delete) re-render by calling renderChecklistLibrary()
+// with no argument, and without that memory the view would silently widen back
+// to every client's checklists after any of them.
+describe('renderChecklistLibrary — client scoping', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+        window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s) };
+        // CERTIFICATION_MANAGER must be present: renderChecklistLibrary reads
+        // window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase() without a
+        // `?.` guard, so a ROLES object missing it throws before any render.
+        window.CONSTANTS = { AUDIT_TYPES: [], AUDIT_SCOPES: [], ROLES: { CERTIFICATION_MANAGER: 'Certification Manager' } };
+        // renderChecklistLibrary writes to window.contentArea (script.js caches
+        // the element there), not via getElementById.
+        document.body.innerHTML = '<div id="content-area"></div>';
+        window.contentArea = document.getElementById('content-area');
+        window.state = {
+            currentUser: { role: 'Admin' },
+            settings: {},
+            cbSettings: { availableStandards: ['ISO 9001:2015'] },
+            clients: [
+                { id: 'c-1', name: 'KTD Select' },
+                { id: 'c-2', name: 'PC Connection' }
+            ],
+            checklists: [
+                { id: 1, name: 'Global ISO 9001 Baseline', standard: 'ISO 9001:2015', type: 'global', clauses: [] },
+                { id: 2, name: 'KTD Select - Surveillance', standard: 'ISO 9001:2015', type: 'custom', clientId: 'c-1', clauses: [] },
+                { id: 3, name: 'PC Connection - Recertification', standard: 'ISO 9001:2015', type: 'custom', clientId: 'c-2', clauses: [] }
+            ],
+            auditReports: [], executions: []
+        };
+        loadModule('./checklist-module.js');
+    });
+
+    const html = () => document.getElementById('content-area').innerHTML;
+
+    it('unscoped, shows every client\'s checklists', () => {
+        window.renderChecklistLibrary(null);
+        expect(html()).toContain('KTD Select - Surveillance');
+        expect(html()).toContain('PC Connection - Recertification');
+        expect(html()).toContain('Global ISO 9001 Baseline');
+    });
+
+    it('scoped to a client, hides another client\'s checklists but keeps global ones', () => {
+        window.renderChecklistLibrary('c-1');
+        expect(html()).toContain('KTD Select - Surveillance');
+        expect(html()).not.toContain('PC Connection - Recertification');
+        expect(html()).toContain('Global ISO 9001 Baseline');
+    });
+
+    it('names the client it is scoped to', () => {
+        window.renderChecklistLibrary('c-1');
+        expect(html()).toContain('Showing checklists for');
+        expect(html()).toContain('KTD Select');
+    });
+
+    it('keeps the scope across a no-argument re-render', () => {
+        window.renderChecklistLibrary('c-1');
+        window.renderChecklistLibrary();          // what delete/restore do
+        expect(html()).not.toContain('PC Connection - Recertification');
+    });
+
+    it('an explicit null clears a previously set scope — the global route', () => {
+        window.renderChecklistLibrary('c-1');
+        window.renderChecklistLibrary(null);
+        expect(html()).toContain('PC Connection - Recertification');
+        expect(html()).not.toContain('Showing checklists for');
+    });
+
+    // Fails CLOSED: an id that matches no client record still scopes, so a
+    // scoped route can never fall back to showing every client's checklists.
+    // Globals stay, since they apply to everyone.
+    it('an unknown client id still scopes rather than showing every client', () => {
+        window.renderChecklistLibrary('no-such-client');
+        expect(html()).not.toContain('KTD Select - Surveillance');
+        expect(html()).not.toContain('PC Connection - Recertification');
+        expect(html()).toContain('Global ISO 9001 Baseline');
+    });
+});

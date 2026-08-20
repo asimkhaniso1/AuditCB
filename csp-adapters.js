@@ -73,12 +73,36 @@
     };
 
     // ─── Checklist accordion toggle with icon ───────────────────────
-    window.toggleAccordion = function (el) {
-        let next = el.nextElementSibling;
-        if (!next) return;
-        next.style.display = next.style.display === 'none' ? 'block' : 'none';
-        let icon = el.querySelector('.accordion-icon');
-        if (icon) icon.style.transform = next.style.display === 'none' ? 'rotate(0deg)' : 'rotate(90deg)';
+    // Two different call shapes reach this action, from two different views:
+    //   checklist-module.js  data-action="toggleAccordion"  (no data-id)
+    //     -> the delegator passes the clicked HEADER ELEMENT; the panel is its
+    //        next sibling and the chevron lives inside it.
+    //   execution-module-v2.js  data-action="toggleAccordion" data-id="<id>"
+    //     -> the delegator passes the SECTION ID string; panel and chevron are
+    //        looked up by id.
+    // execution-module-v2.js defines its own window.toggleAccordion and loads
+    // AFTER this file, so whichever definition happens to win must understand
+    // both shapes or one view silently stops working — which is exactly what
+    // happened: the id-based version won, the Checklist Library passed an
+    // element, getElementById(<HTMLElement>) returned null, and the library's
+    // accordions were dead. Both definitions are now identical and
+    // shape-agnostic, so load order cannot break either view again.
+    window.toggleAccordion = function (target) {
+        let content = null;
+        let icon = null;
+        if (typeof target === 'string') {
+            content = document.getElementById(target);
+            icon = document.getElementById('icon-' + target);
+        } else if (target && target.nodeType === 1) {
+            content = target.nextElementSibling;
+            icon = target.querySelector('.accordion-icon');
+        }
+        if (!content) return;
+        // Treat an unset display as visible, so the first click hides — both
+        // call sites set it explicitly, this only guards hand-written markup.
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+        if (icon) icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
     };
 
     window.toggleSubAccordion = function (el) {

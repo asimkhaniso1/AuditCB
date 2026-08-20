@@ -1633,16 +1633,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     // Helper functions for execution module
 
     // Accordion toggle for clause sections
-    window.toggleAccordion = function (sectionId) {
-        const content = document.getElementById(sectionId);
-        const icon = document.getElementById('icon-' + sectionId);
-        if (content) {
-            const isVisible = content.style.display === 'block';
-            content.style.display = isVisible ? 'none' : 'block';
-            if (icon) {
-                icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
-            }
+    // Accepts EITHER a section id (this view: data-action="toggleAccordion"
+    // data-id="<id>") or the clicked header element (checklist-module.js's
+    // Checklist Library, which sets no data-id, so the delegator passes the
+    // element itself). csp-adapters.js defines the same action for that
+    // element-based markup and loads BEFORE this file, so this definition wins
+    // at runtime — meaning it has to understand both shapes or the library's
+    // accordions stop opening. Kept byte-for-byte equivalent to the
+    // csp-adapters.js copy so load order is irrelevant.
+    window.toggleAccordion = function (target) {
+        let content = null;
+        let icon = null;
+        if (typeof target === 'string') {
+            content = document.getElementById(target);
+            icon = document.getElementById('icon-' + target);
+        } else if (target && target.nodeType === 1) {
+            content = target.nextElementSibling;
+            icon = target.querySelector('.accordion-icon');
         }
+        if (!content) return;
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+        if (icon) icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
     };
 
     // Collapse/Expand ALL accordion sections at once
