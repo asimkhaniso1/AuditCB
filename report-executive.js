@@ -302,6 +302,16 @@
         const realNCs = getRealNCs(d);
         const depts = getDepartments(d);
         const deptList = Object.keys(depts).join(', ') || 'N/A';
+        // Real shipped defect: a report once told senior management the
+        // findings "relate to processes such as X, Y, Z" naming departments
+        // that carried zero findings — the AI had only "Departments Assessed"
+        // (every department, conforming ones included) to draw a name from
+        // when told a narrative field "MUST contain... a named department".
+        // This second list is the ONLY set of department names businessImpact/
+        // risks/forwardOutlook/findings/concerns may draw on below — v.nc > 0
+        // means the department carries at least one actual nc-status item
+        // (major, minor, observation, or ofi), i.e. a real finding record.
+        const findingDeptList = Object.entries(depts).filter(([, v]) => v.nc > 0).map(([n]) => n).join(', ');
 
         const ncLines = realNCs.slice(0, 25).map((i, idx) =>
             `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseText(i)}${clauseTitle(i) ? ' — ' + clauseTitle(i) : ''} (Dept: ${normalizeDept(i.department)})`
@@ -315,6 +325,7 @@ Voice rules (strict):
 - Banned words — do not use any of these anywhere, in any form, alone or combined with another word: "soundness", "fundamental", "health", "resilience", "verdict", "certifiable". Also banned phrases: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of", "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "in conclusion", "moving forward". Banned: any sentence that could be pasted into a different company's report unchanged.
 - Use plain audit language: requirement -> objective evidence -> evaluation -> finding. State only what the audit evidence supports.
 - EVERY paragraph-level field (businessImpact, risks, forwardOutlook) MUST contain at least one concrete quantified reference — a clause or a named department, pulled from the data below. A sentence with no clause or department name is not acceptable. Do NOT restate the total counts of major/minor non-conformities, conformities, observations, or opportunities for improvement in these three fields — those totals already appear once in the Overall Conclusion elsewhere in the report; cite the specific clause(s)/department(s) instead.
+- If you name a department anywhere below (businessImpact, risks, forwardOutlook, findings, or concerns), it MUST be one listed under "Departments With Findings" below, or one appearing in the Non-Conformity Detail list — never a department from "Departments Assessed" that is not also in "Departments With Findings". A department that was merely assessed and found conforming carries no finding and must never be named as though it does. If "Departments With Findings" is empty, ground businessImpact/risks/forwardOutlook in a clause reference instead, or state the point with no department name at all — never substitute a department pulled from "Departments Assessed" merely to satisfy the "must contain a department" rule above, and never list several department names together as a single generic sentence padding out the field.
 - Observations and Opportunities for Improvement (OFI) are two SEPARATE classifications with two separate counts below — never add them together, never restate one count under the other's label, and never invent a combined "opportunities for improvement" figure. If you state either count anywhere (which the rule above otherwise discourages), state each number under its own exact label — "N observation(s)" and "M opportunity/opportunities for improvement" — never "N+M opportunities for improvement" and never "N+M observations".
 - Never write the word "Clause" immediately before an internal audit working reference (anything starting with FOCUS, SURV, ORG, or DOC) — those are not final ISO clause citations. Reuse clause/reference text exactly as it already appears in the Non-Conformity Detail list below; never re-derive or reformat a clause reference yourself.
 - Never state or estimate financial figures, revenue, penalties, customer loss, cost, contract exposure, or reputational damage. Consequences may reference ONLY certification-process outcomes — e.g. closure timelines, certification decision status, or the scope of verification at the next audit — never business, commercial, or financial outcomes.
@@ -337,6 +348,7 @@ Audit Data:
 - Observations: ${stats.observationCount || 0}
 - Opportunities for Improvement: ${stats.ofiCount || 0}
 - Departments Assessed: ${deptList}
+- Departments With Findings (the ONLY departments citable in businessImpact/risks/forwardOutlook — see rule above): ${findingDeptList || 'None — no department carries an open finding this audit'}
 
 Non-Conformity Detail:
 ${ncLines || 'None recorded.'}
@@ -344,11 +356,11 @@ ${ncLines || 'None recorded.'}
 Write a JSON object with these fields (plain text, NO markdown symbols like ** or ##, use complete sentences, reference real numbers/clauses/departments from above, using clause references exactly as formatted in the Non-Conformity Detail list):
 {
   "strengths": ["up to 3 short bullet strings, each a genuinely distinct key strength, cite departments/clauses — never a department or clause that also appears in the Non-Conformity Detail list above"],
-  "findings": ["up to 3 short bullet strings, each a genuinely distinct key finding, cite departments/clauses — do not repeat the same theme worded differently"],
-  "concerns": ["0 to 3 short bullet strings, each a genuinely distinct concern for management beyond what 'findings' already covers, framed only in certification-process terms (closure timelines, verification scope) — never financial or commercial terms; return an empty array if there is nothing genuinely distinct to add"],
-  "businessImpact": "1-2 sentence statement on the certification-process implications of the findings, grounded in a specific clause or department rather than repeating the major/minor/conforming totals (those totals already appear in the Overall Conclusion above) — never a financial, revenue, or commercial figure",
-  "risks": "1-2 sentence forward-looking risk statement grounded in a specific clause or department — certification-process consequences only (e.g. what could delay closure or affect the scope of verification at the next audit); never revenue, cost, penalties, or customer/business impact; do not repeat the finding totals already stated elsewhere",
-  "forwardOutlook": "1-2 sentence statement on forward readiness/confidence heading into the next audit stage, grounded in scope/method/context (which clauses or departments the next audit will need to verify) rather than repeating the major/minor finding totals already shown in the Overall Conclusion above"
+  "findings": ["up to 3 short bullet strings, each a genuinely distinct key finding, cite departments/clauses from 'Departments With Findings' or the Non-Conformity Detail list only — do not repeat the same theme worded differently"],
+  "concerns": ["0 to 3 short bullet strings, each a genuinely distinct concern for management beyond what 'findings' already covers, framed only in certification-process terms (closure timelines, verification scope) — never financial or commercial terms; any department named must be from 'Departments With Findings'; return an empty array if there is nothing genuinely distinct to add"],
+  "businessImpact": "1-2 sentence statement on the certification-process implications of the findings, grounded in a specific clause or a department from 'Departments With Findings' rather than repeating the major/minor/conforming totals (those totals already appear in the Overall Conclusion above) — never a financial, revenue, or commercial figure, and never a department that has no finding",
+  "risks": "1-2 sentence forward-looking risk statement grounded in a specific clause or a department from 'Departments With Findings' — certification-process consequences only (e.g. what could delay closure or affect the scope of verification at the next audit); never revenue, cost, penalties, or customer/business impact; do not repeat the finding totals already stated elsewhere; never a department that has no finding",
+  "forwardOutlook": "1-2 sentence statement on forward readiness/confidence heading into the next audit stage, grounded in scope/method/context (which clauses or departments from 'Departments With Findings' the next audit will need to verify) rather than repeating the major/minor finding totals already shown in the Overall Conclusion above — never a department that has no finding"
 }
 Return ONLY the raw JSON object, no markdown fences.`;
     }
@@ -1278,6 +1290,7 @@ You are an ISO management-system audit reporting assistant generating executive 
 - Never write the word "Clause" immediately before an internal audit working reference (anything starting with FOCUS, SURV, ORG, or DOC). Reuse clause references exactly as formatted in the Non-conformities list below; never re-derive or reformat one yourself.
 - Never state a corrective-action requirement as an absolute condition of keeping certification (e.g. do not write "is required to maintain certification"). State only that findings require corrective action and closure through the certification body's corrective-action process.
 - Observations and OFI (Opportunities for Improvement) below are two SEPARATE counts — never add them together, never restate one under the other's label, and never report a combined figure as "opportunities for improvement" or as "observations". If a bullet cites either number, use the exact figure and exact label given here.
+- The "risks", "recurring", and "strategic" cards may only name a department that shows major>0 or minor>0 in the Department Summary below (or appears in the Non-conformities list) — a department is not a risk merely because it was assessed. The "departments" card exists specifically to surface departments with major>0 or minor>0; never fill its bullets with a department showing major:0, minor:0 to reach the 2-3 bullet count — return fewer bullets, or state plainly that no department currently requires elevated attention, instead of padding with a clean department. The "improvements" card is the one place a department with major:0, minor:0 may be named, since it exists to credit clean departments.
 
 Context:
 - Client: ${report.client || ''}
@@ -2168,7 +2181,16 @@ h1, h2, h3, h4, .b4-page-title, .b4-section-title, .b4-card-heading, .b4-highlig
         // synchronous pieces worth unit-testing directly rather than only via
         // the AI-fallback path of generateExecutiveSummary.
         buildKeyFindingsSummary,
-        buildAuditOutcomeSummary
+        buildAuditOutcomeSummary,
+        // Exposed so a test can assert on the PROMPT itself (Task A): the
+        // businessImpact/risks/forwardOutlook text these prompts request is
+        // AI-generated free text with no deterministic fallback naming
+        // departments, so the only thing a test can pin down is that the
+        // prompt (a) hands the model a findings-only department list and (b)
+        // explicitly forbids naming any department outside it — never the
+        // rendered prose itself, which this module does not control.
+        buildExecSummaryPrompt,
+        buildInsightsPrompt
     };
 
     // CSP-safe wiring: inline handlers are blocked (no 'unsafe-inline' in script-src),
