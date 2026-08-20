@@ -87,3 +87,57 @@ describe('EventDelegator — anchors carrying data-action', () => {
         delete window.__delegatorTest;
     });
 });
+
+function change(el) {
+    el.dispatchEvent(new window.Event('change', { bubbles: true, cancelable: true }));
+}
+
+describe('EventDelegator — data-action-change placeholder resolution', () => {
+    // The click delegator resolved 'this.checked' to the element's actual
+    // checked state; the change delegator's copy of that resolution list never
+    // got the same line, so a checkbox wired with data-arg="this.checked" (the
+    // Gap Analysis screen's "Show only gaps" and per-standard checkboxes) arrived
+    // as the literal string "this.checked" — never true, 'true' or 'on', so a
+    // handler comparing against those always read the box as unchecked.
+    it('resolves this.checked to the real checked state, not the literal string', () => {
+        const calls = [];
+        window.__delegatorChangeTest = checked => calls.push(checked);
+        document.body.innerHTML = '<input type="checkbox" id="c" data-action-change="__delegatorChangeTest" data-arg1="this.checked">';
+
+        const box = document.getElementById('c');
+        box.checked = true;
+        change(box);
+        expect(calls).toEqual([true]);
+
+        box.checked = false;
+        change(box);
+        expect(calls).toEqual([true, false]);
+        delete window.__delegatorChangeTest;
+    });
+
+    it('still resolves this.value alongside this.checked in the same call', () => {
+        const calls = [];
+        window.__delegatorChangeTest2 = (name, checked) => calls.push([name, checked]);
+        document.body.innerHTML = '<input type="checkbox" id="c2" data-action-change="__delegatorChangeTest2" data-arg1="iso27001" data-arg2="this.checked">';
+
+        const box = document.getElementById('c2');
+        box.checked = true;
+        change(box);
+
+        expect(calls).toEqual([['iso27001', true]]);
+        delete window.__delegatorChangeTest2;
+    });
+
+    it('still resolves this.value for a select/text input as before', () => {
+        const calls = [];
+        window.__delegatorChangeTest3 = value => calls.push(value);
+        document.body.innerHTML = '<select id="s" data-action-change="__delegatorChangeTest3" data-arg1="this.value"><option value="a">a</option><option value="b">b</option></select>';
+
+        const sel = document.getElementById('s');
+        sel.value = 'b';
+        change(sel);
+
+        expect(calls).toEqual(['b']);
+        delete window.__delegatorChangeTest3;
+    });
+});

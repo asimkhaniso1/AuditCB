@@ -17,6 +17,7 @@ function loadModule(file) {
 }
 loadModule('./report-stats.js');
 loadModule('./data-service.js');
+loadModule('./report-executive.js');
 loadModule('./report-integrity.js');
 
 const KTD_CLIENT = () => ({
@@ -723,5 +724,173 @@ describe('KTD acceptance #33 — the corrected report issues cleanly', () => {
         // Observations and OFIs summed into one figure.
         expect(withDefect({ executiveSummary: 'The audit identified 4 non-conformities and 5 opportunities for improvement.' })
             .blockers.some((b) => b.id.startsWith('B13'))).toBe(true);
+    });
+
+    // Client spec (KTD Select recertification report review): the shipped
+    // report's Section 5 narrative read "The audit identified 4
+    // non-conformities (Minor/Major) and 5 opportunities for improvement" —
+    // spelling out neither Major nor Minor separately, and inflating OFI from
+    // 1 to 5 (4 Observations restated as OFIs). B13's regexes previously only
+    // matched digits; a spelled-out count bypassed them entirely.
+    it('catches a spelled-out count that disagrees with the dataset', () => {
+        const stats = builtStats();
+        const result = window.ReportIntegrity.check({
+            report: Object.assign(correctedReport(), {
+                executiveSummary: 'Four minor nonconformities were identified. Minor non-conformity in Clause 9.2 (Management).'
+            }),
+            auditPlan: remotePlan(), client: KTD_CLIENT(), stats
+        });
+        // 4 matches the real minor count here, so nothing should fire on THIS
+        // sentence — the point of this fixture is the next one, which changes
+        // only the digit.
+        expect(result.blockers.some((b) => b.id.startsWith('B13'))).toBe(false);
+
+        const wrong = window.ReportIntegrity.check({
+            report: Object.assign(correctedReport(), {
+                executiveSummary: 'Five minor nonconformities were identified. Minor non-conformity in Clause 9.2 (Management).'
+            }),
+            auditPlan: remotePlan(), client: KTD_CLIENT(), stats
+        });
+        const b13 = wrong.blockers.find((b) => b.id.startsWith('B13'));
+        expect(b13).toBeTruthy();
+        expect(b13.message).toContain('5');
+        expect(b13.message).toContain('4');
+    });
+
+    it('catches "5 opportunities for improvement" for 4 Observations + 1 OFI, spelled out or digit', () => {
+        const stats = builtStats();
+        ['5 opportunities for improvement', 'five opportunities for improvement'].forEach((phrase) => {
+            const result = window.ReportIntegrity.check({
+                report: Object.assign(correctedReport(), {
+                    executiveSummary: `The audit identified 4 non-conformities (Minor/Major) and ${phrase}.`
+                }),
+                auditPlan: remotePlan(), client: KTD_CLIENT(), stats
+            });
+            const b13 = result.blockers.find((b) => b.id.startsWith('B13') && b.message.includes('opportunities for improvement'));
+            expect(b13, `expected a B13 blocker for "${phrase}"`).toBeTruthy();
+            expect(b13.message).toContain('the validated findings dataset records 1');
+        });
+    });
+
+    // Clause Area Performance table: single computation, one clause-resolution
+    // rule for every item type (conform/NC/observation/OFI alike), so its own
+    // Checked/Conform/Minor NC/Observation/OFI totals can never silently
+    // disagree with the report's headline counts the way the old dual-rule
+    // table could.
+    describe('Clause Area Performance — single source of truth', () => {
+        it('accounts for every assessed item — Checked totals equal the headline assessed count', () => {
+            const stats = builtStats();
+            const t = stats.byClauseArea.totals;
+            expect(t.checked).toBe(stats.totals.assessed);
+            expect(t.conform).toBe(stats.resultCounts.conform);
+            expect(t.majorNC).toBe(stats.resultCounts.majorNC);
+            expect(t.minorNC).toBe(stats.resultCounts.minorNC);
+            expect(t.observation).toBe(stats.advisories.observation);
+            expect(t.ofi).toBe(stats.advisories.ofi);
+        });
+
+        it('resolves a FOCUS carryover item (with criterionRef) to its real clause area, not "unresolved"', () => {
+            const stats = builtStats();
+            // FOCUS.2 -> criterionRef 9.2 -> Clause 9 (Performance Evaluation).
+            const clause9 = stats.byClauseArea.rows.find((r) => r.clause === '9');
+            expect(clause9).toBeTruthy();
+            expect(clause9.minorNC).toBeGreaterThanOrEqual(1); // 9.2 and 9.1 both land here
+        });
+
+        it('puts a genuinely unattributable item in the unresolved bucket instead of dropping it', () => {
+            const withUnresolved = correctedProgress().concat([
+                { status: 'nc', ncrType: 'observation', clause: 'FOCUS.9', department: 'Quality', comment: 'No criterion assigned yet.' }
+            ]);
+            const rs = window.ReportStats.build({
+                report: correctedReport(), hydratedProgress: withUnresolved, auditPlan: remotePlan(), client: KTD_CLIENT()
+            });
+            expect(rs.byClauseArea.unresolved).toBeTruthy();
+            expect(rs.byClauseArea.unresolved.observation).toBe(1);
+            // Still fully accounted for — nothing silently vanished from Checked.
+            expect(rs.byClauseArea.totals.checked).toBe(rs.totals.assessed);
+        });
+
+        // B16 is a structural safety net, not something normal data should ever
+        // trip — verify it stays silent on the real, correctly-computed dataset.
+        it('B16 raises nothing against the correctly-computed dataset', () => {
+            const result = window.ReportIntegrity.check({
+                report: correctedReport(), auditPlan: remotePlan(), client: KTD_CLIENT(), stats: builtStats()
+            });
+            expect(result.blockers.some((b) => b.id.startsWith('B16'))).toBe(false);
+        });
+    });
+
+    // OFI narrative (report.ofi) must never restate Observations as if they
+    // were OFIs — the exact defect behind the shipped report's "Opportunities
+    // for Improvement" section reading as 4-5 paragraphs when only 1 real OFI
+    // existed, with the structured OFI table beneath it correctly showing 1.
+    describe('B17 — OFI narrative cannot list more items than the dataset has OFIs', () => {
+        it('stays silent when report.ofi has exactly one paragraph for the one real OFI', () => {
+            const result = window.ReportIntegrity.check({
+                report: Object.assign(correctedReport(), {
+                    ofi: 'The organization may consider recording named owners against each risk-register mitigation.'
+                }),
+                auditPlan: remotePlan(), client: KTD_CLIENT(), stats: builtStats()
+            });
+            expect(result.blockers.some((b) => b.id.startsWith('B17'))).toBe(false);
+        });
+
+        it('blocks when report.ofi restates the 4 Observations alongside the 1 real OFI', () => {
+            const result = window.ReportIntegrity.check({
+                report: Object.assign(correctedReport(), {
+                    ofi: [
+                        'The audit team noted an opportunity to further enhance the effectiveness of the management review process.',
+                        'An opportunity for improvement was identified concerning the management of external providers.',
+                        'The audit team observed an opportunity to strengthen document control practices related to change management.',
+                        'An opportunity for improvement was noted regarding the organization’s approach to establishing and monitoring objectives and targets.',
+                        'The organization may consider recording named owners against each risk-register mitigation.'
+                    ].join('\n')
+                }),
+                auditPlan: remotePlan(), client: KTD_CLIENT(), stats: builtStats()
+            });
+            const b17 = result.blockers.find((b) => b.id.startsWith('B17'));
+            expect(b17).toBeTruthy();
+            expect(b17.message).toContain('5');
+            expect(b17.message).toContain('1 OFI');
+        });
+    });
+
+    // Executive Summary "Key Findings" must summarize ALL NCs, not just one —
+    // the shipped report's Key Findings read "Four minor non-conformities were
+    // identified. Minor non-conformity in Clause 9.2 (Management)." and never
+    // mentioned 8.2.2, 7.2 or 9.1. Generated dynamically from the same finding
+    // set ReportStats counts, deterministically — never AI-summarized down to
+    // one representative example.
+    describe('Key Findings names every distinct NC clause, not just one', () => {
+        function keyFindings() {
+            const d = { report: correctedReport(), hydratedProgress: correctedProgress(), stats: {} };
+            const s = window.ReportExecutive.buildAuditOutcomeSummary(d, { findings: [], strengths: [] });
+            return s.findings.join(' | ');
+        }
+
+        it('names all four minor-NC clauses', () => {
+            const text = keyFindings();
+            expect(text).toContain('9.2');
+            expect(text).toContain('8.2.2');
+            expect(text).toContain('7.2');
+            expect(text).toContain('9.1');
+        });
+
+        it('states the count exactly once, correctly, not per-clause', () => {
+            const text = keyFindings();
+            expect(text).toMatch(/\b4 minor nonconformities\b/);
+        });
+
+        it('never states a major-NC count when there are none', () => {
+            const text = keyFindings();
+            expect(text).not.toMatch(/major/i);
+        });
+
+        it('reports "no nonconformities" cleanly when there are none', () => {
+            const cleanProgress = correctedProgress().filter((i) => i.status !== 'nc' || i.ncrType === 'observation' || i.ncrType === 'ofi');
+            const d = { report: correctedReport(), hydratedProgress: cleanProgress, stats: {} };
+            const s = window.ReportExecutive.buildAuditOutcomeSummary(d, { findings: [], strengths: [] });
+            expect(s.findings).toEqual(['No nonconformities were identified during this audit.']);
+        });
     });
 });

@@ -310,13 +310,34 @@ function _resolveAuthoritativeCounts(reportData) {
     }
 }
 
+// Spelled-out numerals a narrative sentence might use instead of digits (e.g.
+// "Four minor non-conformities were identified"). Digit-only regexes miss
+// these entirely — the exact gap that let a report ship stating "Four minor
+// non-conformities" while naming only one of the four affected clauses,
+// because nothing downstream ever parsed "Four" as the number 4 to check it
+// against anything. Covers 0-20, the realistic range for a finding count;
+// anything stated beyond that already reads as a digit in practice.
+const _NUMBER_WORDS = {
+    zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+    eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
+    eighteen: 18, nineteen: 19, twenty: 20
+};
+const _NUMBER_WORD_RE = Object.keys(_NUMBER_WORDS).join('|');
+// A matched numeral group is either digits or one of the words above; resolve
+// either form to its integer value.
+function _parseStatedNumber(raw) {
+    if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+    const n = _NUMBER_WORDS[String(raw || '').toLowerCase()];
+    return n == null ? NaN : n;
+}
+
 // Same regexes report-integrity.js's B13 check uses to parse narrative counts,
 // duplicated deliberately (this file may not load after report-integrity.js) so
 // that whatever this guard leaves uncorrected is exactly what B13 would block.
 const _NARRATIVE_COUNT_PATTERNS = [
-    { key: 'ncTotal', re: /(\d+)(\s+(?:minor\s+)?non-?conformit(?:y|ies))/gi, unitRe: /conformit(y|ies)/i },
-    { key: 'ofiCount', re: /(\d+)(\s+opportunit(?:y|ies)\s+for\s+improvement)/gi, unitRe: /opportunit(y|ies)/i },
-    { key: 'observationCount', re: /(\d+)(\s+observations?)\b/gi, unitRe: /observations?/i }
+    { key: 'ncTotal', re: new RegExp(`(\\d+|${_NUMBER_WORD_RE})(\\s+(?:minor\\s+)?non-?conformit(?:y|ies))`, 'gi'), unitRe: /conformit(y|ies)/i },
+    { key: 'ofiCount', re: new RegExp(`(\\d+|${_NUMBER_WORD_RE})(\\s+opportunit(?:y|ies)\\s+for\\s+improvement)`, 'gi'), unitRe: /opportunit(y|ies)/i },
+    { key: 'observationCount', re: new RegExp(`(\\d+|${_NUMBER_WORD_RE})(\\s+observations?)\\b`, 'gi'), unitRe: /observations?/i }
 ];
 
 // Adjust a matched unit word ("conformities", "opportunity", ...) to agree in
@@ -344,7 +365,7 @@ function _reconcileNarrativeCounts(text, authoritative, fieldLabel) {
         if (expected == null) return;
         try {
             result = result.replace(pattern.re, (full, digits, tail) => {
-                const stated = parseInt(digits, 10);
+                const stated = _parseStatedNumber(digits);
                 if (isNaN(stated) || stated === expected) return full;
                 const fixedTail = tail.replace(pattern.unitRe, (unit) => _agreeInNumber(unit, expected !== 1));
                 return String(expected) + fixedTail;
@@ -1128,7 +1149,11 @@ Return raw JSON only (no markdown fences, no prose outside the JSON), an array w
         return entries;
     },
 
-    draftExecutiveSummary: async (reportData, compliantAreas = [], observationItems = []) => {
+    // `ofiItems` MUST be strictly ncrType==='ofi' — see runAutoSummary's caller
+    // comment. This function does not re-filter its input; it trusts the
+    // classification the caller already applied, same as every other
+    // ReportStats-adjacent helper in this file.
+    draftExecutiveSummary: async (reportData, compliantAreas = [], ofiItems = []) => {
         // Authoritative figures come from ReportStats — the same dataset the
         // finalize gate reconciles narrative against. Fall back to a local
         // tally, kept split by classification (never combined), only when
@@ -1152,10 +1177,14 @@ Return raw JSON only (no markdown fences, no prose outside the JSON), an array w
             areaText = compliantAreas.join(', ');
         }
 
-        // Format observation items for the prompt
+        // Format OFI items for the prompt — true OFI findings only, never
+        // Observations (those get their own section elsewhere in the report;
+        // blending them in here is exactly what produced an "Opportunities for
+        // Improvement" narrative that restated every Observation as if it were
+        // an OFI).
         let obsText = '';
-        if (observationItems.length > 0) {
-            obsText = observationItems.map((o, i) => `${i + 1}. Clause ${o.clause}: ${o.text}${o.comment ? ' — Auditor note: ' + o.comment : ''}`).join('\n');
+        if (ofiItems.length > 0) {
+            obsText = ofiItems.map((o, i) => `${i + 1}. Clause ${o.clause}: ${o.text}${o.comment ? ' — Auditor note: ' + o.comment : ''}`).join('\n');
         }
 
         // Get KB context for more accurate positive observations
@@ -1220,7 +1249,7 @@ Standard Requirements (from Knowledge Base):
 ${kbContext}
 ` : ''}
 ${obsText ? `
-Audit Observations & OFI Findings (from checklist):
+Opportunities for Improvement (OFI) — from checklist, OFI classification only, does NOT include Observations:
 ${obsText}
 ` : ''}
 AUTHORITATIVE COUNTS — TREAT AS FACT, DO NOT RECOMPUTE:
@@ -1242,7 +1271,7 @@ CRITICAL RULES — CCI Gold Standard:
 Instructions:
 1. Executive Summary: Write a comprehensive, authoritative paragraph (150-250 words) summarizing the audit scope, methodology, and overall conclusion. Open with the audit context (type, standard, dates). ${planScopeContext ? 'Reference the stated audit objectives and methodology from the audit plan.' : ''} Briefly reference the opening meeting (attendees, date). State the overall assessment outcome, mentioning the number of non-conformities (${ncCount}), observations (${stats.observationCount}) and opportunities for improvement (${stats.ofiCount}) as three separate figures — never combine observations and OFI into one number. Conclude by stating what the sampled evidence showed about conformity with the audit criteria and which processes carry the open findings — a factual closing statement, not an impression, a grade, or a maturity verdict. Keep the register plain and objective: requirement, objective evidence, evaluation, finding.
 2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 4-6 specific positive observations. Each must reference the specific clause number and title (e.g. "Clause 5.1 Leadership and commitment"). Describe the specific objective evidence of effective implementation observed. Use authoritative language (e.g., "The audit team confirmed that the organization has established a well-embedded approach to...", "Through examination of records and interviews, the assessment confirmed mature implementation of..."). Do NOT use markdown formatting. Each observation MUST be on its own numbered line (1. 2. 3. etc).
-3. OFI: ${obsText ? 'Based on the "Audit Observations & OFI Findings" listed above, write specific, actionable opportunities for improvement that reference the actual observations raised during the audit. Include the relevant clause numbers and reference specific documents, procedures, or records where improvement is recommended.' : 'Write a list of specific, actionable opportunities for improvement referencing relevant clause requirements.'} Use measured, constructive improvement language befitting a senior auditor (e.g., "The organization would benefit from further developing...", "The audit team recommends consideration of...", "The organization may consider strengthening the control described in..."). These are NOT non-conformities.
+3. OFI: ${obsText ? `Based on the "Opportunities for Improvement (OFI)" list above, write one improvement statement per OFI item listed — exactly ${stats.ofiCount} item${stats.ofiCount === 1 ? '' : 's'} in the returned "ofi" array, no more and no fewer. Do not draw on, restate, or reference any Observation — Observations are a separate classification with their own section of the report and must never appear here. Include the relevant clause numbers and reference specific documents, procedures, or records where improvement is recommended.` : 'Write a list of specific, actionable opportunities for improvement referencing relevant clause requirements.'} Use measured, constructive improvement language befitting a senior auditor (e.g., "The organization would benefit from further developing...", "The audit team recommends consideration of...", "The organization may consider strengthening the control described in..."). These are NOT non-conformities.
 
 IMPORTANT: Return plain text only. Do NOT use markdown formatting like **, ***, ##, or bullet symbols in any field values. Use numbered lists (1. 2. 3.) instead. Each numbered item MUST be separated by a newline character.
 
@@ -1273,6 +1302,16 @@ Return raw JSON:
                     json.ofi = json.ofi.map((entry, idx) => typeof entry === 'string'
                         ? _reconcileNarrativeCounts(entry, authoritativeCounts, `ofi[${idx}]`)
                         : entry);
+                    // The model was told exactly how many OFI items to write
+                    // (one per genuine OFI finding). More than that means it
+                    // invented items or folded in something that isn't an OFI
+                    // (an Observation, most likely) — truncate to the
+                    // authoritative count rather than let extra entries reach
+                    // the printed report and read as more OFIs than exist.
+                    if (json.ofi.length > authoritativeCounts.ofiCount) {
+                        if (window.Logger) window.Logger.warn('AI_SERVICE', `draftExecutiveSummary returned ${json.ofi.length} OFI item(s) but only ${authoritativeCounts.ofiCount} exist; truncating.`);
+                        json.ofi = json.ofi.slice(0, authoritativeCounts.ofiCount);
+                    }
                 }
             }
 
@@ -1986,12 +2025,21 @@ window.runAutoSummary = async function (reportId) {
         // Resolve standard name using shared helper
         report.standard = window.KB_HELPERS.resolveStandardName(report) || report.standard;
 
-        // Gather OBS/OFI items for AI analysis
-        const obsItems = [];
+        // Gather TRUE OFI items only for the AI's "opportunities for improvement"
+        // narrative. This used to also sweep in Observations (and even blank/
+        // pending-classification NCs) under the label "OBS/OFI items", handed to
+        // the AI as if they were all OFI findings — which is exactly why the
+        // Opportunities for Improvement section could read as 4-5 paragraphs
+        // (one per observation, restated) when only 1 real OFI existed, and why
+        // the executive summary's own count sentence would drift to match that
+        // inflated list length instead of the authoritative OFI count. Strictly
+        // ncrType==='ofi' now — Observations get their own section from
+        // report-findings-ops.js and must never be drafted as if they were OFIs.
+        const ofiItems = [];
         if (report.checklistProgress) {
-            report.checklistProgress.filter(p => p.status === 'nc' && (!p.ncrType || p.ncrType.toLowerCase() === 'observation' || p.ncrType.toLowerCase() === 'ofi')).forEach(item => {
+            report.checklistProgress.filter(p => p.status === 'nc' && String(p.ncrType || '').toLowerCase() === 'ofi').forEach(item => {
                 const { clauseText } = window.KB_HELPERS.resolveChecklistClause(item, assignedChecklists);
-                obsItems.push({
+                ofiItems.push({
                     clause: clauseText || item.clause || item.id,
                     text: item.requirement || item.description || item.text || clauseText || '',
                     comment: item.comment || ''
@@ -1999,7 +2047,7 @@ window.runAutoSummary = async function (reportId) {
             });
         }
 
-        const result = await window.AI_SERVICE.draftExecutiveSummary(report, uniqueCompliantAreas, obsItems);
+        const result = await window.AI_SERVICE.draftExecutiveSummary(report, uniqueCompliantAreas, ofiItems);
 
         // Helper to strip any remaining markdown from AI response
         const stripMd = (text) => text ? text.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1').replace(/^#+\s*/gm, '').replace(/^[-•]\s*/gm, '').trim() : '';
