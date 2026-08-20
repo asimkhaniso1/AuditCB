@@ -3489,6 +3489,12 @@
             window.renderConfigureChecklist(planId);
         } else if (assigned && typeof window.viewAuditPlan === 'function') {
             window.viewAuditPlan(planId);
+        } else if (client && client.id != null && /^#?client\//.test(window.location.hash || '')) {
+            // Started from the client workspace (its Checklists screen), not from
+            // a plan — land back on that client's own list rather than the global
+            // library, which would drop the operator out of the workspace they
+            // were working in and show every other client's checklists.
+            window.location.hash = `client/${client.id}/checklists`;
         } else {
             window.location.hash = 'checklists';
         }
