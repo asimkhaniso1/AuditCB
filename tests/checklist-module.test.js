@@ -607,21 +607,33 @@ describe('markChecklistReadyForAudit — the release gate', () => {
     });
 
     /**
-     * Clear the gate the way an auditor does: resolve what can be resolved,
-     * record a justification for what genuinely stands. Two ISO/IEC 27001
-     * clause titles read almost identically (4.3 "Determining the scope of the
-     * ISMS" against 4.4 "Information security management system"), so a
-     * checklist covering both legitimately reaches the duplicate check and the
-     * auditor has to say why both questions stay.
+     * Clear the gate the way an auditor does: record a justification for
+     * whatever still stands, until nothing blocks.
+     *
+     * A fully covered checklist normally clears with nothing to justify —
+     * questions that merely READ alike while testing different requirements are
+     * a wording note, not a blocker. The loop is here for the fixtures that do
+     * carry a real blocker.
      */
-    function clearTheGate() {
-        window.prompt = () => '4.3 tests the scope boundary and 4.4 the system established within it; both questions stand.';
+    function clearTheGate(note) {
+        window.prompt = () => note || 'Both questions stand; the wording is tightened on site.';
         let r = window.checklistReadiness(window.state.checklists[0]).readiness;
         for (let guard = 0; !r.ready && guard < 10; guard++) {
             window.justifyChecklistIssue('cl-1', r.blockers[0].key);
             r = window.checklistReadiness(window.state.checklists[0]).readiness;
         }
         return r;
+    }
+
+    /** Two questions against the SAME requirement — a real duplicate, not similar wording. */
+    function addRealDuplicate() {
+        const subs = window.state.checklists[0].clauses[0].subClauses;
+        const first = subs[0];
+        subs.push({
+            clause: first.clause, title: first.title,
+            requirement: first.requirement,
+            refs: first.refs.map(r => ({ stdId: r.stdId, ref: r.ref }))
+        });
     }
 
     it('releases a checklist once every blocker is resolved or dispositioned', () => {
@@ -633,13 +645,22 @@ describe('markChecklistReadyForAudit — the release gate', () => {
         expect(notes.join(' ')).toMatch(/released for audit/i);
     });
 
-    it('records the justification that let an issue stand', () => {
-        clearTheGate();
+    it('clears with nothing to justify when the checklist is genuinely clean', () => {
+        const r = window.checklistReadiness(window.state.checklists[0]).readiness;
+        expect(r.ready).toBe(true);
+        expect(window.state.checklists[0].resolvedIssues).toBeUndefined();
+    });
+
+    it('records the justification that let a real duplicate stand', () => {
+        addRealDuplicate();
+        expect(window.checklistReadiness(window.state.checklists[0]).readiness.ready).toBe(false);
+
+        clearTheGate('Both sites are audited against this requirement separately, so the question is asked twice by design.');
         const cl = window.state.checklists[0];
         const recorded = Object.keys(cl.resolvedIssues || {}).map(k => cl.resolvedIssues[k]);
         expect(recorded.length).toBeGreaterThan(0);
         expect(recorded[0].by).toBe('Lead Auditor');
-        expect(recorded[0].note).toMatch(/scope boundary/);
+        expect(recorded[0].note).toMatch(/audited against this requirement separately/);
     });
 
     it('refuses, naming the reasons, when a question has no clause behind it', () => {

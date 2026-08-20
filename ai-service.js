@@ -965,6 +965,180 @@ Return raw JSON only (no markdown code fences, no prose outside the JSON):
     },
 
     /**
+     * 1d-2. Question-clause suggester for FOCUS/ORG/DOC checklist items
+     * (Review Criteria modal, execution-module-v2.js).
+     *
+     * suggestFindingClause() above answers "what did the objective evidence
+     * prove was NOT fulfilled" — the right test for a nonconformity, the
+     * wrong one here. Review Criteria rows are a mix of conform/observation/
+     * nc, and most carry no evidence at all; a conforming item still needs a
+     * clause. This asks a different, outcome-independent question instead:
+     *   "Which single requirement of the audited standard is this audit
+     *   question testing conformity against?"
+     * `status` is passed only for context — the requirement a question tests
+     * does not change because the recorded outcome happened to be conform,
+     * an observation, or an nc.
+     *
+     * Same structural guardrail as suggestFindingClause(): the model may
+     * choose only from the audited standard's real KB clause inventory —
+     * window.state.knowledgeBase.standards[] entries with status 'ready' and
+     * a populated clauses[] of {clause, title, requirement}. The answer (and
+     * every alternative) is re-validated against that same inventory
+     * afterwards; an out-of-inventory clause is discarded and the result
+     * degrades to insufficient — it is never surfaced to the caller.
+     * Returned clauseTitle values are always the KB's own title text, never
+     * the model's, so a title cannot be invented even when a clause number
+     * does validate. If the Knowledge Base has no ready standard matching
+     * `standard`, this returns insufficient: true immediately, before any AI
+     * call — it never falls back to guessing from clause-number patterns.
+     *
+     * Never throws: any missing KB standard, network failure, or unparseable
+     * AI response degrades to insufficient: true.
+     *
+     * @param {Object} params
+     * @param {string} params.question - The checklist question text. Required — empty question short-circuits to insufficient without calling the AI.
+     * @param {string} [params.sourceClause] - The item's FOCUS.n/ORG/DOC working reference. Background only — must NOT be inherited or echoed as the answer; it is not a clause of the standard.
+     * @param {string} params.standard - The audited standard name (e.g. "ISO 9001:2015"). Required — used to select the KB clause inventory that gates every answer.
+     * @param {string} [params.auditorNotes] - The auditor's comment/evidence for this item, if any. Strengthens the mapping but is NOT required — an absent value is normal for a checklist question, not a reason to refuse.
+     * @param {string} [params.status] - 'conform' | 'observation' | 'nc' etc. Context only; the clause a question tests does not change with the outcome.
+     * @returns {Promise<{
+     *   clause: string|null,
+     *   clauseTitle: string|null,
+     *   reason: string,
+     *   alternatives: Array<{clause: string, clauseTitle: string}>,
+     *   confidence: 'high'|'medium'|'low',
+     *   insufficient: boolean
+     * }>}
+     *   clause/clauseTitle are null and alternatives is [] whenever
+     *   insufficient is true. `reason` carries the specific technical cause
+     *   (missing KB standard, out-of-inventory clause, parse/network
+     *   failure, unmappable question, etc.) for logging/debugging.
+     */
+    suggestQuestionClause: async ({ question, sourceClause, standard, auditorNotes, status } = {}) => {
+        const insufficient = (reason) => ({
+            clause: null,
+            clauseTitle: null,
+            reason: reason || 'Insufficient information to suggest a clause.',
+            alternatives: [],
+            confidence: 'low',
+            insufficient: true
+        });
+
+        const questionText = String(question || '').trim();
+        if (!questionText) return insufficient('No question text was provided to evaluate.');
+        if (!standard || !String(standard).trim()) return insufficient('No audited standard was specified — cannot validate against the Knowledge Base.');
+
+        // Guardrail step 1: identical to suggestFindingClause() — the audited
+        // standard must have a ready, populated clause inventory in the
+        // Knowledge Base. Never fall back to guessing from clause-number
+        // patterns when it doesn't.
+        const stdDoc = _findReadyKBStandardDoc(standard);
+        if (!stdDoc) {
+            return insufficient(`No ready Knowledge Base standard matching "${standard}" was found — clause mapping cannot be validated without a clause inventory.`);
+        }
+
+        const validClauses = new Map((stdDoc.clauses || [])
+            .filter(c => c && c.clause)
+            .map(c => [String(c.clause).trim(), c]));
+        if (validClauses.size === 0) {
+            return insufficient(`The Knowledge Base entry for "${stdDoc.name || standard}" has no clauses recorded.`);
+        }
+
+        const clauseInventoryText = _buildClauseInventoryForPrompt(stdDoc);
+
+        const prompt = `
+You are a Senior Lead Auditor at a top-tier international Certification Body, mapping an audit checklist question to the requirement of the audited standard it tests. The mapping will be reviewed by a Qualified Registrar before client submission.
+
+GOVERNING TEST — apply this exact test and no other:
+"Which single requirement of the audited standard is this audit question testing conformity against?"
+
+This is NOT asking what was breached, and it is NOT asking what the objective evidence proves — the same question tests the same requirement regardless of whether the recorded audit outcome was conforming, an observation, or a nonconformity. Reason from what the question itself is actually asking the auditee to demonstrate.
+
+The item's internal working reference, if given below, is NOT a clause of the audited standard — it is an internal checklist tracking code (e.g. FOCUS.1, ORG, DOC). It is background context only; do NOT inherit it, echo it back, or treat it as if it were already the answer.
+
+Audited Standard: ${stdDoc.name || standard}
+${status ? `Recorded Audit Outcome (context only — does not change which requirement the question tests): ${status}\n` : ''}${sourceClause ? `Internal Working Reference (context only — NOT a clause of the standard, do not inherit): ${sourceClause}\n` : ''}
+Audit Question:
+${questionText}
+${auditorNotes ? `\nAuditor Notes/Evidence for this item:\n${String(auditorNotes).trim()}\n` : '\n(No auditor notes were recorded for this item. That is normal for a checklist question and is NOT a reason to refuse a mapping — map the question itself.)\n'}
+Candidate Clauses — you MUST choose the primary clause and any alternatives ONLY from this list, exactly as written. Do not invent, rename, renumber, or paraphrase a clause number or title. If the question genuinely cannot be mapped to one of these clauses, say so instead of guessing:
+${clauseInventoryText}
+
+Confidence rules:
+- "high": ONLY when the question plainly and specifically tests one particular requirement above.
+- "medium" or "low": whenever identifying the requirement takes auditor judgement, the question is generic or spans more than one clause, or more than one clause is plausible.
+- If the question does not provide sufficient basis to identify a specific requirement from the list above, set "insufficient": true, set "clause" and "clauseTitle" to null, and explain why in "reason" — do NOT guess or force a match to the nearest-sounding clause.
+
+Alternative Related Clause(s): only include a clause here where it is genuinely relevant to the same question — do not pad the list. Return an empty array if there is no genuinely relevant alternative.
+
+Return raw JSON only (no markdown code fences, no prose outside the JSON):
+{
+  "clause": "<clause number exactly as it appears in the candidate list above, or null>",
+  "clauseTitle": "<its title exactly as it appears in the candidate list above, or null>",
+  "reason": "<2-4 sentences grounded in what the question itself is testing, not the internal working reference>",
+  "alternatives": [{"clause": "...", "clauseTitle": "..."}],
+  "confidence": "high" | "medium" | "low",
+  "insufficient": false
+}
+`;
+
+        let responseText;
+        try {
+            responseText = await AI_SERVICE.callProxyAPI(prompt);
+        } catch (error) {
+            if (window.Logger) window.Logger.warn('AI_SERVICE', 'suggestQuestionClause: AI request failed, degrading to insufficient.', error);
+            return insufficient('The AI request failed — clause mapping could not be evaluated automatically.');
+        }
+
+        const parsed = _parseClauseSuggestionJSON(responseText);
+        if (!parsed) {
+            if (window.Logger) window.Logger.warn('AI_SERVICE', 'suggestQuestionClause: could not parse AI response as JSON.');
+            return insufficient('The AI response could not be interpreted — clause mapping could not be evaluated automatically.');
+        }
+
+        if (parsed.insufficient === true || !parsed.clause) {
+            return insufficient(_stripMdLite(parsed.reason) || 'The question does not clearly map to a single requirement of the standard.');
+        }
+
+        // Guardrail step 2: identical to suggestFindingClause() — validate
+        // the model's answer against the SAME inventory passed into the
+        // prompt. An out-of-inventory clause is never surfaced to the
+        // caller, structurally, not just by prompt compliance.
+        const normalizedClause = window.KB_HELPERS.extractClauseNum(String(parsed.clause).trim());
+        const kbEntry = validClauses.get(normalizedClause) || validClauses.get(String(parsed.clause).trim());
+        if (!kbEntry) {
+            if (window.Logger) window.Logger.warn('AI_SERVICE', `suggestQuestionClause: model returned clause "${parsed.clause}" not found in Knowledge Base inventory for "${stdDoc.name}" — discarding rather than surfacing an unvalidated clause.`);
+            return insufficient(`The AI suggested a clause not found in the "${stdDoc.name || standard}" Knowledge Base inventory — this has been discarded rather than risking an invented clause reference.`);
+        }
+
+        // Alternatives go through the identical validation + KB title
+        // lookup. Titles are ALWAYS the KB's own text, never the model's.
+        const alternatives = [];
+        if (Array.isArray(parsed.alternatives)) {
+            parsed.alternatives.forEach(alt => {
+                if (!alt || !alt.clause) return;
+                const altNorm = window.KB_HELPERS.extractClauseNum(String(alt.clause).trim());
+                const altEntry = validClauses.get(altNorm) || validClauses.get(String(alt.clause).trim());
+                if (altEntry && altEntry.clause !== kbEntry.clause) {
+                    alternatives.push({ clause: altEntry.clause, clauseTitle: altEntry.title || '' });
+                }
+            });
+        }
+
+        let confidence = String(parsed.confidence || '').toLowerCase().trim();
+        if (!['high', 'medium', 'low'].includes(confidence)) confidence = 'low'; // unrecognized/missing confidence defaults to the most conservative value
+
+        return {
+            clause: kbEntry.clause,
+            clauseTitle: kbEntry.title || '',
+            reason: _stripMdLite(parsed.reason) || 'This is the requirement the question tests conformity against.',
+            alternatives,
+            confidence,
+            insufficient: false
+        };
+    },
+
+    /**
      * 1e. Client-facing evidence statement builder (client spec #10).
      *
      * Raw auditor field notes ("Records Are Available.", "Ssytem is in

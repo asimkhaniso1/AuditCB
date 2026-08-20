@@ -358,13 +358,26 @@ describe('buildClientChecklist — audit-type scaling', () => {
         const cl = B.buildClientChecklist(CLIENT, DOCS.concat([
             { id: 'x', name: 'Miscellaneous Working Notes', category: 'Other', linkedClauses: '' }
         ]), { auditType: 'recertification', standard: IMS_SCOPE, manDays: 12 });
-        const review = cl.clauses.find(c => c.mainClause === 'REVIEW');
-        expect(review).toBeTruthy();
-        review.subClauses.forEach(s => {
-            expect(s.auditorReview).toBe(true);
-            expect(s.refs).toEqual([]);
-            expect(s.criterionRef).toBe('');
+        // Nothing the generator cannot map is given a citation. Such items land
+        // in one of two sections: REVIEW for a question with no defensible
+        // mapping, DOCNOTE for a document on file that maps to no requirement —
+        // the latter is an awareness note, not a deficiency, so it is kept out
+        // of the "for auditor review" section. Both carry no citation at all.
+        const unmapped = cl.clauses.filter(c => c.mainClause === 'REVIEW' || c.mainClause === 'DOCNOTE');
+        expect(unmapped.length).toBeGreaterThan(0);
+        unmapped.forEach(section => {
+            section.subClauses.forEach(s => {
+                expect(s.auditorReview).toBe(true);
+                expect(s.refs).toEqual([]);
+                expect(s.criterionRef).toBe('');
+            });
         });
+
+        const docNote = cl.clauses.find(c => c.mainClause === 'DOCNOTE');
+        expect(docNote).toBeTruthy();
+        expect(docNote.subClauses[0].documentNote).toBe(true);
+        // The wording must not read as a finding against the organisation.
+        expect(docNote.subClauses[0].requirement).toMatch(/not a finding|implies no nonconformity/i);
     });
 
     it('flags a standard the registry does not hold instead of auditing it as ISO 9001', () => {

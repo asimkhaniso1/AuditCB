@@ -380,3 +380,164 @@ describe('ChecklistCoverage.readiness — nothing could be validated', () => {
         expect(r.ready).toBe(true);
     });
 });
+
+describe('ChecklistCoverage.assess — SoA read from a client document', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
+        loadModule('./checklist-standards.js');
+        loadModule('./checklist-qa.js');
+        loadModule('./checklist-coverage.js');
+    });
+
+    it('drives the applicable pool from the document\'s refs and stops warning that none was supplied', () => {
+        const res = window.ChecklistCoverage.assess(
+            checklistOf(allMandatory('iso27001')),
+            ctxOf({
+                soaSource: 'document',
+                soaApplicable: ['A.5.1', 'A.5.9', 'A.8.13'],
+                soaDocument: { name: 'ISO27001 Statement of Applicability', revision: 'Rev 3', date: '2026-01-15', refCount: 3 }
+            }));
+        const row = res.coverage.controls[0];
+        expect(row.pool).toBe(3);
+        expect(row.soaDriven).toBe(true);
+        expect(row.soaSource).toBe('document');
+        expect(codes(res)).not.toContain('SOA_NOT_SUPPLIED');
+        const note = res.issues.find(i => i.code === 'SOA_FROM_DOCUMENT');
+        expect(note).toBeTruthy();
+        expect(note.severity).toBe('info');
+        expect(note.message).toMatch(/ISO27001 Statement of Applicability/);
+        expect(note.message).toMatch(/3 control/);
+    });
+
+    it('reports an SoA document that yielded no control references, instead of assuming tier 1 in silence', () => {
+        const res = window.ChecklistCoverage.assess(
+            checklistOf(allMandatory('iso27001')),
+            ctxOf({
+                soaSource: null,
+                soaApplicable: [],
+                soaDocument: { name: 'ISO27001 Statement of Applicability', revision: 'Rev 1', date: '', refCount: 0 }
+            }));
+        expect(codes(res)).not.toContain('SOA_NOT_SUPPLIED');
+        const note = res.issues.find(i => i.code === 'SOA_DOCUMENT_UNREADABLE');
+        expect(note).toBeTruthy();
+        expect(note.severity).toBe('warning');
+        expect(note.message).toMatch(/ISO27001 Statement of Applicability/);
+        expect(res.coverage.controls[0].soaDriven).toBe(false);
+    });
+});
+
+describe('ChecklistCoverage.buildContext — Statement of Applicability from a document', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
+        loadModule('./checklist-standards.js');
+        loadModule('./checklist-qa.js');
+        loadModule('./checklist-coverage.js');
+    });
+
+    function stateWithDocs(documents) {
+        return {
+            clients: [{
+                id: 'c-1', name: 'Acme ISMS Ltd',
+                certificates: [{ standard: 'ISO/IEC 27001:2022', initialDate: '2023-08-01', expiryDate: '2026-07-31' }],
+                keyProcesses: [], documents
+            }],
+            auditPlans: [], checklists: [], ncrs: [], complaints: [], appeals: []
+        };
+    }
+
+    it('reads Annex A references off the current SoA document when none were pasted', () => {
+        window.state = stateWithDocs([{
+            name: 'ISO27001 Statement of Applicability', category: 'Other', revision: 'Rev 3', date: '2026-01-15',
+            notes: 'Controls declared applicable: A.5.1, A.5.9, A.8.13.'
+        }]);
+        const ctx = window.ChecklistCoverage.buildContext(checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), {});
+        expect(ctx.soaSource).toBe('document');
+        expect(ctx.soaApplicable.slice().sort()).toEqual(['A.5.1', 'A.5.9', 'A.8.13']);
+        expect(ctx.soaDocument.name).toBe('ISO27001 Statement of Applicability');
+        expect(ctx.soaDocument.revision).toBe('Rev 3');
+    });
+
+    it('uses the most recent SoA document when several are on file', () => {
+        window.state = stateWithDocs([
+            { name: 'ISO27001 Statement of Applicability', revision: 'Rev 1', date: '2024-01-01', notes: 'Applicable: A.5.1.' },
+            { name: 'ISO27001 Statement of Applicability', revision: 'Rev 2', date: '2026-01-15', notes: 'Applicable: A.5.9, A.8.13.' }
+        ]);
+        const ctx = window.ChecklistCoverage.buildContext(checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), {});
+        expect(ctx.soaApplicable.slice().sort()).toEqual(['A.5.9', 'A.8.13']);
+        expect(ctx.soaDocument.revision).toBe('Rev 2');
+    });
+
+    it('reports an SoA document that could not be read rather than silently assuming', () => {
+        window.state = stateWithDocs([{
+            name: 'ISO27001 Statement of Applicability', revision: 'Rev 1', date: '2026-01-15',
+            notes: 'All controls in Annex A apply to the certified scope.'
+        }]);
+        const ctx = window.ChecklistCoverage.buildContext(checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), {});
+        expect(ctx.soaSource).toBe(null);
+        expect(ctx.soaApplicable).toEqual([]);
+        expect(ctx.soaDocument).toBeTruthy();
+        expect(ctx.soaDocument.refCount).toBe(0);
+    });
+
+    it('does not mistake a risk assessment that mentions the SoA for the SoA itself', () => {
+        window.state = stateWithDocs([{
+            name: 'Information Security Risk Assessment', category: 'Risk', revision: 'Rev 4', date: '2026-01-15',
+            notes: 'Treatment cross-referenced against the SoA for controls A.5.1 and A.8.13.'
+        }]);
+        const ctx = window.ChecklistCoverage.buildContext(checklistOf(['5.1'], { clientId: 'c-1', id: 'cl-1' }), {});
+        expect(ctx.soaSource).toBe(null);
+        expect(ctx.soaDocument).toBe(null);
+        expect(ctx.soaApplicable).toEqual([]);
+    });
+
+    it('lets a pasted SoA win over a document on file', () => {
+        window.state = stateWithDocs([{
+            name: 'ISO27001 Statement of Applicability', revision: 'Rev 3', date: '2026-01-15',
+            notes: 'Applicable: A.5.9, A.8.13.'
+        }]);
+        const checklist = checklistOf(['5.1'], {
+            clientId: 'c-1', id: 'cl-1', qaContext: { standardIds: ['iso27001'], auditType: 'recertification', soaApplicable: ['A.5.1'] }
+        });
+        const ctx = window.ChecklistCoverage.buildContext(checklist, {});
+        expect(ctx.soaSource).toBe('supplied');
+        expect(ctx.soaApplicable).toEqual(['A.5.1']);
+        expect(ctx.soaDocument).toBe(null);
+    });
+});
+
+describe('ChecklistCoverage.readiness — control-gap blockers carry what to add', () => {
+    beforeEach(() => {
+        window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
+        loadModule('./checklist-standards.js');
+        loadModule('./checklist-qa.js');
+        loadModule('./checklist-coverage.js');
+    });
+
+    it('carries stdId and the control refs through onto a RISK_CONTROL_GAP blocker', () => {
+        const controls = [{ ref: 'A.8.13', title: 'Backup', theme: 'technical', drivers: ['finding'], why: ['previous audit result'] }];
+        const r = window.ChecklistCoverage.readiness({}, {
+            coverage: {
+                issues: [{
+                    code: 'RISK_CONTROL_GAP', severity: 'critical', itemRef: '',
+                    message: '1 control(s) not sampled — A.8.13', stdId: 'iso27001', controls
+                }]
+            }
+        });
+        expect(r.blockers[0].stdId).toBe('iso27001');
+        expect(r.blockers[0].controls).toEqual(controls);
+    });
+
+    it('carries stdId and the missing refs through onto a CYCLE_CONTROL_GAP blocker', () => {
+        const r = window.ChecklistCoverage.readiness({}, {
+            coverage: {
+                issues: [{
+                    code: 'CYCLE_CONTROL_GAP', severity: 'critical', itemRef: '',
+                    message: '2 of 45 applicable control(s) sampled nowhere — A.5.35, A.8.3',
+                    stdId: 'iso27001', missing: ['A.5.35', 'A.8.3']
+                }]
+            }
+        });
+        expect(r.blockers[0].stdId).toBe('iso27001');
+        expect(r.blockers[0].missing).toEqual(['A.5.35', 'A.8.3']);
+    });
+});

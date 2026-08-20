@@ -885,6 +885,11 @@
             criterionRef: list.length ? list[0].ref : '',
             criterionSource: o.source || 'scoped-standard',
             auditorReview: !!o.auditorReview,
+            // Marks an item that reports on the document set rather than
+            // testing a requirement. ChecklistQA reports these separately from
+            // unmapped questions, and the Ready-for-Audit gate does not block
+            // on them.
+            documentNote: !!o.documentNote,
             items: [{ clause: displayRef, requirement }]
         };
         if (item.auditorReview) { item.criterionRef = ''; item.citation = ''; }
@@ -1309,7 +1314,7 @@
                 plan.residual.filter(c => c.stdId === std.id).forEach(c => {
                     const refs = [{ stdId: std.id, ref: c.ref }];
                     subs.push(scopedQuestion(c.ref, c.title,
-                        `Verify the requirements of ${std.label} ${c.ref} (${c.title}) are implemented and evidenced for the services in the certified scope.${evidenceHint(list, refs)}`,
+                        `${c.title} — examine how the organisation satisfies ${std.label} ${c.ref}, and obtain evidence that it operates as described for the services in the certified scope.${evidenceHint(list, refs)}`,
                         refs, { source: 'standard-specific' }));
                 });
             }
@@ -1365,12 +1370,15 @@
         // any standard named on the engagement that this registry does not
         // carry. Both are surfaced for the auditor rather than mapped to a
         // clause the generator cannot substantiate.
+        // A document that maps to no requirement is intelligence about the
+        // document set, not a deficiency: an organisation is entitled to hold
+        // documents its management system does not require. It is stated as an
+        // awareness note, in its own section, so nothing about it reads as a
+        // finding or as an obligation on the organisation.
         const unclaimed = list.filter(d => !String(d.linkedClauses || '').trim());
-        if (unclaimed.length) {
-            review.push(scopedQuestion('REVIEW', 'Unmapped documented information',
-                `${unclaimed.length} document(s) on file are not mapped to a requirement of any standard in this audit scope: ${unclaimed.slice(0, 10).map(d => d.name).join('; ')}${unclaimed.length > 10 ? `; and ${unclaimed.length - 10} more` : ''}. Determine during the audit whether any of them evidences a requirement, and map them before the next audit. No clause has been assigned to them.`,
-                [], { source: 'auditor-review', auditorReview: true }));
-        }
+        const docIntel = unclaimed.length ? [scopedQuestion('DOCNOTE', 'Documents on file not yet mapped to a requirement',
+            `For awareness only — this is not a finding and implies no nonconformity. ${unclaimed.length} document(s) on file carry no mapping to a requirement of any standard in this audit scope: ${unclaimed.slice(0, 10).map(d => d.name).join('; ')}${unclaimed.length > 10 ? `; and ${unclaimed.length - 10} more` : ''}. The organisation is not required to map them. If any turns out to evidence a requirement during the audit, record it against that requirement; otherwise no action arises.`,
+            [], { source: 'document-intelligence', auditorReview: true, documentNote: true })] : [];
         if (scope.unresolved.length) {
             review.push(scopedQuestion('REVIEW', 'Standard not held in the clause registry',
                 `The engagement names ${scope.unresolved.join(', ')}, which this generator does not hold a validated clause set for. No clauses, controls or questions have been generated for it — cover it from the standard itself and add it to the registry before the next audit.`,
@@ -1381,6 +1389,13 @@
                 mainClause: 'REVIEW',
                 title: 'For Auditor Review — no defensible clause mapping established',
                 subClauses: review
+            });
+        }
+        if (docIntel.length) {
+            clauses.push({
+                mainClause: 'DOCNOTE',
+                title: 'Document Intelligence — awareness note, not an audit finding',
+                subClauses: docIntel
             });
         }
 
