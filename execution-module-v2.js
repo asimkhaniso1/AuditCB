@@ -4197,6 +4197,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             while ((m = re.exec(text)) !== null) {
                 const stated = parseInt(m[1], 10);
                 if (isNaN(stated) || stated === controlled) continue;
+                // A number glued to a document code is not a headcount:
+                // "FORM-004 Employee Training Record" is a form reference, and
+                // reading it as "4 employees" produced a warning the offered
+                // note-rewrite could never clear (\b4 cannot match inside 004).
+                const prevChar = m.index > 0 ? text.charAt(m.index - 1) : '';
+                if (/[-/._#]/.test(prevChar)) continue;
+                const employeeWord = (m[0].match(/empl\w*$/i) || [''])[0];
+                const tailText = text.slice(m.index + m[0].length);
+                // Singular "Employee" opening a document title is a name, not a
+                // count — a genuine count reads "4 employees".
+                if (!/s$/i.test(employeeWord) && /^\s+(training|competenc|handbook|record|matrix|register|file|induction|onboard|appraisal)/i.test(tailText)) continue;
                 const key = stated + '|' + label;
                 if (seen[key]) continue;
                 seen[key] = true;

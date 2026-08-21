@@ -861,7 +861,12 @@
                         image: img,
                         thumb: thumbs[i] || img,
                         comment: item.comment || '',
-                        clause: item.clause || '',
+                        // The resolved criterion, not the raw internal ref — a
+                        // clause corrected via Review Criteria must show on the
+                        // Evidence Pack card too. Plain text only: this cell is
+                        // escaped at render, so displayCriterion's HTML variants
+                        // cannot be used here.
+                        clause: item.criterionRef || item.clause || '',
                         criterionRef: item.criterionRef || null,
                         criterionSource: item.criterionSource || null,
                         dept: item.department || item.deptName || '',
