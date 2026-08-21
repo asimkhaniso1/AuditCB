@@ -324,6 +324,7 @@ Voice rules (strict):
 - Report counts and evidence-based statements only. Never characterize the management system's overall "health", "soundness", "resilience", or "maturity" in subjective terms, and never render a one-line verdict.
 - Banned words — do not use any of these anywhere, in any form, alone or combined with another word: "soundness", "fundamental", "health", "resilience", "verdict", "certifiable". Also banned phrases: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of", "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "in conclusion", "moving forward". Banned: any sentence that could be pasted into a different company's report unchanged.
 - Use plain audit language: requirement -> objective evidence -> evaluation -> finding. State only what the audit evidence supports.
+- forwardOutlook: where ANY nonconformity is open, do NOT assert high or strong confidence. State that continued conformity is dependent upon satisfactory corrective action and closure of the open nonconformities within the required timeframe. Confidence language is only permitted when there are zero open nonconformities.
 - EVERY paragraph-level field (businessImpact, risks, forwardOutlook) MUST contain at least one concrete quantified reference — a clause or a named department, pulled from the data below. A sentence with no clause or department name is not acceptable. Do NOT restate the total counts of major/minor non-conformities, conformities, observations, or opportunities for improvement in these three fields — those totals already appear once in the Overall Conclusion elsewhere in the report; cite the specific clause(s)/department(s) instead.
 - If you name a department anywhere below (businessImpact, risks, forwardOutlook, findings, or concerns), it MUST be one listed under "Departments With Findings" below, or one appearing in the Non-Conformity Detail list — never a department from "Departments Assessed" that is not also in "Departments With Findings". A department that was merely assessed and found conforming carries no finding and must never be named as though it does. If "Departments With Findings" is empty, ground businessImpact/risks/forwardOutlook in a clause reference instead, or state the point with no department name at all — never substitute a department pulled from "Departments Assessed" merely to satisfy the "must contain a department" rule above, and never list several department names together as a single generic sentence padding out the field.
 - Observations and Opportunities for Improvement (OFI) are two SEPARATE classifications with two separate counts below — never add them together, never restate one count under the other's label, and never invent a combined "opportunities for improvement" figure. If you state either count anywhere (which the rule above otherwise discourages), state each number under its own exact label — "N observation(s)" and "M opportunity/opportunities for improvement" — never "N+M opportunities for improvement" and never "N+M observations".
@@ -389,15 +390,15 @@ Return ONLY the raw JSON object, no markdown fences.`;
         // deterministic path can honestly add beyond those counts is an
         // evidence-coverage gap, which is independent information. An empty
         // array is the honest answer otherwise; the render layer hides the card.
-        const intel = computeEvidenceIntel(d);
+        // Evidence-attachment coverage is an INTERNAL completeness control —
+        // how much of the audit team's own evidence has been uploaded — not a
+        // statement about the client's management system. It reached the
+        // formal executive summary as a "concern" ("coverage is 46%; 6
+        // finding(s) currently lack supporting evidence"), where a client
+        // reads it as a finding against them. It stays in the Report
+        // Integrity panel and the Evidence annex; the formal report never
+        // states it.
         const concerns = [];
-        if (intel.missingEvidence.length > 0 && intel.coveragePct < 70) {
-            // intel.coveragePct is the evidence-ATTACHMENT metric (items with
-            // supporting evidence attached), distinct from Audit Coverage
-            // (items-assessed, see computeCoveragePct) — labelled accordingly
-            // so the two metrics never read as the same figure.
-            concerns.push(`Evidence-attachment coverage across applicable items is ${intel.coveragePct}%; ${intel.missingEvidence.length} finding(s) currently lack supporting evidence.`);
-        }
 
         return {
             strengths,
@@ -411,9 +412,17 @@ Return ONLY the raw JSON object, no markdown fences.`;
                 : 'Continued monitoring of minor findings and observations is advised to prevent them from compounding into a broader pattern of control gaps.',
             forwardOutlook: stats.majorNC > 0
                 ? `Certification remains achievable on the current timeline provided the major finding(s) identified above are closed within the corrective-action window; the audit team has moderate confidence in readiness pending that closure.`
-                : conformPct >= 80
-                    ? `The management system is on a stable trajectory toward the next audit stage; the audit team has high confidence in continued conformity if current controls are sustained.`
-                    : `Closure of the findings above, verified at the next audit, is what the certification programme requires from this point.`
+                // Open minor nonconformities make continued conformity
+                // CONDITIONAL, however high the conformity percentage. The
+                // previous branch read only conformPct, so an audit carrying
+                // four open minor NCs was issued with "high confidence in
+                // continued conformity" — an assurance the findings do not
+                // support. Confidence language is reserved for a clean audit.
+                : stats.minorNC > 0
+                    ? `The management system demonstrates an overall stable level of implementation. Continued conformity is dependent upon satisfactory corrective action and closure of the ${stats.minorNC === 1 ? 'identified minor nonconformity' : (['', '', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][stats.minorNC] || stats.minorNC) + ' identified minor nonconformities'} within the required timeframe.`
+                    : conformPct >= 80
+                        ? `The management system is on a stable trajectory toward the next audit stage; the audit team has high confidence in continued conformity if current controls are sustained.`
+                        : `Closure of the findings above, verified at the next audit, is what the certification programme requires from this point.`
         };
     }
 
@@ -1159,10 +1168,9 @@ ${intel.missingEvidence.length ? `
 
         const risks = [];
         if (stats.majorNC > 0) risks.push(`${stats.majorNC} major non-conformity(ies) could delay certification issuance.`);
-        // Factual percentage only — "defensibility"/accreditation-scrutiny
-        // framing is internal QA commentary, not client report content
-        // (validator rule B11 blocks it in client-facing narrative text).
-        if (intel.coveragePct < 50) risks.push(`Evidence-attachment coverage is ${intel.coveragePct}%; supporting evidence is not yet attached for all findings.`);
+        // Evidence-attachment coverage is the audit team's own upload
+        // completeness, not a risk to the client's certification — see the
+        // executive-summary concerns above. It is not stated here either.
         if (stats.minorNC > 3) {
             if (recurrenceData && recurrenceData.hasPrior && recurrenceData.recurringClauses.length) {
                 risks.push(`${stats.minorNC} minor non-conformities include ${recurrenceData.recurringClauses.length} clause(s) that also failed in the client's prior audit — a genuine recurrence pattern.`);
@@ -2163,6 +2171,9 @@ h1, h2, h3, h4, .b4-page-title, .b4-section-title, .b4-card-heading, .b4-highlig
     // ------------------------------------------------------------------
 
     window.ReportExecutive = {
+        // Exported for tests: the deterministic fallback is the wording that
+        // ships whenever the AI draft is unavailable, so it is the one to pin.
+        fallbackExecSummaryData,
         generateExecutiveSummary,
         computeEvidenceIntel,
         generateExecutiveInsights,
