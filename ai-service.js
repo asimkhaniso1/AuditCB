@@ -1362,6 +1362,33 @@ Return raw JSON only (no markdown fences, no prose outside the JSON), an array w
         }
 
         // Get KB context for more accurate positive observations
+        // Processes/departments that actually carry a nonconformity.
+        //
+        // The instruction below asks the model to close by saying "which
+        // processes carry the open findings", and until now nothing in the
+        // context told it which those were. With no grounding it supplied
+        // plausible ISO textbook process names instead: a shipped report
+        // attributed its findings to "Rework & Repair, Risk and Opportunity
+        // Management, Maintenance and Calibration" — none of which had a
+        // finding against it. A named process in a certification report is an
+        // assertion about the client's management system, so it has to come
+        // from a record rather than from what reads well.
+        const ncDepartments = (function () {
+            const seen = new Set();
+            const add = (v) => { const d = String(v == null ? '' : v).trim(); if (d) seen.add(d); };
+            (reportData.checklistProgress || []).forEach(function (i) {
+                if (!i || i.status !== 'nc') return;
+                if (!['major', 'minor'].includes(String(i.ncrType || '').toLowerCase())) return;
+                add(i.department);
+            });
+            (reportData.ncrs || []).forEach(function (n) {
+                if (!n || !/^(major|minor)$/i.test(String(n.type || n.ncrType || n.severity || ''))) return;
+                add(n.department);
+            });
+            return Array.from(seen);
+        })();
+        const ncDepartmentText = ncDepartments.length ? ncDepartments.join(', ') : 'NONE RECORDED';
+
         const kbContext = reportData.standard ? AI_SERVICE.getRelevantKBClauses(reportData.standard) : '';
 
         // Get Organization Context & Audit Plan details
@@ -1415,6 +1442,7 @@ Context:
 - Observations: ${stats.observationCount}
 - Opportunities for Improvement (OFI): ${stats.ofiCount}
 - Compliant Clauses/Areas: ${areaText}
+- Processes/departments carrying a nonconformity: ${ncDepartmentText}
 ${orgPlanContext}
 ${openingMeetingContext}
 ${planScopeContext}
@@ -1443,7 +1471,7 @@ CRITICAL RULES — CCI Gold Standard:
 - Prefer plain, objective audit language: requirement, objective evidence, evaluation, finding
 
 Instructions:
-1. Executive Summary: Write a comprehensive, authoritative paragraph (150-250 words) summarizing the audit scope, methodology, and overall conclusion. Open with the audit context (type, standard, dates). ${planScopeContext ? 'Reference the stated audit objectives and methodology from the audit plan.' : ''} Briefly reference the opening meeting (attendees, date). State the overall assessment outcome, mentioning the number of non-conformities (${ncCount}), observations (${stats.observationCount}) and opportunities for improvement (${stats.ofiCount}) as three separate figures — never combine observations and OFI into one number. Conclude by stating what the sampled evidence showed about conformity with the audit criteria and which processes carry the open findings — a factual closing statement, not an impression, a grade, or a maturity verdict. Keep the register plain and objective: requirement, objective evidence, evaluation, finding.
+1. Executive Summary: Write a comprehensive, authoritative paragraph (150-250 words) summarizing the audit scope, methodology, and overall conclusion. Open with the audit context (type, standard, dates). ${planScopeContext ? 'Reference the stated audit objectives and methodology from the audit plan.' : ''} Briefly reference the opening meeting (attendees, date). State the overall assessment outcome, mentioning the number of non-conformities (${ncCount}), observations (${stats.observationCount}) and opportunities for improvement (${stats.ofiCount}) as three separate figures — never combine observations and OFI into one number. Conclude by stating what the sampled evidence showed about conformity with the audit criteria and which processes carry the open findings — a factual closing statement, not an impression, a grade, or a maturity verdict. Name ONLY processes that appear on the "Processes/departments carrying a nonconformity" line above, spelled exactly as written there. If that line reads NONE RECORDED, name no process at all and do not substitute one that sounds plausible — say the findings are recorded against the clauses cited instead. Naming a process with no finding against it misattributes a nonconformity to part of the client's business that did not receive one. Keep the register plain and objective: requirement, objective evidence, evaluation, finding.
 2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 4-6 specific positive observations. Each must reference the specific clause number and title (e.g. "Clause 5.1 Leadership and commitment"). Describe the specific objective evidence of effective implementation observed. Use authoritative language (e.g., "The audit team confirmed that the organization has established a well-embedded approach to...", "Through examination of records and interviews, the assessment confirmed mature implementation of..."). Do NOT use markdown formatting. Each observation MUST be on its own numbered line (1. 2. 3. etc).
 3. OFI: ${obsText ? `Based on the "Opportunities for Improvement (OFI)" list above, write one improvement statement per OFI item listed — exactly ${stats.ofiCount} item${stats.ofiCount === 1 ? '' : 's'} in the returned "ofi" array, no more and no fewer. Do not draw on, restate, or reference any Observation — Observations are a separate classification with their own section of the report and must never appear here. Include the relevant clause numbers and reference specific documents, procedures, or records where improvement is recommended.` : 'Write a list of specific, actionable opportunities for improvement referencing relevant clause requirements.'} Use measured, constructive improvement language befitting a senior auditor (e.g., "The organization would benefit from further developing...", "The audit team recommends consideration of...", "The organization may consider strengthening the control described in..."). These are NOT non-conformities.
 

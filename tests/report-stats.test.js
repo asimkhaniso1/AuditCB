@@ -255,6 +255,48 @@ describe('ReportStats.effectivenessStatements', () => {
         const report = { checklistProgress: [{ status: 'conform', clause: '9.3' }], ncrs: [{ clause: '9.3', type: 'minor' }] };
         expect(window.ReportStats.effectivenessStatements(report).mgmtReview).toMatch(/minor nonconformity/i);
     });
+
+    // Task B — single source of truth: effectivenessStatements used to run its
+    // own classification pass over report.checklistProgress + report.ncrs,
+    // separate from the classifyItem()/build() pass every other figure in the
+    // report reads. One consequence: a manual NCR entered in the register for
+    // a clause a checklist item ALREADY raised as an NC (the normal workflow —
+    // an auditor logs a checklist finding, then records it in the NCR
+    // register) would be counted a second time here, so Management System
+    // Effectiveness could report more nonconformities against an area than
+    // the report's own headline/uniqueFindings count for that same clause.
+    // Now that this function reads window.ReportStats.build()'s own
+    // uniqueFindings (which already dedupes a manual NCR against a matching
+    // checklist finding by clause), the same input produces exactly one.
+    it('does not double-count a manual NCR already matched to a checklist finding for the same clause', () => {
+        const report = {
+            checklistProgress: [{ status: 'nc', ncrType: 'minor', clause: '9.2', comment: 'Planned internal audits were not completed.' }],
+            ncrs: [{ clause: '9.2', type: 'minor' }]
+        };
+        const eff = window.ReportStats.effectivenessStatements(report);
+        expect(eff.internalAudit).toMatch(/1 minor nonconformity\(ies\)/);
+        expect(eff.internalAudit).not.toMatch(/2 minor nonconformity\(ies\)/);
+
+        // Cross-check against the canonical dataset's own finding count for
+        // clause 9.2 — the two must always agree; that agreement is the point.
+        const ds = window.ReportStats.build({ report });
+        const nineTwoFindings = ds.uniqueFindings.filter((f) => f.clause === '9.2');
+        expect(nineTwoFindings.length).toBe(1);
+    });
+
+    // A department-vs-clause resolution regression: a FOCUS-carryover
+    // Observation (advisory, not a nonconformity) must resolve to its real
+    // clause via criterionRef the same way a major/minor finding does, so it
+    // lands under the correct Management System Effectiveness area instead of
+    // silently matching nothing.
+    it('resolves a FOCUS-carryover Observation to its real clause via criterionRef', () => {
+        const report = {
+            checklistProgress: [{ status: 'nc', ncrType: 'observation', clause: 'FOCUS.3', criterionRef: '9.3', comment: 'Management review records were available for the sample reviewed.' }]
+        };
+        const eff = window.ReportStats.effectivenessStatements(report);
+        expect(eff.mgmtReview).toMatch(/opportunity for improvement/i);
+        expect(eff.mgmtReview).not.toMatch(/nonconformity/i);
+    });
 });
 
 // A client report must never present a certification-programme criterion or an

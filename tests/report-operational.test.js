@@ -6,6 +6,11 @@ window.ReportExecutive = { icon: () => '', bigFourCss: () => '' };
 
 const fs = await import('fs');
 const path = await import('path');
+// report-stats.js loaded first — report-operational.js's canonicalStats()
+// prefers window.ReportStats.build() (the canonical single source) the same
+// way report-executive.js's getStats() does, falling back to legacy d.stats
+// only if ReportStats never loaded.
+eval(fs.readFileSync(path.resolve('./report-stats.js'), 'utf8'));
 const src = fs.readFileSync(path.resolve('./report-operational.js'), 'utf8');
 eval(src);
 
@@ -66,5 +71,41 @@ describe('ReportOperational — empty-column suppression', () => {
         expect(sec.bodyHtml).toContain('Process / Department');
         expect(sec.bodyHtml).toContain('Items Applicable');
         expect(sec.bodyHtml).toContain('Result');
+    });
+});
+
+// Task B: "Findings Raised" is a headline count and must never drift from
+// the canonical ReportStats dataset the rest of the report reads (Executive
+// Summary, Management System Effectiveness, Certification Recommendation).
+describe('ReportOperational — Sampling Summary "Findings Raised" reads the canonical count', () => {
+    const progress = () => [
+        { status: 'nc', ncrType: 'minor', clause: '9.2', department: 'Quality' },
+        { status: 'nc', ncrType: 'minor', clause: '7.2', department: 'Human Resources' },
+        { status: 'nc', ncrType: 'observation', clause: '8.1', department: 'Production' },
+        { status: 'nc', ncrType: 'observation', clause: '8.4', department: 'Purchasing' },
+        { status: 'nc', ncrType: 'ofi', clause: '6.1', department: 'Quality' },
+        { status: 'conform', clause: '4.1', department: 'Management' }
+    ];
+
+    function findingsRaisedValue(bodyHtml) {
+        const m = bodyHtml.match(/<div class="b4-kpi-value">(\d+)<\/div><div class="b4-kpi-label">Findings Raised<\/div>/);
+        return m ? Number(m[1]) : null;
+    }
+
+    it('counts major+minor NCs only — Observations and OFIs (also status:\'nc\') are never folded in', () => {
+        // No d.stats supplied at all — canonicalStats() must fall through to
+        // window.ReportStats.build(), not the old "count every status==='nc'
+        // item" fallback, which would have read 4 here (2 NC + 1 Obs + 1 OFI)
+        // instead of the correct 2.
+        const d = { hydratedProgress: progress(), report: { checklistProgress: progress() } };
+        const sec = opsSection('opsSampling', d);
+        expect(sec).toBeTruthy();
+        expect(findingsRaisedValue(sec.bodyHtml)).toBe(2);
+    });
+
+    it('a stale legacy d.stats never overrides the canonical figure', () => {
+        const d = { hydratedProgress: progress(), report: { checklistProgress: progress() }, stats: { majorNC: 9, minorNC: 9 } };
+        const sec = opsSection('opsSampling', d);
+        expect(findingsRaisedValue(sec.bodyHtml)).toBe(2);
     });
 });

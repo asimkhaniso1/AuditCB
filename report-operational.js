@@ -106,6 +106,26 @@
         return n;
     }
 
+    // Task B: window.ReportStats.build() is the canonical single source for
+    // headline counts (majorNC/minorNC) — the same one report-executive.js's
+    // getStats() always reads. This module used to read d.stats (a legacy,
+    // second counting path built upstream by execution-reporting.js) directly
+    // for the "Findings Raised" KPI, falling back to counting every
+    // status==='nc' item when d.stats lacked majorNC/minorNC — a fallback
+    // that silently folded Observations and OFIs (also status:'nc') into a
+    // "Findings Raised" figure that must mean major+minor only, so it could
+    // read a different number than the Executive Summary's own NC count for
+    // the exact same audit. Mirrors getStats()'s try/catch-degrade pattern.
+    function canonicalStats(d) {
+        try {
+            if (global.ReportStats && typeof global.ReportStats.build === 'function') {
+                var ds = global.ReportStats.build(d || {});
+                if (ds && ds.resultCounts) return { majorNC: ds.resultCounts.majorNC, minorNC: ds.resultCounts.minorNC };
+            }
+        } catch (_e) { /* fall through to legacy d.stats */ }
+        return (d && d.stats) || {};
+    }
+
     function isMajorNc(item) {
         return item && item.status === 'nc' && String(item.ncrType || '').toLowerCase() === 'major';
     }
@@ -260,7 +280,7 @@
     // ── SECTION 3: AUDIT SAMPLING SUMMARY ─────────────────────────────────────
     function buildSamplingSection(d) {
         var items = Array.isArray(d.hydratedProgress) ? d.hydratedProgress : [];
-        var stats = d.stats || {};
+        var stats = canonicalStats(d);
 
         var depts = {}, clauses = {}, photos = 0;
         items.forEach(function (item) {
@@ -268,9 +288,7 @@
             if (item && item.clause) clauses[String(item.clause).trim()] = true;
             photos += evidenceCount(item);
         });
-        var findingsRaised = stats.majorNC != null && stats.minorNC != null
-            ? (Number(stats.majorNC) || 0) + (Number(stats.minorNC) || 0)
-            : items.filter(function (i) { return i && i.status === 'nc'; }).length;
+        var findingsRaised = (Number(stats.majorNC) || 0) + (Number(stats.minorNC) || 0);
         var sites = (d.auditPlan && Array.isArray(d.auditPlan.selectedSites) && d.auditPlan.selectedSites.length)
             || (d.client && Array.isArray(d.client.sites) && d.client.sites.length) || 1;
 

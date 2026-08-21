@@ -1044,6 +1044,12 @@
                 id: (bucket === 'observation' ? 'OBS-' : 'OFI-') + String(advCounter[bucket]).padStart(2, '0'),
                 type: bucket,
                 clause: trim(item.clause) || 'General',
+                // Additive field — carried through for the same reason
+                // uniqueFindings carries it: so a consumer can resolve a
+                // FOCUS/SURV/ORG/DOC-carryover advisory to its real clause
+                // (e.g. effectivenessFindings below) instead of reading
+                // `clause` raw, which may be an internal working reference.
+                criterionRef: item.criterionRef || null,
                 department: normalizeDeptName(item.department),
                 comment: cleanText(item.comment || '', 200),
                 evidenceCount: evidenceCount(item)
@@ -1172,18 +1178,30 @@
         legal: { label: 'legal and regulatory compliance', clauses: ['4.2', '6.1.3', '8.2.2'] }
     };
 
+    // Single source of truth (Task B): this used to run its OWN pass over
+    // report.checklistProgress + report.ncrs — status==='nc' plus a raw
+    // ncrType read, entirely separate from classifyItem()/buildInner() above.
+    // A manual NCR already matched to a checklist finding there (so it isn't
+    // double-counted in resultCounts/uniqueFindings) would still be counted
+    // again here as an independent finding, and a hydration-resolved clause
+    // could differ from the raw report.checklistProgress value this function
+    // read directly — either way, Management System Effectiveness could
+    // silently disagree with the same audit's headline counts. Deriving from
+    // build()'s own uniqueFindings (majorNC/minorNC/pendingClassification,
+    // register/manual-NCR merge already applied) and advisoryItems
+    // (observation/ofi) instead makes this exactly as correct as every other
+    // consumer of the canonical dataset — never a second count.
     function effectivenessFindings(report) {
-        const fromChecklist = safeArr(report && report.checklistProgress)
-            .filter((i) => i && String(i.status).toLowerCase() === 'nc')
-            .map((i) => ({
-                ref: trim(i.criterionRef) || trim(i.clause),
-                type: String(i.ncrType || '').toLowerCase()
-            }));
-        const fromManual = safeArr(report && report.ncrs).map((n) => ({
-            ref: trim(n && (n.criterionRef || n.clause)),
-            type: String((n && (n.type || n.ncrType || n.severity)) || '').toLowerCase()
+        const ds = build({ report: report || {} });
+        const fromFindings = safeArr(ds.uniqueFindings).map((f) => ({
+            ref: trim(f.criterionRef) || trim(f.clause),
+            type: f.severity === 'major' ? 'major' : (f.severity === 'minor' ? 'minor' : '')
         }));
-        return fromChecklist.concat(fromManual).filter((f) => f.ref);
+        const fromAdvisories = safeArr(ds.advisoryItems).map((a) => ({
+            ref: trim(a.criterionRef) || trim(a.clause),
+            type: a.type
+        }));
+        return fromFindings.concat(fromAdvisories).filter((f) => f.ref);
     }
 
     function matchesArea(ref, clauses) {

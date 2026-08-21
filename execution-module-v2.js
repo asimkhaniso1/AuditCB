@@ -1054,7 +1054,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${window.UTILS.escapeHtml(ncr.description || '-')}">${window.UTILS.escapeHtml(ncr.description || '-')}</td>
                                         <td><span style="background: ${ncr.status === window.CONSTANTS.STATUS.CLOSED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.status || 'Open'}</span></td>
                                         <td>${ncr.source === 'manual'
-                    ? `<button class="btn btn-sm" style="color: var(--primary-color);" data-action="editNCR" data-arg1="${report.id}" data-arg2="${idx - checklistNCRs.length < 0 ? idx : idx}" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>`
+                    ? `<button class="btn btn-sm" style="color: var(--primary-color);" data-action="editExecutionNCR" data-arg1="${report.id}" data-arg2="${idx - checklistNCRs.length < 0 ? idx : idx}" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>`
                     : `<button class="btn btn-sm" style="color: #8b5cf6;" title="Edit in Checklist tab" data-action="showNotification" data-arg1="Edit this NCR in the Checklist tab where it was raised" data-arg2="info"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
                 }</td>
                                     </tr>
@@ -2371,11 +2371,22 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     }
                 }
 
-                // Severity-based default due date (matches ncr-capa-module.js:1015-1026)
+                // Severity-based default due date (matches ncr-capa-module.js:1015-1026),
+                // counted from the AUDIT date rather than from whenever this save ran.
+                //
+                // A nonconformity is raised on the day it is found. Dating it
+                // "today" made the raised date drift to whichever day the auditor
+                // happened to press Save, and the due date drift with it — one
+                // audit produced NCRs due 13 September and others due 14, purely
+                // because the checklist was saved across two days. The client is
+                // then given inconsistent response deadlines for a single audit.
                 const severity = item.ncrType || 'Minor';
-                const today = new Date();
-                const due = new Date(today);
-                due.setDate(today.getDate() + (String(severity).toLowerCase() === 'major' ? 90 : 30));
+                const raisedOn = (function () {
+                    const d = new Date(report.date || report.createdAt || Date.now());
+                    return isNaN(d.getTime()) ? new Date() : d;
+                })();
+                const due = new Date(raisedOn);
+                due.setDate(raisedOn.getDate() + (String(severity).toLowerCase() === 'major' ? 90 : 30));
 
                 // Create new NCR record
                 const ncrRecord = {
@@ -2392,7 +2403,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     severity: severity,
                     description: item.ncrDescription || item.comment || 'Non-conformity identified during audit',
                     raisedBy: report.auditor || 'Auditor',
-                    raisedDate: new Date().toISOString().split('T')[0],
+                    raisedDate: raisedOn.toISOString().split('T')[0],
                     dueDate: due.toISOString().split('T')[0],
                     status: 'Open',
                     correction: '',
@@ -2874,9 +2885,22 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     }
 
     // Edit existing NCR
-    function editNCR(reportId, ncrIdx) {
+    // Named for the table it serves, because there are two different editors.
+    //
+    // ncr-capa-module.js also defines window.editNCR, taking a single NCR id
+    // from the register, and it loads AFTER this file — so its one-argument
+    // version silently replaced this two-argument one. This table's Edit button
+    // then called it with (reportId, index): the register looked for an NCR
+    // whose id was a REPORT id, found none, and returned without a word. The
+    // button appeared to do nothing at all.
+    function editExecutionNCR(reportId, ncrIdx) {
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
-        if (!report || !report.ncrs || !report.ncrs[ncrIdx]) return;
+        if (!report || !report.ncrs || !report.ncrs[ncrIdx]) {
+            // Say so rather than returning silently — a dead button teaches an
+            // auditor to distrust the screen.
+            window.showNotification('That nonconformity could not be opened for editing — it is no longer on this report.', 'error');
+            return;
+        }
 
         const ncr = report.ncrs[ncrIdx];
 
@@ -3541,8 +3565,22 @@ function renderExecutionTab(report, tabName, contextData = {}) {
      * clean result the panel is about to contradict.
      */
     function persistAndRefreshIntegrity(reportId, message, severity) {
+        // Remember which tab the auditor is on before anything re-renders.
+        //
+        // These fix actions are reached from the Report Integrity panel on the
+        // Review & Submit tab, and saving from one of them was landing the
+        // auditor back on a different tab — losing their place and making a
+        // successful save look like it had gone wrong. Whatever re-renders,
+        // the tab they were working in is restored.
+        const activeTab = document.querySelector('.tab-btn.active')?.getAttribute('data-tab') || null;
         if (typeof window.saveChecklist === 'function') window.saveChecklist(reportId);
         if (typeof window.runReportIntegrityCheck === 'function') window.runReportIntegrityCheck(reportId);
+        if (activeTab) {
+            const stillActive = document.querySelector('.tab-btn.active')?.getAttribute('data-tab');
+            if (stillActive !== activeTab) {
+                document.querySelector('.tab-btn[data-tab="' + activeTab + '"]')?.click();
+            }
+        }
         if (message && typeof window.showNotification === 'function') window.showNotification(message, severity || 'success');
     }
 
@@ -4407,7 +4445,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     window.renderExecutionDetail = renderExecutionDetail;
     window.saveChecklist = saveChecklist;
     window.createNCR = createNCR;
-    window.editNCR = editNCR;
+    window.editExecutionNCR = editExecutionNCR;
     window.createCAPA = createCAPA;
     // Note: submitForReview, publishReport, revertToDraft, saveReportDraft,
     //       generateAIConclusion, generateAuditReport are now in reporting-module.js
@@ -4549,5 +4587,5 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { _autoFillPersonnel, toggleAccordion, toggleAllAccordions, initClauseDragReorder, toggleSectionSelection, setChecklistStatus, updateAccordionCounter, addCustomQuestion, saveChecklist, filterChecklistItems, bulkUpdateStatus, submitToLeadAuditor, startDictation, _collectMeetingAttendees, addCustomMeetingAttendee, saveMeetingRecords, renderAuditExecutionEnhanced, renderAuditExecution, renderExecutionDetail, createNCR, editNCR, createCAPA, openCreateReportModal, openEditReportModal, updateMeetingData };
+    module.exports = { _autoFillPersonnel, toggleAccordion, toggleAllAccordions, initClauseDragReorder, toggleSectionSelection, setChecklistStatus, updateAccordionCounter, addCustomQuestion, saveChecklist, filterChecklistItems, bulkUpdateStatus, submitToLeadAuditor, startDictation, _collectMeetingAttendees, addCustomMeetingAttendee, saveMeetingRecords, renderAuditExecutionEnhanced, renderAuditExecution, renderExecutionDetail, createNCR, editExecutionNCR, createCAPA, openCreateReportModal, openEditReportModal, updateMeetingData };
 }

@@ -1016,4 +1016,76 @@ describe('KTD acceptance #33 — the corrected report issues cleanly', () => {
             expect(intel.missingEvidence[0].department).toBe('Management');
         });
     });
+
+    // Real shipped defect this suite's report-back names directly: the
+    // Executive Summary told senior management the findings "relate to
+    // processes such as Rework & Repair, Risk and Opportunity Management,
+    // Maintenance and Calibration" — none of which carried an actual finding
+    // in the audit. businessImpact/risks/forwardOutlook are AI-authored free
+    // text with no deterministic fallback, so the only thing testable here is
+    // the PROMPT buildExecSummaryPrompt hands the model — it must supply a
+    // findings-only department list and forbid naming anything outside it.
+    describe('Task A — narrative names only processes/departments a finding actually touches', () => {
+        // Two departments assessed as fully conforming (zero findings),
+        // alongside the 4 real minor NCs (Quality/Compliance/Human Resources)
+        // and the "Management" department, which in correctedProgress() also
+        // carries only a conform item — three clean departments in total.
+        const progressWithCleanDepartments = () => correctedProgress().concat([
+            { status: 'conform', clause: '8.7', department: 'Rework & Repair', comment: 'Rework records reviewed; fully conforming.' },
+            { status: 'conform', clause: '7.1.3', department: 'Maintenance and Calibration', comment: 'Calibration schedule reviewed; fully conforming.' }
+        ]);
+
+        it('"Departments With Findings" lists only departments an actual finding maps to', () => {
+            const d = { report: correctedReport(), hydratedProgress: progressWithCleanDepartments() };
+            const prompt = window.ReportExecutive.buildExecSummaryPrompt(d);
+            const findingsLine = prompt.split('\n').find((l) => l.startsWith('- Departments With Findings'));
+            expect(findingsLine).toBeTruthy();
+            expect(findingsLine).toContain('Quality');
+            expect(findingsLine).toContain('Compliance');
+            expect(findingsLine).toContain('Human Resources');
+            expect(findingsLine).toContain('Production');
+            expect(findingsLine).toContain('Purchasing');
+            // Assessed and conforming, but zero findings — must never appear.
+            expect(findingsLine).not.toContain('Management');
+            expect(findingsLine).not.toContain('Rework & Repair');
+            expect(findingsLine).not.toContain('Maintenance and Calibration');
+            // Sanity: the full "Departments Assessed" line still carries them,
+            // proving the exclusion above is deliberate filtering, not a
+            // data gap — the clean departments really were assessed.
+            const assessedLine = prompt.split('\n').find((l) => l.startsWith('- Departments Assessed'));
+            expect(assessedLine).toContain('Rework & Repair');
+            expect(assessedLine).toContain('Maintenance and Calibration');
+        });
+
+        it('instructs the model that businessImpact/risks/forwardOutlook may only name a department with a real finding', () => {
+            const d = { report: correctedReport(), hydratedProgress: progressWithCleanDepartments() };
+            const prompt = window.ReportExecutive.buildExecSummaryPrompt(d);
+            expect(prompt).toMatch(/never a department from "Departments Assessed" that is not also in "Departments With Findings"/);
+            expect(prompt).toMatch(/A department that was merely assessed and found conforming carries no finding/);
+        });
+
+        it('when no department carries a finding, says so and forbids padding the narrative with a generic list', () => {
+            const cleanProgress = [
+                { status: 'conform', clause: '4.1', department: 'Quality', comment: 'Reviewed; conforming.' },
+                { status: 'conform', clause: '8.7', department: 'Rework & Repair', comment: 'Reviewed; conforming.' }
+            ];
+            const d = { report: correctedReport(), hydratedProgress: cleanProgress };
+            const prompt = window.ReportExecutive.buildExecSummaryPrompt(d);
+            const findingsLine = prompt.split('\n').find((l) => l.startsWith('- Departments With Findings'));
+            expect(findingsLine).toContain('None — no department carries an open finding this audit');
+            expect(prompt).toMatch(/never substitute a department pulled from "Departments Assessed" merely to satisfy/);
+            expect(prompt).toMatch(/never list several department names together as a single generic sentence padding out the field/);
+        });
+
+        // The exec-insights dashboard prompt (buildInsightsPrompt) carries the
+        // identical risk via its own "Department Summary" context — same class
+        // of defect, same fix shape: the "risks"/"recurring"/"strategic" cards
+        // must be told a clean department (major:0, minor:0) is not a risk.
+        it('buildInsightsPrompt forbids the risk/recurring/strategic cards from treating a clean department as a risk', () => {
+            const d = { report: correctedReport(), hydratedProgress: progressWithCleanDepartments() };
+            const prompt = window.ReportExecutive.buildInsightsPrompt(d);
+            expect(prompt).toMatch(/may only name a department that shows major>0 or minor>0/);
+            expect(prompt).toMatch(/a department is not a risk merely because it was assessed/i);
+        });
+    });
 });
