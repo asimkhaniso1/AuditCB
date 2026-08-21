@@ -9,6 +9,13 @@ const path = await import('path');
 const src = fs.readFileSync(path.resolve('./report-integrity.js'), 'utf8');
 eval(src);
 
+// W25 needs real ReportStats.classifyCriterion (internal-ref detection,
+// programme-criterion detection) rather than a hand-rolled stand-in — a
+// mock could drift from the real classification rules and hide a false
+// positive/negative. Loaded the same way report-stats.test.js loads it.
+const reportStatsSrc = fs.readFileSync(path.resolve('./report-stats.js'), 'utf8');
+eval(reportStatsSrc);
+
 function baseReport(overrides) {
     return Object.assign({
         id: 'report-1',
@@ -709,5 +716,162 @@ describe('ReportIntegrity — Phase B cross-report contradictions', () => {
         });
 
         expect(result.warnings.some((w) => w.id === 'W24')).toBe(false);
+    });
+});
+
+// W12 — a document code is not a headcount.
+//
+// "FORM-004 Employee Training Record" matched the stated-headcount pattern:
+// the word boundary after the hyphen let it capture "004" and warn that the
+// evidence referred to 4 employees against a profile of 8 — and the offered
+// note-rewrite could never clear it, because \b4 has no boundary inside "004".
+// The auditor was locked in a loop of confirming a headcount that was never
+// contradicted.
+describe('W12 — form codes and document titles are not headcounts', () => {
+    const CLIENT_8 = { id: 'c-1', name: 'KTD Select', sites: [{ employees: 8 }] };
+
+    function w12(report) {
+        const res = window.ReportIntegrity.check({ report, client: CLIENT_8, checklists: [], auditPlan: {} });
+        return res.warnings.filter(w => String(w.id || '').indexOf('W12') === 0);
+    }
+
+    it('does not read FORM-004 / FORM-005 document codes as employee counts', () => {
+        const hits = w12({
+            id: 'r1', client: 'KTD Select', clientId: 'c-1', standard: 'ISO 9001:2015',
+            positiveObservations: "Clause 7.2 Competence: the 'FORM-004 Employee Training Record' and 'FORM-005 Employee Competency Matrix' provided objective evidence of the organization's arrangements.",
+            checklistProgress: []
+        });
+        expect(hits).toHaveLength(0);
+    });
+
+    it('does not read a singular Employee-titled document as a count', () => {
+        const hits = w12({
+            id: 'r2', client: 'KTD Select', clientId: 'c-1', standard: 'ISO 9001:2015',
+            executiveSummary: 'Sampled 4 Employee Training records against the competence requirement.',
+            checklistProgress: []
+        });
+        expect(hits).toHaveLength(0);
+    });
+
+    it('still warns on a genuinely stated headcount that disagrees with the profile', () => {
+        const hits = w12({
+            id: 'r3', client: 'KTD Select', clientId: 'c-1', standard: 'ISO 9001:2015',
+            checklistProgress: [{ status: 'conform', comment: '4 now total employees confirmed at the opening meeting.' }]
+        });
+        expect(hits.length).toBeGreaterThan(0);
+        expect(hits[0].message).toContain('4 employees');
+    });
+});
+
+// W25 — a finding cited against a bare top-level clause number ("7", "9")
+// when the KB's own inventory for the audited standard shows that parent
+// has subclauses. The permanent fix for the live defect that triggered this
+// rule ("Clause 7 (Management)" cited on a Minor NC — ISO 9001:2015 Clause 7
+// spans 7.1 Resources through 7.5 Documented information).
+describe('W25 — bare parent-clause citation against a KB clause inventory', () => {
+    function kbWithClause7Subclauses() {
+        return {
+            standards: [{
+                name: 'ISO 9001:2015',
+                status: 'ready',
+                clauses: [
+                    { clause: '7', title: 'Support' },
+                    { clause: '7.1', title: 'Resources' },
+                    { clause: '7.2', title: 'Competence' },
+                    { clause: '7.3', title: 'Awareness' },
+                    { clause: '7.4', title: 'Communication' },
+                    { clause: '7.5', title: 'Documented information' },
+                    // Clause 9 is present but deliberately carries no children,
+                    // to prove a bare parent that IS a genuine KB leaf stays silent.
+                    { clause: '9', title: 'Performance evaluation' }
+                ]
+            }]
+        };
+    }
+
+    beforeEach(() => {
+        window.state = { auditReports: [], ncrs: [], clients: [], auditPlans: [], knowledgeBase: kbWithClause7Subclauses() };
+    });
+
+    function w25(warnings) {
+        return warnings.filter((w) => String(w.id || '').indexOf('W25') === 0);
+    }
+
+    it('a Minor NC cited as bare "7" trips the warning and lists the KB subclauses', () => {
+        const report = baseReport({
+            standard: 'ISO 9001:2015',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: '7', department: 'Management', comment: 'Insufficient competence records on file for the process.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: { auditType: 'Surveillance' }, client: baseClient() });
+
+        const hits = w25(result.warnings);
+        expect(hits).toHaveLength(1);
+        expect(hits[0].severity).toBe('warning');
+        expect(hits[0].message).toContain('Clause 7');
+        expect(hits[0].message).toContain('7.1');
+        expect(hits[0].message).toContain('7.5');
+    });
+
+    it('a finding correctly cited against subclause "7.2" does not trip the warning', () => {
+        const report = baseReport({
+            standard: 'ISO 9001:2015',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: '7.2', department: 'Management', comment: 'Insufficient competence records on file for the process.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: { auditType: 'Surveillance' }, client: baseClient() });
+
+        expect(w25(result.warnings)).toHaveLength(0);
+    });
+
+    it('an Observation cited as bare "7" also trips the warning (not just NC/OFI)', () => {
+        const report = baseReport({
+            standard: 'ISO 9001:2015',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'observation', clause: '7', department: 'Management', comment: 'Training plan review noted for the department this cycle.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: { auditType: 'Surveillance' }, client: baseClient() });
+
+        expect(w25(result.warnings)).toHaveLength(1);
+    });
+
+    it('a bare parent clause with NO KB inventory for the standard raises nothing', () => {
+        window.state.knowledgeBase = undefined; // no KB at all
+        const report = baseReport({
+            standard: 'ISO 9001:2015',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: '7', department: 'Management', comment: 'Insufficient competence records on file for the process.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: { auditType: 'Surveillance' }, client: baseClient() });
+
+        expect(w25(result.warnings)).toHaveLength(0);
+    });
+
+    it('a bare parent clause that is a genuine leaf in the KB (no subclauses recorded) raises nothing', () => {
+        const report = baseReport({
+            standard: 'ISO 9001:2015',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: '9', department: 'Management', comment: 'Analysis of customer satisfaction data was incomplete for the period.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: { auditType: 'Surveillance' }, client: baseClient() });
+
+        expect(w25(result.warnings)).toHaveLength(0);
+    });
+
+    it('a FOCUS.n internal tracking reference is skipped — not double-reported alongside B1', () => {
+        const report = baseReport({
+            standard: 'ISO 9001:2015',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: 'FOCUS.2', department: 'Management', comment: 'Insufficient competence records on file for the process.' }
+            ]
+        });
+        const result = window.ReportIntegrity.check({ report, auditPlan: { auditType: 'Surveillance' }, client: baseClient() });
+
+        expect(w25(result.warnings)).toHaveLength(0);
     });
 });

@@ -1035,6 +1035,19 @@
             let m;
             re.lastIndex = 0;
             while ((m = re.exec(text)) !== null) {
+                // Same two guards as findEvidenceEmployeeCounts in
+                // execution-module-v2.js, and they must stay identical: the
+                // integrity panel raises the warning and the Review Employee
+                // Count modal offers the fix, so the two reading "stated
+                // headcount" differently strands the auditor with a warning
+                // whose fix dialog cannot see its cause. "FORM-004 Employee
+                // Training Record" read as "4 employees" is the case that
+                // proved it.
+                const prevChar = m.index > 0 ? text.charAt(m.index - 1) : '';
+                if (/[-/._#]/.test(prevChar)) continue;
+                const employeeWord = (m[0].match(/empl\w*$/i) || [''])[0];
+                const tailText = text.slice(m.index + m[0].length);
+                if (!/s$/i.test(employeeWord) && /^\s+(training|competenc|handbook|record|matrix|register|file|induction|onboard|appraisal)/i.test(tailText)) continue;
                 const n = parseInt(m[1], 10);
                 if (!isNaN(n) && found.indexOf(n) === -1) found.push(n);
             }
@@ -1714,6 +1727,164 @@
         ));
     }
 
+    // W25 — a finding cited against a bare top-level clause number ("7", "9",
+    // "8" — no dot) when the Knowledge Base's own clause inventory for the
+    // audited standard shows that parent has subclauses (e.g. ISO 9001:2015
+    // Clause 7 spans 7.1 Resources through 7.5 Documented information). A
+    // certification report must cite the most specific applicable requirement;
+    // a bare parent clause is not defensible to an accreditation assessor —
+    // this is the permanent, product-level fix for the live defect that
+    // triggered this rule ("Clause 7 (Management)" cited on a Minor NC).
+    // Warning, not blocker, for the same reason B13's comment gives: a false
+    // block is worse than a missed warning, and a parent-clause citation is a
+    // precision defect, not a factual contradiction like B15/B18/B19 above.
+    // Deliberately conservative — raises nothing rather than guessing:
+    //   - only fires on kind === 'standard' (classifyCriterion already routes
+    //     internal FOCUS/SURV/ORG/DOC refs to 'internal' and programme/17021
+    //     criteria to 'programme' — those are different problems with their
+    //     own checks (B1/B15/W20) and must not be double-reported here);
+    //   - only fires when the audited standard has a ready, populated KB
+    //     inventory AND that inventory actually carries subclauses under the
+    //     cited parent — no KB, or a parent that is genuinely a leaf in the
+    //     KB, produces no warning at all.
+    const BARE_PARENT_CLAUSE_RE = /^\d{1,2}$/;
+
+    // Mirrors KB_HELPERS.normalizeStdName (ai-service.js) — duplicated, not
+    // shared, because this file must stand alone (evaluated directly in
+    // tests, and usable even when ai-service.js/settings-kb.js haven't
+    // loaded yet) exactly as B15 above resolves its own path through
+    // ReportStats rather than reaching into another module's helper.
+    function normalizeStdNameLocal(name) {
+        return String(name || '').toLowerCase()
+            .replace(/iso\/iec/g, 'iso')
+            .replace(/iso\s*/g, '')
+            .replace(/[:\-–]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    // Locate the audited standard's ready, populated KB clause inventory —
+    // same two-direction normalized-name matching as
+    // ai-service.js's _findReadyKBStandardDoc()/KB_HELPERS.lookupKBRequirement().
+    // Returns null (never throws, never guesses) when the KB has nothing
+    // usable for this standard.
+    function kbStandardDoc(standardName) {
+        const kb = global.state && global.state.knowledgeBase;
+        const name = trim(standardName);
+        if (!kb || !Array.isArray(kb.standards) || !kb.standards.length || !name) return null;
+        const normStd = normalizeStdNameLocal(name);
+        if (!normStd) return null;
+        const ready = kb.standards.filter((s) => s && s.status === 'ready' && Array.isArray(s.clauses) && s.clauses.length > 0);
+        return ready.find((s) => normalizeStdNameLocal(s.name).indexOf(normStd) !== -1)
+            || ready.find((s) => normStd.indexOf(normalizeStdNameLocal(s.name)) !== -1)
+            || null;
+    }
+
+    // The immediate subclauses the KB records under `parent` (e.g. "7" ->
+    // ["7.1","7.2",...]), derived from every clause entry that descends from
+    // it regardless of how deep the KB's own hierarchy goes — a KB that only
+    // carries "7.1.2" (no "7.1" entry of its own) still proves "7.1" exists.
+    function kbSubclausesOf(stdDoc, parent) {
+        const parentDepth = parent.split('.').length;
+        const found = {};
+        safeArr(stdDoc && stdDoc.clauses).forEach((c) => {
+            const cl = trim(c && c.clause);
+            if (!cl || cl.indexOf(parent + '.') !== 0) return;
+            const child = cl.split('.').slice(0, parentDepth + 1).join('.');
+            found[child] = true;
+        });
+        return Object.keys(found).sort((a, b) => {
+            const pa = a.split('.').map(Number);
+            const pb = b.split('.').map(Number);
+            for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                const diff = (pa[i] || 0) - (pb[i] || 0);
+                if (diff) return diff;
+            }
+            return 0;
+        });
+    }
+
+    // Every observation/OFI with its full criterion fields (clause,
+    // criterionRef, criterionSource) — allAdvisoriesWithClause() above only
+    // keeps a resolved clause string, which loses criterionSource and so
+    // cannot be run through classifyCriterion the way this check needs.
+    function advisoryFindingsRaw(report) {
+        return safeArr(report && report.checklistProgress)
+            .map((i, idx) => ((i && lower(i.status) === 'nc' && ['observation', 'ofi'].includes(lower(i.ncrType)))
+                ? {
+                    clause: i.clause || '',
+                    criterionRef: i.criterionRef,
+                    criterionSource: i.criterionSource,
+                    department: i.department,
+                    checklistId: i.checklistId,
+                    itemIdx: i.itemIdx,
+                    _source: 'checklist',
+                    _label: lower(i.ncrType) === 'ofi' ? 'OFI' : 'Observation',
+                    _idx: idx
+                }
+                : null))
+            .filter(Boolean);
+    }
+
+    function checkW25BareParentClauseCitation(input, results) {
+        const { report, auditPlan, ncrs } = input;
+        if (!(global.ReportStats && typeof global.ReportStats.classifyCriterion === 'function')) return;
+        const standardName = trim((report && report.standard) || (auditPlan && auditPlan.standard));
+        if (!standardName) return;
+        const stdDoc = kbStandardDoc(standardName);
+        if (!stdDoc) return; // no usable KB inventory for this standard — never guess
+
+        function evaluate(finding) {
+            let classified;
+            try {
+                classified = global.ReportStats.classifyCriterion(finding);
+            } catch (_e) { return null; }
+            if (classified.kind !== 'standard') return null; // internal/programme/unverified: not this rule's problem
+            const ref = trim(classified.ref);
+            if (!BARE_PARENT_CLAUSE_RE.test(ref)) return null;
+            const subclauses = kbSubclausesOf(stdDoc, ref);
+            if (!subclauses.length) return null; // parent is a genuine leaf in this KB — nothing to refine to
+            return { ref, subclauses };
+        }
+
+        function subclauseList(subclauses) {
+            return subclauses.map((sc) => {
+                const entry = stdDoc.clauses.find((c) => trim(c && c.clause) === sc);
+                return (entry && entry.title) ? `${sc} (${entry.title})` : sc;
+            }).join(', ');
+        }
+
+        ncrs.forEach((ncr, idx) => {
+            const hit = evaluate(ncr);
+            if (!hit) return;
+            const label = lower(ncr.ncrType) === 'major' ? 'Major nonconformity' : 'Minor nonconformity';
+            const dept = trim(ncr.department);
+            results.warnings.push(item(
+                'W25-nc-' + idx,
+                'warning',
+                'findings',
+                `${label}${dept ? ' (' + dept + ')' : ''} is cited against Clause ${hit.ref} alone, but Clause ${hit.ref} of ${stdDoc.name || standardName} comprises subclauses ${subclauseList(hit.subclauses)} per the Knowledge Base. A certification report must cite the most specific applicable subclause — a bare parent-clause citation is not defensible to an accreditation assessor.`,
+                ncr._source === 'manual' ? 'manual NCR register' : 'checklist finding',
+                `Open the Review Criteria screen and refine the citation to the specific subclause of Clause ${hit.ref} that the objective evidence supports.`,
+                findingRef(ncr, idx)
+            ));
+        });
+
+        advisoryFindingsRaw(report).forEach((adv) => {
+            const hit = evaluate(adv);
+            if (!hit) return;
+            const dept = trim(adv.department);
+            results.warnings.push(item(
+                'W25-adv-' + adv._idx,
+                'warning',
+                'findings',
+                `${adv._label}${dept ? ' (' + dept + ')' : ''} is cited against Clause ${hit.ref} alone, but Clause ${hit.ref} of ${stdDoc.name || standardName} comprises subclauses ${subclauseList(hit.subclauses)} per the Knowledge Base. A certification report must cite the most specific applicable subclause — a bare parent-clause citation is not defensible to an accreditation assessor.`,
+                'checklist finding',
+                `Open the Review Criteria screen and refine the citation to the specific subclause of Clause ${hit.ref} that the objective evidence supports.`
+            ));
+        });
+    }
+
     // I1-I4 information items
 
     function checkInformation(report, results) {
@@ -1800,6 +1971,7 @@
         try { checkW22ClauseTitleInconsistent(report, results); } catch (_e) { /* skip */ }
         try { checkB20ConclusionOmitsContingency(report, ncrs, results); } catch (_e) { /* skip */ }
         try { checkW24PreviousFindingsClosureContradiction({ report, auditPlan, client }, results); } catch (_e) { /* skip */ }
+        try { checkW25BareParentClauseCitation({ report, auditPlan, ncrs }, results); } catch (_e) { /* skip */ }
 
         try { checkInformation(report, results); } catch (_e) { /* skip */ }
 

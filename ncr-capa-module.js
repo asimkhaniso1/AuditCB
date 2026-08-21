@@ -1620,7 +1620,7 @@ window.viewNCRDetails = function (ncrId) {
             <h4>${window.UTILS.escapeHtml(ncr.description)}</h4>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                 <div><strong>Standard:</strong> ${window.UTILS.escapeHtml(ncr.standard)}</div>
-                <div><strong>Clause:</strong> ${window.UTILS.escapeHtml(ncr.clause)}</div>
+                <div><strong>Clause:</strong> ${window.UTILS.escapeHtml(resolveClauseDisplay(ncr).text)}</div>
                 <div><strong>Severity:</strong> ${window.UTILS.escapeHtml(ncr.severity)}</div>
                 <div><strong>Status:</strong> ${window.UTILS.escapeHtml(ncr.status)}</div>
                 <div><strong>Client:</strong> ${window.UTILS.escapeHtml(ncr.clientName)}</div>
