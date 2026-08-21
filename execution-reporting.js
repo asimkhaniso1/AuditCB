@@ -4111,6 +4111,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             +   'p,li,td{orphans:3;widows:3;}'
             +   'h1,h2,h3,h4{break-after:avoid;page-break-after:avoid;}'
             +   'table{break-inside:auto;}'
+            // A short table that fits on one page stays on one page — a lone
+            // final row on the next page reads as an error in a controlled
+            // document. Paragraph orphans/widows and a heading row separated
+            // from its body are the same class of defect.
+            +   '.keep-together{break-inside:avoid;page-break-inside:avoid;}'
+            +   'p,li{orphans:3;widows:3;}'
+            +   'thead{break-after:avoid;page-break-after:avoid;}'
             +   '.chart-box,.b4-chart-box,canvas,img{break-inside:avoid;page-break-inside:avoid;max-width:100% !important;}'
             +   '.b4-kpi-card,.b4-card,.b4-callout,.b4-insight-card,.ev-card{break-inside:avoid;page-break-inside:avoid;}'
             // Paper has no scrollbars: neutralize inline scroll containers so content
@@ -4358,7 +4365,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (secMap['audit-programme'] ? '<div id="sec-audit-programme" class="sh" style="border-left-color:#0ea5e9;">' + sBadge('audit-programme') + 'AUDIT PROGRAMME</div><div class="sb">'
                 + '<div style="font-size:0.85rem;color:#475569;margin-bottom:12px;">Planned audit activities across the 3-year certification cycle, ' + programmeAnchorCaptionExport(auditProgramme) + '.</div>'
                 + (auditProgramme.issues && auditProgramme.issues.length ? '<div style="font-size:0.8rem;color:#92400e;background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 12px;margin-bottom:12px;border-radius:4px;">' + auditProgramme.issues.map(function (i) { return window.UTILS.escapeHtml(i); }).join('<br>') + '</div>' : '')
-                + '<table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:22%;">Audit Stage</th><th style="width:14%;">Planned Timing</th><th style="width:44%;">Focus &amp; Scope</th><th style="width:20%;text-align:center;">Status</th></tr></thead><tbody>'
+                + '<table class="f-tbl keep-together"><thead><tr style="background:#eff6ff;"><th style="width:22%;">Audit Stage</th><th style="width:14%;">Planned Timing</th><th style="width:44%;">Focus &amp; Scope</th><th style="width:20%;text-align:center;">Status</th></tr></thead><tbody>'
                 + programmeStages.map(function (s) {
                     const editedMap = { 'rp-prog-s1': editedProgS1, 'rp-prog-s2': editedProgS2, 'rp-prog-sv1': editedProgSv1, 'rp-prog-sv2': editedProgSv2, 'rp-prog-recert': editedProgRecert };
                     const editedTxt = editedMap[s.editId] || s.def;

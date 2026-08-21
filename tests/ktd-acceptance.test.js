@@ -1089,3 +1089,66 @@ describe('KTD acceptance #33 — the corrected report issues cleanly', () => {
         });
     });
 });
+
+// Final client-release QA on the KTD report surfaced two statements the
+// formal executive summary must never make.
+//
+// 1. "Evidence-attachment coverage across applicable items is 46%; 6
+//    finding(s) currently lack supporting evidence." — that is the audit
+//    TEAM's upload completeness, an internal control, and a client reads it
+//    as a finding against them.
+// 2. "…the audit team has high confidence in continued conformity…" on an
+//    audit carrying four open minor NCs — the fallback read only the
+//    conformity percentage, so open findings never tempered it.
+describe('Executive summary fallback — client-release wording', () => {
+    // Self-contained: the corrected-report fixture lives inside another
+    // describe and is out of scope here.
+    const qaReport = () => ({
+        id: 'r-qa', client: 'KTD Select', clientId: 'ktd-1', planId: 'plan-ktd',
+        standard: 'ISO 9001:2015', date: '2026-08-14', auditType: 'Surveillance',
+        reportStatus: 'draft', executiveSummary: '', positiveObservations: '', ofi: []
+    });
+    function progressWith(minorCount) {
+        const minors = ['9.2', '8.2.2', '7.5.3', '9.1.3'].slice(0, minorCount).map((clause, i) =>
+            ncItem({ clause, department: ['Quality', 'Sales', 'Documentation', 'Management'][i], evidenceImages: [] }));
+        const conform = Array.from({ length: 12 }, (_, i) => ({
+            status: 'conform', clause: '5.' + (i + 1), department: 'Operations', comment: 'Conforms.', evidenceImages: []
+        }));
+        return minors.concat(conform);
+    }
+    function fallback(minorCount) {
+        const d = { report: qaReport(), client: KTD_CLIENT(), auditPlan: KTD_PLAN(), hydratedProgress: progressWith(minorCount), stats: {} };
+        return window.ReportExecutive.fallbackExecSummaryData(d);
+    }
+
+    it('makes continued conformity conditional when minor NCs are open', () => {
+        const out = fallback(4).forwardOutlook;
+        expect(out).toContain('Continued conformity is dependent upon satisfactory corrective action');
+        expect(out).toContain('four identified minor nonconformities');
+        expect(out).toContain('within the required timeframe');
+        expect(out).not.toMatch(/high confidence/i);
+    });
+
+    it('uses the singular for one open minor NC', () => {
+        expect(fallback(1).forwardOutlook).toContain('the identified minor nonconformity within');
+    });
+
+    it('keeps the confidence wording for a clean, highly conforming audit', () => {
+        expect(fallback(0).forwardOutlook).toMatch(/high confidence in continued conformity/);
+    });
+
+    it('never states evidence-attachment coverage as a client concern', () => {
+        // Every item above carries no evidence, so attachment coverage is 0%
+        // — the exact condition that used to push the sentence.
+        const concerns = fallback(4).concerns.join(' | ');
+        expect(concerns).not.toMatch(/evidence-attachment/i);
+        expect(concerns).not.toMatch(/lack supporting evidence/i);
+    });
+
+    it('holds the AI draft to the same no-confidence rule', () => {
+        const d = { report: qaReport(), client: KTD_CLIENT(), auditPlan: KTD_PLAN(), hydratedProgress: progressWith(4), stats: {} };
+        const prompt = window.ReportExecutive.buildExecSummaryPrompt(d);
+        expect(prompt).toMatch(/where ANY nonconformity is open, do NOT assert high or strong confidence/);
+        expect(prompt).toMatch(/Confidence language is only permitted when there are zero open nonconformities/);
+    });
+});
