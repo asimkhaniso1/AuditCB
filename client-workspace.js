@@ -1717,8 +1717,11 @@ window.initClientDashboardCharts = function (clientId) {
 
         // Build monthly data from NCR register for this client
         const clientNCRs = (window.state.ncrs || []).filter(n =>
-            (n.clientId && String(n.clientId) === String(client.id)) ||
-            (n.clientName && n.clientName.trim().toLowerCase() === client.name.trim().toLowerCase())
+            // Withdrawn records are superseded duplicates kept for traceability;
+            // charting them double-counts a single finding.
+            String(n.status || '').toLowerCase() !== 'withdrawn' &&
+            ((n.clientId && String(n.clientId) === String(client.id)) ||
+             (n.clientName && n.clientName.trim().toLowerCase() === client.name.trim().toLowerCase()))
         );
 
         // Group by month

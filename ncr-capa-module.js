@@ -92,7 +92,22 @@ function bumpCarStatus(selected, autoStatus) {
 
 // Render <option> elements for the extended CAR status vocabulary, grouped
 // into sensible stages.
-function carStatusOptionsHTML(selected) {
+//
+// opts.hideVerdicts (used by editNCR/updateCAPAProgress's general status
+// dropdown) drops 'Effective' and 'Closed' from the offered choices. Those
+// two are verification VERDICTS, not just workflow stages, and must only be
+// reached through window.verifyCAPA, which records verificationMethod,
+// effectiveness, verifiedBy and verifiedDate together as one act. Offering
+// them on a plain status dropdown let an auditor flip a record straight to
+// "Closed" with none of that evidence on file — a CAPA closed with no record
+// of who verified it worked, or how. `selected` is always still offered even
+// when hideVerdicts is set, so a record already sitting in one of those
+// states (closed via the proper flow earlier, or migrated data) doesn't lose
+// its own current value off its own edit form — only moving INTO the state
+// via this dropdown is blocked.
+function carStatusOptionsHTML(selected, opts) {
+    const hideVerdicts = !!(opts && opts.hideVerdicts);
+    const dropVerdict = (s) => hideVerdicts && s !== selected && (s === 'Effective' || s === 'Closed');
     const groups = [
         { label: 'Intake', values: ['Draft', 'Correction Pending'] },
         { label: 'Root Cause & Planning', values: ['RCA Pending', 'Plan Pending', 'Approved'] },
@@ -100,9 +115,13 @@ function carStatusOptionsHTML(selected) {
         { label: 'Verification', values: ['Verification Pending', 'Effective', 'Ineffective'] },
         { label: 'Closure', values: ['Closed', 'Reopened', 'Withdrawn'] }
     ];
-    return groups.map(g => `<optgroup label="${g.label}">${g.values.map(s =>
-        `<option value="${s}" ${selected === s ? 'selected' : ''}>${s}</option>`
-    ).join('')}</optgroup>`).join('');
+    return groups.map(g => {
+        const values = g.values.filter(s => !dropVerdict(s));
+        if (values.length === 0) return '';
+        return `<optgroup label="${g.label}">${values.map(s =>
+            `<option value="${s}" ${selected === s ? 'selected' : ''}>${s}</option>`
+        ).join('')}</optgroup>`;
+    }).join('');
 }
 
 window.NCRModule = window.NCRModule || {};
@@ -110,6 +129,7 @@ window.NCRModule.CAR_STATUSES = CAR_STATUSES;
 window.NCRModule.normalizeCarStatus = normalizeCarStatus;
 window.NCRModule.legacyStatusFromCar = legacyStatusFromCar;
 window.NCRModule.computeAutoCarStatus = computeAutoCarStatus;
+window.NCRModule.carStatusOptionsHTML = carStatusOptionsHTML;
 window.normalizeCarStatus = normalizeCarStatus;
 
 // Helper: is this NCR excluded from active counts/views (withdrawn by checklist auto-sync)?
@@ -160,6 +180,30 @@ function renderClauseCell(rec) {
     return `<span class="badge bg-gray">${window.UTILS.escapeHtml(d.text)}</span>`;
 }
 window.NCRModule.resolveClauseDisplay = resolveClauseDisplay;
+
+// --------------------------------------------
+// AUDIT ATTRIBUTION (register + CAPA tracker rows)
+// Both tables show every non-Withdrawn record for the active client scope
+// (matchesActiveNCRClient below) — ACROSS every audit that client has ever
+// had, not just whichever audit is currently open in Execution. That's a
+// legitimate design for a running CAPA register, but with no way to see which
+// audit engagement raised a given row, an auditor reviewing (say) 20 register
+// rows for a client has no way to tell "this client genuinely has that many
+// findings across several real audits" apart from "the same audit's findings
+// got counted twice." Resolves auditId (FK -> audit_plans.id) to a short
+// human label. Falls back to the raised date alone when there's no linked
+// plan on file (legacy/manually-entered records), so the column is never
+// blank on a legitimate record — there's just no audit-type label to show.
+function resolveAuditRef(rec) {
+    const plan = (window.state.auditPlans || []).find(p => p && String(p.id) === String(rec && rec.auditId));
+    if (plan) {
+        const kind = plan.auditType || plan.type || 'Audit';
+        const when = plan.date || plan.startDate || (rec && rec.raisedDate) || '';
+        return when ? `${kind} — ${window.UTILS.formatDate(when)}` : kind;
+    }
+    return (rec && rec.raisedDate) ? window.UTILS.formatDate(rec.raisedDate) : '-';
+}
+window.NCRModule.resolveAuditRef = resolveAuditRef;
 
 // --------------------------------------------
 // SHARED CONTRACT: capaDisplayStatus / isOverdue
@@ -791,7 +835,7 @@ function getNCRRegisterHTML() {
                     </div>
                     <div class="form-group" style="margin: 0;">
                         <label style="font-size: 0.85rem; margin-bottom: 0.3rem;">Search</label>
-                        <input type="text" class="form-control" id="filter-search" placeholder="Search..." onkeyup="filterNCRs()" style="font-size: 0.9rem;">
+                        <input type="text" class="form-control" id="filter-search" placeholder="Search..." data-action-input="filterNCRs" style="font-size: 0.9rem;">
                     </div>
                 </div>
             </div>
@@ -818,6 +862,7 @@ function renderNCRTable(ncrs) {
                     <th>NCR#</th>
                     <th>Level</th>
                     <th>Client</th>
+                    <th>Audit</th>
                     <th>Clause</th>
                     <th>Severity</th>
                     <th>Description</th>
@@ -843,6 +888,7 @@ function renderNCRTable(ncrs) {
                                 </span>
                             </td>
                             <td>${window.UTILS.escapeHtml(ncr.clientName || 'N/A')}</td>
+                            <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(resolveAuditRef(ncr))}</td>
                             <td>${renderClauseCell(ncr)}</td>
                             <td>
                                 <span class="badge" style="background: ${ncr.severity === 'Major' ? '#dc2626' : ncr.severity === 'Minor' ? '#f59e0b' : '#3b82f6'}; color: white;">
@@ -1101,6 +1147,7 @@ function getCAPATrackerHTML() {
                         <tr>
                             <th>NCR#</th>
                             <th>Client</th>
+                            <th>Audit</th>
                             <th>Severity</th>
                             <th>Root Cause</th>
                             <th>Corrective Action</th>
@@ -1114,6 +1161,7 @@ function getCAPATrackerHTML() {
                             <tr>
                                 <td><strong>NCR-${String(ncr.id).padStart(3, '0')}</strong></td>
                                 <td>${window.UTILS.escapeHtml(ncr.clientName || '')}</td>
+                                <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(resolveAuditRef(ncr))}</td>
                                 <td>
                                     <span class="badge" style="background: ${ncr.severity === 'Major' ? '#dc2626' : '#f59e0b'}; color: white;">
                                         ${ncr.severity}
@@ -1590,7 +1638,13 @@ window.viewNCRDetails = function (ncrId) {
 
 window.editNCR = function (ncrId) {
     const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
-    if (!ncr) return;
+    if (!ncr) {
+        // Silent returns are why "the Edit button does nothing" was reported
+        // rather than diagnosed.
+        window.showNotification && window.showNotification(
+            'That nonconformity could not be found in the register — refresh and try again.', 'error');
+        return;
+    }
 
     document.getElementById('modal-title').textContent = 'Edit NCR';
     document.getElementById('modal-body').innerHTML = `
@@ -1616,9 +1670,9 @@ window.editNCR = function (ncrId) {
                 </div>
                 <div class="form-group"><label>Status</label>
                     <select id="edit-status" class="form-control">
-                        ${carStatusOptionsHTML(ncr.carStatus === 'Ineffective' ? 'Reopened' : (ncr.carStatus || normalizeCarStatus(ncr.status)))}
+                        ${carStatusOptionsHTML(ncr.carStatus === 'Ineffective' ? 'Reopened' : (ncr.carStatus || normalizeCarStatus(ncr.status)), { hideVerdicts: true })}
                     </select>
-                    ${ncr.carStatus === 'Ineffective' ? '<small style="color: var(--danger-color);"><i class="fa-solid fa-triangle-exclamation"></i> Prior verification was Not Effective — this NCR reopens with a new action plan required.</small>' : ''}
+                    ${ncr.carStatus === 'Ineffective' ? '<small style="color: var(--danger-color);"><i class="fa-solid fa-triangle-exclamation"></i> Prior verification was Not Effective — this NCR reopens with a new action plan required.</small>' : '<small style="color: var(--text-secondary);">To close this record, use the register\'s Verify action — it records who verified effectiveness and how.</small>'}
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -1756,8 +1810,12 @@ window.deleteNCR = async function (id) {
 window.printNCRRegister = function () {
     // Printed register must match what's on screen — scope it the same way
     // every tab does, so printing from inside a client workspace can never
-    // put another client's NCRs on paper.
-    const ncrs = (window.state.ncrs || []).filter(matchesActiveNCRClient);
+    // put another client's NCRs on paper. This previously stopped at the
+    // client filter and skipped the Withdrawn exclusion getNCRRegisterHTML()
+    // applies on screen — a superseded/duplicate record (see
+    // reconcileDuplicateNCRs above) would print looking exactly like a live
+    // open finding, with nothing on the page distinguishing it.
+    const ncrs = (window.state.ncrs || []).filter(matchesActiveNCRClient).filter(n => !isWithdrawnNCR(n));
     const printWindow = window.open('', '', 'width=1000,height=700');
 
     printWindow.document.write(`
@@ -1840,12 +1898,24 @@ window.verifyCAPA = function (ncrId) {
             ncr.status = 'Closed';
             ncr.carStatus = 'Closed';
         } else {
-            // Not Effective: the NCR stays open-equivalent (status is left as-is,
-            // NOT bumped to Closed) — this is no longer a silent dead-end. The
-            // carStatus flags Ineffective; editNCR/openAddCAPAModal auto-set
-            // "Reopened" the next time this record is touched, once a new
-            // action plan is recorded.
+            // Not Effective: the NCR stays open-equivalent (never bumped to
+            // Closed) — this is no longer a silent dead-end. The carStatus
+            // flags Ineffective; editNCR/openAddCAPAModal auto-set "Reopened"
+            // the next time this record is touched, once a new action plan is
+            // recorded.
+            //
+            // legacy `status` must be re-derived here too, same as every other
+            // carStatus-setting site in this file (editNCR, openAddCAPAModal,
+            // updateCAPAProgress all call legacyStatusFromCar right after).
+            // Leaving it untouched used to strand it at whatever it was before
+            // verification — typically still 'Verification' — which kept the
+            // register's status badge reading "awaiting verification" and kept
+            // renderNCRTable's Verify button showing (it triggers on
+            // status==='Verification' && capaImplementedDate) side-by-side with
+            // the correct "Add CAPA" button, on a record that had in fact
+            // already been verified and failed.
             ncr.carStatus = 'Ineffective';
+            ncr.status = legacyStatusFromCar(ncr.carStatus);
             window.showNotification('CAPA verified as Not Effective — a new corrective action plan is required for NCR-' + String(ncr.id).padStart(3, '0') + '.', 'warning');
         }
 
@@ -1884,9 +1954,9 @@ window.updateCAPAProgress = function (ncrId) {
             </div>
             <div class="form-group"><label>Status</label>
                 <select id="prog-status" class="form-control">
-                    ${carStatusOptionsHTML(ncr.carStatus === 'Ineffective' ? 'Reopened' : (ncr.carStatus || normalizeCarStatus(ncr.status)))}
+                    ${carStatusOptionsHTML(ncr.carStatus === 'Ineffective' ? 'Reopened' : (ncr.carStatus || normalizeCarStatus(ncr.status)), { hideVerdicts: true })}
                 </select>
-                ${ncr.carStatus === 'Ineffective' ? '<small style="color: var(--danger-color);"><i class="fa-solid fa-triangle-exclamation"></i> Prior verification was Not Effective — a new action plan is required.</small>' : ''}
+                ${ncr.carStatus === 'Ineffective' ? '<small style="color: var(--danger-color);"><i class="fa-solid fa-triangle-exclamation"></i> Prior verification was Not Effective — a new action plan is required.</small>' : '<small style="color: var(--text-secondary);">To close this record, use the register\'s Verify action — it records who verified effectiveness and how.</small>'}
             </div>
         </form>
     `;

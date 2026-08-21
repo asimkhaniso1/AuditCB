@@ -258,6 +258,35 @@
         }
     });
 
+    // ─── Blur Delegation ─────────────────────────────────────────────
+    // Uses focusout, which bubbles; blur does not, so document-level
+    // delegation cannot see it. 'this.innerText' is resolved alongside the
+    // value/checked placeholders because the field that needs this is a
+    // contenteditable, which has no .value at all.
+    document.addEventListener('focusout', function (e) {
+        let target = e.target.closest && e.target.closest('[data-action-blur]');
+        if (!target) return;
+        let action = target.dataset.actionBlur;
+        let fn = window[action];
+        if (typeof fn !== 'function') {
+            if (window.Logger) window.Logger.error('EventDelegator', 'Blur action not found: ' + action);
+            return;
+        }
+        let args = extractArgs(target);
+        if (args.length > 0) {
+            args = args.map(function (a) {
+                if (a === 'this.value') return target.value;
+                if (a === 'this.innerText') return target.innerText;
+                if (a === 'this.checked') return target.checked;
+                if (a === 'this') return target;
+                return a;
+            });
+            fn.apply(null, args);
+        } else {
+            fn.call(target, target, target.dataset, e);
+        }
+    });
+
     // ─── Input Delegation ────────────────────────────────────────────
     document.addEventListener('input', function (e) {
         let target = e.target.closest('[data-action-input]');
