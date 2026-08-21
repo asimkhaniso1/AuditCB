@@ -1961,6 +1961,13 @@ const SupabaseClient = {
                 client_id: checklist.clientId || null,
                 client_name: checklist.clientName || null,
                 clauses: checklist.clauses || [],
+                // The Ready-for-Audit gate's state. Without these the release
+                // record, the auditor's recorded dispositions and the scope the
+                // checklist was judged against exist only in the browser that
+                // made them.
+                ready_for_audit: checklist.readyForAudit || null,
+                resolved_issues: checklist.resolvedIssues || null,
+                qa_context: checklist.qaContext || null,
                 updated_at: new Date().toISOString()
             }));
 
@@ -2012,6 +2019,9 @@ const SupabaseClient = {
                 clientName: checklist.client_name || null,
                 clientId: checklist.client_id || null,
                 clauses: checklist.clauses,
+                readyForAudit: checklist.ready_for_audit || undefined,
+                resolvedIssues: checklist.resolved_issues || undefined,
+                qaContext: checklist.qa_context || undefined,
                 createdAt: checklist.created_at,
                 updatedAt: checklist.updated_at
             }));
