@@ -859,95 +859,224 @@
     // ============================================
 
     // ─── CCI Registry Import ─────────────────────────────────────────
-    // Accepts the JSON export from the CCI (companycertification.com) Supabase:
-    // either nested rows [{...company, certificates:[...]}] (PostgREST) or flat
-    // company+cert join rows (SQL editor json_agg). Only ACTIVE companies are
-    // imported (active === false is skipped). Maps certificate number, standard,
-    // registration/current-issue/expiry dates and scope text (certificates.body).
-    window.importFromCCIJson = function (data) {
-        const rows = Array.isArray(data) ? data : (data.rows || data.companies || []);
+    // Accepts the JSON export from the CCI (companycertification.com) Supabase,
+    // produced by `export_auditcb_clients.js` in the CCI Website repo: nested
+    // rows {companies:[{...company, certificates:[...]}]} / [{...}] or flat
+    // company+cert join rows (SQL editor). Only ACTIVE companies are imported
+    // (active === false is skipped).
+    //
+    //  • Matching: the cciCompanyId stamped by an earlier import wins; otherwise
+    //    a normalised name match (case / punctuation / legal-suffix insensitive,
+    //    so "Visiontech Export Intl (Pvt.) Ltd." is "VISIONTECH EXPORT
+    //    INTERNATIONAL (PVT.) LTD."), then a unique prefix match ("Pakistan Post
+    //    Foundation" is "PAKISTAN POST FOUNDATION (Press Division)").
+    //  • Company details (industry, website, employees, contact, head office)
+    //    only FILL GAPS: a value already held in AuditCB is never overwritten.
+    //  • Certificates belong to the registry: number, standard, dates, status
+    //    and scope are refreshed from CCI on every import, deduped by cert number.
+    //  • CCI standard labels map to the canonical app names
+    //    ("ISO 9001-Quality Management" → "ISO 9001:2015").
+    //  • CCI validity codes: V valid (Expired once the end date has passed),
+    //    S suspended, W withdrawn, R revoked (→ Withdrawn), I / E → Expired.
+
+    const CCI_STANDARD_YEARS = {
+        '9001': '2015', '14001': '2015', '45001': '2018', '27001': '2022', '22000': '2018',
+        '13485': '2016', '50001': '2018', '20000-1': '2018', '22301': '2019', '27701': '2019',
+        '17021-1': '2015', '37001': '2016', '41001': '2018', '55001': '2014', '28000': '2022',
+        '39001': '2012', '42001': '2023', '15189': '2022', '18788': '2015', '29001': '2020'
+    };
+    const CCI_STANDARD_ALIASES = [
+        [/^ce[\s-]*marking/i, 'CE-Marking'],
+        [/^gmp\b/i, 'GMP'],
+        [/^rohs\b/i, 'RoHS'],
+        [/^halal\b/i, 'Halal'],
+        [/^haccp\b/i, 'HACCP'],
+        [/^reach\b/i, 'REACH SVHC'],
+        [/^kosher\b/i, 'Kosher']
+    ];
+    // Legal-form words that differ between the two registers but mean the same company.
+    const CCI_NAME_WORDS = { international: 'intl', private: 'pvt', limited: 'ltd', incorporated: 'inc', corporation: 'corp', company: 'co' };
+    const CCI_LEGAL_SUFFIXES = new Set(['pvt', 'ltd', 'inc', 'llc', 'co', 'corp', 'ag', 'gmbh', 'plc', 'sa', 'llp', 'pte']);
+
+    // Drupal-era text carries HTML entities ("&amp;"), stray tags and CRLFs.
+    function cleanCciText(value) {
+        return String(value == null ? '' : value)
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function mapCciStandard(label) {
+        const raw = cleanCciText(label);
+        if (!raw) return '';
+        const iso = raw.match(/^ISO(?:\/IEC)?\s*(\d+(?:-\d+)?)(?:\s*:\s*(\d{4}))?/i);
+        if (iso) {
+            const num = iso[1];
+            const year = iso[2] || CCI_STANDARD_YEARS[num];
+            return year ? `ISO ${num}:${year}` : `ISO ${num}`;
+        }
+        for (const [re, name] of CCI_STANDARD_ALIASES) {
+            if (re.test(raw)) return name;
+        }
+        return raw; // "Product Safety Certification", "Food Safety Certification", …
+    }
+
+    function mapCciStatus(code, endDate, now) {
+        const c = String(code || '').trim().toUpperCase();
+        const end = endDate ? new Date(endDate) : null;
+        const ref = now instanceof Date ? now : new Date();
+        const expiredByDate = !!(end && !isNaN(end.getTime()) && end.getTime() < ref.getTime());
+        if (c === 'S') return 'Suspended';
+        if (c === 'W' || c === 'R') return 'Withdrawn';
+        if (c === 'V') return expiredByDate ? 'Expired' : 'Active';
+        return 'Expired';
+    }
+
+    function normalizeCompanyName(name) {
+        let s = cleanCciText(name).replace(/\([^)]*\)/g, ' ').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+        s = s.split(' ').map(w => CCI_NAME_WORDS[w] || w).join(' ');
+        if (s.startsWith('the ')) s = s.slice(4);
+        const words = s.split(' ').filter(Boolean);
+        while (words.length > 1 && CCI_LEGAL_SUFFIXES.has(words[words.length - 1])) words.pop();
+        return words.join(' ');
+    }
+
+    function companyNamesMatch(a, b) {
+        const na = normalizeCompanyName(a), nb = normalizeCompanyName(b);
+        if (!na || !nb) return false;
+        if (na === nb) return true;
+        const [short, long] = na.length <= nb.length ? [na, nb] : [nb, na];
+        return short.length >= 10 && long.startsWith(short + ' ');
+    }
+
+    function findClientForCompany(clients, src) {
+        const list = Array.isArray(clients) ? clients : [];
+        const id = src && src.id ? String(src.id) : '';
+        if (id) {
+            const byId = list.find(c => c.cciCompanyId && String(c.cciCompanyId) === id);
+            if (byId) return byId;
+        }
+        // A client already bound to a different CCI company is never a name candidate.
+        const free = list.filter(c => !c.cciCompanyId || String(c.cciCompanyId) === id);
+        const name = (src && (src.name || src.company_name)) || '';
+        const norm = normalizeCompanyName(name);
+        if (!norm) return null;
+        const exact = free.find(c => normalizeCompanyName(c.name) === norm);
+        if (exact) return exact;
+        const prefix = free.filter(c => companyNamesMatch(c.name, name));
+        return prefix.length === 1 ? prefix[0] : null;
+    }
+
+    window.CCIImport = { cleanCciText, mapCciStandard, mapCciStatus, normalizeCompanyName, companyNamesMatch, findClientForCompany };
+
+    window.importFromCCIJson = function (data, opts) {
+        const rows = Array.isArray(data) ? data : ((data && (data.rows || data.companies)) || []);
         if (!rows.length) throw new Error('No records found in JSON');
 
         const S = window.Sanitizer;
-        const statusMap = { V: 'Active', E: 'Expired', S: 'Suspended', W: 'Withdrawn' };
+        const now = opts && opts.now instanceof Date ? opts.now : new Date();
+        const txt = v => S.sanitizeText(cleanCciText(v));
+        const positiveInt = v => { const n = parseInt(v, 10); return n > 0 ? n : 0; };
 
         // Normalize: group flat join rows by company; nested rows pass through.
         const companies = new Map();
         rows.forEach(r => {
             const name = r.name || r.company_name;
             if (!name) return;
-            const key = name.trim().toLowerCase();
-            if (!companies.has(key)) {
-                companies.set(key, { src: r, certs: [] });
-            }
+            const key = normalizeCompanyName(name) || String(name).trim().toLowerCase();
+            if (!companies.has(key)) companies.set(key, { src: r, certs: [] });
             const bucket = companies.get(key);
-            if (Array.isArray(r.certificates)) {
-                bucket.certs.push(...r.certificates);
-            } else if (r.certificate_no || r.applicable_standard) {
-                bucket.certs.push(r);
-            }
+            if (Array.isArray(r.certificates)) bucket.certs.push(...r.certificates);
+            else if (r.certificate_no || r.applicable_standard) bucket.certs.push(r);
         });
 
+        const touched = [];
         let imported = 0, updated = 0, skippedInactive = 0, certCount = 0;
         companies.forEach(({ src, certs }) => {
             if (src.active === false) { skippedInactive++; return; }
-            const name = (src.name || src.company_name).trim();
+            const name = cleanCciText(src.name || src.company_name);
+            // Flat join rows carry the certificate id in `id`; only trust it as the company id on nested rows.
+            const cciId = src.company_id || (Array.isArray(src.certificates) ? src.id : null) || null;
 
-            let client = window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
+            let client = findClientForCompany(window.state.clients, { id: cciId, name });
             if (client) { updated++; }
             else {
                 client = { id: crypto.randomUUID(), name: S.sanitizeText(name), status: 'Active', contacts: [], sites: [], certificates: [] };
                 window.state.clients.push(client);
                 imported++;
             }
-
-            if (src.industry) client.industry = S.sanitizeText(src.industry);
-            if (src.website) client.website = S.sanitizeURL(src.website);
-            if (src.total_employees) client.employees = parseInt(src.total_employees, 10) || client.employees;
-            if (src.group_name) client.groupName = S.sanitizeText(src.group_name);
+            if (cciId) client.cciCompanyId = cciId;
             client.source = 'CCI';
+            client.cciSyncedAt = now.toISOString();
+
+            // Company details: fill gaps only, never overwrite what AuditCB already holds.
+            if (!client.industry && src.industry) client.industry = txt(src.industry);
+            if (!client.website && src.website) client.website = S.sanitizeURL(String(src.website).trim());
+            if (!positiveInt(client.employees) && positiveInt(src.total_employees)) client.employees = positiveInt(src.total_employees);
+            if (!client.groupName && src.group_name && !/^\d+$/.test(String(src.group_name).trim())) client.groupName = txt(src.group_name);
 
             if (src.contact_name || src.email) {
-                const contact = { name: S.sanitizeText(src.contact_name || ''), email: S.sanitizeEmail(src.email || ''), role: 'Primary Contact' };
-                if (client.contacts && client.contacts.length) client.contacts[0] = { ...client.contacts[0], ...contact };
-                else client.contacts = [contact];
-            }
-            if (src.address || src.country) {
-                const site = { name: 'Head Office', address: S.sanitizeText(src.address || ''), country: S.sanitizeText(src.country || ''), employees: parseInt(src.total_employees, 10) || 0 };
-                if (client.sites && client.sites.length) client.sites[0] = { ...client.sites[0], ...site };
-                else client.sites = [site];
+                if (!Array.isArray(client.contacts)) client.contacts = [];
+                const primary = client.contacts[0] || { name: '', email: '', phone: '', role: 'Primary Contact' };
+                if (!primary.name && src.contact_name) primary.name = txt(src.contact_name);
+                if (!primary.email && src.email) primary.email = S.sanitizeEmail(String(src.email).trim());
+                if (!primary.role && !primary.designation) primary.role = 'Primary Contact';
+                client.contacts[0] = primary;
             }
 
-            // Certificates with scope + dates
-            if (!client.certificates) client.certificates = [];
+            const certAddress = (certs.find(c => c && c.address) || {}).address;
+            const address = src.address || certAddress;
+            if (address || src.country) {
+                if (!Array.isArray(client.sites)) client.sites = [];
+                const office = client.sites[0] || { name: 'Head Office', address: '', city: '', country: '', employees: 0 };
+                if (!office.name) office.name = 'Head Office';
+                if (!office.address && address) office.address = txt(address);
+                if (!office.country && src.country) office.country = txt(src.country);
+                if (!positiveInt(office.employees) && positiveInt(src.total_employees)) office.employees = positiveInt(src.total_employees);
+                client.sites[0] = office;
+            }
+            const siteName = (client.sites && client.sites[0] && client.sites[0].name) || 'Head Office';
+
+            // Certificates: the registry is the record of truth, refreshed every import.
+            if (!Array.isArray(client.certificates)) client.certificates = [];
             const stds = new Set((client.standard || '').split(',').map(s => s.trim()).filter(Boolean));
             certs.forEach((cert, i) => {
-                const std = S.sanitizeText(cert.applicable_standard || '');
-                const certNo = S.sanitizeText(cert.certificate_no || '');
+                if (!cert) return;
+                const std = mapCciStandard(cert.applicable_standard);
+                const certNo = cleanCciText(cert.certificate_no);
                 if (!std && !certNo) return;
                 if (std) stds.add(std);
                 let existing = client.certificates.find(c =>
                     (certNo && c.certificateNo === certNo) || (!certNo && std && c.standard === std));
                 if (!existing) {
-                    existing = { id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 100000) + '-' + i, siteScopes: {} };
+                    existing = { id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 100000) + '-' + i, revision: '00', siteScopes: {} };
                     client.certificates.push(existing);
                 }
                 existing.standard = std || existing.standard;
                 existing.certificateNo = certNo || existing.certificateNo;
-                existing.status = statusMap[cert.validity_status] || existing.status || 'Active';
+                existing.status = mapCciStatus(cert.validity_status, cert.issue_end_date, now);
                 existing.initialDate = cert.registration_date || existing.initialDate || '';
                 existing.currentIssue = cert.current_issue_date || existing.currentIssue || '';
                 existing.expiryDate = cert.issue_end_date || existing.expiryDate || '';
-                const scope = (cert.scope || cert.body || '').trim();
+                // Scope is stored raw like the Settings editor does (updateSiteScope), not HTML-escaped.
+                const scope = cleanCciText(cert.scope || cert.body);
                 if (scope) {
                     existing.scope = scope;
                     if (!existing.siteScopes) existing.siteScopes = {};
-                    existing.siteScopes['Head Office'] = scope;
+                    existing.siteScopes[siteName] = scope;
                 }
+                if (cert.applicable_standard) existing.cciLabel = cleanCciText(cert.applicable_standard);
+                if (cert !== src && cert.id) existing.cciCertificateId = cert.id;
+                if (cert.url_path && /^\/[a-z0-9\-_/.]+$/i.test(String(cert.url_path))) existing.registryUrl = 'https://companycertification.com' + cert.url_path;
                 existing.client = client.name;
                 certCount++;
             });
             if (stds.size) client.standard = Array.from(stds).join(', ');
+            // The head office carries the standards so the per-site scope annex renders.
+            if (client.sites && client.sites[0] && !client.sites[0].standards && client.standard) client.sites[0].standards = client.standard;
+            touched.push(client);
         });
 
         window.saveData();
@@ -955,11 +1084,7 @@
 
         // Push to cloud (client jsonb + individual certificates)
         if (window.SupabaseClient?.isInitialized) {
-            companies.forEach(({ src }) => {
-                if (src.active === false) return;
-                const name = (src.name || src.company_name).trim();
-                const client = window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
-                if (!client) return;
+            touched.forEach(client => {
                 window.DataService.syncClient(client, { saveLocal: false, silent: true });
                 (client.certificates || []).forEach(cert => {
                     window.SupabaseClient.upsertCertificate(cert).catch(err => console.error('Cert sync failed:', cert.certificateNo, err));
@@ -967,6 +1092,7 @@
             });
         }
         if (typeof window.renderClientsEnhanced === 'function') window.renderClientsEnhanced();
+        return { imported, updated, certCount, skippedInactive };
     };
 
     window.openImportAccountSetupModal = function (clientId) {
