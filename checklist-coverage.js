@@ -327,6 +327,9 @@
         plans.forEach(function (p) { planIds[String(p.id)] = true; });
         const findings = arr(state.ncrs).filter(function (n) {
             if (!n) return false;
+            // A superseded duplicate is not a previous audit result and must
+            // not drive control selection as though it were one.
+            if (String(n.status || '').toLowerCase() === 'withdrawn') return false;
             if (n.auditId != null && planIds[String(n.auditId)]) return true;
             return forClient(n) && inCycle(n.raisedDate || n.dateRaised || n.createdAt || n.date);
         });

@@ -1055,7 +1055,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <td><span style="background: ${ncr.status === window.CONSTANTS.STATUS.CLOSED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.status || 'Open'}</span></td>
                                         <td>${ncr.source === 'manual'
                     ? `<button class="btn btn-sm" style="color: var(--primary-color);" data-action="editExecutionNCR" data-arg1="${report.id}" data-arg2="${idx - checklistNCRs.length < 0 ? idx : idx}" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>`
-                    : `<button class="btn btn-sm" style="color: #8b5cf6;" title="Edit in Checklist tab" data-action="showNotification" data-arg1="Edit this NCR in the Checklist tab where it was raised" data-arg2="info"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
+                    : `<button class="btn btn-sm" style="color: #8b5cf6;" title="Open the checklist item that raised this" data-action="openNCRInChecklist" data-arg1="${window.UTILS.escapeHtml(String(ncr.sourceChecklistId == null ? '' : ncr.sourceChecklistId))}" data-arg2="${window.UTILS.escapeHtml(String(ncr.sourceItemIdx == null ? '' : ncr.sourceItemIdx))}" data-arg2="info"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
                 }</td>
                                     </tr>
                                 `).join('') : `
@@ -4446,6 +4446,51 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     window.saveChecklist = saveChecklist;
     window.createNCR = createNCR;
     window.editExecutionNCR = editExecutionNCR;
+
+    /**
+     * Open the checklist item a nonconformity was raised from.
+     *
+     * A checklist-raised NCR is not editable in the NCR table — its wording and
+     * classification belong to the checklist item that produced it. The action
+     * button said so in a toast and then did nothing, leaving the auditor to
+     * find the item themselves among a hundred-odd rows. The record already
+     * carries sourceChecklistId and sourceItemIdx, which is exactly the id the
+     * checklist row is rendered with, so it can simply go there.
+     */
+    window.openNCRInChecklist = function (sourceChecklistId, sourceItemIdx) {
+        const checklistId = String(sourceChecklistId == null ? '' : sourceChecklistId).trim();
+        const itemIdx = String(sourceItemIdx == null ? '' : sourceItemIdx).trim();
+        if (!checklistId || !itemIdx) {
+            window.showNotification('This nonconformity does not record which checklist item raised it, so it cannot be opened automatically.', 'warning');
+            return;
+        }
+
+        const checklistTab = document.querySelector('.tab-btn[data-tab="checklist"]');
+        if (!checklistTab) {
+            window.showNotification('The Checklist tab is not available on this screen.', 'warning');
+            return;
+        }
+        checklistTab.click();
+
+        // The tab renders synchronously, but the row lives inside an accordion
+        // that may be collapsed — open it before scrolling, or the item is
+        // scrolled to while it has no height and the auditor lands nowhere.
+        setTimeout(function () {
+            const row = document.getElementById('row-' + checklistId + '-' + itemIdx);
+            if (!row) {
+                window.showNotification('That checklist item is no longer in this audit — the checklist may have been rebuilt since the nonconformity was raised.', 'warning');
+                return;
+            }
+            const section = row.closest('.accordion-content');
+            if (section && section.style.display === 'none') section.style.display = 'block';
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // A brief highlight so the item is findable once the scroll settles.
+            const previousBorder = row.style.borderLeftColor;
+            row.style.borderLeftColor = '#8b5cf6';
+            row.style.transition = 'border-left-color 0.4s';
+            setTimeout(function () { row.style.borderLeftColor = previousBorder; }, 2500);
+        }, 80);
+    };
     window.createCAPA = createCAPA;
     // Note: submitForReview, publishReport, revertToDraft, saveReportDraft,
     //       generateAIConclusion, generateAuditReport are now in reporting-module.js

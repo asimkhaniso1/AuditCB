@@ -922,6 +922,9 @@
         const claimedIds = {};
         registerAll.forEach((n) => {
             if (!n) return;
+            // Superseded duplicates are retained in the register for
+            // traceability and must never reach a report figure.
+            if (String(n.status || '').toLowerCase() === 'withdrawn') return;
             if (planId != null && n.auditId != null && String(n.auditId) === String(planId)) {
                 linkedRegister.push(n);
                 if (n.id != null) claimedIds[String(n.id)] = true;

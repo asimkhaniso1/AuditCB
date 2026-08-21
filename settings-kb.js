@@ -2148,7 +2148,7 @@ window.viewKBAnalysis = function (docId) {
                                         </div>
                                         <div style="color: #475569; font-size: 0.82rem; line-height: 1.5; padding-left: 0.5rem; border-left: 3px solid #e2e8f0; margin-left: 0.25rem;"
                                              contenteditable="true" 
-                                             onblur="window.updateKBSection('${doc.id}', '${c.clause}', this.innerText)" 
+                                             data-action-blur="updateKBSection" data-arg1="${window.UTILS.escapeHtml(String(doc.id))}" data-arg2="${window.UTILS.escapeHtml(String(c.clause))}" data-arg3="this.innerText" 
                                              title="Click to edit"
                                              style="cursor: text;">
                                             ${window.UTILS.escapeHtml(c.requirement)}

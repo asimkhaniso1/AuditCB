@@ -581,6 +581,9 @@
         const clientKey = report && report.clientId != null ? String(report.clientId) : null;
         const linked = registerAll.filter((n) => {
             if (!n) return false;
+            // A withdrawn duplicate has no root cause and never needed one —
+            // warning about it sends the auditor to fix a superseded record.
+            if (String(n.status || '').toLowerCase() === 'withdrawn') return false;
             if (report && report.planId != null && n.auditId != null && String(n.auditId) === String(report.planId)) return true;
             if (clientKey && n.clientId != null && String(n.clientId) === clientKey) return true;
             return false;
