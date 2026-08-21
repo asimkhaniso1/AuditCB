@@ -572,6 +572,15 @@ async function persistNCR(ncr) {
         car_status: ncr.carStatus || null,
         criterion_ref: ncr.criterionRef || null,
         criterion_source: ncr.criterionSource || null,
+        // The checklist finding this record was raised from. fetchNCRs already
+        // read these back and carried them across refetches within a session,
+        // but nothing ever WROTE them, so every fresh sign-in loaded a register
+        // with no identity on any record. The next checklist save then could not
+        // recognise its own findings, fell through to an exact-text match, and
+        // minted a duplicate for any finding whose wording had since changed.
+        // Columns from migrations/ADD_NCR_SOURCE_IDENTITY.sql.
+        source_checklist_id: ncr.sourceChecklistId != null ? String(ncr.sourceChecklistId) : null,
+        source_item_idx: ncr.sourceItemIdx != null ? String(ncr.sourceItemIdx) : null,
         risk_likelihood: ncr.riskLikelihood != null ? ncr.riskLikelihood : null,
         risk_impact: ncr.riskImpact != null ? ncr.riskImpact : null,
         evidence: ncr.evidence || []
@@ -595,9 +604,22 @@ async function persistNCR(ncr) {
             if (data && data[0]) ncr.id = data[0].id; // Assign the new DB ID
         }
 
-        // Refresh local state and UI
+        // Refresh local state, and the UI only if the NCR module is what is on
+        // screen.
+        //
+        // This used to repaint the NCR & CAPA module unconditionally. The
+        // checklist save path persists every synced finding through here, so
+        // saving from Review & Submit — or from the employee-count dialog, or
+        // any Report Integrity fix action — ended with the NCR Register
+        // replacing the screen the auditor was working on. Being async, it
+        // landed after the caller had already restored its own tab, which is
+        // why "it jumps to the register on save" survived that earlier fix.
+        // #ncr-content exists only while this module is rendered, so its
+        // presence is the test for "the user is looking at the register".
         await window.fetchNCRs();
-        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+        if (document.getElementById('ncr-content')) {
+            renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+        }
 
     } catch (error) {
         console.error('Failed to sync NCR:', error);

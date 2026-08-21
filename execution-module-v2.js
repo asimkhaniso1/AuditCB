@@ -197,16 +197,22 @@ window.NCRSyncUtils.applyCriterionToFinding = applyCriterionToFinding;
  * @returns {Array<{index, item, clause, requirement, status, ncrType, suggestedRef,
  *   confidence, basis, blocksIssuance}>} ordered blockers-first
  */
-function collectUnconfirmedCriteria(report) {
+function collectUnconfirmedCriteria(report, opts) {
     if (!report) return [];
+    // includeAssigned: list every finding, not only the unassigned ones. An
+    // assigned criterion can be WRONG — a competence finding filed under 9.2
+    // Internal audit — and a bare parent clause ("7") is a real clause that
+    // W25 rightly flags. Both need changing, and the review screen is the
+    // only control that writes a criterion; excluding assigned items from it
+    // left no way back once a wrong clause was saved.
+    const includeAssigned = !!(opts && opts.includeAssigned);
     const pseudo = window.NCR_PSEUDO_CLAUSE_PATTERN || /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
     const isRegisterSeverity = (t) => ['major', 'minor'].includes(String(t || '').toLowerCase());
     const out = [];
 
     (report.checklistProgress || []).forEach((item, index) => {
         if (!item) return;
-        if (String(item.criterionRef || '').trim()) return; // already assigned
-
+        const currentRef = String(item.criterionRef || '').trim();
         const clause = String(item.clause || '').trim();
 
         // Canonical decision on what KIND of reference this is, when the
@@ -216,13 +222,27 @@ function collectUnconfirmedCriteria(report) {
         if (window.ReportStats && typeof window.ReportStats.classifyCriterion === 'function') {
             try { kind = window.ReportStats.classifyCriterion(item).kind; } catch (_e) { kind = null; }
         }
-        if (kind) {
-            // 'standard' needs nothing; 'programme' must never be given a
-            // clause of the audited standard.
-            if (kind !== 'internal' && kind !== 'none') return;
-        } else if (clause && !pseudo.test(clause)) {
-            return;
+        // A certification-programme criterion (ISO/IEC 17021-1 9.6.2) must
+        // never be given a clause of the audited standard, in either mode.
+        if (kind === 'programme') return;
+        const rawReal = kind === 'standard' || (!kind && clause && !pseudo.test(clause));
+        if (includeAssigned) {
+            // Assigned, or a finding on a real clause: changeable. A conforming
+            // item on a real clause has nothing to review.
+            if (!currentRef && rawReal && item.status !== 'nc') return;
+            if (!currentRef && !rawReal && kind && kind !== 'internal' && kind !== 'none') return;
+        } else {
+            if (currentRef) return; // already assigned
+            if (kind) {
+                // 'standard' needs nothing; 'programme' was excluded above.
+                if (kind !== 'internal' && kind !== 'none') return;
+            } else if (clause && !pseudo.test(clause)) {
+                return;
+            }
         }
+        // What the report currently prints for this finding: the assigned
+        // criterion, else the raw clause when that is itself a real one.
+        const effectiveRef = currentRef || (rawReal ? clause : '');
 
         out.push({
             index,
@@ -238,13 +258,17 @@ function collectUnconfirmedCriteria(report) {
             // on; an observation, OFI or conforming item is attribution quality,
             // not a gate. Sorting on it puts the ones that actually stop the
             // report from issuing at the top of the review.
-            blocksIssuance: item.status === 'nc' && isRegisterSeverity(item.ncrType)
+            blocksIssuance: item.status === 'nc' && isRegisterSeverity(item.ncrType),
+            currentRef: effectiveRef,
+            assigned: !!effectiveRef
         });
     });
 
     const CONF_RANK = { medium: 0, low: 1, none: 2 };
+    // Unassigned first — those are the gaps; assigned rows follow for review.
     return out.sort((a, b) =>
-        (b.blocksIssuance ? 1 : 0) - (a.blocksIssuance ? 1 : 0)
+        (a.assigned ? 1 : 0) - (b.assigned ? 1 : 0)
+        || (b.blocksIssuance ? 1 : 0) - (a.blocksIssuance ? 1 : 0)
         || (CONF_RANK[a.confidence] ?? 3) - (CONF_RANK[b.confidence] ?? 3)
         || a.index - b.index);
 }
@@ -3418,8 +3442,19 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // stop issuance.
         const panelReport = state.auditReports.find(r => String(r.id) === String(reportId));
         const unassigned = panelReport ? collectUnconfirmedCriteria(panelReport) : [];
-        if (!unassigned.length) return '';
         const blocks = unassigned.filter(u => u.blocksIssuance).length;
+        if (!unassigned.length) {
+            // Nothing unassigned — but an assigned criterion can still be
+            // wrong, and this is the only control that can change one. Hiding
+            // it left the auditor with a W25 warning pointing at a screen
+            // that no longer existed.
+            return `<div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:0.9rem;">
+                    <div style="flex:1;min-width:220px;font-size:0.85rem;color:#334155;">Every finding carries a criterion. Review or change any assignment here — a bare parent clause, or a clause the evidence does not support.</div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="reviewAllCriteria" data-id="${esc(String(reportId))}" aria-label="Review or change criteria">
+                        <i class="fa-solid fa-list-check" style="margin-right: 0.3rem;"></i>Review / change criteria
+                    </button>
+                </div>`;
+        }
         return `<div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;background:${blocks ? '#fef2f2' : '#f8fafc'};border:1px solid ${blocks ? '#fee2e2' : '#e2e8f0'};border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1rem;">
                     <div style="flex:1;min-width:220px;font-size:0.85rem;color:#334155;">
                         <strong>${unassigned.length} finding(s)</strong> carry an internal reference (FOCUS/ORG/DOC) with no assigned criterion${blocks ? ` — <strong style="color:#991b1b;">${blocks} block issuance</strong>` : ''}.
@@ -3774,11 +3809,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
         if (!report) { window.showNotification('Report not found.', 'error'); return; }
 
-        const entries = collectUnconfirmedCriteria(report);
+        const entries = collectUnconfirmedCriteria(report, { includeAssigned: true });
         if (!entries.length) {
-            window.showNotification('Every finding already carries an assigned criterion.', 'success');
+            window.showNotification('This report has no findings to assign a criterion to.', 'info');
             return;
         }
+        const unassignedCount = entries.filter(e => !e.assigned).length;
 
         const esc = window.UTILS.escapeHtml;
         const blocking = entries.filter(e => e.blocksIssuance).length;
@@ -3796,7 +3832,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <td style="padding:0.55rem 0.5rem;vertical-align:top;white-space:nowrap;font-family:monospace;font-weight:700;font-size:0.82rem;">${esc(e.clause)}</td>
                 <td style="padding:0.55rem 0.5rem;vertical-align:top;">
                     <div style="font-size:0.82rem;color:#334155;line-height:1.45;">${esc(e.requirement.slice(0, 220))}${e.requirement.length > 220 ? '…' : ''}</div>
-                    <div style="margin-top:0.3rem;display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">${sevLabel}<span class="rac-conf-badge" data-row="${i}">${criterionConfidenceBadge(e)}</span></div>
+                    <div style="margin-top:0.3rem;display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">${e.currentRef ? '<span style="background:#f1f5f9;color:#334155;font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9px;font-family:monospace;" title="What the report prints today">current: ' + esc(e.currentRef) + '</span>' : ''}${sevLabel}<span class="rac-conf-badge" data-row="${i}">${criterionConfidenceBadge(e)}</span></div>
                 </td>
                 <td style="padding:0.55rem 0.5rem;vertical-align:top;white-space:nowrap;">
                     <div class="rac-proposal-slot" data-row="${i}">${e.suggestedRef ? `<label style="display:flex;gap:0.35rem;align-items:center;font-size:0.78rem;cursor:pointer;margin-bottom:0.3rem;">
@@ -3804,13 +3840,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     </label>` : ''}</div>
                     <input type="text" class="form-control rac-input" data-row="${i}" data-index="${e.index}"
                         style="margin:0;font-size:0.82rem;padding:4px 8px;width:120px;font-family:monospace;"
-                        placeholder="e.g. 8.5.2" value="">
+                        placeholder="e.g. 8.5.2" value="${esc(e.currentRef || '')}" data-current="${esc(e.currentRef || '')}">
                     <div class="rac-warning" data-row="${i}" style="display:none;color:#dc2626;font-size:0.7rem;margin-top:0.2rem;"></div>
                 </td>
             </tr>`;
         }).join('');
 
-        window.DataService.openFormModal('Review Criteria — ' + entries.length + ' unassigned', `
+        window.DataService.openFormModal('Review Criteria — ' + unassignedCount + ' unassigned, ' + (entries.length - unassignedCount) + ' to review', `
             <div style="font-size:0.85rem;color:#475569;margin-bottom:0.75rem;line-height:1.5;">
                 These findings carry an internal working reference (FOCUS/ORG/DOC), not a clause of the audited standard.
                 ${blocking ? '<strong style="color:#991b1b;">' + blocking + ' of them block issuance</strong> and are listed first. ' : ''}
@@ -3853,6 +3889,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (warnEl) { warnEl.style.display = 'none'; warnEl.textContent = ''; }
                 const value = Sanitizer.sanitizeText(input.value || '').trim();
                 if (!value) return; // skipped row
+                // An unchanged prefilled value is a review, not an edit.
+                if (value === String(input.getAttribute('data-current') || '').trim()) return;
 
                 if (window.NCR_PSEUDO_CLAUSE_PATTERN.test(value)) {
                     if (warnEl) { warnEl.textContent = 'Internal reference, not a clause.'; warnEl.style.display = 'block'; }
@@ -3873,7 +3911,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 return;
             }
             if (!pending.length) {
-                window.showNotification('No criteria entered — nothing was changed.', 'info');
+                window.showNotification('No criteria changed — nothing was written.', 'info');
                 return;
             }
 
@@ -3885,7 +3923,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             });
 
             window.closeModal();
-            persistAndRefreshIntegrity(reportId, 'Assigned criteria to ' + applied + ' finding(s).');
+            persistAndRefreshIntegrity(reportId, 'Criteria written for ' + applied + ' finding(s).');
         });
 
         // "use <suggestion>" ticks copy the proposal into that row's input.
