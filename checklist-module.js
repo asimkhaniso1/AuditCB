@@ -2497,13 +2497,35 @@ function recountChecklist(checklist) {
 /** Persist a mutated checklist locally and, when connected, to Supabase. */
 function persistChecklist(checklist) {
     window.saveData();
-    if (window.SupabaseClient && window.SupabaseClient.isInitialized && window.SupabaseClient.db) {
-        Promise.resolve(window.SupabaseClient.db.update('checklists', String(checklist.id), {
-            data: checklist, updated_at: new Date().toISOString()
-        })).catch(err => {
-            if (window.Logger) window.Logger.error('Checklists', 'Cloud update failed: ' + err.message);
-        });
-    }
+    if (!(window.SupabaseClient && window.SupabaseClient.isInitialized && window.SupabaseClient.db)) return;
+    // Column-by-column, because the checklists table has no generic `data`
+    // column. Writing one made every gate action — release, remove question,
+    // assign clause, record justification, add controls, supply the SoA —
+    // fail with a 400 that was caught, logged and swallowed, so the auditor
+    // saw a saved release that had only ever reached local state.
+    //
+    // ready_for_audit / resolved_issues / qa_context are added by
+    // migrations/ADD_CHECKLIST_GATE_COLUMNS.sql; on a database that has not
+    // run it yet this write fails the same way, which is why the failure is
+    // now reported rather than only logged.
+    Promise.resolve(window.SupabaseClient.db.update('checklists', String(checklist.id), {
+        name: checklist.name,
+        standard: checklist.standard,
+        type: checklist.type || 'custom',
+        audit_type: checklist.auditType || null,
+        audit_scope: checklist.auditScope || null,
+        client_id: checklist.clientId || null,
+        client_name: checklist.clientName || null,
+        clauses: checklist.clauses || [],
+        archived: !!checklist.archived,
+        ready_for_audit: checklist.readyForAudit || null,
+        resolved_issues: checklist.resolvedIssues || null,
+        qa_context: checklist.qaContext || null,
+        updated_at: new Date().toISOString()
+    })).catch(err => {
+        if (window.Logger) window.Logger.error('Checklists', 'Cloud update failed: ' + err.message);
+        window.showNotification('Saved on this device, but the cloud update failed — run ADD_CHECKLIST_GATE_COLUMNS.sql if this persists.', 'warning');
+    });
 }
 
 /**

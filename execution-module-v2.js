@@ -1205,7 +1205,26 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             let primaryActionBtn;
 
-            if (report.status === window.CONSTANTS.STATUS.FINALIZED || report.status === window.CONSTANTS.STATUS.PUBLISHED) {
+            // Whether the report has actually been ISSUED, which is what decides
+            // between offering issuance and offering the issued PDF.
+            //
+            // reportStatus is the issued flag; report.status is the broader
+            // workflow state, and the two can disagree. A report that was
+            // finalized and then reverted to draft kept report.status at
+            // 'Finalized', so this screen went on offering "Download PDF" and
+            // never rendered Finalize & Publish — while the preview's own toggle
+            // refuses to act on a draft and points the auditor at that missing
+            // button. The report became impossible to issue by any route.
+            //
+            // Records predating the reportStatus field carry no issued flag at
+            // all, so those still fall back to the workflow state rather than
+            // being offered re-issuance of a report that was already issued.
+            const issuedFlag = String(report.reportStatus == null ? '' : report.reportStatus).trim().toLowerCase();
+            const isIssued = issuedFlag
+                ? issuedFlag === 'final'
+                : (report.status === window.CONSTANTS.STATUS.FINALIZED || report.status === window.CONSTANTS.STATUS.PUBLISHED);
+
+            if (isIssued) {
                 primaryActionBtn = `
                     <button class="btn btn-secondary" data-action="generateAuditReport" data-id="${report.id}" aria-label="Export PDF">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Download PDF
