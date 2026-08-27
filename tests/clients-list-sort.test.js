@@ -49,6 +49,37 @@ beforeEach(() => {
     };
 });
 
+describe('deleting a duplicate client', () => {
+    // Linked records carry the client NAME, so a name-based cascade would take
+    // the surviving twin's audits with it.
+    beforeEach(() => {
+        window.state.clients = [
+            { id: 'keep', name: 'B&K International', status: 'Active' },
+            { id: 'copy', name: 'B&K International', status: 'Active' }
+        ];
+        window.state.auditPlans = [{ id: 'p1', clientId: 'keep', client: 'B&K International' }];
+        window.state.auditReports = [{ id: 'r1', client: 'B&K International' }];
+        window.state.auditPrograms = [];
+        window.state.certificationDecisions = [];
+        globalThis.confirm = () => true;
+    });
+
+    it('keeps the twin\'s records when deleting the copy', async () => {
+        await window.deleteClient('copy');
+        expect(window.state.clients.map(c => c.id)).toEqual(['keep']);
+        expect(window.state.auditPlans).toHaveLength(1);
+        expect(window.state.auditReports).toHaveLength(1);   // name-linked, so preserved
+    });
+
+    it('still cascades by name once no twin remains', async () => {
+        await window.deleteClient('copy');
+        await window.deleteClient('keep');
+        expect(window.state.clients).toEqual([]);
+        expect(window.state.auditPlans).toHaveLength(0);
+        expect(window.state.auditReports).toHaveLength(0);
+    });
+});
+
 describe('client list sorting', () => {
     it('opens sorted by name ascending, case-insensitively', () => {
         const { names } = renderAndReadNames();
