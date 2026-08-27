@@ -9,7 +9,6 @@ window.Sanitizer = {
     sanitizeEmail: s => (s ? String(s).trim() : ''),
     sanitizeURL: s => (s ? String(s) : '')
 };
-window.UTILS = { escapeHtml: s => String(s == null ? '' : s) };
 window.state = { clients: [] };
 window.saveData = () => { };
 window.showNotification = () => { };
@@ -20,6 +19,9 @@ if (!globalThis.crypto || typeof globalThis.crypto.randomUUID !== 'function') {
 
 const fs = await import('fs');
 const path = await import('path');
+// utils.js first: it owns canonicalStandard, the single standard-label table the
+// importer and every standards picker share.
+eval(fs.readFileSync(path.resolve('./utils.js'), 'utf8'));
 // The trailing CommonJS export block names functions that live in sibling files (openNewClientModal, ...),
 // so it is stripped before eval; only the window.* surface is exercised here.
 const clientsImportSrc = fs.readFileSync(path.resolve('./clients-import.js'), 'utf8')
@@ -84,6 +86,32 @@ describe('CCIImport.mapCciStandard — CCI labels become the canonical app names
         [null, '']
     ])('%s → %s', (label, expected) => {
         expect(CCI.mapCciStandard(label)).toBe(expected);
+    });
+});
+
+describe('UTILS.isStandardSelected — the pickers tick a chip whatever spelling is stored', () => {
+    it('ticks the chip for a raw registry label left by an older import', () => {
+        expect(window.UTILS.isStandardSelected('ISO 9001-Quality Management', 'ISO 9001:2015')).toBe(true);
+        expect(window.UTILS.isStandardSelected('ISO 9001-Quality Management, ISO 14001-Environment Mgmt.', 'ISO 14001:2015')).toBe(true);
+        expect(window.UTILS.isStandardSelected('CE Marking / EU Directive', 'CE-Marking')).toBe(true);
+        expect(window.UTILS.isStandardSelected('GMP - Good Manufacturing Practice', 'GMP')).toBe(true);
+    });
+    it('ticks a bare number against the edition-stamped chip, and vice versa', () => {
+        expect(window.UTILS.isStandardSelected('ISO 9001', 'ISO 9001:2015')).toBe(true);
+        expect(window.UTILS.isStandardSelected('ISO 9001:2015', 'ISO 9001')).toBe(true);
+        expect(window.UTILS.isStandardSelected('ISO/IEC 27001:2022', 'ISO 27001:2022')).toBe(true);
+    });
+    it('does not tick a different standard, a superstring, or an empty option', () => {
+        expect(window.UTILS.isStandardSelected('ISO 9001:2015', 'ISO 14001:2015')).toBe(false);
+        expect(window.UTILS.isStandardSelected('ISO 20000-1:2018', 'ISO 20000')).toBe(false);
+        expect(window.UTILS.isStandardSelected('', 'ISO 9001:2015')).toBe(false);
+        expect(window.UTILS.isStandardSelected('ISO 9001:2015', '')).toBe(false);
+        expect(window.UTILS.isStandardSelected(null, 'ISO 9001:2015')).toBe(false);
+    });
+    it('keeps custom standards intact and matches them exactly', () => {
+        expect(window.UTILS.canonicalStandard('Product Safety Certification')).toBe('Product Safety Certification');
+        expect(window.UTILS.isStandardSelected('Product Safety Certification, ISO 9001:2015', 'Product Safety Certification')).toBe(true);
+        expect(window.UTILS.parseStandards('ISO 9001-Quality Management , ISO 45001-Health & Safety Mgmt.')).toEqual(['ISO 9001:2015', 'ISO 45001:2018']);
     });
 });
 
