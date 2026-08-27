@@ -106,6 +106,22 @@ describe('CCIImport.mapCciStatus — every live validity code lands in the app v
     });
 });
 
+describe('CCIImport.websiteFromEmail — company mail domain becomes the website, free providers never do', () => {
+    it.each([
+        ['Rubeena@skincarepakistan.com', 'https://skincarepakistan.com'],
+        ['usman@salsoft.net', 'https://salsoft.net'],
+        ['info@ppf.com.pk', 'https://ppf.com.pk'],
+        ['albasit_facilities786@hotmail.com', ''],
+        ['abdulqs508@gmail.com', ''],
+        ['someone@outlook.com', ''],
+        ['not-an-email', ''],
+        ['', ''],
+        [null, '']
+    ])('%s → %s', (email, expected) => {
+        expect(CCI.websiteFromEmail(email)).toBe(expected);
+    });
+});
+
 describe('CCIImport name matching — the same company spelled two ways is one client', () => {
     it.each([
         ['Visiontech Export Intl (Pvt.) Ltd.', 'VISIONTECH EXPORT INTERNATIONAL (PVT.) LTD.'],
@@ -190,6 +206,14 @@ describe('importFromCCIJson — a fresh registry export', () => {
         expect(statuses).toEqual({ '22PK9031': 'Expired', '22PK9030': 'Expired' });
     });
 
+    it('derives the website from the company email domain, but not from a free mailbox', () => {
+        window.importFromCCIJson({ companies: [salsoft(), visiontech()] }, { now: NOW });
+        const sal = window.state.clients.find(c => /SALSOFT/.test(c.name));
+        expect(sal.website).toBe('https://salsoft.net');
+        const vt = window.state.clients.find(c => /VISIONTECH/.test(c.name));
+        expect(vt.website).toBeUndefined();          // gmail address → no website invented
+    });
+
     it('accepts flat SQL join rows (company columns repeated per certificate)', () => {
         const rows = [
             { company_name: 'SHAKIL TRADERS', country: 'Pakistan', certificate_no: '25PK9020', applicable_standard: 'Halal Certification', registration_date: '2025-01-23', issue_end_date: '2099-01-22', validity_status: 'V', body: 'Trading of spices' },
@@ -252,6 +276,64 @@ describe('importFromCCIJson — against clients that already exist in AuditCB', 
         expect(result).toEqual({ imported: 0, updated: 1, certCount: 1, skippedInactive: 0 });
         expect(window.state.clients).toHaveLength(1);
         expect(window.state.clients[0].standard).toBe('ISO 9001:2015, ISO 27001:2022');
+    });
+
+    it('heals raw CCI labels left behind by the pre-mapping importer', () => {
+        // The first production import ran before the label mapping existed, so
+        // client.standard and site.standards hold "ISO 9001-Quality Management".
+        window.state.clients.push({
+            id: 'ab', name: 'AL-BASIT FACILITIES MANAGEMENT (PVT.) LIMITED.', status: 'Active',
+            standard: 'ISO 9001-Quality Management', website: '',
+            contacts: [{ name: 'Muhammad Amjad', email: 'albasit_facilities786@hotmail.com', role: 'Primary Contact' }],
+            sites: [{ name: 'Head Office', country: 'Pakistan', standards: 'ISO 9001-Quality Management' }],
+            certificates: [{ id: 'CERT-old', standard: 'ISO 9001-Quality Management', certificateNo: '22PK9016', status: 'Active', siteScopes: {} }]
+        });
+        const result = window.importFromCCIJson({
+            companies: [{
+                id: 'co-albasit', name: 'AL-BASIT FACILITIES MANAGEMENT (PVT.) LIMITED.', active: true, country: 'Pakistan',
+                email: 'albasit_facilities786@hotmail.com',
+                certificates: [{ id: 'k-ab', certificate_no: '22PK9016', applicable_standard: 'ISO 9001-Quality Management', registration_date: '2022-05-30', current_issue_date: '2026-05-30', issue_end_date: '2099-05-29', validity_status: 'V', scope: 'Facilities management services' }]
+            }]
+        }, { now: NOW });
+
+        expect(result).toEqual({ imported: 0, updated: 1, certCount: 1, skippedInactive: 0 });
+        const c = window.state.clients.find(x => x.id === 'ab');
+        expect(c.standard).toBe('ISO 9001:2015');                    // label healed, no duplicate entry
+        expect(c.sites[0].standards).toBe('ISO 9001:2015');
+        expect(c.website).toBe('');                                  // hotmail → nothing invented
+        const cert = c.certificates.find(k => k.certificateNo === '22PK9016');
+        expect(c.certificates).toHaveLength(1);
+        expect(cert.id).toBe('CERT-old');
+        expect(cert.standard).toBe('ISO 9001:2015');
+    });
+
+    it('decodes the HTML-escaped text the pre-fix importer stored ("FD&amp;C" printing bug)', () => {
+        window.state.clients.push({
+            id: 'fdc', name: 'FD&amp;C (Private) Limited.', status: 'Active',
+            standard: 'ISO 9001-Quality Management, ISO 14001-Environment Mgmt.',
+            industry: 'IT &amp; Technology',
+            contacts: [{ name: 'Mr. Shahid &amp; Co', email: '', role: 'Primary Contact' }],
+            sites: [{ name: 'Head Office', address: 'F-116 SITE &amp; Annex, Karachi', country: 'Pakistan', standards: 'ISO 9001-Quality Management' }],
+            certificates: []
+        });
+        const result = window.importFromCCIJson({
+            companies: [{
+                id: 'co-fdc', name: 'FD&C (Private) Limited.', active: true, country: 'Pakistan', industry: 'Manufacturing',
+                certificates: [{ id: 'k-fdc', certificate_no: '22PK9017', applicable_standard: 'ISO 9001-Quality Management', registration_date: '2022-06-03', current_issue_date: '2026-06-03', issue_end_date: '2099-06-02', validity_status: 'V', scope: 'Fragrances & flavours' }]
+            }]
+        }, { now: NOW });
+
+        expect(result).toEqual({ imported: 0, updated: 1, certCount: 1, skippedInactive: 0 });
+        expect(window.state.clients).toHaveLength(1);
+        const c = window.state.clients.find(x => x.id === 'fdc');
+        expect(c.name).toBe('FD&C (Private) Limited.');
+        expect(c.industry).toBe('IT & Technology');             // decoded in place, not overwritten
+        expect(c.contacts[0].name).toBe('Mr. Shahid & Co');
+        expect(c.sites[0].address).toBe('F-116 SITE & Annex, Karachi');
+        expect(c.standard).toBe('ISO 9001:2015, ISO 14001:2015');
+        expect(c.sites[0].standards).toBe('ISO 9001:2015');
+        expect(c.certificates[0].scope).toBe('Fragrances & flavours');
+        expect(c.certificates[0].client).toBe('FD&C (Private) Limited.');
     });
 
     it('is idempotent: a second import adds no certificates and picks up a status change', () => {

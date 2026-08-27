@@ -969,7 +969,19 @@
         return prefix.length === 1 ? prefix[0] : null;
     }
 
-    window.CCIImport = { cleanCciText, mapCciStandard, mapCciStatus, normalizeCompanyName, companyNamesMatch, findClientForCompany };
+    // A mailbox on a free provider never stands for the company website.
+    const FREE_MAIL_DOMAINS = new Set([
+        'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.co.uk', 'outlook.com', 'live.com',
+        'msn.com', 'yahoo.com', 'yahoo.co.uk', 'ymail.com', 'aol.com', 'icloud.com', 'me.com',
+        'proton.me', 'protonmail.com', 'mail.com', 'gmx.com', 'gmx.de', 'zoho.com', 'rediffmail.com'
+    ]);
+    function websiteFromEmail(email) {
+        const m = String(email || '').trim().toLowerCase().match(/^[^@\s]+@([a-z0-9.-]+\.[a-z]{2,})$/);
+        if (!m || FREE_MAIL_DOMAINS.has(m[1])) return '';
+        return 'https://' + m[1];
+    }
+
+    window.CCIImport = { cleanCciText, mapCciStandard, mapCciStatus, normalizeCompanyName, companyNamesMatch, findClientForCompany, websiteFromEmail };
 
     window.importFromCCIJson = function (data, opts) {
         const rows = Array.isArray(data) ? data : ((data && (data.rows || data.companies)) || []);
@@ -977,7 +989,9 @@
 
         const S = window.Sanitizer;
         const now = opts && opts.now instanceof Date ? opts.now : new Date();
-        const txt = v => S.sanitizeText(cleanCciText(v));
+        // Stored as clean RAW text (tags stripped, entities decoded) — HTML escaping
+        // belongs to the render layer. Escaping here made "FD&C" print as "FD&amp;C".
+        const txt = v => cleanCciText(v);
         const positiveInt = v => { const n = parseInt(v, 10); return n > 0 ? n : 0; };
 
         // Normalize: group flat join rows by company; nested rows pass through.
@@ -1003,13 +1017,24 @@
             let client = findClientForCompany(window.state.clients, { id: cciId, name });
             if (client) { updated++; }
             else {
-                client = { id: crypto.randomUUID(), name: S.sanitizeText(name), status: 'Active', contacts: [], sites: [], certificates: [] };
+                client = { id: crypto.randomUUID(), name: name, status: 'Active', contacts: [], sites: [], certificates: [] };
                 window.state.clients.push(client);
                 imported++;
             }
             if (cciId) client.cciCompanyId = cciId;
             client.source = 'CCI';
             client.cciSyncedAt = now.toISOString();
+
+            // Heal entity-escaped text the pre-fix importer stored ("FD&amp;C",
+            // "IT &amp; Technology"): decode in place. Identity for clean values.
+            if (client.name) client.name = txt(client.name) || client.name;
+            if (client.industry) client.industry = txt(client.industry);
+            if (client.groupName) client.groupName = txt(client.groupName);
+            (client.contacts || []).forEach(ct => { if (ct && ct.name) ct.name = txt(ct.name); });
+            (client.sites || []).forEach(st => {
+                if (!st) return;
+                ['name', 'address', 'city', 'country'].forEach(f => { if (st[f]) st[f] = txt(st[f]); });
+            });
 
             // Company details: fill gaps only, never overwrite what AuditCB already holds.
             if (!client.industry && src.industry) client.industry = txt(src.industry);
@@ -1024,6 +1049,12 @@
                 if (!primary.email && src.email) primary.email = S.sanitizeEmail(String(src.email).trim());
                 if (!primary.role && !primary.designation) primary.role = 'Primary Contact';
                 client.contacts[0] = primary;
+            }
+            // No website on either side: derive it from the company email domain
+            // (skipped for free mailbox providers such as hotmail/gmail).
+            if (!client.website) {
+                const derived = websiteFromEmail(src.email || (client.contacts && client.contacts[0] && client.contacts[0].email));
+                if (derived) client.website = derived;
             }
 
             const certAddress = (certs.find(c => c && c.address) || {}).address;
@@ -1041,7 +1072,10 @@
 
             // Certificates: the registry is the record of truth, refreshed every import.
             if (!Array.isArray(client.certificates)) client.certificates = [];
-            const stds = new Set((client.standard || '').split(',').map(s => s.trim()).filter(Boolean));
+            // Existing entries go through the mapper too, so a client that was imported
+            // before the label mapping existed ("ISO 9001-Quality Management") heals to
+            // the canonical name instead of keeping both spellings.
+            const stds = new Set((client.standard || '').split(',').map(s => mapCciStandard(s)).filter(Boolean));
             certs.forEach((cert, i) => {
                 if (!cert) return;
                 const std = mapCciStandard(cert.applicable_standard);
@@ -1074,6 +1108,10 @@
                 certCount++;
             });
             if (stds.size) client.standard = Array.from(stds).join(', ');
+            // Site standards heal the same way (identity for canonical or custom names).
+            (client.sites || []).forEach(site => {
+                if (site && site.standards) site.standards = String(site.standards).split(',').map(s => mapCciStandard(s)).filter(Boolean).join(', ');
+            });
             // The head office carries the standards so the per-site scope annex renders.
             if (client.sites && client.sites[0] && !client.sites[0].standards && client.standard) client.sites[0].standards = client.standard;
             touched.push(client);
