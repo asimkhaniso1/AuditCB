@@ -77,6 +77,11 @@ function renderClientsEnhanced() {
     const startIndex = (window.state.clientPagination.currentPage - 1) * window.state.clientPagination.itemsPerPage;
     const paginatedClients = filteredClients.slice(startIndex, startIndex + window.state.clientPagination.itemsPerPage);
 
+    // Twins created by an import share a name, so the list alone cannot tell them
+    // apart — surface a review button only while any exist.
+    const duplicateGroups = (window.DataMigration && typeof window.DataMigration.describeDuplicates === 'function')
+        ? window.DataMigration.describeDuplicates(window.state.clients) : [];
+
     const rows = paginatedClients.map(client => `
         <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;">
             <td>${window.UTILS.escapeHtml(client.name)}</td>
@@ -108,12 +113,17 @@ function renderClientsEnhanced() {
                 <h2 style="margin: 0;">Client Management</h2>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     ${(window.state.currentUser?.role === 'Certification Manager' || window.state.currentUser?.role === 'Admin') ? `
-                        <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls">
+                        <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls, .csv, .json">
                         <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;" aria-label="Export">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
                         </button>
                         <button class="btn btn-sm btn-outline-secondary" data-action="clickElement" data-id="client-import-file" style="white-space: nowrap;">
                             <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import
+                        </button>
+                    ` : ''}
+                    ${duplicateGroups.length ? `
+                        <button class="btn btn-sm" data-action="reviewDuplicateClients" style="white-space: nowrap; color: #b45309; border: 1px solid #fcd34d; background: #fffbeb;" title="Two client records share a name">
+                            <i class="fa-solid fa-clone" style="margin-right: 0.5rem;"></i>Review duplicates (${duplicateGroups.length})
                         </button>
                     ` : ''}
                     <button class="btn btn-sm btn-outline-secondary" data-action="toggleClientAnalytics" style="white-space: nowrap;">
@@ -302,6 +312,73 @@ function renderClientsEnhanced() {
     }, 0);
 }
 
+// Two records with the same name are indistinguishable in the list, and deleting
+// the wrong one loses work. This lays the pair side by side with what each holds
+// and recommends the copy that carries nothing.
+window.reviewDuplicateClients = function () {
+    const groups = (window.DataMigration && typeof window.DataMigration.describeDuplicates === 'function')
+        ? window.DataMigration.describeDuplicates(window.state.clients) : [];
+    const esc = window.UTILS.escapeHtml;
+
+    if (!groups.length) {
+        window.openModal('Duplicate clients', '<p style="margin: 0; color: var(--text-secondary);">No duplicate client names remain.</p>');
+        document.getElementById('modal-save').style.display = 'none';
+        return;
+    }
+
+    const body = groups.map(group => {
+        const rows = group.map((c, i) => {
+            const keep = i === 0;
+            const work = c.plans + c.reports + c.ncrs + c.programs;
+            return `
+            <tr style="background: ${keep ? '#f0fdf4' : '#fff'};">
+                <td style="padding: 0.6rem 0.5rem; vertical-align: top;">
+                    <span style="display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; ${keep
+                    ? 'background: #dcfce7; color: #15803d;'
+                    : 'background: #fee2e2; color: #b91c1c;'}">${keep ? 'KEEP' : 'DELETE'}</span>
+                </td>
+                <td style="padding: 0.6rem 0.5rem; vertical-align: top; font-size: 0.85rem;">
+                    ${work ? `<strong>${work}</strong> audit record${work === 1 ? '' : 's'}` : 'No audit records'}
+                    <div style="color: #64748b; font-size: 0.78rem; margin-top: 0.2rem;">
+                        ${c.plans} plan(s), ${c.reports} report(s), ${c.ncrs} NCR(s) &middot; ${c.certificates} certificate(s), ${c.sites} site(s)
+                    </div>
+                    <div style="color: #94a3b8; font-size: 0.72rem; margin-top: 0.2rem;">id ${esc(String(c.id)).slice(0, 8)}</div>
+                </td>
+                <td style="padding: 0.6rem 0.5rem; vertical-align: top; text-align: right;">
+                    ${keep ? '' : `<button class="btn btn-sm" data-action="deleteDuplicateClient" data-id="${esc(String(c.id))}" style="color: #ef4444; border: 1px solid #fecaca;"><i class="fa-solid fa-trash" style="margin-right: 0.35rem;"></i>Delete this copy</button>`}
+                </td>
+            </tr>`;
+        }).join('');
+
+        const anyWork = group.some(c => c.hasHistory);
+        return `
+        <div style="margin-bottom: 1.25rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+            <div style="background: #f8fafc; padding: 0.6rem 0.75rem; font-weight: 600; font-size: 0.9rem;">${esc(group[0].name)}</div>
+            <table style="width: 100%; border-collapse: collapse;">${rows}</table>
+            ${anyWork ? `
+            <div style="padding: 0.6rem 0.75rem; background: #fffbeb; color: #92400e; font-size: 0.78rem; border-top: 1px solid #fde68a;">
+                Plans and reports are linked by client name, so both copies claim the same work. Open each and confirm before deleting.
+            </div>` : ''}
+        </div>`;
+    }).join('');
+
+    window.openModal('Review duplicate clients', `
+        <p style="margin: 0 0 1rem 0; color: var(--text-secondary); font-size: 0.9rem;">
+            These records share a name — an import created a second copy. Keep the one holding audit work; the copy marked DELETE carries none.
+        </p>
+        ${body}`);
+    document.getElementById('modal-save').style.display = 'none';
+};
+
+window.deleteDuplicateClient = async function (clientId) {
+    window.closeModal();
+    await window.deleteClient(clientId);
+    // Reopen only while there is still a pair to judge.
+    const left = (window.DataMigration && typeof window.DataMigration.describeDuplicates === 'function')
+        ? window.DataMigration.describeDuplicates(window.state.clients) : [];
+    if (left.length) window.reviewDuplicateClients();
+};
+
 // Clicking the active column flips direction; a new column starts ascending.
 // Paging resets, otherwise a reorder can leave you on an out-of-range page.
 window.sortClients = function (field) {
@@ -359,31 +436,45 @@ window.deleteClient = async function (clientId) {
         const clientName = client.name;
         let deleteStats = { programs: 0, plans: 0, reports: 0, decisions: 0 };
 
+        // Linked records mostly carry the client NAME, not its id. When a twin of
+        // the same name survives this delete (an import duplicate), a name-based
+        // cascade would take the survivor's history with it — so only records
+        // explicitly bound to THIS id are removed in that case.
+        const twinRemains = window.state.clients.some((c, i) =>
+            i !== clientIndex && (c.name || '').trim().toLowerCase() === (clientName || '').trim().toLowerCase());
+        const belongsToThisClient = record => {
+            if (record.clientId) return String(record.clientId) === String(clientId);
+            return twinRemains ? false : record.client === clientName;
+        };
+        if (twinRemains) {
+            Logger.warn(`Another client is named '${clientName}' — keeping records that are not bound to id ${clientId}`);
+        }
+
         // 1. Audit Programs
         if (window.state.auditPrograms) {
             const initialPrograms = window.state.auditPrograms.length;
-            window.state.auditPrograms = window.state.auditPrograms.filter(p => p.client !== clientName);
+            window.state.auditPrograms = window.state.auditPrograms.filter(p => !belongsToThisClient(p));
             deleteStats.programs = initialPrograms - window.state.auditPrograms.length;
         }
 
         // 2. Audit Plans
         if (window.state.auditPlans) {
             const initialPlans = window.state.auditPlans.length;
-            window.state.auditPlans = window.state.auditPlans.filter(p => p.client !== clientName);
+            window.state.auditPlans = window.state.auditPlans.filter(p => !belongsToThisClient(p));
             deleteStats.plans = initialPlans - window.state.auditPlans.length;
         }
 
         // 3. Audit Reports
         if (window.state.auditReports) {
             const initialReports = window.state.auditReports.length;
-            window.state.auditReports = window.state.auditReports.filter(r => r.client !== clientName);
+            window.state.auditReports = window.state.auditReports.filter(r => !belongsToThisClient(r));
             deleteStats.reports = initialReports - window.state.auditReports.length;
         }
 
         // 4. Certification Decisions
         if (window.state.certificationDecisions) {
             const initialDecisions = window.state.certificationDecisions.length;
-            window.state.certificationDecisions = window.state.certificationDecisions.filter(d => d.client !== clientName);
+            window.state.certificationDecisions = window.state.certificationDecisions.filter(d => !belongsToThisClient(d));
             deleteStats.decisions = initialDecisions - window.state.certificationDecisions.length;
         }
 

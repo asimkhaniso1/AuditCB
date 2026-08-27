@@ -100,12 +100,58 @@ const DataMigration = {
 
         // Decoding a name can reveal that two records are the same company (an
         // import created a clean twin of an escaped one). Merging is the user's
-        // call — a client may carry audits — so name them rather than act.
+        // call — a client may carry audits — so report rather than act.
         if (result.duplicates.length && typeof window.showNotification === 'function') {
             const names = result.duplicates.map(g => g[0].name).join(', ');
-            window.showNotification(`Duplicate clients found: ${names}. Open Clients and delete the copy with no audit history.`, 'warning');
+            window.showNotification(`${result.duplicates.length} duplicate client name(s): ${names}. Clients → Review duplicates shows which copy to delete.`, 'warning');
         }
         return result;
+    },
+
+    /**
+     * Count what a client would take with it if deleted, so a duplicate pair can
+     * be told apart: the record carrying work is the one to keep.
+     */
+    describeClient: function (client) {
+        // A record that names an id belongs to that client alone; only fall back
+        // to the name when there is no id, where twins are indistinguishable.
+        const belongs = record => (record.clientId
+            ? String(record.clientId) === String(client.id)
+            : !!(record.client && client.name && String(record.client).trim().toLowerCase() === String(client.name).trim().toLowerCase()));
+        const count = list => (Array.isArray(list) ? list.filter(belongs).length : 0);
+        const s = window.state || {};
+        const plans = count(s.auditPlans);
+        const reports = count(s.auditReports);
+        const ncrs = count(s.ncrs);
+        const programs = count(s.auditPrograms);
+        return {
+            id: client.id,
+            name: client.name,
+            plans: plans,
+            reports: reports,
+            ncrs: ncrs,
+            programs: programs,
+            certificates: (client.certificates || []).length,
+            sites: (client.sites || []).length,
+            createdAt: client.createdAt || client.created_at || null,
+            // Records linked only by NAME cannot be told apart between twins, so
+            // work is attributed to both — deliberately cautious.
+            hasHistory: (plans + reports + ncrs + programs) > 0
+        };
+    },
+
+    /**
+     * Duplicate groups, each annotated and ordered so the record to KEEP comes
+     * first: audit history wins, then more certificates, then the older record.
+     */
+    describeDuplicates: function (clients) {
+        return DataMigration.findDuplicateClients(clients || (window.state && window.state.clients) || [])
+            .map(group => group
+                .map(DataMigration.describeClient)
+                .sort((a, b) => (Number(b.hasHistory) - Number(a.hasHistory))
+                    || (b.plans + b.reports + b.ncrs + b.programs) - (a.plans + a.reports + a.ncrs + a.programs)
+                    || b.certificates - a.certificates
+                    || String(a.createdAt || '').localeCompare(String(b.createdAt || ''))));
     },
 
     /**

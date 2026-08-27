@@ -122,6 +122,60 @@ describe('DataMigration.findDuplicateClients', () => {
     });
 });
 
+describe('DataMigration.describeDuplicates — which copy is safe to delete', () => {
+    it('puts the record carrying audit work first, and flags the other as empty', () => {
+        window.state = {
+            clients: [
+                { id: 'import-copy', name: 'Pakistan Post Foundation', certificates: [{ standard: 'ISO 9001:2015' }], sites: [{ name: 'Head Office' }] },
+                { id: 'original', name: 'PAKISTAN POST FOUNDATION', certificates: [], sites: [] }
+            ],
+            auditPlans: [{ clientId: 'original', client: 'PAKISTAN POST FOUNDATION' }],
+            auditReports: [{ clientId: 'original' }],
+            ncrs: [], auditPrograms: []
+        };
+
+        const groups = window.DataMigration.describeDuplicates();
+        expect(groups).toHaveLength(1);
+        const [keep, drop] = groups[0];
+        expect(keep.id).toBe('original');
+        expect(keep.hasHistory).toBe(true);
+        expect(keep.plans).toBe(1);
+        expect(keep.reports).toBe(1);
+        expect(drop.id).toBe('import-copy');
+        expect(drop.hasHistory).toBe(false);
+    });
+
+    it('falls back to the richer record when neither carries audit work', () => {
+        window.state = {
+            clients: [
+                { id: 'thin', name: 'FD&C (Private) Limited.', certificates: [], sites: [] },
+                { id: 'rich', name: 'FD&C (Private) Limited.', certificates: [{ standard: 'ISO 9001:2015' }, { standard: 'ISO 14001:2015' }], sites: [{ name: 'Head Office' }] }
+            ],
+            auditPlans: [], auditReports: [], ncrs: [], auditPrograms: []
+        };
+        const [keep, drop] = window.DataMigration.describeDuplicates()[0];
+        expect(keep.id).toBe('rich');
+        expect(keep.certificates).toBe(2);
+        expect(drop.id).toBe('thin');
+    });
+
+    it('counts name-linked work against both twins rather than guessing', () => {
+        window.state = {
+            clients: [{ id: 'a', name: 'B&K International' }, { id: 'b', name: 'B&K International' }],
+            auditPlans: [{ client: 'B&K International' }],
+            auditReports: [], ncrs: [], auditPrograms: []
+        };
+        const group = window.DataMigration.describeDuplicates()[0];
+        expect(group.every(c => c.plans === 1)).toBe(true);
+        expect(group.every(c => c.hasHistory)).toBe(true);
+    });
+
+    it('reports nothing when every client name is unique', () => {
+        window.state = { clients: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }], auditPlans: [] };
+        expect(window.DataMigration.describeDuplicates()).toEqual([]);
+    });
+});
+
 describe('DataMigration.healClientTextAndSync', () => {
     it('pushes only the repaired clients and warns about the duplicates it reveals', () => {
         const synced = [];
@@ -136,7 +190,7 @@ describe('DataMigration.healClientTextAndSync', () => {
         expect(result.changed).toHaveLength(1);
         expect(synced).toEqual(['B&K International']);
         expect(result.duplicates).toHaveLength(1);
-        expect(notices[0]).toContain('Duplicate clients found');
+        expect(notices[0]).toContain('duplicate client name(s)');
         expect(notices[0]).toContain('B&K International');
     });
 });
