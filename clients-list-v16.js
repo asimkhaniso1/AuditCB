@@ -5,6 +5,23 @@
 // Loaded AFTER clients-module.js - overrides the original function
 // CACHE BUST: 2026-01-31 17:03
 
+// A column heading that sorts. The arrow shows the direction on the active
+// column and stays faint elsewhere, so the whole row reads as clickable.
+function sortableHeader(field, label, sort) {
+    const active = sort.field === field;
+    const icon = active ? (sort.dir === 'asc' ? 'fa-arrow-up-a-z' : 'fa-arrow-down-z-a') : 'fa-sort';
+    // A real button, not a clickable <th>: Enter and Space then work without the
+    // event delegator needing key handling, and it lands in the tab order itself.
+    return `<th aria-sort="${active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}" style="white-space: nowrap;">
+        <button type="button" data-action="sortClients" data-id="${field}"
+            title="Sort by ${window.UTILS.escapeHtml(label)}"
+            style="all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; font: inherit; color: inherit;">
+            ${window.UTILS.escapeHtml(label)}
+            <i class="fa-solid ${icon}" style="font-size: 0.8em; opacity: ${active ? '1' : '0.35'};"></i>
+        </button>
+    </th>`;
+}
+
 function renderClientsEnhanced() {
     const state = window.state;
     // Safety Check: Ensure state exists
@@ -32,6 +49,21 @@ function renderClientsEnhanced() {
         const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = filterStatus === 'All' || client.status === filterStatus;
         return matchesSearch && matchesStatus;
+    });
+
+    // Sort before paging, so the order is over the whole result set rather than
+    // the visible page. Name ascending is the default the list opens with.
+    const sort = window.state.clientSort || (window.state.clientSort = { field: 'name', dir: 'asc' });
+    const sortValue = {
+        name: c => c.name || '',
+        // Badges read left to right, so the first standard is what the eye sorts by.
+        standard: c => (c.standard || '').split(',')[0].trim(),
+        status: c => c.status || ''
+    };
+    const readValue = sortValue[sort.field] || sortValue.name;
+    filteredClients.sort((a, b) => {
+        const cmp = String(readValue(a)).localeCompare(String(readValue(b)), undefined, { sensitivity: 'base', numeric: true });
+        return sort.dir === 'desc' ? -cmp : cmp;
     });
 
     const totalItems = filteredClients.length;
@@ -152,9 +184,9 @@ function renderClientsEnhanced() {
                 <table>
                     <thead>
                         <tr>
-                            <th>Client Name</th>
-                            <th>Standard</th>
-                            <th>Status</th>
+                            ${sortableHeader('name', 'Client Name', sort)}
+                            ${sortableHeader('standard', 'Standard', sort)}
+                            ${sortableHeader('status', 'Status', sort)}
 
                             <th>Actions</th>
                         </tr>
@@ -269,6 +301,19 @@ function renderClientsEnhanced() {
         });
     }, 0);
 }
+
+// Clicking the active column flips direction; a new column starts ascending.
+// Paging resets, otherwise a reorder can leave you on an out-of-range page.
+window.sortClients = function (field) {
+    const allowed = ['name', 'standard', 'status'];
+    if (allowed.indexOf(field) === -1) return;
+    const sort = window.state.clientSort || { field: 'name', dir: 'asc' };
+    window.state.clientSort = (sort.field === field)
+        ? { field: field, dir: sort.dir === 'asc' ? 'desc' : 'asc' }
+        : { field: field, dir: 'asc' };
+    if (window.state.clientPagination) window.state.clientPagination.currentPage = 1;
+    renderClientsEnhanced();
+};
 
 // Pagination helpers (fixed window.window.state bug)
 window.changeClientPage = function (page) {
