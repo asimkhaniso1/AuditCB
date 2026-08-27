@@ -1878,17 +1878,22 @@ window.renderEditClient = function (clientId) {
 
     const firstSite = client.sites && client.sites[0] ? client.sites[0] : {};
     const firstContact = client.contacts && client.contacts[0] ? client.contacts[0] : {};
-    const standards = (client.standard || '').split(',').map(s => s.trim());
-
     // Temporarily store original logo URL for comparison/fallback
     window._originalClientLogo = client.logoUrl;
     window._tempClientLogo = null; // Reset temp
 
-    const standardsToShow = (window.state.cbSettings && window.state.cbSettings.standardsOffered && window.state.cbSettings.standardsOffered.length > 0)
+    const standardsOffered = (window.state.cbSettings && window.state.cbSettings.standardsOffered && window.state.cbSettings.standardsOffered.length > 0)
         ? window.state.cbSettings.standardsOffered
         : ((window.state.cbSettings && window.state.cbSettings.availableStandards && window.state.cbSettings.availableStandards.length > 0)
             ? window.state.cbSettings.availableStandards
             : ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]);
+    // A standard this client holds but the CB does not list (product marks such as
+    // "Product Safety Certification") still gets a chip — saving keeps only the
+    // ticked ones, so an unlisted standard would otherwise be silently dropped.
+    const standardsToShow = standardsOffered.slice();
+    window.UTILS.parseStandards(client.standard).forEach(std => {
+        if (!standardsToShow.some(s => window.UTILS.canonicalStandard(s) === std)) standardsToShow.push(std);
+    });
 
     const html = `
     <div class="fade-in" style="max-width: 1200px; margin: 0 auto; padding-bottom: 4rem;">
@@ -1968,7 +1973,7 @@ window.renderEditClient = function (clientId) {
                              <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 0.75rem;">Applicable Standards <span class="text-danger">*</span></label>
                             <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
                                 ${standardsToShow.map((std) => {
-        const isChecked = standards.includes(std);
+        const isChecked = window.UTILS.isStandardSelected(client.standard, std);
         return `
                                     <label class="standard-checkbox-btn ${isChecked ? 'active' : ''}" style="cursor: pointer;">
                                         <input type="checkbox" name="client_standards" value="${std}" ${isChecked ? 'checked' : ''} style="display: none;" data-action-change="toggleCheckboxStyle">
@@ -2322,7 +2327,7 @@ window.handleIndustryChange = function (select) {
                     <label>Applicable Standards</label>
                     <select class="form-control" id="site-standards" multiple style="height: 100px;">
                         ${standardsToShow.map(std =>
-            `<option value="${std}" ${(client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
+            `<option value="${std}" ${window.UTILS.isStandardSelected(client.standard, std) ? 'selected' : ''}>${std}</option>`
         ).join('')}
                     </select>
                     <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple (Defaults to client standards)</small>

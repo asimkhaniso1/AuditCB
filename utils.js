@@ -3,7 +3,62 @@
 // ============================================
 // Structured as a standalone const + window export.
 
+// Edition year per standard number, so a label written without one ("ISO 9001",
+// "ISO 9001-Quality Management") resolves to the name the app offers as a chip.
+const STANDARD_EDITIONS = {
+    '9001': '2015', '14001': '2015', '45001': '2018', '27001': '2022', '22000': '2018',
+    '13485': '2016', '50001': '2018', '20000-1': '2018', '22301': '2019', '27701': '2019',
+    '17021-1': '2015', '37001': '2016', '41001': '2018', '55001': '2014', '28000': '2022',
+    '39001': '2012', '42001': '2023', '15189': '2022', '18788': '2015', '29001': '2020'
+};
+const STANDARD_ALIASES = [
+    [/^ce[\s-]*marking/i, 'CE-Marking'],
+    [/^c?gmp\b/i, 'GMP'],
+    [/^rohs\b/i, 'RoHS'],
+    [/^halal\b/i, 'Halal'],
+    [/^haccp\b/i, 'HACCP'],
+    [/^reach\b/i, 'REACH SVHC'],
+    [/^kosher\b/i, 'Kosher']
+];
+
 const UTILS = {
+    // The house spelling of a standard. Accepts what any source happens to write
+    // — a registry label ("ISO 9001-Quality Management"), a bare number
+    // ("ISO 9001"), a slashed body ("ISO/IEC 27001:2022") — and returns the
+    // canonical name ("ISO 9001:2015"). Anything unrecognised comes back
+    // whitespace-normalised so custom entries survive untouched.
+    canonicalStandard: function (label) {
+        const raw = String(label == null ? '' : label).replace(/\s+/g, ' ').trim();
+        if (!raw) return '';
+        const iso = raw.match(/^ISO(?:\/IEC)?\s*(\d+(?:-\d+)?)(?:\s*:\s*(\d{4}))?/i);
+        if (iso) {
+            const num = iso[1];
+            const year = iso[2] || STANDARD_EDITIONS[num];
+            return year ? 'ISO ' + num + ':' + year : 'ISO ' + num;
+        }
+        for (let i = 0; i < STANDARD_ALIASES.length; i++) {
+            if (STANDARD_ALIASES[i][0].test(raw)) return STANDARD_ALIASES[i][1];
+        }
+        return raw;
+    },
+
+    // Split a stored standards string ("ISO 9001:2015, ISO 14001-Environment
+    // Mgmt.") into canonical names.
+    parseStandards: function (stored) {
+        return String(stored == null ? '' : stored)
+            .split(',')
+            .map(function (s) { return UTILS.canonicalStandard(s); })
+            .filter(Boolean);
+    },
+
+    // Should this picker option show as selected? Compares canonically, so a
+    // client carrying a raw registry label still ticks the matching chip.
+    isStandardSelected: function (stored, option) {
+        const want = UTILS.canonicalStandard(option);
+        if (!want) return false;
+        return UTILS.parseStandards(stored).indexOf(want) !== -1;
+    },
+
     escapeHtml: function (unsafe) {
         if (!unsafe) return '';
         if (typeof unsafe !== 'string') return String(unsafe);

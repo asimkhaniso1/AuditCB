@@ -747,7 +747,7 @@ window.addSite = function (clientId) {
     if (!client) return;
     const stdOptions = ((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 22000:2018', 'ISO 50001:2018', 'ISO 13485:2016']);
     const stdHtml = stdOptions.map(function (std) {
-        let sel = (client.standard || '').includes(std) ? 'selected' : '';
+        let sel = window.UTILS.isStandardSelected(client.standard, std) ? 'selected' : '';
         return '<option value="' + std + '" ' + sel + '>' + std + '</option>';
     }).join('');
     window.openModal('Add Site', `
@@ -1242,7 +1242,7 @@ window.editSite = function (clientId, siteIndex) {
     const site = client.sites[siteIndex];
     const stdOptions = ((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 22000:2018', 'ISO 50001:2018', 'ISO 13485:2016']);
     const stdHtml = stdOptions.map(function (std) {
-        let sel = (site.standards || client.standard || '').includes(std) ? 'selected' : '';
+        let sel = window.UTILS.isStandardSelected(site.standards || client.standard, std) ? 'selected' : '';
         return '<option value="' + std + '" ' + sel + '>' + std + '</option>';
     }).join('');
     window.DataService.openFormModal('Edit Site Location', '<form id="site-form">' +

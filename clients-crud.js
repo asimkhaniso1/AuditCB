@@ -44,7 +44,7 @@
                     <label>Applicable Standards</label>
                     <select class="form-control" id="site-standards" multiple style="height: 100px;">
                         ${((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map(std =>
-            `<option value="${std}" ${(site.standards || client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
+            `<option value="${std}" ${window.UTILS.isStandardSelected(site.standards || client.standard, std) ? 'selected' : ''}>${std}</option>`
         ).join('')}
                     </select>
                     <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>

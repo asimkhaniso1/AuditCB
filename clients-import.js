@@ -879,21 +879,6 @@
     //  • CCI validity codes: V valid (Expired once the end date has passed),
     //    S suspended, W withdrawn, R revoked (→ Withdrawn), I / E → Expired.
 
-    const CCI_STANDARD_YEARS = {
-        '9001': '2015', '14001': '2015', '45001': '2018', '27001': '2022', '22000': '2018',
-        '13485': '2016', '50001': '2018', '20000-1': '2018', '22301': '2019', '27701': '2019',
-        '17021-1': '2015', '37001': '2016', '41001': '2018', '55001': '2014', '28000': '2022',
-        '39001': '2012', '42001': '2023', '15189': '2022', '18788': '2015', '29001': '2020'
-    };
-    const CCI_STANDARD_ALIASES = [
-        [/^ce[\s-]*marking/i, 'CE-Marking'],
-        [/^gmp\b/i, 'GMP'],
-        [/^rohs\b/i, 'RoHS'],
-        [/^halal\b/i, 'Halal'],
-        [/^haccp\b/i, 'HACCP'],
-        [/^reach\b/i, 'REACH SVHC'],
-        [/^kosher\b/i, 'Kosher']
-    ];
     // Legal-form words that differ between the two registers but mean the same company.
     const CCI_NAME_WORDS = { international: 'intl', private: 'pvt', limited: 'ltd', incorporated: 'inc', corporation: 'corp', company: 'co' };
     const CCI_LEGAL_SUFFIXES = new Set(['pvt', 'ltd', 'inc', 'llc', 'co', 'corp', 'ag', 'gmbh', 'plc', 'sa', 'llp', 'pte']);
@@ -908,19 +893,11 @@
             .trim();
     }
 
+    // Registry labels ("ISO 9001-Quality Management", "CE Marking / EU Directive")
+    // become the house name the standards pickers offer. One table, in UTILS, so
+    // the importer and the pickers can never drift apart.
     function mapCciStandard(label) {
-        const raw = cleanCciText(label);
-        if (!raw) return '';
-        const iso = raw.match(/^ISO(?:\/IEC)?\s*(\d+(?:-\d+)?)(?:\s*:\s*(\d{4}))?/i);
-        if (iso) {
-            const num = iso[1];
-            const year = iso[2] || CCI_STANDARD_YEARS[num];
-            return year ? `ISO ${num}:${year}` : `ISO ${num}`;
-        }
-        for (const [re, name] of CCI_STANDARD_ALIASES) {
-            if (re.test(raw)) return name;
-        }
-        return raw; // "Product Safety Certification", "Food Safety Certification", …
+        return window.UTILS.canonicalStandard(cleanCciText(label));
     }
 
     function mapCciStatus(code, endDate, now) {
