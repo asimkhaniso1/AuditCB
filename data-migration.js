@@ -8,6 +8,123 @@ const DataMigration = {
     // Current sync status
     isSyncing: false,
 
+    // ── Legacy client text heal ──────────────────────────────────────
+    // Early imports HTML-escaped text before storing it, so names read back as
+    // "B&amp;K International", and they kept the certification registry's own
+    // standard labels ("ISO 9001-Quality Management") instead of the house name.
+    // Both are data-level faults: every list, header, chart and PDF shows them.
+    // healClientText repairs the records themselves, once, and reports which
+    // clients changed so the caller can push just those to the cloud.
+    // Idempotent — clean data is left untouched and nothing is reported.
+
+    // Decode entity-escaped strings anywhere inside a client record (scope text
+    // and site-scope maps included), flagging ctx.changed when anything moved.
+    // Depth- and cycle-guarded: this runs on live state during cloud sync and
+    // must never throw or spin.
+    _decodeDeep: function (value, ctx, depth) {
+        const d = depth || 0;
+        if (d > 8 || value == null) return value;
+        if (typeof value === 'string') {
+            const decoded = window.UTILS.decodeEntities(value);
+            if (decoded !== value) ctx.changed = true;
+            return decoded;
+        }
+        if (typeof value !== 'object') return value;
+        if (ctx.seen.has(value)) return value;
+        ctx.seen.add(value);
+        if (Array.isArray(value)) {
+            for (let i = 0; i < value.length; i++) value[i] = DataMigration._decodeDeep(value[i], ctx, d + 1);
+        } else {
+            Object.keys(value).forEach(k => { value[k] = DataMigration._decodeDeep(value[k], ctx, d + 1); });
+        }
+        return value;
+    },
+
+    _canonicalList: function (stored) {
+        const list = window.UTILS.parseStandards(stored);
+        return list.length ? list.join(', ') : '';
+    },
+
+    /**
+     * Repair legacy client records in place.
+     * @param {Array} clients - window.state.clients (mutated)
+     * @returns {{changed: Array, decoded: number, relabelled: number}}
+     */
+    healClientText: function (clients) {
+        const list = Array.isArray(clients) ? clients : [];
+        const changed = [];
+        let decoded = 0, relabelled = 0;
+
+        list.forEach(client => {
+            if (!client || typeof client !== 'object') return;
+
+            const ctx = { changed: false, seen: new WeakSet() };
+            DataMigration._decodeDeep(client, ctx, 0);
+            if (ctx.changed) decoded++;
+
+            let labelsMoved = false;
+            const relabel = (holder, key, mapper) => {
+                if (!holder || !holder[key]) return;
+                const next = mapper(holder[key]);
+                if (next !== holder[key]) { holder[key] = next; labelsMoved = true; }
+            };
+            relabel(client, 'standard', DataMigration._canonicalList);
+            (client.sites || []).forEach(site => relabel(site, 'standards', DataMigration._canonicalList));
+            (client.certificates || []).forEach(cert => relabel(cert, 'standard', window.UTILS.canonicalStandard));
+            if (labelsMoved) relabelled++;
+
+            if (ctx.changed || labelsMoved) changed.push(client);
+        });
+
+        return { changed: changed, decoded: decoded, relabelled: relabelled };
+    },
+
+    /**
+     * Run the heal against current state, persist locally, and push only the
+     * repaired clients back to Supabase. Safe to call on every startup.
+     */
+    healClientTextAndSync: function () {
+        const clients = (window.state && window.state.clients) || [];
+        const result = DataMigration.healClientText(clients);
+        result.duplicates = DataMigration.findDuplicateClients(clients);
+
+        if (result.changed.length) {
+            window.Logger && Logger.info(`Healed ${result.changed.length} legacy client records (${result.decoded} decoded, ${result.relabelled} relabelled)`);
+            result.changed.forEach(client => {
+                if (window.DataService && typeof window.DataService.syncClient === 'function') {
+                    window.DataService.syncClient(client, { saveLocal: false, silent: true });
+                }
+            });
+            if (typeof window.saveData === 'function') window.saveData();
+        }
+
+        // Decoding a name can reveal that two records are the same company (an
+        // import created a clean twin of an escaped one). Merging is the user's
+        // call — a client may carry audits — so name them rather than act.
+        if (result.duplicates.length && typeof window.showNotification === 'function') {
+            const names = result.duplicates.map(g => g[0].name).join(', ');
+            window.showNotification(`Duplicate clients found: ${names}. Open Clients and delete the copy with no audit history.`, 'warning');
+        }
+        return result;
+    },
+
+    /**
+     * Group clients whose names are the same company. Comparison ignores case,
+     * punctuation and entity escaping, so "FD&amp;C" and "FD&C" land together.
+     * @returns {Array<Array>} one array per duplicated name (2+ records each)
+     */
+    findDuplicateClients: function (clients) {
+        const groups = new Map();
+        (Array.isArray(clients) ? clients : []).forEach(client => {
+            if (!client || !client.name) return;
+            const key = window.UTILS.decodeEntities(String(client.name)).toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (!key) return;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(client);
+        });
+        return Array.from(groups.values()).filter(g => g.length > 1);
+    },
+
     /**
      * Get data statistics (Local vs Supabase count)
      */

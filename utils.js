@@ -59,6 +59,30 @@ const UTILS = {
         return UTILS.parseStandards(stored).indexOf(want) !== -1;
     },
 
+    // Reverse of escapeHtml. Text that was HTML-escaped before being STORED (an
+    // old import bug) reads back as "B&amp;K International"; decoding it once at
+    // the data layer restores the real value. Escaping stays a render concern.
+    decodeEntities: function (value) {
+        if (typeof value !== 'string' || value.indexOf('&') === -1) return value;
+        // Escaping was applied once per save, so a record edited twice reads back
+        // as "B&amp;amp;K". Decode until the text stops changing (capped) rather
+        // than assuming a single layer.
+        let out = value;
+        for (let pass = 0; pass < 5; pass++) {
+            const next = out
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#0?39;/g, "'")
+                .replace(/&apos;/g, "'")
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&amp;/g, '&');
+            if (next === out) break;
+            out = next;
+        }
+        return out;
+    },
+
     escapeHtml: function (unsafe) {
         if (!unsafe) return '';
         if (typeof unsafe !== 'string') return String(unsafe);
