@@ -883,12 +883,10 @@
     const CCI_NAME_WORDS = { international: 'intl', private: 'pvt', limited: 'ltd', incorporated: 'inc', corporation: 'corp', company: 'co' };
     const CCI_LEGAL_SUFFIXES = new Set(['pvt', 'ltd', 'inc', 'llc', 'co', 'corp', 'ag', 'gmbh', 'plc', 'sa', 'llp', 'pte']);
 
-    // Drupal-era text carries HTML entities ("&amp;"), stray tags and CRLFs.
+    // Drupal-era text carries HTML entities ("&amp;"), stray tags and CRLFs — and
+    // an AuditCB record escaped once per save can carry several layers of them.
     function cleanCciText(value) {
-        return String(value == null ? '' : value)
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&nbsp;/g, ' ')
+        return window.UTILS.decodeEntities(String(value == null ? '' : value).replace(/<[^>]+>/g, ' '))
             .replace(/\s+/g, ' ')
             .trim();
     }

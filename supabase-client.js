@@ -512,6 +512,18 @@ const SupabaseClient = {
                 Logger.info(`Hydrated certificates for ${hydrationCount} clients`);
             }
 
+            // Repair records written by older builds — text stored HTML-escaped
+            // ("B&amp;K International") and registry standard labels. Runs on the
+            // freshly loaded cloud copy, so the fix reaches every device; a no-op
+            // once the data is clean.
+            try {
+                if (window.DataMigration && typeof window.DataMigration.healClientTextAndSync === 'function') {
+                    window.DataMigration.healClientTextAndSync();
+                }
+            } catch (healErr) {
+                Logger.warn('Client text heal skipped:', healErr);
+            }
+
             // CRITICAL: Save to IndexedDB (don't call saveData - it triggers upload!)
             try {
                 await window.StateStore.save(window.state);

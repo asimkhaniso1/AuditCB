@@ -1698,6 +1698,15 @@ window.renderAddClient = function () {
     }
 };
 
+// Undo the sanitizer's HTML escaping so records store the text the user typed.
+// XSS protection is unaffected: every render site escapes on output.
+function decodeCleanData(cleanData) {
+    Object.keys(cleanData || {}).forEach(k => {
+        if (typeof cleanData[k] === 'string') cleanData[k] = window.UTILS.decodeEntities(cleanData[k]);
+    });
+    return cleanData;
+}
+
 window.saveNewClient = async function () {
     // 1. Define Fields
     const fieldIds = {
@@ -1766,10 +1775,14 @@ window.saveNewClient = async function () {
     Validator.clearErrors(fieldIds);
 
     // 4. Sanitize
-    const cleanData = Sanitizer.sanitizeFormData(result.formData,
+    // sanitizeFormData HTML-escapes, which is a RENDER concern — storing the
+    // escaped form turned "FD&C" into "FD&amp;C", and one more layer with every
+    // save. Decode it straight back so records hold the real text; every render
+    // site escapes on the way out.
+    const cleanData = decodeCleanData(Sanitizer.sanitizeFormData(result.formData,
         ['name', 'contactName', 'contactDesignation', 'contactPhone',
             'address', 'city', 'country', 'geotag']
-    );
+    ));
 
     // 5. Construct Object
     const standard = checkedStandards.join(', ');
@@ -2191,10 +2204,14 @@ window.saveAuditClient = async function (clientId) {
     Validator.clearErrors(fieldIds);
 
     // 4. Sanitize
-    const cleanData = Sanitizer.sanitizeFormData(result.formData,
+    // sanitizeFormData HTML-escapes, which is a RENDER concern — storing the
+    // escaped form turned "FD&C" into "FD&amp;C", and one more layer with every
+    // save. Decode it straight back so records hold the real text; every render
+    // site escapes on the way out.
+    const cleanData = decodeCleanData(Sanitizer.sanitizeFormData(result.formData,
         ['name', 'contactName', 'contactDesignation', 'contactPhone',
             'address', 'city', 'country', 'geotag', 'website']
-    );
+    ));
 
     // 5. Update Record
     // Update basic info
