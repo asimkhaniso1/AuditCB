@@ -336,8 +336,12 @@ function getAuditPlanningPolicyHTML() {
             <label style="margin-top:1rem;"><input id="planning-placeholder" type="checkbox" ${value('developmentPlaceholder') ? 'checked' : ''}> Values remain development placeholders</label><br>
             <button class="btn btn-primary" type="submit" style="margin-top:1rem;">Save Planning Policy</button>
         </form>
-        <hr><h4>Duration methodologies</h4><p>${Object.keys(window.state.cbSettings?.durationMethodologies || {}).length ? 'Configured scheme families: ' + Object.keys(window.state.cbSettings.durationMethodologies).join(', ') : 'No approved scheme calculation tables configured.'}</p>
-        <p>IMS methodology: ${window.UTILS.escapeHtml(window.state.cbSettings?.imsMethodology?.version || 'Not configured')}</p></div>`;
+        <hr><h4>Versioned duration methodologies</h4>
+        <p>Enter only reviewed CB methodology data. Each scheme entry requires a name, version, and applicable tables. Saving configuration does not assert accreditation approval.</p>
+        <div class="form-group"><label>Scheme methodology registry (JSON)</label><textarea id="planning-duration-methodologies" class="form-control" rows="12" spellcheck="false">${window.UTILS.escapeHtml(JSON.stringify(window.state.cbSettings?.durationMethodologies || {}, null, 2))}</textarea></div>
+        <div class="form-group"><label>IMS methodology (JSON or null)</label><textarea id="planning-ims-methodology" class="form-control" rows="8" spellcheck="false">${window.UTILS.escapeHtml(JSON.stringify(window.state.cbSettings?.imsMethodology || null, null, 2))}</textarea></div>
+        <button class="btn btn-primary" type="button" data-action="saveDurationMethodologies">Validate & Save Methodologies</button>
+        <p style="margin-top:1rem;">Configured scheme families: ${Object.keys(window.state.cbSettings?.durationMethodologies || {}).join(', ') || 'None'} · IMS: ${window.UTILS.escapeHtml(window.state.cbSettings?.imsMethodology?.version || 'Not configured')}</p></div>`;
 }
 
 window.saveAuditPlanningPolicy = async function () {
@@ -359,6 +363,27 @@ window.saveAuditPlanningPolicy = async function () {
     window.saveData();
     await window.DataService?.syncSettings?.({ saveLocal: false, silent: true });
     window.showNotification('Audit planning policy saved.', 'success');
+};
+
+window.saveDurationMethodologies = async function () {
+    try {
+        const registry = JSON.parse(document.getElementById('planning-duration-methodologies')?.value || '{}');
+        const ims = JSON.parse(document.getElementById('planning-ims-methodology')?.value || 'null');
+        if (!registry || Array.isArray(registry) || typeof registry !== 'object') throw new Error('Scheme registry must be a JSON object keyed by standard family.');
+        Object.entries(registry).forEach(([family, method]) => {
+            if (!method?.name || !method?.version) throw new Error(`${family}: name and version are required.`);
+            if (!method.tables && !Array.isArray(method.employeeBands)) throw new Error(`${family}: tables or employeeBands are required.`);
+        });
+        if (ims && (!ims.name || !ims.version)) throw new Error('IMS methodology requires name and version.');
+        window.state.cbSettings.durationMethodologies = registry;
+        window.state.cbSettings.imsMethodology = ims;
+        window.saveData();
+        await window.DataService?.syncSettings?.({ saveLocal: false, silent: true });
+        window.showNotification('Versioned duration methodologies saved.', 'success');
+        window.switchSettingsSubTab('policies', 'audit-planning');
+    } catch (error) {
+        window.showNotification(`Methodology configuration not saved: ${error.message}`, 'error');
+    }
 };
 
 // Switch main tab

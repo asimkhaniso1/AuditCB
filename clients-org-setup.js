@@ -163,6 +163,7 @@ window.getClientCertificatesHTML = function (client) {
                         <label style="font-size:0.8rem;">Current Cycle Stage</label>
                         <div class="form-control" style="background:#f8fafc;color:#475569;">Derived from lifecycle history</div>
                         <small style="color:#64748b;">Changes require an authorized lifecycle override; certificate data is not overwritten.</small>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" style="margin-top:.4rem;" data-action="recordCertificationStageOverride" data-arg1="${client.id}" data-arg2="${index}">Record Override</button>
                     </div>
                     <div>
                         <label style="font-size:0.8rem;">NC Closure Buffer</label>
@@ -178,6 +179,67 @@ window.getClientCertificatesHTML = function (client) {
         </div>`;
     }).join('')}
 </div>`;
+};
+
+window.recordCertificationStageOverride = async function (clientId, certificateIndex) {
+    const client = window.state.clients.find(item => String(item.id) === String(clientId));
+    const certificate = client?.certificates?.[Number(certificateIndex)];
+    if (!client || !certificate || !window.AuditPlanningDomain) {
+        window.showNotification('Certification lifecycle service is unavailable.', 'error');
+        return;
+    }
+    const requestedStage = window.prompt('Authorized stage override: enter Surveillance 1, Surveillance 2, or Recertification.');
+    if (!requestedStage) return;
+    const normalized = ['Surveillance 1', 'Surveillance 2', 'Recertification'].find(stage => stage.toLowerCase() === requestedStage.trim().toLowerCase());
+    if (!normalized) {
+        window.showNotification('Use Surveillance 1, Surveillance 2, or Recertification.', 'error');
+        return;
+    }
+    const reason = window.prompt('Enter the documented reason for this lifecycle override.');
+    if (!reason?.trim()) {
+        window.showNotification('An override reason is required.', 'error');
+        return;
+    }
+    try {
+        const currentContext = window.AuditPlanningDomain.resolveCycleContext({
+            client,
+            settings: window.state.cbSettings || {},
+            allReports: window.state.auditReports || [],
+            allPlans: window.state.auditPlans || [],
+            cycleStateResolver: window.ReportStats?.cycleState
+        });
+        const record = currentContext.cycles.find(cycle => String(cycle.certificateId) === String(certificate.id || certificate.certificateNo));
+        const override = window.AuditPlanningDomain.createOverride({
+            category: 'stage',
+            originalValue: record?.auditType || null,
+            overrideValue: normalized,
+            reason,
+            user: window.state.currentUser?.name || 'Unknown user',
+            role: window.state.currentUser?.role || 'Unknown role',
+            settings: window.state.cbSettings || {},
+            approvedBy: window.state.currentUser?.name || null
+        });
+        const event = window.AuditPlanningDomain.createLifecycleEvent({
+            certificateId: certificate.id || certificate.certificateNo,
+            type: 'authorized-override',
+            stage: normalized,
+            user: override.user,
+            role: override.role,
+            reason: override.reason,
+            originalValue: override.originalValue,
+            overrideValue: override.overrideValue,
+            approvedBy: override.approvedBy,
+            metadata: { category: 'stage', overrideId: override.id }
+        });
+        client.certificationLifecycleEvents = client.certificationLifecycleEvents || [];
+        client.certificationLifecycleEvents.push(event);
+        window.saveData();
+        await window.SupabaseClient?.syncClientsToSupabase?.([client]);
+        window.showNotification(`Authorized ${normalized} lifecycle override recorded without overwriting certificate history.`, 'success');
+        if (typeof window.renderClientOrgSetup === 'function') window.renderClientOrgSetup(clientId);
+    } catch (error) {
+        window.showNotification(`Override not recorded: ${error.message}`, 'error');
+    }
 };
 
 window.generateCertificatesFromStandards = function (clientId) {
