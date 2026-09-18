@@ -1564,12 +1564,18 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 - Client: ${ctx.client}
 - Standard: ${ctx.standard}
 - Audit Type: ${ctx.type}
-- Duration: ${ctx.manDays} Man-days (${ctx.onsiteDays} On-site Days)
+- Certification Cycle Stage: ${ctx.cycleStage || ctx.type}
+- Audit Method: ${ctx.method || 'On-site'}
+- Duration: ${ctx.manDays} Man-days (${ctx.onsiteDays} On-site, ${ctx.remoteDays || 0} Remote)
+- Approved Scope: ${ctx.scope || 'As recorded in the certification cycle'}
+- Risk/Sampling Priority: ${ctx.riskLevel || 'Medium'}
+- Significant Changes: ${Array.isArray(ctx.significantChanges) ? ctx.significantChanges.map(change => change.description || change.title || change).join('; ') : (ctx.significantChanges || 'None recorded')}
+- Operational/Control Areas: ${(ctx.operationalAreas || []).join(', ') || 'Derive only from the approved scope and applicable standard clauses'}
 - Sites: ${ctx.sites.map(s => s.name).join(', ')}
 - Departments: ${(ctx.departments || []).join(', ')}
 - Key Designations: ${(ctx.designations || []).map(d => d.title || d).join(', ')}${personnelSection}${previousAuditSection}${ctx.clientDocumentContext || ''}
 **Requirements:**
-1. Create a day-by-day schedule covering ${ctx.onsiteDays} days.
+1. Create a day-by-day schedule covering ${ctx.manDays} audit days and respect the stated remote/on-site allocation.
 2. Include "Opening Meeting" (Day 1 AM) and "Closing Meeting" (Last Day PM).
 3. Include "Lunch Break" (13:00-14:00) each day.
 4. Assign specific auditors from the team to specific activities.
@@ -1579,6 +1585,10 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 8. Times should be in "HH:MM - HH:MM" format.
 9. In the "Department / Auditee" column, use ACTUAL personnel names from the roster above where available. Format as "Department / Person Name" — e.g., "HR / Ahmed Khan". If no matching person exists for a clause, use the department name only.
 ${ctx.previousAudit ? '10. Include a dedicated "Previous Findings Follow-up / CAPA Verification" session referencing the specific NC clauses from the previous audit.' : ''}
+${ctx.method === 'Remote' ? '11. This is a REMOTE audit. Do not schedule physical presence, an on-site review, a facility tour, or other physical site activity.' : ''}
+${ctx.method === 'Hybrid' ? '11. Label every activity clearly as Remote or On-site and use each only within its allocated days.' : ''}
+12. Optimize sequencing and timing only. Do not remove opening/closing meetings, previous-findings follow-up, applicable management-system clauses, or required operational/control-area coverage. Do not invent requirements.
+13. Give sampling priority to previous findings, significant changes, higher-risk processes, applicable management-system clauses and operational/control areas supplied above.
 **Output Format:**
 Return ONLY a raw JSON array of objects. Do not include markdown formatting (like \`\`\`json).
 Example:

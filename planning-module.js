@@ -2,6 +2,133 @@
 // AUDIT PLANNING MODULE (ESM-ready)
 // ============================================
 
+// Certification-cycle and structured plan data are authoritative.  Narrative/AI
+// helpers below only turn those records into editable drafting text.
+const AUDIT_PLAN_TEMPLATE_VERSION = 'approved-audit-plan-v1';
+
+function parsePlanDate(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toPlanDateValue(date) {
+    if (!date || Number.isNaN(date.getTime())) return '';
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+}
+
+function addPlanDays(date, days) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+}
+
+function normalizeStandardFamily(standard) {
+    const match = String(standard || '').toUpperCase().match(/ISO(?:\/IEC)?\s*(\d{4,5}(?:-\d)?)/);
+    return match ? match[1] : String(standard || '').toUpperCase().replace(/:\d{4}.*/, '').trim();
+}
+
+function getAuditTypeForCycle(issueDate, expiryDate, now = new Date()) {
+    const first = new Date(issueDate); first.setFullYear(first.getFullYear() + 1);
+    const second = new Date(issueDate); second.setFullYear(second.getFullYear() + 2);
+    if (now < first) return { stage: 'Surveillance 1', auditType: 'Surveillance 1', target: first };
+    if (now < second) return { stage: 'Surveillance 2', auditType: 'Surveillance 2', target: second };
+    return { stage: now > expiryDate ? 'Recertification overdue' : 'Recertification', auditType: 'Recertification', target: expiryDate };
+}
+
+function getCertificationCycleContext(client, now = new Date()) {
+    const settings = window.state?.cbSettings || window.state?.settings || {};
+    const closureBufferDays = Math.max(0, parseInt(settings.ncClosureBufferDays ?? settings.requiredNcClosureBufferDays ?? 30, 10) || 30);
+    const candidates = (client?.certificates || []).filter(cert => cert.standard && (cert.currentIssue || cert.initialDate));
+    const recordsByScheme = new Map();
+    candidates.forEach((cert, index) => {
+        const key = normalizeStandardFamily(cert.standard);
+        const existing = recordsByScheme.get(key);
+        const certDate = parsePlanDate(cert.initialDate || cert.currentIssue)?.getTime() || 0;
+        const existingDate = existing ? (parsePlanDate(existing.cert.initialDate || existing.cert.currentIssue)?.getTime() || 0) : -1;
+        if (!existing || cert.status === 'Active' && existing.cert.status !== 'Active' || (cert.status === existing.cert.status && certDate > existingDate)) {
+            recordsByScheme.set(key, { cert, index });
+        }
+    });
+    const records = [...recordsByScheme.values()];
+    const cycles = records.map(({ cert, index }) => {
+        const issueDate = parsePlanDate(cert.initialDate || cert.currentIssue);
+        if (!issueDate) return null;
+        const expiryDate = parsePlanDate(cert.expiryDate) || (() => {
+            const value = new Date(issueDate);
+            value.setFullYear(value.getFullYear() + 3);
+            return value;
+        })();
+        let next = getAuditTypeForCycle(issueDate, expiryDate, now);
+        const authoritativeCycle = window.ReportStats?.cycleState?.({
+            client,
+            standard: cert.standard,
+            certificate: cert,
+            allReports: window.state?.auditReports || [],
+            allPlans: window.state?.auditPlans || [],
+            today: now
+        });
+        if (authoritativeCycle) {
+            if (!authoritativeCycle.completed.s1) next = { stage: authoritativeCycle.stage, auditType: 'Surveillance 1', target: authoritativeCycle.surv1Due };
+            else if (!authoritativeCycle.completed.s2) next = { stage: authoritativeCycle.stage, auditType: 'Surveillance 2', target: authoritativeCycle.surv2Due };
+            else next = { stage: authoritativeCycle.stage, auditType: 'Recertification', target: authoritativeCycle.recertDue || expiryDate };
+        }
+        const recordedStage = String(cert.currentStage || cert.cycleStage || cert.stage || '').trim();
+        if (/surveillance\s*1/i.test(recordedStage)) {
+            const target = new Date(issueDate); target.setFullYear(target.getFullYear() + 1);
+            next = { stage: 'Surveillance 1', auditType: 'Surveillance 1', target };
+        } else if (/surveillance\s*2/i.test(recordedStage)) {
+            const target = new Date(issueDate); target.setFullYear(target.getFullYear() + 2);
+            next = { stage: 'Surveillance 2', auditType: 'Surveillance 2', target };
+        } else if (/recert/i.test(recordedStage)) {
+            next = { stage: recordedStage, auditType: 'Recertification', target: expiryDate };
+        }
+        const recordClosureBufferDays = Math.max(0, parseInt(cert.ncClosureBufferDays ?? cert.requiredNcClosureBufferDays ?? closureBufferDays, 10) || closureBufferDays);
+        let windowEnd;
+        let windowStart;
+        if (next.auditType === 'Recertification') {
+            windowEnd = addPlanDays(expiryDate, -recordClosureBufferDays);
+            windowStart = addPlanDays(windowEnd, -60);
+        } else {
+            windowStart = addPlanDays(next.target, -30);
+            windowEnd = addPlanDays(next.target, 30);
+            const closureLimit = addPlanDays(expiryDate, -recordClosureBufferDays);
+            if (windowEnd > closureLimit) windowEnd = closureLimit;
+        }
+        return {
+            cycleRecordIndex: index,
+            certificateNo: cert.certificateNo || '',
+            standard: cert.standard,
+            standardFamily: normalizeStandardFamily(cert.standard),
+            scope: cert.scope || client.scope || '',
+            siteScopes: cert.siteScopes || {},
+            issueDate: toPlanDateValue(issueDate),
+            expiryDate: toPlanDateValue(expiryDate),
+            stage: next.stage,
+            auditType: next.auditType,
+            recommendedWindowStart: toPlanDateValue(windowStart),
+            recommendedWindowEnd: toPlanDateValue(windowEnd),
+            closureBufferDays: recordClosureBufferDays
+        };
+    }).filter(Boolean);
+
+    const stages = [...new Set(cycles.map(c => c.auditType))];
+    return {
+        valid: cycles.length > 0 && stages.length === 1,
+        cycles,
+        standards: cycles.map(c => c.standard),
+        auditType: stages.length === 1 ? stages[0] : '',
+        stage: [...new Set(cycles.map(c => c.stage))].join(' / '),
+        recommendedWindowStart: cycles.length ? cycles.map(c => c.recommendedWindowStart).sort().at(-1) : '',
+        recommendedWindowEnd: cycles.length ? cycles.map(c => c.recommendedWindowEnd).sort()[0] : '',
+        certificateExpiry: cycles.length ? cycles.map(c => c.expiryDate).sort()[0] : '',
+        closureBufferDays: cycles.length ? Math.max(...cycles.map(c => c.closureBufferDays)) : closureBufferDays,
+        conflict: stages.length > 1 ? `Cycle records are at different stages (${stages.join(', ')}). Align the cycles before creating one combined plan.` : ''
+    };
+}
+
+window.getCertificationCycleContext = getCertificationCycleContext;
+
 function renderAuditPlanningEnhanced() {
     if (!window.state) {
         alert('CRITICAL ERROR: window.state is undefined! Script loading failed.');
@@ -26,7 +153,7 @@ function renderAuditPlanningEnhanced() {
                 <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(plan.standard) || 'ISO 9001:2015'}</div>
             </td>
             <td>${window.UTILS.escapeHtml(plan.type) || 'Surveillance'}</td>
-            <td>${window.UTILS.formatDate(plan.date)}</td>
+            <td>${plan.date ? window.UTILS.formatDate(plan.date) : '<span style="color:var(--text-secondary);">Not scheduled</span>'}${plan.endDate ? ` – ${window.UTILS.formatDate(plan.endDate)}` : ''}</td>
             <td>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     ${((plan.team && Array.isArray(plan.team)) ? plan.team : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map(auditor => `
@@ -314,17 +441,24 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                     </select>
                                 </div>
                                 <div class="form-group" style="margin: 0;">
-                                    <label>Planned Date <span style="color: var(--danger-color);">*</span></label>
-                                    <input type="date" class="form-control" id="plan-date" required>
+                                    <label>Scheduled Audit Start</label>
+                                    <input type="date" class="form-control" id="plan-date">
+                                    <small style="color: var(--text-secondary);">Leave blank while the plan is guidance-only.</small>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Scheduled Audit End</label>
+                                    <input type="date" class="form-control" id="plan-end-date">
                                 </div>
                                 <div class="form-group" style="grid-column: 1 / -1; margin: 0;">
-                                    <label>Audit Standard(s) <span style="color: var(--danger-color);">*</span></label>
-                                    <select class="form-control" id="plan-standard" multiple style="height: 100px; font-size: 0.9rem;" disabled title="Hold Ctrl/Cmd to select multiple">
+                                    <label>Standards & Current Editions <span style="color: var(--danger-color);">*</span></label>
+                                    <select class="form-control" id="plan-standard" multiple style="height: 100px; font-size: 0.9rem; background: #f1f5f9;" disabled>
                                         <option value="">-- Select Client First --</option>
                                     </select>
-                                    <small id="standards-hint" style="color: var(--text-secondary); display: block; margin-top: 4px;">Select a client to see applicable standards</small>
+                                    <small id="standards-hint" style="color: var(--text-secondary); display: block; margin-top: 4px;">Pulled directly from the active certification-cycle record; confirmation is required, re-entry is not.</small>
                                 </div>
                             </div>
+
+                            <div id="cycle-source-panel" style="margin-top: 1.25rem; display: none; padding: 1rem; border-radius: 8px; border: 1px solid #bfdbfe; background: #eff6ff;"></div>
 
                             <!-- Dynamic Client Info Panel -->
                             <div id="client-info-panel" style="margin-top: 1.25rem; display: none; background: #f0f9ff; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #bae6fd;"></div>
@@ -356,9 +490,11 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
 
                         <!-- Card: Audit Objectives, Criteria & Methodology (moved to main column for space) -->
                         <div class="card" style="margin: 0; padding: 1.5rem; border-top: 4px solid #0891b2;">
-                            <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: #0891b2;">
-                                <i class="fa-solid fa-bullseye"></i> Audit Objectives, Criteria & Methodology
-                            </h3>
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1.25rem;">
+                                <h3 style="margin:0;font-size:1.1rem;display:flex;align-items:center;gap:.5rem;color:#0891b2;"><i class="fa-solid fa-bullseye"></i> Audit Objectives, Criteria & Methodology</h3>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="btn-refresh-narratives">Regenerate from structured data</button>
+                            </div>
+                            <small style="display:block;color:var(--text-secondary);margin-bottom:1rem;">Approved template ${AUDIT_PLAN_TEMPLATE_VERSION}. Lead Auditor may edit; consistency is checked before save.</small>
                             
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                                 <div class="form-group" style="margin: 0;">
@@ -453,13 +589,13 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                             <div style="display: grid; gap: 1rem;">
                                 <div class="form-group" style="margin: 0;">
                                     <label style="font-size: 0.8rem;">Audit Type</label>
-                                    <select class="form-control" id="plan-audit-type">
-                                        <option value="Stage 1">Stage 1 Audit</option>
-                                        <option value="Stage 2" selected>Stage 2 Audit</option>
-                                        <option value="Surveillance">Surveillance</option>
+                                    <select class="form-control" id="plan-audit-type" disabled style="background:#f1f5f9;">
+                                        <option value="">From certification cycle</option>
+                                        <option value="Surveillance 1">Surveillance 1</option>
+                                        <option value="Surveillance 2">Surveillance 2</option>
                                         <option value="Recertification">Recertification</option>
-                                        <option value="Special">Special Audit</option>
                                     </select>
+                                    <small style="color:var(--text-secondary);">Locked to the current cycle stage.</small>
                                 </div>
                                 <div class="form-group" style="margin: 0;">
                                     <label style="font-size: 0.8rem;">Method</label>
@@ -517,23 +653,35 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.4rem;"></i>Calculate Days
                             </button>
 
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; padding: 1rem; background: #f8fafc; border: 1px dashed var(--border-color); border-radius: 8px;">
-                                <div class="form-group" style="margin: 0;">
-                                    <label style="font-size: 0.8rem; font-weight: 600;">Total Days</label>
-                                    <input type="number" class="form-control" id="plan-mandays" step="0.5" style="font-weight: bold; color: var(--primary-color);">
+                            <div style="display:grid; gap:0.75rem; padding:1rem; background:#f8fafc; border:1px dashed var(--border-color); border-radius:8px;">
+                                <div><label style="font-size:.8rem;">Calculation basis</label><textarea id="plan-duration-basis" rows="2" class="form-control" readonly style="background:#fff;"></textarea></div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                                    <div><label style="font-size:.8rem;">Baseline duration</label><input type="number" id="plan-baseline-days" class="form-control" readonly></div>
+                                    <div><label style="font-size:.8rem;">IMS adjustment (%)</label><input type="number" id="plan-ims-adjustment" class="form-control" min="-20" max="0" step="5" value="0"></div>
+                                    <div><label style="font-size:.8rem;">Remote allocation</label><input type="number" id="plan-remote-days" class="form-control" min="0" step="0.5" value="0"></div>
+                                    <div><label style="font-size:.8rem;">On-site allocation</label><input type="number" id="plan-onsite-days" class="form-control" min="0" step="0.5"></div>
+                                    <div><label style="font-size:.8rem;">Justified adjustment</label><input type="number" id="plan-justified-adjustment" class="form-control" step="0.5" value="0"></div>
+                                    <div><label style="font-size:.8rem;font-weight:600;">Final audit duration</label><input type="number" id="plan-mandays" class="form-control" readonly style="font-weight:bold;color:var(--primary-color);"></div>
                                 </div>
-                                <div class="form-group" style="margin: 0;">
-                                    <label style="font-size: 0.8rem; font-weight: 600;">On-Site</label>
-                                    <input type="number" class="form-control" id="plan-onsite-days" step="0.5" style="font-weight: bold; color: var(--success-color);">
-                                </div>
+                                <div><label style="font-size:.8rem;">Adjustment justification</label><textarea id="plan-duration-justification" class="form-control" rows="2" placeholder="Required when a justified adjustment is applied"></textarea></div>
                             </div>
-                            <small id="manday-hint" style="color: #6b7280; display: block; margin-top: 8px; font-size: 0.75rem; text-align: center;">Based on ISO 17021-1 Annex Tables</small>
+                            <small id="manday-hint" style="color:#6b7280;display:block;margin-top:8px;font-size:.75rem;text-align:center;">Uses each selected scheme's approved duration methodology and IMS rules.</small>
+                        </div>
+
+                        <div class="card" style="margin:0;padding:1.5rem;">
+                            <h3 style="margin:0 0 1rem;font-size:1.1rem;color:var(--primary-color);">Team competence & allocation</h3>
+                            <div id="team-competence-panel" style="font-size:.85rem;color:var(--text-secondary);">Select the cycle and audit team.</div>
+                        </div>
+
+                        <div class="card" style="margin:0;padding:1.5rem;">
+                            <h3 style="margin:0 0 1rem;font-size:1.1rem;color:var(--primary-color);">Pre-save QA</h3>
+                            <div id="plan-qa-panel" style="font-size:.85rem;color:var(--text-secondary);">Validation results will appear here before finalization.</div>
                         </div>
 
                         <!-- Main Actions -->
                         <div style="display: grid; gap: 0.75rem; padding: 1rem; background: white; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);">
                             <button type="button" id="btn-plan-save" class="btn btn-primary" style="height: 48px; font-weight: 600;" aria-label="Save">
-                                <i class="fa-solid fa-floppy-disk" style="margin-right: 0.5rem;"></i> Save Audit Plan
+                                <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i> Validate & Save Audit Plan
                             </button>
                             <button type="button" id="btn-plan-save-print" class="btn btn-outline-primary" style="height: 42px;" aria-label="Print">
                                 <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Save & Print Draft
@@ -557,8 +705,15 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
     if (btnSavePrint) btnSavePrint.onclick = () => saveAuditPlan(true);
     if (btnCancel) btnCancel.onclick = () => renderAuditPlanningEnhanced();
 
-    // Fill initial agenda row
-    addAgendaRow({ day: 'Day 1', time: '09:00 - 09:30', item: 'Opening Meeting', dept: 'Top Management', auditor: 'All' });
+    document.getElementById('btn-refresh-narratives')?.addEventListener('click', generatePlanNarratives);
+    document.getElementById('plan-audit-method')?.addEventListener('change', () => {
+        recalculateDurationAllocation();
+        generatePlanNarratives();
+    });
+    ['plan-ims-adjustment', 'plan-remote-days', 'plan-onsite-days', 'plan-justified-adjustment'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', recalculateDurationAllocation);
+    });
+    ['plan-lead-auditor', 'plan-team'].forEach(id => document.getElementById(id)?.addEventListener('change', renderTeamCompetence));
 
     // Auto-trigger client details if activeClientId needed or pre-selected
     if (preSelectedClientName) {
@@ -583,6 +738,95 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
     }
 }
 
+function getCurrentFormCycleContext() {
+    const clientName = document.getElementById('plan-client')?.value;
+    const client = window.state.clients.find(c => c.name === clientName);
+    return client ? getCertificationCycleContext(client) : { valid: false, cycles: [], standards: [] };
+}
+
+function getPreviousPlanFindings(clientName, standards) {
+    const families = standards.map(normalizeStandardFamily);
+    const reports = (window.state.auditReports || []).filter(report => {
+        if (report.client !== clientName) return false;
+        const linked = (window.state.auditPlans || []).find(plan => String(plan.id) === String(report.planId));
+        const source = `${report.standard || ''} ${linked?.standard || ''}`;
+        return families.some(family => source.toUpperCase().includes(family));
+    });
+    return reports.flatMap(report => (report.checklistProgress || []).filter(item => item.status === 'nc')).slice(0, 20);
+}
+
+function generatePlanNarratives() {
+    const clientName = document.getElementById('plan-client')?.value || '';
+    const client = window.state.clients.find(c => c.name === clientName);
+    const cycle = getCurrentFormCycleContext();
+    if (!client || !cycle.cycles.length) return;
+    const method = document.getElementById('plan-audit-method')?.value || 'On-site';
+    const sites = Array.from(document.querySelectorAll('.site-checkbox:checked')).map(cb => cb.dataset.name);
+    const scopes = [...new Set(cycle.cycles.map(c => c.scope).filter(Boolean))];
+    const previousFindings = getPreviousPlanFindings(clientName, cycle.standards);
+    const standards = cycle.standards.join(', ');
+    const activityText = method === 'Remote'
+        ? 'Activities will be performed remotely using secure communication, document-sharing and interview tools; no physical site activity is planned.'
+        : method === 'Hybrid'
+            ? 'Remote activities will cover document review and suitable interviews. On-site activities will cover physical verification, operational controls, sampling and the facility tour.'
+            : 'Activities will be performed on-site and include interviews, document and record sampling, operational-control verification and a facility tour.';
+    const objectives = `For the ${cycle.auditType} stage, determine conformity and effectiveness against ${standards}; confirm continued fulfilment of certification requirements; verify action on previous findings and significant changes; and identify audit conclusions within the approved certification scope.`;
+    const criteria = `${standards}; the approved certification scope${scopes.length ? ` (${scopes.join(' | ')})` : ''}; the organization's documented management system; applicable legal, regulatory and contractual requirements; and relevant certification-programme requirements. Sites: ${sites.join(', ') || 'to be confirmed'}. Previous findings requiring risk-based follow-up: ${previousFindings.length}.`;
+    const methodology = `${activityText} Evidence will be obtained through interviews, review of documented information and records, and risk-based sampling across ${sites.length || 0} selected site(s). Previous findings and significant changes will be prioritized. Sampling does not remove mandatory audit activities or applicable scheme requirements.`;
+    if (document.getElementById('plan-objectives')) document.getElementById('plan-objectives').value = objectives;
+    if (document.getElementById('plan-criteria')) document.getElementById('plan-criteria').value = criteria;
+    if (document.getElementById('plan-methodology')) document.getElementById('plan-methodology').value = methodology;
+}
+
+function getDurationMethodology(standard) {
+    const family = normalizeStandardFamily(standard);
+    const configured = window.state?.cbSettings?.durationMethodologies?.[family];
+    if (configured) return configured;
+    if (family === '27001') return 'ISO/IEC 27006-1 scheme duration methodology';
+    if (family === '22000') return 'ISO 22003-1 scheme duration methodology';
+    if (family === '13485') return 'IAF MD 9 medical-device scheme methodology';
+    if (family === '50001') return 'ISO 50003 energy-management scheme methodology';
+    return 'Applicable IAF MD 5 management-system duration methodology';
+}
+
+function recalculateDurationAllocation() {
+    const baseline = parseFloat(document.getElementById('plan-baseline-days')?.value) || 0;
+    const imsPercent = parseFloat(document.getElementById('plan-ims-adjustment')?.value) || 0;
+    const justified = parseFloat(document.getElementById('plan-justified-adjustment')?.value) || 0;
+    const finalDays = Math.max(0, Math.ceil((baseline * (1 + imsPercent / 100) + justified) * 2) / 2);
+    const method = document.getElementById('plan-audit-method')?.value || 'On-site';
+    const remoteInput = document.getElementById('plan-remote-days');
+    const onsiteInput = document.getElementById('plan-onsite-days');
+    if (document.activeElement !== remoteInput && document.activeElement !== onsiteInput) {
+        if (method === 'Remote') { remoteInput.value = finalDays; onsiteInput.value = 0; }
+        else if (method === 'On-site') { remoteInput.value = 0; onsiteInput.value = finalDays; }
+        else { remoteInput.value = Math.floor(finalDays / 2 * 2) / 2; onsiteInput.value = finalDays - parseFloat(remoteInput.value); }
+    }
+    if (document.getElementById('plan-mandays')) document.getElementById('plan-mandays').value = finalDays.toFixed(1);
+    renderTeamCompetence();
+}
+
+function renderTeamCompetence() {
+    const panel = document.getElementById('team-competence-panel');
+    if (!panel) return;
+    const cycle = getCurrentFormCycleContext();
+    const lead = document.getElementById('plan-lead-auditor')?.value;
+    const members = Array.from(document.getElementById('plan-team')?.selectedOptions || []).map(o => o.value);
+    const names = [lead, ...members].filter(Boolean);
+    if (!names.length) { panel.textContent = 'Select a Lead Auditor and team members to validate scheme coverage.'; return; }
+    const finalDays = parseFloat(document.getElementById('plan-mandays')?.value) || 0;
+    const defaultAllocation = names.length ? Math.ceil(finalDays / names.length * 2) / 2 : 0;
+    panel.innerHTML = names.map((name, index) => {
+        const auditor = window.state.auditors.find(a => a.name === name) || {};
+        const competence = auditor.standards || [];
+        const covers = cycle.standards.filter(std => competence.some(c => normalizeStandardFamily(c) === normalizeStandardFamily(std)));
+        return `<div style="display:grid;grid-template-columns:1fr auto;gap:.75rem;padding:.65rem 0;border-bottom:1px solid #e2e8f0;">
+            <div><strong>${window.UTILS.escapeHtml(name)}</strong> — ${index === 0 ? 'Lead Auditor' : (auditor.role || 'Team Member')}<br><span style="color:${covers.length ? '#166534' : '#b91c1c'};">Competence: ${competence.join(', ') || 'None recorded'} · Covers ${covers.length}/${cycle.standards.length}</span></div>
+            <label style="white-space:nowrap;">Days <input type="number" class="team-day-allocation" data-auditor="${window.UTILS.escapeHtml(name)}" min="0" step="0.5" value="${defaultAllocation}" style="width:70px;"></label>
+        </div>`;
+    }).join('');
+}
+
 function editAuditPlan(id) {
     const plan = state.auditPlans.find(p => String(p.id) === String(id));
     if (!plan) return;
@@ -601,8 +845,15 @@ function editAuditPlan(id) {
             // We need to wait for updateClientDetails to populate it if it's dynamic
         }
 
-        document.getElementById('plan-audit-type').value = plan.type || 'Surveillance';
-        document.getElementById('plan-date').value = plan.date;
+        document.getElementById('plan-audit-type').value = plan.certificationCycle?.auditType || plan.type || '';
+        document.getElementById('plan-date').value = plan.date || '';
+        document.getElementById('plan-end-date').value = plan.endDate || '';
+        document.getElementById('plan-audit-method').value = plan.auditMethod || 'On-site';
+        document.getElementById('plan-impartiality-risk').value = plan.impartialityAssessment?.risk || 'None';
+        document.getElementById('plan-impartiality-notes').value = plan.impartialityAssessment?.notes || '';
+        document.getElementById('plan-objectives').value = plan.objectives || '';
+        document.getElementById('plan-criteria').value = plan.criteria || '';
+        document.getElementById('plan-methodology').value = plan.methodology || '';
 
         // Critical Fix: Load ManDays from various possible sources
         const savedManDays = plan.manDays || plan.man_days || '';
@@ -610,6 +861,13 @@ function editAuditPlan(id) {
 
         if (document.getElementById('plan-mandays')) document.getElementById('plan-mandays').value = savedManDays;
         if (document.getElementById('plan-onsite-days')) document.getElementById('plan-onsite-days').value = savedOnsiteDays;
+        const duration = plan.durationCalculation || {};
+        if (document.getElementById('plan-baseline-days')) document.getElementById('plan-baseline-days').value = duration.baselineDays || savedManDays;
+        if (document.getElementById('plan-ims-adjustment')) document.getElementById('plan-ims-adjustment').value = duration.imsAdjustmentPercent || 0;
+        if (document.getElementById('plan-remote-days')) document.getElementById('plan-remote-days').value = duration.remoteDays || 0;
+        if (document.getElementById('plan-justified-adjustment')) document.getElementById('plan-justified-adjustment').value = duration.justifiedAdjustment || 0;
+        if (document.getElementById('plan-duration-justification')) document.getElementById('plan-duration-justification').value = duration.justification || '';
+        if (document.getElementById('plan-duration-basis')) document.getElementById('plan-duration-basis').value = duration.basis || '';
 
         // Trigger client details load
         updateClientDetails(plan.client);
@@ -653,6 +911,16 @@ function editAuditPlan(id) {
             Array.from(teamSelect.options).forEach(opt => {
                 opt.selected = teamNames.includes(opt.value);
             });
+            renderTeamCompetence();
+            (plan.teamAllocations || []).forEach(allocation => {
+                const input = Array.from(document.querySelectorAll('.team-day-allocation')).find(el => el.dataset.auditor === allocation.auditor);
+                if (input) input.value = allocation.days;
+            });
+            const confirmation = document.getElementById('plan-cycle-confirmed');
+            if (confirmation && plan.certificationCycle) confirmation.checked = true;
+            if (plan.objectives) document.getElementById('plan-objectives').value = plan.objectives;
+            if (plan.criteria) document.getElementById('plan-criteria').value = plan.criteria;
+            if (plan.methodology) document.getElementById('plan-methodology').value = plan.methodology;
 
         }, 300);
 
@@ -689,28 +957,38 @@ function updateClientDetails(clientName) {
         // Define sitesCount early to avoid ReferenceError
         const sitesCount = (client.sites && client.sites.length) || 1;
 
-        // Update Standards Filtered by Client
+        // Certification cycle is the sole source for standards, editions and stage.
         const stdSelect = document.getElementById('plan-standard');
         const stdHint = document.getElementById('standards-hint');
+        const cyclePanel = document.getElementById('cycle-source-panel');
+        const cycle = getCertificationCycleContext(client);
         if (stdSelect) {
-            // Get standards assigned to client
-            const clientStdsStr = client.standard || '';
-            const clientStds = clientStdsStr.split(',').map(s => s.trim()).filter(Boolean);
-
-            if (clientStds.length > 0) {
-                stdSelect.disabled = false;
-                stdSelect.innerHTML = clientStds.map(std => `<option value="${std}">${std}</option>`).join('');
-                if (stdHint) stdHint.textContent = 'Hold Ctrl/Cmd to select multiple';
-
-                // If there's only one standard, auto-select it
-                if (clientStds.length === 1) {
-                    stdSelect.options[0].selected = true;
-                }
+            if (cycle.cycles.length > 0) {
+                stdSelect.disabled = true;
+                stdSelect.innerHTML = cycle.standards.map(std => `<option value="${std}" selected>${std}</option>`).join('');
+                if (stdHint) stdHint.textContent = 'Locked to the current certification-cycle record. Confirm below; do not re-enter.';
+                const typeInput = document.getElementById('plan-audit-type');
+                if (typeInput) typeInput.value = cycle.auditType;
             } else {
                 stdSelect.disabled = true;
-                stdSelect.innerHTML = '<option value="">-- No Standards Assigned to Client --</option>';
-                if (stdHint) stdHint.textContent = 'Please update client profile with applicable standards';
+                stdSelect.innerHTML = '<option value="">-- No active certification cycle --</option>';
+                if (stdHint) stdHint.textContent = 'Create or complete the client certification-cycle record first.';
             }
+        }
+        if (cyclePanel) {
+            cyclePanel.style.display = 'block';
+            cyclePanel.innerHTML = cycle.cycles.length ? `
+                <div style="font-weight:700;margin-bottom:.5rem;">Certification-cycle source of truth</div>
+                ${cycle.conflict ? `<div style="color:#b91c1c;margin-bottom:.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> ${cycle.conflict}</div>` : ''}
+                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;font-size:.85rem;">
+                    <div><strong>Current stage:</strong> ${cycle.stage || 'Unresolved'}</div>
+                    <div><strong>Required audit type:</strong> ${cycle.auditType || 'Resolve cycle conflict'}</div>
+                    <div><strong>Recommended window:</strong> ${cycle.recommendedWindowStart || '-'} to ${cycle.recommendedWindowEnd || '-'}</div>
+                    <div><strong>Certificate expiry:</strong> ${cycle.certificateExpiry || '-'} (${cycle.closureBufferDays}-day NC closure buffer)</div>
+                </div>
+                <label style="display:flex;gap:.5rem;align-items:flex-start;margin-top:.75rem;font-weight:600;"><input type="checkbox" id="plan-cycle-confirmed"> I confirm the cycle stage, standards and current editions shown above.</label>
+                <small style="display:block;color:#64748b;margin-top:.35rem;">The recommended window is planning guidance, not a compliance deadline.</small>
+            ` : '<div style="color:#b91c1c;">No usable certification-cycle record. Audit planning cannot be finalized.</div>';
         }
 
         // Enable Man-Day button if employees/sites are present
@@ -765,6 +1043,7 @@ function updateClientDetails(clientName) {
                     if (calcBtn) {
                         calcBtn.disabled = count === 0;
                     }
+                    generatePlanNarratives();
                 });
             });
         } else if (siteGroup) {
@@ -805,6 +1084,8 @@ function updateClientDetails(clientName) {
         } else if (auditeeSelect) {
             auditeeSelect.innerHTML = '<option value="">-- No contacts available --</option>';
         }
+        generatePlanNarratives();
+        renderTeamCompetence();
     } else {
         if (siteGroup) siteGroup.style.display = 'none';
     }
@@ -847,42 +1128,25 @@ function autoCalculateDays() {
 
     const risk = document.getElementById('plan-risk').value || 'Medium';
 
-    // Ensure the helper function exists (it's in advanced-modules.js)
-    if (typeof calculateManDays !== 'function') {
-        // Simple fallback if advanced-module isn't loaded
-        console.warn('Advanced Man-Day Calculator not found, using simple fallback');
-        let simpleDays;
-        if (totalEmployees <= 10) simpleDays = 2;
-        else if (totalEmployees <= 50) simpleDays = 3;
-        else if (totalEmployees <= 100) simpleDays = 5;
-        else if (totalEmployees <= 500) simpleDays = 8;
-        else simpleDays = 12;
-
-        // Adjust for multiple sites
-        simpleDays += (siteCount - 1) * 0.5;
-
-        document.getElementById('plan-mandays').value = simpleDays.toFixed(1);
-        document.getElementById('plan-onsite-days').value = (simpleDays * 0.8).toFixed(1);
-        window.showNotification(`Calculated ${simpleDays.toFixed(1)} days for ${totalEmployees} employees at ${siteCount} site(s)`, 'success');
-        return;
-    }
-
     if (totalEmployees > 0) {
-        // Signature: calculateManDays(employees, sites, effectiveness, shiftWork, riskLevel)
-        const results = calculateManDays(totalEmployees, siteCount, 2, hasShiftWork, risk);
-
-        const typeSelect = document.getElementById('plan-audit-type');
-        const type = typeSelect ? typeSelect.value : 'Surveillance';
-        let days;
-
-        if (type.includes('Stage 1')) days = results.stage1;
-        else if (type.includes('Stage 2') || type.includes('Recertification') || type.includes('Initial')) days = results.stage2; // Recert is typically full duration like Stage 2
-        else days = results.surveillance;
-
-        document.getElementById('plan-mandays').value = days.toFixed(1);
-        document.getElementById('plan-onsite-days').value = (days * 0.8).toFixed(1);
-
-        window.showNotification(`Calculated ${days.toFixed(1)} man - days for ${totalEmployees} employees at ${siteCount} site(s)${hasShiftWork ? ' (with shift work)' : ''} `, 'success');
+        const cycle = getCurrentFormCycleContext();
+        if (!cycle.valid) {
+            window.showNotification(cycle.conflict || 'A valid certification cycle is required before duration can be calculated.', 'error');
+            return;
+        }
+        const results = typeof calculateManDays === 'function'
+            ? calculateManDays(totalEmployees, siteCount, 2, hasShiftWork, risk)
+            : { stage1: 1, stage2: Math.max(2, Math.ceil(totalEmployees / 50)), surveillance: Math.max(1, Math.ceil(totalEmployees / 150)) };
+        let baseline = cycle.auditType.startsWith('Surveillance') ? results.surveillance : Math.ceil(results.stage2 * 0.67 * 2) / 2;
+        const schemeFactors = { '27001': 1.1, '22000': 1.15, '13485': 1.15, '50001': 1.1 };
+        baseline = Math.max(...cycle.standards.map(std => baseline * (schemeFactors[normalizeStandardFamily(std)] || 1)));
+        baseline = Math.ceil(baseline * 2) / 2;
+        const imsDefault = cycle.standards.length > 1 ? Math.max(-20, -(cycle.standards.length - 1) * 10) : 0;
+        document.getElementById('plan-baseline-days').value = baseline.toFixed(1);
+        document.getElementById('plan-ims-adjustment').value = imsDefault;
+        document.getElementById('plan-duration-basis').value = [...new Set(cycle.standards.map(getDurationMethodology))].join('; ');
+        recalculateDurationAllocation();
+        window.showNotification(`Duration calculation recorded for ${cycle.auditType}: baseline ${baseline.toFixed(1)} days, with transparent allocation and adjustments.`, 'success');
     } else {
         window.showNotification('No employee data available for selected sites. Please verify client/site information.', 'warning');
     }
@@ -1162,16 +1426,23 @@ function viewAuditPlan(id) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem;">
                     <div>
                         <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Objectives</div>
-                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.auditObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system'}</div>
+                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.objectives || plan.auditObjectives || 'Not recorded'}</div>
                     </div>
                     <div>
                         <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Criteria</div>
-                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.auditCriteria || '• ' + (plan.standard || 'Applicable ISO standard(s)') + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records'}</div>
+                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.criteria || plan.auditCriteria || 'Not recorded'}</div>
                     </div>
                     <div>
                         <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Methodology</div>
-                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.auditMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel\n• Observation of activities and work environment\n• Review of documented information and objective evidence'}</div>
+                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.methodology || plan.auditMethodology || 'Not recorded'}</div>
                     </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1rem;padding-top:1rem;border-top:1px solid #e2e8f0;">
+                    <div><strong>Cycle stage</strong><br>${window.UTILS.escapeHtml(plan.certificationCycle?.stage || plan.type || 'Not recorded')}</div>
+                    <div><strong>Recommended window</strong><br>${plan.certificationCycle ? `${window.UTILS.formatDate(plan.certificationCycle.recommendedWindowStart)} – ${window.UTILS.formatDate(plan.certificationCycle.recommendedWindowEnd)}` : 'Not recorded'} <small>(guidance)</small></div>
+                    <div><strong>Scheduled audit</strong><br>${plan.date ? `${window.UTILS.formatDate(plan.date)}${plan.endDate ? ` – ${window.UTILS.formatDate(plan.endDate)}` : ''}` : 'Not yet booked'}</div>
+                    <div><strong>Certificate expiry</strong><br>${plan.certificationCycle?.certificateExpiry ? window.UTILS.formatDate(plan.certificationCycle.certificateExpiry) : 'Not recorded'}</div>
+                    <div style="grid-column:1/-1;"><strong>Duration</strong><br>${plan.durationCalculation ? `${plan.durationCalculation.baselineDays} baseline → ${plan.durationCalculation.imsAdjustmentPercent}% IMS → ${plan.durationCalculation.remoteDays} remote / ${plan.durationCalculation.onsiteDays} on-site → ${plan.durationCalculation.justifiedAdjustment} adjustment → ${plan.durationCalculation.finalDays} final days` : `${plan.manDays || 0} total days`}</div>
                 </div>
             </div>
 
@@ -2369,8 +2640,12 @@ window.printAuditPlanDetails = function (planId) {
                     <td><span class="meta-label">Audit Standard</span>${window.UTILS.escapeHtml(plan.standard)}</td>
                 </tr>
                 <tr>
-                    <td><span class="meta-label">Planned Date</span>${window.UTILS.formatDate(plan.date)}</td>
+                    <td><span class="meta-label">Scheduled Audit</span>${plan.date ? `${window.UTILS.formatDate(plan.date)}${plan.endDate ? ` – ${window.UTILS.formatDate(plan.endDate)}` : ''}` : 'Not yet booked'}</td>
                     <td><span class="meta-label">Audit Type</span>${window.UTILS.escapeHtml(plan.type)}</td>
+                </tr>
+                <tr>
+                    <td><span class="meta-label">Recommended Audit Window</span>${plan.certificationCycle ? `${window.UTILS.formatDate(plan.certificationCycle.recommendedWindowStart)} – ${window.UTILS.formatDate(plan.certificationCycle.recommendedWindowEnd)} (planning guidance)` : 'Not recorded'}</td>
+                    <td><span class="meta-label">Certificate Expiry</span>${plan.certificationCycle?.certificateExpiry ? window.UTILS.formatDate(plan.certificationCycle.certificateExpiry) : 'Not recorded'}</td>
                 </tr>
                 <tr>
                     <td><span class="meta-label">Audit Method</span>${window.UTILS.escapeHtml(plan.auditMethod || 'Not recorded')}</td>
@@ -2381,7 +2656,7 @@ window.printAuditPlanDetails = function (planId) {
                     <td><span class="meta-label">Audit Team</span>${window.UTILS.escapeHtml(otherMembers.join(', ') || 'None')}</td>
                 </tr>
                  <tr>
-                    <td><span class="meta-label">Total Man-Days</span>${window.UTILS.escapeHtml(plan.manDays)} days (${window.UTILS.escapeHtml(plan.onsiteDays)} onsite)</td>
+                    <td><span class="meta-label">Duration Calculation</span>${window.UTILS.escapeHtml(plan.durationCalculation?.baselineDays ?? plan.manDays)} baseline → ${window.UTILS.escapeHtml(plan.durationCalculation?.imsAdjustmentPercent ?? 0)}% IMS → ${window.UTILS.escapeHtml(plan.durationCalculation?.remoteDays ?? 0)} remote / ${window.UTILS.escapeHtml(plan.onsiteDays)} on-site → ${window.UTILS.escapeHtml(plan.durationCalculation?.justifiedAdjustment ?? 0)} justified adjustment → <strong>${window.UTILS.escapeHtml(plan.manDays)} final days</strong></td>
                     <td><span class="meta-label">Operational Risk</span>${window.UTILS.escapeHtml(plan.riskLevel || 'Medium')}</td>
                 </tr>
             </table>
@@ -2456,17 +2731,17 @@ window.printAuditPlanDetails = function (planId) {
 
             <div class="section-title">AUDIT OBJECTIVES</div>
             <div style="white-space: pre-line; color: #333; line-height: 1.8; padding-left: 10px;">
-${plan.auditObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement'}
+${plan.objectives || plan.auditObjectives || 'Not recorded'}
             </div>
 
             <div class="section-title">AUDIT CRITERIA</div>
             <div style="white-space: pre-line; color: #333; line-height: 1.8; padding-left: 10px;">
-${plan.auditCriteria || '• ' + (plan.standard || 'Applicable ISO standard(s)') + '\n• Organization management system documentation (manuals, procedures, work instructions)\n• Applicable legal, statutory and regulatory requirements\n• Previous audit findings and corrective action records'}
+${plan.criteria || plan.auditCriteria || 'Not recorded'}
             </div>
 
             <div class="section-title">AUDIT METHODOLOGY</div>
             <div style="white-space: pre-line; color: #333; line-height: 1.8; padding-left: 10px;">
-${plan.auditMethodology || planMethodologyDefault(plan.auditMethod)}
+${plan.methodology || plan.auditMethodology || planMethodologyDefault(plan.auditMethod)}
             </div>
 
             <div class="footer">
@@ -2493,6 +2768,122 @@ function togglePlanningAnalytics() {
     renderAuditPlanningEnhanced();
 }
 
+function renderPlanQA(qa) {
+    const panel = document.getElementById('plan-qa-panel');
+    if (!panel) return;
+    const row = (item, color, icon) => `<div style="color:${color};margin:.35rem 0;"><i class="fa-solid ${icon}" style="width:18px;"></i>${window.UTILS.escapeHtml(item)}</div>`;
+    const passedCount = qa.checks.filter(check => check.passed).length;
+    const warningCount = qa.warnings.length;
+    const blockingCount = qa.errors.length;
+    panel.innerHTML = [
+        `<div style="padding:.75rem;border-radius:8px;background:${blockingCount ? '#fef2f2' : warningCount ? '#fffbeb' : '#f0fdf4'};border:1px solid ${blockingCount ? '#fecaca' : warningCount ? '#fde68a' : '#bbf7d0'};margin-bottom:.75rem;">
+            <div style="font-weight:700;color:${blockingCount ? '#991b1b' : warningCount ? '#92400e' : '#166534'};">Readiness result: ${passedCount}/${qa.checks.length} checks passed</div>
+            <div style="font-size:.78rem;margin-top:.25rem;color:#475569;">${blockingCount} blocking issue${blockingCount === 1 ? '' : 's'} · ${warningCount} warning${warningCount === 1 ? '' : 's'}</div>
+        </div>`,
+        `<details ${blockingCount ? 'open' : ''} style="margin-bottom:.65rem;"><summary style="cursor:pointer;font-weight:600;color:#475569;">View readiness checks</summary><div style="margin-top:.4rem;">${qa.checks.map(check => row(check.label, check.passed ? '#166534' : '#b91c1c', check.passed ? 'fa-circle-check' : 'fa-circle-xmark')).join('')}</div></details>`,
+        ...qa.errors.map(item => row(item, '#b91c1c', 'fa-circle-xmark')),
+        ...qa.warnings.map(item => row(item, '#a16207', 'fa-triangle-exclamation')),
+        ...(qa.errors.length || qa.warnings.length ? [] : [row('All pre-save checks passed.', '#166534', 'fa-circle-check')])
+    ].join('');
+}
+
+function validateAuditPlanForSave(planData) {
+    const errors = [];
+    const warnings = [];
+    const cycle = getCurrentFormCycleContext();
+    if (!cycle.cycles.length) errors.push('Complete the certification-cycle record before finalizing this plan.');
+    if (cycle.conflict) errors.push(cycle.conflict);
+    if (!document.getElementById('plan-cycle-confirmed')?.checked) errors.push('Confirm the certification-cycle stage, standards and editions.');
+    if (planData.standard !== cycle.standards.join(', ')) errors.push('Standards must exactly match the current certification-cycle record.');
+    if (planData.auditType !== cycle.auditType) errors.push('Audit type must match the current certification-cycle stage.');
+
+    const start = parsePlanDate(planData.date);
+    const end = parsePlanDate(planData.endDate);
+    const expiry = parsePlanDate(cycle.certificateExpiry);
+    const windowStart = parsePlanDate(cycle.recommendedWindowStart);
+    const windowEnd = parsePlanDate(cycle.recommendedWindowEnd);
+    if ((start && !end) || (!start && end)) errors.push('Enter both scheduled audit start and end dates, or leave both blank.');
+    if (start && end && end < start) errors.push('Scheduled audit end cannot be before the start.');
+    if (end && expiry && end > expiry) errors.push('Scheduled audit dates extend beyond certificate expiry.');
+    if (start && windowStart && windowEnd && (start < windowStart || start > windowEnd)) warnings.push('Scheduled dates are outside the recommended planning window.');
+    if (end && windowEnd && end > windowEnd) warnings.push(`Scheduled completion leaves less than the required ${cycle.closureBufferDays}-day NC closure buffer before expiry.`);
+
+    if (!planData.objectives || !planData.criteria || !planData.methodology) errors.push('Objectives, criteria and methodology are required.');
+    const methodText = String(planData.methodology || '').toLowerCase();
+    if (planData.auditMethod === 'Remote' && /(physical presence|on-site review|onsite review|facility tour)/i.test(methodText)) errors.push('Remote methodology contains contradictory on-site activity text.');
+    if (planData.auditMethod === 'Hybrid' && (!methodText.includes('remote') || !/on-site|onsite/.test(methodText))) errors.push('Hybrid methodology must distinguish remote and on-site activities.');
+
+    const duration = planData.durationCalculation;
+    if (!duration.basis || duration.baselineDays <= 0 || duration.finalDays <= 0) errors.push('Complete the scheme-specific duration calculation.');
+    if (Math.abs((duration.remoteDays + duration.onsiteDays) - duration.finalDays) > 0.01) errors.push('Remote and on-site allocations must equal final audit duration.');
+    if (planData.auditMethod === 'Remote' && duration.onsiteDays > 0) errors.push('A Remote audit cannot have on-site duration allocated.');
+    if (planData.auditMethod === 'On-site' && duration.remoteDays > 0) errors.push('An On-site audit cannot have remote duration allocated.');
+    if (planData.auditMethod === 'Hybrid' && (!duration.remoteDays || !duration.onsiteDays)) errors.push('A Hybrid audit requires both remote and on-site allocation.');
+    if (duration.justifiedAdjustment !== 0 && !duration.justification.trim()) errors.push('Document justification for the duration adjustment.');
+    if (!planData.selectedSites.length) errors.push('Select at least one site for audit coverage.');
+
+    const assignedAuditors = planData.team.map(name => window.state.auditors.find(a => a.name === name)).filter(Boolean);
+    const covered = new Set(assignedAuditors.flatMap(a => (a.standards || []).map(normalizeStandardFamily)));
+    cycle.standards.forEach(std => { if (!covered.has(normalizeStandardFamily(std))) errors.push(`Audit team lacks recorded competence for ${std}.`); });
+    const lead = assignedAuditors[0];
+    if (!lead || lead.role !== 'Lead Auditor') errors.push('The assigned lead must have the Lead Auditor role.');
+    if (lead) cycle.standards.forEach(std => {
+        if (!(lead.standards || []).some(c => normalizeStandardFamily(c) === normalizeStandardFamily(std))) errors.push(`Lead Auditor lacks recorded competence for ${std}.`);
+    });
+    const allocatedDays = planData.teamAllocations.reduce((sum, item) => sum + item.days, 0);
+    if (Math.abs(allocatedDays - duration.finalDays) > 0.01) errors.push('Planned auditor-day allocations must equal final audit duration.');
+    if (planData.impartialityAssessment.risk === 'High') errors.push('High impartiality risk must be resolved before plan finalization.');
+    if (['Medium', 'High'].includes(planData.impartialityAssessment.risk) && !planData.impartialityAssessment.notes.trim()) errors.push('Record mitigation for the identified impartiality risk.');
+
+    const agendaText = planData.agenda.map(item => item.item.toLowerCase()).join(' ');
+    if (!planData.agenda.length) errors.push('Generate or enter the audit agenda after all planning inputs are established.');
+    if (!agendaText.includes('opening')) errors.push('Agenda must include the mandatory opening meeting.');
+    if (!agendaText.includes('closing')) errors.push('Agenda must include the mandatory closing meeting.');
+    if (!/management system|clause/.test(agendaText)) errors.push('Agenda must cover applicable management-system clauses.');
+    if (planData.auditMethod === 'Remote' && /(facility tour|site tour|physical presence|on-site review|onsite review)/i.test(agendaText)) errors.push('Remote agenda contains a contradictory physical/on-site activity.');
+    if (planData.auditMethod === 'Hybrid' && planData.agenda.some(item => !/^\[(remote|on-site)\]/i.test(String(item.item || '')))) errors.push('Every Hybrid agenda activity must be labelled Remote or On-site.');
+    const previousFindings = getPreviousPlanFindings(planData.client, cycle.standards);
+    if (previousFindings.length && !/previous|finding|nonconform/.test(agendaText)) errors.push('Agenda must include follow-up of previous findings.');
+    if (planData.agenda.length && duration.finalDays > 0) {
+        const maxDay = Math.max(...planData.agenda.map(item => parseInt(String(item.day).match(/\d+/)?.[0] || '1', 10)));
+        if (maxDay > Math.ceil(duration.finalDays)) errors.push('Agenda extends beyond the calculated audit duration.');
+        if (maxDay < Math.ceil(duration.finalDays)) warnings.push('Agenda does not yet allocate activities across the full calculated duration.');
+    }
+    const datePairValid = (!start && !end) || (start && end && end >= start && (!expiry || end <= expiry));
+    const narrativeValid = Boolean(planData.objectives && planData.criteria && planData.methodology)
+        && !(planData.auditMethod === 'Remote' && /(physical presence|on-site review|onsite review|facility tour)/i.test(methodText))
+        && !(planData.auditMethod === 'Hybrid' && (!methodText.includes('remote') || !/on-site|onsite/.test(methodText)));
+    const allocationValid = Math.abs((duration.remoteDays + duration.onsiteDays) - duration.finalDays) <= 0.01
+        && !(planData.auditMethod === 'Remote' && duration.onsiteDays > 0)
+        && !(planData.auditMethod === 'On-site' && duration.remoteDays > 0)
+        && !(planData.auditMethod === 'Hybrid' && (!duration.remoteDays || !duration.onsiteDays));
+    const competenceValid = Boolean(lead && lead.role === 'Lead Auditor')
+        && cycle.standards.every(std => covered.has(normalizeStandardFamily(std)))
+        && (!lead || cycle.standards.every(std => (lead.standards || []).some(c => normalizeStandardFamily(c) === normalizeStandardFamily(std))));
+    const agendaValid = Boolean(planData.agenda.length && agendaText.includes('opening') && agendaText.includes('closing') && /management system|clause/.test(agendaText))
+        && !(previousFindings.length && !/previous|finding|nonconform/.test(agendaText))
+        && !(planData.auditMethod === 'Remote' && /(facility tour|site tour|physical presence|on-site review|onsite review)/i.test(agendaText))
+        && !(planData.auditMethod === 'Hybrid' && planData.agenda.some(item => !/^\[(remote|on-site)\]/i.test(String(item.item || ''))))
+        && (!planData.agenda.length || Math.max(...planData.agenda.map(item => parseInt(String(item.day).match(/\d+/)?.[0] || '1', 10))) <= Math.ceil(duration.finalDays));
+    const checks = [
+        { label: 'Certification cycle is established and internally consistent', passed: cycle.valid && !cycle.conflict },
+        { label: 'Cycle stage, standards and editions are auditor-confirmed', passed: Boolean(document.getElementById('plan-cycle-confirmed')?.checked) },
+        { label: 'Audit type and standards match the certification cycle', passed: planData.standard === cycle.standards.join(', ') && planData.auditType === cycle.auditType },
+        { label: 'Scheduled dates are valid against certificate expiry', passed: Boolean(datePairValid) },
+        { label: 'Objectives, criteria and methodology are complete and consistent', passed: narrativeValid },
+        { label: 'Scheme-specific duration calculation is complete', passed: Boolean(duration.basis && duration.baselineDays > 0 && duration.finalDays > 0 && (duration.justifiedAdjustment === 0 || duration.justification.trim())) },
+        { label: 'Remote/on-site duration allocation matches the audit method', passed: allocationValid },
+        { label: 'Required sites are covered', passed: planData.selectedSites.length > 0 },
+        { label: 'Lead Auditor and collective team competence are covered', passed: competenceValid },
+        { label: 'Planned auditor-day allocations match final duration', passed: Math.abs(allocatedDays - duration.finalDays) <= 0.01 },
+        { label: 'Impartiality and conflict status is acceptable', passed: planData.impartialityAssessment.risk !== 'High' && (!['Medium', 'High'].includes(planData.impartialityAssessment.risk) || Boolean(planData.impartialityAssessment.notes.trim())) },
+        { label: 'Agenda contains mandatory activities and fits the plan', passed: agendaValid }
+    ];
+    const qa = { errors: [...new Set(errors)], warnings: [...new Set(warnings)], checks };
+    renderPlanQA(qa);
+    return qa;
+}
+
 // Note: goToStep2, goToStep1, addAgendaRow, deleteAgendaRow are defined earlier in the file (around lines 1369-1461)
 // The saveAuditPlan function below is the definitive version with proper validation and sanitization
 
@@ -2511,7 +2902,7 @@ function saveAuditPlan(shouldPrint = false) {
     // 2. Define Rules
     const rules = {
         client: [{ rule: 'required', fieldName: 'Client' }],
-        date: [{ rule: 'required', fieldName: 'Date' }],
+        date: [],
         manDays: [
             { rule: 'required', fieldName: 'Man-Days' },
             { rule: 'number', fieldName: 'Man-Days' },
@@ -2534,11 +2925,12 @@ function saveAuditPlan(shouldPrint = false) {
     // 4. Collect & Sanitize Data
     const clientName = document.getElementById('plan-client').value;
     const date = document.getElementById('plan-date').value;
-    const auditType = document.getElementById('plan-audit-type')?.value || 'Stage 2';
+    const endDate = document.getElementById('plan-end-date')?.value || '';
+    const cycleContext = getCurrentFormCycleContext();
+    const auditType = cycleContext.auditType || '';
 
     // Safely map multi-selects
-    const standardSelect = document.getElementById('plan-standard');
-    const standard = Array.from(standardSelect.selectedOptions).map(o => o.value).join(', ');
+    const standard = cycleContext.standards.join(', ');
 
     // Validate Leads/Team
     const leadAuditor = document.getElementById('plan-lead-auditor').value;
@@ -2552,12 +2944,15 @@ function saveAuditPlan(shouldPrint = false) {
 
     const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
     const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
+    const remoteDays = parseFloat(document.getElementById('plan-remote-days')?.value) || 0;
 
     const selectedSites = [];
     document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
         selectedSites.push({
             name: cb.dataset.name, // Usually safe as it comes from dataset, but...
-            geotag: cb.dataset.geotag || null
+            geotag: cb.dataset.geotag || null,
+            employees: parseInt(cb.dataset.employees, 10) || 0,
+            standards: cb.dataset.standards || ''
         });
     });
 
@@ -2584,11 +2979,16 @@ function saveAuditPlan(shouldPrint = false) {
     const auditMethod = document.getElementById('plan-audit-method')?.value || 'On-site';
     const impartialityRisk = document.getElementById('plan-impartiality-risk')?.value || 'None';
     const impartialityNotes = document.getElementById('plan-impartiality-notes')?.value || '';
+    const teamAllocations = Array.from(document.querySelectorAll('.team-day-allocation')).map(input => ({
+        auditor: input.dataset.auditor,
+        days: parseFloat(input.value) || 0
+    }));
 
     // 6. Construct Plan Object
     const planData = {
         client: clientName,
         date: date,
+        endDate: endDate,
         type: auditType, // Using consolidated auditType
         standard: standard,
         auditors: [],
@@ -2597,10 +2997,41 @@ function saveAuditPlan(shouldPrint = false) {
         onsiteDays: onsiteDays,
         selectedSites: selectedSites,
         agenda: agenda,
-        status: 'Scheduled',
+        status: date && endDate ? 'Scheduled' : 'Draft',
         // ISO 17021-1 Compliance Fields
         auditType: auditType,
         auditMethod: auditMethod,
+        certificationCycle: {
+            stage: cycleContext.stage,
+            auditType: cycleContext.auditType,
+            standards: cycleContext.standards,
+            records: cycleContext.cycles,
+            recommendedWindowStart: cycleContext.recommendedWindowStart,
+            recommendedWindowEnd: cycleContext.recommendedWindowEnd,
+            certificateExpiry: cycleContext.certificateExpiry,
+            ncClosureBufferDays: cycleContext.closureBufferDays,
+            confirmedBy: window.state.currentUser?.name || 'System',
+            confirmedAt: new Date().toISOString()
+        },
+        objectives: Sanitizer.sanitizeText(document.getElementById('plan-objectives')?.value || ''),
+        criteria: Sanitizer.sanitizeText(document.getElementById('plan-criteria')?.value || ''),
+        methodology: Sanitizer.sanitizeText(document.getElementById('plan-methodology')?.value || ''),
+        narrativeTemplateVersion: AUDIT_PLAN_TEMPLATE_VERSION,
+        durationCalculation: {
+            employees: parseInt(document.getElementById('plan-employees')?.value, 10) || 0,
+            sites: parseInt(document.getElementById('plan-sites')?.value, 10) || 0,
+            riskLevel: document.getElementById('plan-risk')?.value || 'Medium',
+            basis: document.getElementById('plan-duration-basis')?.value || '',
+            baselineDays: parseFloat(document.getElementById('plan-baseline-days')?.value) || 0,
+            imsAdjustmentPercent: parseFloat(document.getElementById('plan-ims-adjustment')?.value) || 0,
+            remoteDays,
+            onsiteDays,
+            justifiedAdjustment: parseFloat(document.getElementById('plan-justified-adjustment')?.value) || 0,
+            justification: document.getElementById('plan-duration-justification')?.value || '',
+            finalDays: manDays,
+            calculatedAt: new Date().toISOString()
+        },
+        teamAllocations,
         impartialityAssessment: {
             risk: impartialityRisk,
             notes: impartialityNotes,
@@ -2613,9 +3044,19 @@ function saveAuditPlan(shouldPrint = false) {
         auditMethodology: document.getElementById('plan-methodology')?.value || ''
     };
 
+    const qa = validateAuditPlanForSave(planData);
+    const passedChecks = qa.checks.filter(check => check.passed).length;
+    const readinessSummary = `${passedChecks}/${qa.checks.length} checks passed · ${qa.warnings.length} warning${qa.warnings.length === 1 ? '' : 's'}`;
+    if (qa.errors.length) {
+        window.showNotification(`${readinessSummary} · ${qa.errors.length} blocking issue${qa.errors.length === 1 ? '' : 's'}. Review Pre-save QA.`, 'error');
+        document.getElementById('plan-qa-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+    window.showNotification(readinessSummary, qa.warnings.length ? 'warning' : 'success');
+
     // 7. Save to Supabase (CRITICAL FIX: Database Persistence)
     const btnSave = document.getElementById('btn-plan-save');
-    const originalText = btnSave ? btnSave.textContent : 'Save Audit Plan';
+    const originalText = btnSave ? btnSave.textContent : 'Validate & Save Audit Plan';
 
     // Helper to Restore Button State
     const restoreButton = () => {
@@ -2626,7 +3067,7 @@ function saveAuditPlan(shouldPrint = false) {
     };
 
     if (btnSave) {
-        btnSave.textContent = 'Saving...';
+        btnSave.textContent = `${passedChecks}/${qa.checks.length} checks passed · Saving...`;
         btnSave.disabled = true;
     }
 
@@ -2674,9 +3115,13 @@ function saveAuditPlan(shouldPrint = false) {
                     id: planId,
                     client_id: clientId,
                     client_name: planData.client,
-                    date: planData.date,
+                    date: planData.date || null,
+                    start_date: planData.date || null,
+                    end_date: planData.endDate || null,
                     standard: planData.standard,
                     type: planData.type,
+                    audit_type: planData.auditType,
+                    objectives: planData.objectives,
                     lead_auditor: planData.team[0] || null,
                     status: planData.status,
 
@@ -2694,7 +3139,7 @@ function saveAuditPlan(shouldPrint = false) {
                 window.showNotification('Audit Plan saved and synced to database', 'success');
 
                 // Send Assignment Emails (Async, non-blocking) - Only if online
-                if (window.EmailService && window.state.auditors) {
+                if (planData.status === 'Scheduled' && window.EmailService && window.state.auditors) {
                     const teamMembers = [leadAuditor, ...team].filter(Boolean);
                     teamMembers.forEach(name => {
                         const auditor = window.state.auditors.find(a => a.name === name);
@@ -2765,10 +3210,12 @@ async function generateAIAgenda() {
     try {
         // Collect Context
         const clientName = document.getElementById('plan-client').value;
-        const standard = Array.from(document.getElementById('plan-standard').selectedOptions).map(o => o.value).join(', ');
-        const type = document.getElementById('plan-audit-type').value;
+        const cycle = getCurrentFormCycleContext();
+        const standard = cycle.standards.join(', ');
+        const type = cycle.auditType;
         const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
         const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
+        const method = document.getElementById('plan-audit-method')?.value || 'On-site';
 
         const selectedSites = [];
         document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
@@ -2778,6 +3225,9 @@ async function generateAIAgenda() {
         const leadAuditor = document.getElementById('plan-lead-auditor').value;
         const team = Array.from(document.getElementById('plan-team').selectedOptions).map(o => o.value);
         const fullTeam = [leadAuditor, ...team].filter(Boolean);
+        if (!cycle.valid || !clientName || !selectedSites.length || !manDays || !fullTeam.length) {
+            throw new Error(cycle.conflict || 'Establish the cycle stage, standards, sites, method, duration and audit team before generating the agenda.');
+        }
 
         // Fetch Client Departments & Contacts for Context
         const clientObj = window.state.clients.find(c => c.name === clientName);
@@ -2788,8 +3238,11 @@ async function generateAIAgenda() {
             client: clientName,
             standard: standard,
             type: type,
+            cycleStage: cycle.stage,
+            method: method,
             manDays: manDays,
             onsiteDays: onsiteDays,
+            remoteDays: parseFloat(document.getElementById('plan-remote-days')?.value) || 0,
             sites: selectedSites,
             team: fullTeam,
             departments: departments,
@@ -2802,6 +3255,13 @@ async function generateAIAgenda() {
             })).filter(c => c.name),
             clientDocumentContext: window.KB_HELPERS?.getClientDocumentContext?.(clientObj) || ''
         };
+        context.scope = cycle.cycles.map(c => c.scope).filter(Boolean).join(' | ');
+        context.significantChanges = clientObj?.significantChanges || clientObj?.changes || [];
+        context.riskLevel = document.getElementById('plan-risk')?.value || 'Medium';
+        context.operationalAreas = [
+            ...(clientObj?.keyProcesses || []).map(item => item.name || item),
+            ...(clientObj?.goodsServices || []).map(item => item.name || item)
+        ].filter(Boolean);
 
         // ── Inject previous audit report context (same client + same standard) ──
         const allReports = window.state.auditReports || [];
@@ -2847,7 +3307,35 @@ async function generateAIAgenda() {
         const tbody = document.getElementById('agenda-tbody');
         tbody.innerHTML = '';
 
-        agenda.forEach(item => {
+        let requiredActivities = [
+            { day: 'Day 1', time: '09:00 - 09:30', item: 'Mandatory opening meeting', dept: 'Top Management', auditor: 'All' },
+            ...(context.previousAudit?.ncCount ? [{ day: 'Day 1', time: '09:30 - 10:00', item: 'Follow-up of previous findings and nonconformities', dept: 'Process Owners', auditor: leadAuditor }] : []),
+            { day: 'Day 1', time: '', item: `Management system clauses and operational controls — ${standard}`, dept: 'Relevant Functions', auditor: 'All' },
+            { day: `Day ${Math.max(1, Math.ceil(manDays))}`, time: '', item: 'Mandatory audit conclusions and closing meeting', dept: 'Top Management', auditor: 'All' }
+        ];
+        if (method === 'Hybrid') {
+            requiredActivities = requiredActivities.map(item => {
+                const dayNumber = parseInt(String(item.day).match(/\d+/)?.[0] || '1', 10);
+                return { ...item, item: `[${dayNumber <= Math.ceil(context.remoteDays || 0) ? 'Remote' : 'On-site'}] ${item.item}` };
+            });
+        }
+        let optimized = Array.isArray(agenda) ? agenda : [];
+        if (method === 'Remote') {
+            optimized = optimized.filter(item => !/(facility tour|site tour|physical presence|on-site review|onsite review)/i.test(String(item.item || '')));
+        } else if (method === 'Hybrid') {
+            const remoteAllocation = context.remoteDays || 0;
+            optimized = optimized.map(item => {
+                if (/^\[(remote|on-site)\]/i.test(String(item.item || ''))) return item;
+                const dayNumber = parseInt(String(item.day || '').match(/\d+/)?.[0] || '1', 10);
+                const mode = dayNumber <= Math.ceil(remoteAllocation) ? 'Remote' : 'On-site';
+                return { ...item, item: `[${mode}] ${item.item}` };
+            });
+        }
+        requiredActivities.forEach(required => {
+            const token = required.item.toLowerCase().includes('opening') ? 'opening' : required.item.toLowerCase().includes('closing') ? 'closing' : required.item.toLowerCase().includes('previous') ? 'previous' : 'management system';
+            if (!optimized.some(item => String(item.item || '').toLowerCase().includes(token))) optimized.push(required);
+        });
+        optimized.forEach(item => {
             addAgendaRow(item);
         });
 

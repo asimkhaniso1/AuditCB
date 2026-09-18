@@ -592,7 +592,7 @@ function renderClientOverview(client) {
                     <div class="card">
                         <h4 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-info-circle" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Quick Info</h4>
                         <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.9rem;">
-                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Next Audit:</span><strong>${(function () { const upcoming = clientPlans.filter(p => p.status === 'Scheduled' || p.status === 'Planned' || p.status === 'Approved').sort((a, b) => new Date(a.date) - new Date(b.date))[0]; return upcoming ? upcoming.date : 'Not scheduled'; })()}</strong></div>
+                            ${(function () { const upcoming = clientPlans.filter(p => p.status === 'Scheduled' && p.date).sort((a, b) => new Date(a.date) - new Date(b.date))[0]; return `<div style="display:flex;justify-content:space-between;"><span style="color:var(--text-secondary);">${upcoming ? 'Scheduled Audit:' : 'Audit Booking:'}</span><strong>${upcoming ? window.UTILS.formatDate(upcoming.date) : 'Not scheduled'}</strong></div>`; })()}
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Industry:</span><span>${window.UTILS.escapeHtml(client.industry || '-')}</span></div>
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Standard:</span><span>${window.UTILS.escapeHtml(client.standard || '-')}</span></div>
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Sites:</span><span>${totalSites || 1}</span></div>
@@ -973,13 +973,20 @@ function renderCertificationCycleWidget(client) {
             expired = today > cycleEnd;
         }
 
-        const nextAuditLabel = (cs && cs.nextAudit && cs.nextAudit.source === 'scheduled') ? 'Next Audit (scheduled)' : 'Next Audit';
         const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
         const isUrgent = daysToNext > 0 && daysToNext <= 60;
         // Calendar-projected stage (no finalized audit on file) must say so —
         // otherwise "Surveillance 2 period" sits beside unticked S1/S2 nodes
         // and reads as a contradiction. cycleState exposes stageSource for this.
         const isProjectedStage = !!(cs && cs.stageSource === 'calendar');
+        const cycleContext = window.getCertificationCycleContext ? window.getCertificationCycleContext(client, today) : null;
+        const cycleRecord = cycleContext?.cycles?.find(c => c.standard === std);
+        const scheduledPlan = (window.state.auditPlans || [])
+            .filter(plan => plan.client === client.name && plan.status === 'Scheduled' && String(plan.standard || '').includes(std))
+            .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+        const scheduledEnd = scheduledPlan?.endDate || scheduledPlan?.date;
+        const daysFromScheduledEndToExpiry = scheduledEnd ? Math.ceil((cycleEnd - new Date(scheduledEnd)) / (1000 * 60 * 60 * 24)) : null;
+        const expiryWarning = scheduledPlan && daysFromScheduledEndToExpiry <= (cycleContext?.closureBufferDays || 30);
 
         return `
             <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, ${expired ? '#fee2e2' : '#f0f9ff'} 0%, ${expired ? '#fecaca' : '#e0f2fe'} 100%); border-left: 4px solid ${expired ? '#dc2626' : '#3b82f6'};">
@@ -1005,20 +1012,20 @@ function renderCertificationCycleWidget(client) {
                                 <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-top: 0.25rem;">${currentStage}</div>
                                 ${isProjectedStage ? '<div style="font-size: 0.7rem; color: #b45309; margin-top: 0.15rem;" title="Stage nodes tick only when the corresponding audit report is finalized in ISOXPERT Audit360."><i class="fa-solid fa-circle-info" style="margin-right: 3px;"></i>Projected from certificate dates — no finalized audit on file yet</div>' : ''}
                             </div>
-                            ${nextAudit ? `
+                            ${scheduledPlan ? `
                             <div>
-                                <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">${nextAuditLabel}</div>
-                                <div style="font-size: 1.1rem; font-weight: 600; color: ${isUrgent ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">
-                                    ${window.UTILS.formatDate(nextAudit)}
-                                    ${isUrgent ? `<span style="font-size: 0.75rem; color: #dc2626; margin-left: 0.5rem;">(${daysToNext} days!)</span>` : ''}
+                                <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Scheduled Audit</div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: ${expiryWarning ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">
+                                    ${window.UTILS.formatDate(scheduledPlan.date)}${scheduledPlan.endDate && scheduledPlan.endDate !== scheduledPlan.date ? ` – ${window.UTILS.formatDate(scheduledPlan.endDate)}` : ''}
                                 </div>
+                                ${expiryWarning ? `<div style="font-size:.75rem;color:#dc2626;margin-top:.25rem;"><i class="fa-solid fa-triangle-exclamation"></i> Scheduled dates approach certificate expiry and may not preserve the NC closure buffer.</div>` : ''}
                             </div>
-
-                            ` : ''}
+                            ` : nextAudit ? `<div><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Next Audit Stage</div><div style="font-size:1.1rem;font-weight:600;color:${isUrgent ? '#dc2626' : '#1e293b'};margin-top:.25rem;">${cycleRecord?.auditType || currentStage}</div></div>` : ''}
+                            ${cycleRecord ? `<div><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Recommended Audit Window</div><div style="font-size:1.1rem;font-weight:600;color:#1e293b;margin-top:.25rem;">${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}</div><div style="font-size:.7rem;color:#64748b;">Planning guidance · includes ${cycleRecord.closureBufferDays}-day NC closure buffer</div></div>` : ''}
                             <div>
-                                <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Expiry Date</div>
-                                <div style="font-size: 1.1rem; font-weight: 600; color: ${expired ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(cycleEnd)}</div>
-                                ${rawExpiry && rawExpiry.getTime() !== cycleEnd.getTime() ? `<div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem;">3-yr cycle end • annual cert on file expires ${window.UTILS.formatDate(rawExpiry)}</div>` : ''}
+                                <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Certificate Expiry</div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: ${expired ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(rawExpiry || cycleEnd)}</div>
+                                ${rawExpiry && rawExpiry.getTime() !== cycleEnd.getTime() ? `<div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem;">Certification cycle ends ${window.UTILS.formatDate(cycleEnd)}</div>` : ''}
                             </div>
                         </div>
                     </div>
@@ -1107,7 +1114,6 @@ function renderAuditCycleTimeline(client) {
 
     const today = new Date();
     let currentStage = "Initial Certification";
-    let nextAudit = surv1;
 
     // Same finalized-history-driven cycle state as the overview widget and the
     // report's Audit Programme (see renderCertificationCycleWidget).
@@ -1123,21 +1129,23 @@ function renderAuditCycleTimeline(client) {
 
     if (cs) {
         currentStage = cs.stage;
-        nextAudit = cs.nextAudit ? cs.nextAudit.date : null;
     } else {
-        if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; }
-        if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; }
-        if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = cycleEnd; }
-        if (today > cycleEnd) { currentStage = "Expired"; nextAudit = null; }
+        if (today > surv1) currentStage = "Surveillance 1";
+        if (today > surv2) currentStage = "Surveillance 2";
+        if (today > recertAudit) currentStage = "Recertification Due";
+        if (today > cycleEnd) currentStage = "Expired";
         const recentAudit = findRecentFinalizedAudit(client.id, latestCert.standard);
         if (recentAudit && currentStage === "Recertification Due"
             && !/re-?cert/.test(String(recentAudit.auditType || recentAudit.type || '').toLowerCase())) {
             currentStage = "Surveillance 2";
-            nextAudit = recertAudit;
         }
     }
 
-    const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
+    const cycleContext = window.getCertificationCycleContext ? window.getCertificationCycleContext(client, today) : null;
+    const cycleRecord = cycleContext?.cycles?.find(c => c.standard === latestCert.standard);
+    const scheduledPlan = (window.state.auditPlans || [])
+        .filter(plan => plan.client === client.name && plan.status === 'Scheduled' && String(plan.standard || '').includes(latestCert.standard))
+        .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
 
     // Milestone completion — finalized audits, not calendar dates (fallback to
     // the calendar only when cycleState is unavailable).
@@ -1166,9 +1174,9 @@ function renderAuditCycleTimeline(client) {
                 </div>
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
                     <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${nextAudit ? window.UTILS.formatDate(nextAudit) : 'N/A'}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Next Scheduled Audit</p>
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${daysToNext > 0 ? daysToNext + ' days remaining' : 'Due/Overdue'}</p>
+                    <p style="font-size: 1.25rem; font-weight: 700; margin: 0.25rem 0;">${scheduledPlan ? `${window.UTILS.formatDate(scheduledPlan.date)}${scheduledPlan.endDate ? ` – ${window.UTILS.formatDate(scheduledPlan.endDate)}` : ''}` : (cycleRecord ? `${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}` : 'N/A')}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">${scheduledPlan ? 'Scheduled Audit' : 'Recommended Audit Window'}</p>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${scheduledPlan ? 'Booked dates' : 'Planning guidance, not a compliance deadline'}</p>
                 </div>
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">
                     <i class="fa-solid fa-hourglass-half" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>

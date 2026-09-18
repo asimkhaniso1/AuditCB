@@ -146,7 +146,7 @@ window.getClientCertificatesHTML = function (client) {
         }).join('')}
             </div>
             <div style="margin-top: 1rem; display: flex; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                 <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                 <div style="flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
                     <div>
                         <label style="font-size: 0.8rem;">Initial Date</label>
                         <input type="date" class="form-control" value="${cert.initialDate || ''}" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="initialDate" data-arg4="this.value">
@@ -158,6 +158,19 @@ window.getClientCertificatesHTML = function (client) {
                     <div>
                         <label style="font-size: 0.8rem;">Expiry Date</label>
                         <input type="date" class="form-control" value="${cert.expiryDate || ''}" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="expiryDate" data-arg4="this.value">
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem;">Current Cycle Stage</label>
+                        <select class="form-control" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="cycleStage" data-arg4="this.value">
+                            <option value="" ${!cert.cycleStage ? 'selected' : ''}>Auto from cycle records</option>
+                            <option value="Surveillance 1" ${cert.cycleStage === 'Surveillance 1' ? 'selected' : ''}>Surveillance 1</option>
+                            <option value="Surveillance 2" ${cert.cycleStage === 'Surveillance 2' ? 'selected' : ''}>Surveillance 2</option>
+                            <option value="Recertification" ${cert.cycleStage === 'Recertification' ? 'selected' : ''}>Recertification</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem;">Required NC Closure Buffer (days)</label>
+                        <input type="number" class="form-control" min="0" step="1" value="${cert.ncClosureBufferDays ?? 30}" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="ncClosureBufferDays" data-arg4="this.value">
                     </div>
                  </div>
                  <div style="display: flex; align-items: flex-end;">
@@ -180,7 +193,7 @@ window.generateCertificatesFromStandards = function (clientId) {
     if (!client.certificates) client.certificates = [];
     allStandards.forEach(std => {
         if (!client.certificates.find(c => c.standard === std)) {
-            client.certificates.push({ id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 10000), standard: std, certificateNo: '', status: 'Active', revision: '00', scope: client.scope || '', siteScopes: {} });
+            client.certificates.push({ id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 10000), standard: std, certificateNo: '', status: 'Active', revision: '00', cycleStage: '', ncClosureBufferDays: 30, scope: client.scope || '', siteScopes: {} });
         }
     });
     if (window.saveData) window.saveData();
