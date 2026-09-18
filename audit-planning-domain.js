@@ -100,6 +100,24 @@
     function auditTypeFromCycleState(cycleState, events) {
         const override = latestAuthorizedStageOverride(events);
         if (override) return { auditType: override.overrideValue, stage: override.overrideValue, override };
+        // With no finalized lifecycle history ReportStats deliberately exposes a
+        // calendar projection. Its `completed` flags remain false because those
+        // milestones were not evidenced by reports, so using the flags here
+        // would always regress planning to Surveillance 1. In projection mode,
+        // the displayed period/due date is the authoritative next milestone.
+        if (cycleState?.stageSource === 'calendar') {
+            const projectedStage = String(cycleState.stage || '').toLowerCase();
+            if (projectedStage.includes('recertification') || projectedStage.includes('certificate expired')) {
+                return { auditType: 'Recertification', stage: cycleState.stage, projected: true };
+            }
+            if (projectedStage.includes('surveillance 2')) {
+                return { auditType: 'Recertification', stage: cycleState.stage, projected: true };
+            }
+            if (projectedStage.includes('surveillance 1')) {
+                return { auditType: 'Surveillance 2', stage: cycleState.stage, projected: true };
+            }
+            return { auditType: 'Surveillance 1', stage: cycleState.stage || 'Initial certification', projected: true };
+        }
         const completedTypes = new Set(safeArray(events).map((event) => event.type));
         const completed = cycleState?.completed || {};
         const s1 = completed.s1 || completedTypes.has('surveillance-1-completed');

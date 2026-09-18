@@ -52,6 +52,23 @@ describe('certification-cycle-driven audit planning domain', () => {
         expect(context.cycles.every((cycle) => cycle.stageSource === 'history')).toBe(true);
     });
 
+    it('uses the projected next milestone when PC CONNECTION has no finalized audit history', () => {
+        const client = pcConnectionFixture();
+        client.certificationLifecycleEvents = [];
+        const context = Domain.resolveCycleContext({
+            client,
+            now: new Date('2026-09-18T00:00:00Z'),
+            settings: { auditPlanningPolicy: { version: 'CB-PLAN-2026-01', ncClosureBufferDays: 30 } },
+            allReports: [], allPlans: [], cycleStateResolver: ReportStats.cycleState
+        });
+
+        expect(context.valid).toBe(true);
+        expect(context.stage).toBe('Surveillance 2 period');
+        expect(context.auditType).toBe('Recertification');
+        expect(context.certificateExpiry).toBe('2026-12-15');
+        expect(context.cycles.every((cycle) => cycle.stageSource === 'calendar')).toBe(true);
+    });
+
     it('requires separate plans when stages differ or planning windows do not intersect', () => {
         const client = pcConnectionFixture();
         client.certificationLifecycleEvents.push({
