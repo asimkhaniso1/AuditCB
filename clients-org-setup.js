@@ -161,16 +161,12 @@ window.getClientCertificatesHTML = function (client) {
                     </div>
                     <div>
                         <label style="font-size:0.8rem;">Current Cycle Stage</label>
-                        <select class="form-control" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="cycleStage" data-arg4="this.value">
-                            <option value="" ${!cert.cycleStage ? 'selected' : ''}>Auto from cycle records</option>
-                            <option value="Surveillance 1" ${cert.cycleStage === 'Surveillance 1' ? 'selected' : ''}>Surveillance 1</option>
-                            <option value="Surveillance 2" ${cert.cycleStage === 'Surveillance 2' ? 'selected' : ''}>Surveillance 2</option>
-                            <option value="Recertification" ${cert.cycleStage === 'Recertification' ? 'selected' : ''}>Recertification</option>
-                        </select>
+                        <div class="form-control" style="background:#f8fafc;color:#475569;">Derived from lifecycle history</div>
+                        <small style="color:#64748b;">Changes require an authorized lifecycle override; certificate data is not overwritten.</small>
                     </div>
                     <div>
-                        <label style="font-size:0.8rem;">Required NC Closure Buffer (days)</label>
-                        <input type="number" class="form-control" min="0" step="1" value="${cert.ncClosureBufferDays ?? 30}" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="ncClosureBufferDays" data-arg4="this.value">
+                        <label style="font-size:0.8rem;">NC Closure Buffer</label>
+                        <div class="form-control" style="background:#f8fafc;color:#475569;">From central CB planning policy</div>
                     </div>
                  </div>
                  <div style="display: flex; align-items: flex-end;">
@@ -193,7 +189,7 @@ window.generateCertificatesFromStandards = function (clientId) {
     if (!client.certificates) client.certificates = [];
     allStandards.forEach(std => {
         if (!client.certificates.find(c => c.standard === std)) {
-            client.certificates.push({ id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 10000), standard: std, certificateNo: '', status: 'Active', revision: '00', cycleStage: '', ncClosureBufferDays: 30, scope: client.scope || '', siteScopes: {} });
+            client.certificates.push({ id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 10000), standard: std, certificateNo: '', status: 'Active', revision: '00', scope: client.scope || '', siteScopes: {} });
         }
     });
     if (window.saveData) window.saveData();

@@ -1571,6 +1571,7 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 - Risk/Sampling Priority: ${ctx.riskLevel || 'Medium'}
 - Significant Changes: ${Array.isArray(ctx.significantChanges) ? ctx.significantChanges.map(change => change.description || change.title || change).join('; ') : (ctx.significantChanges || 'None recorded')}
 - Operational/Control Areas: ${(ctx.operationalAreas || []).join(', ') || 'Derive only from the approved scope and applicable standard clauses'}
+- Approved Coverage Matrix (mandatory; sequence it but do not delete entries): ${JSON.stringify(ctx.coverageMatrix || {})}
 - Sites: ${ctx.sites.map(s => s.name).join(', ')}
 - Departments: ${(ctx.departments || []).join(', ')}
 - Key Designations: ${(ctx.designations || []).map(d => d.title || d).join(', ')}${personnelSection}${previousAuditSection}${ctx.clientDocumentContext || ''}
@@ -1589,6 +1590,7 @@ ${ctx.method === 'Remote' ? '11. This is a REMOTE audit. Do not schedule physica
 ${ctx.method === 'Hybrid' ? '11. Label every activity clearly as Remote or On-site and use each only within its allocated days.' : ''}
 12. Optimize sequencing and timing only. Do not remove opening/closing meetings, previous-findings follow-up, applicable management-system clauses, or required operational/control-area coverage. Do not invent requirements.
 13. Give sampling priority to previous findings, significant changes, higher-risk processes, applicable management-system clauses and operational/control areas supplied above.
+14. Every mandatory entry in the approved coverage matrix must be represented. Common IMS areas may be combined once; standard-specific and site entries must retain their identity.
 **Output Format:**
 Return ONLY a raw JSON array of objects. Do not include markdown formatting (like \`\`\`json).
 Example:

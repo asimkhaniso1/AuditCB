@@ -27,6 +27,25 @@ if (!window.state.cbSettings) {
         // Privacy: evidence geolocation is opt-in and off by default.
         captureEvidenceLocation: false,
 
+        // Development planning defaults only. These are CB policy settings,
+        // not ISO or accreditation requirements, and must be reviewed locally.
+        auditPlanningPolicy: {
+            version: 'audit-planning-policy-v1',
+            developmentPlaceholder: true,
+            recertificationWindowLeadDays: 60,
+            surveillanceWindowBeforeDays: 30,
+            surveillanceWindowAfterDays: 30,
+            ncClosureBufferDays: 30,
+            expiryWarningDays: 90,
+            expiryCriticalDays: 45,
+            criticalTimingBehavior: 'override-required',
+            expiredCertificateBehavior: 'block',
+            workingHoursPerDay: 8,
+            overrideRoles: ['Admin', 'Certification Manager', 'Cert Manager']
+        },
+        durationMethodologies: {},
+        imsMethodology: null,
+
         // Quality Policy
         qualityPolicy: 'We are committed to providing impartial, competent, and consistent certification services that meet the requirements of ISO 17021-1 and exceed our clients\' expectations.',
         qualityObjectives: [
@@ -193,6 +212,7 @@ function getSettingsSubTabs(mainTab) {
             { id: 'quality', label: 'Quality Policy', icon: 'fa-star' },
             { id: 'cbpolicies', label: 'CB Policies', icon: 'fa-gavel' },
             { id: 'capa-timeframes', label: 'CAPA Timeframes', icon: 'fa-clock' },
+            { id: 'audit-planning', label: 'Audit Planning', icon: 'fa-calendar-check' },
             { id: 'retention', label: 'Retention', icon: 'fa-archive' }
         ],
         'users': [
@@ -237,6 +257,7 @@ function getSettingsContent(mainTab, subTab) {
             'quality': () => getQualityPolicyHTML(),
             'cbpolicies': () => getCBPoliciesHTML(),
             'capa-timeframes': () => getCapaTimeframesHTML(),
+            'audit-planning': () => getAuditPlanningPolicyHTML(),
             'retention': () => getRetentionHTML()
         },
         'users': {
@@ -293,6 +314,52 @@ function getSettingsContent(mainTab, subTab) {
 
     return getCBProfileHTML();
 }
+
+function getAuditPlanningPolicyHTML() {
+    const defaults = window.AuditPlanningDomain?.DEFAULT_POLICY || {};
+    const configured = window.state.cbSettings?.auditPlanningPolicy || {};
+    const value = (key) => configured[key] ?? defaults[key] ?? '';
+    return `<div class="fade-in"><h3 style="color:var(--primary-color);">Audit Planning Policy</h3>
+        <div class="alert alert-warning">These values are internal CB planning policy. They are not represented as ISO or accreditation requirements. Replace development placeholders with approved policy values.</div>
+        <form data-action-submit="saveAuditPlanningPolicy">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;">
+                <div><label>Policy version</label><input id="planning-policy-version" class="form-control" value="${window.UTILS.escapeHtml(value('version'))}" required></div>
+                <div><label>Recertification window lead days</label><input id="planning-recert-lead" type="number" min="0" class="form-control" value="${value('recertificationWindowLeadDays')}"></div>
+                <div><label>NC closure buffer days</label><input id="planning-closure-buffer" type="number" min="0" class="form-control" value="${value('ncClosureBufferDays')}"></div>
+                <div><label>Surveillance window before</label><input id="planning-surv-before" type="number" min="0" class="form-control" value="${value('surveillanceWindowBeforeDays')}"></div>
+                <div><label>Surveillance window after</label><input id="planning-surv-after" type="number" min="0" class="form-control" value="${value('surveillanceWindowAfterDays')}"></div>
+                <div><label>Expiry warning days</label><input id="planning-warning-days" type="number" min="0" class="form-control" value="${value('expiryWarningDays')}"></div>
+                <div><label>Expiry critical days</label><input id="planning-critical-days" type="number" min="0" class="form-control" value="${value('expiryCriticalDays')}"></div>
+                <div><label>Working hours per auditor-day</label><input id="planning-hours-day" type="number" min="1" step="0.5" class="form-control" value="${value('workingHoursPerDay')}"></div>
+                <div><label>Critical timing behavior</label><select id="planning-critical-behavior" class="form-control"><option value="warning" ${value('criticalTimingBehavior') === 'warning' ? 'selected' : ''}>Warning</option><option value="override-required" ${value('criticalTimingBehavior') === 'override-required' ? 'selected' : ''}>Authorized override required</option><option value="block" ${value('criticalTimingBehavior') === 'block' ? 'selected' : ''}>Block</option></select></div>
+            </div>
+            <label style="margin-top:1rem;"><input id="planning-placeholder" type="checkbox" ${value('developmentPlaceholder') ? 'checked' : ''}> Values remain development placeholders</label><br>
+            <button class="btn btn-primary" type="submit" style="margin-top:1rem;">Save Planning Policy</button>
+        </form>
+        <hr><h4>Duration methodologies</h4><p>${Object.keys(window.state.cbSettings?.durationMethodologies || {}).length ? 'Configured scheme families: ' + Object.keys(window.state.cbSettings.durationMethodologies).join(', ') : 'No approved scheme calculation tables configured.'}</p>
+        <p>IMS methodology: ${window.UTILS.escapeHtml(window.state.cbSettings?.imsMethodology?.version || 'Not configured')}</p></div>`;
+}
+
+window.saveAuditPlanningPolicy = async function () {
+    const number = (id) => Number(document.getElementById(id)?.value || 0);
+    window.state.cbSettings.auditPlanningPolicy = {
+        version: document.getElementById('planning-policy-version')?.value.trim() || 'unversioned',
+        developmentPlaceholder: Boolean(document.getElementById('planning-placeholder')?.checked),
+        recertificationWindowLeadDays: number('planning-recert-lead'),
+        surveillanceWindowBeforeDays: number('planning-surv-before'),
+        surveillanceWindowAfterDays: number('planning-surv-after'),
+        ncClosureBufferDays: number('planning-closure-buffer'),
+        expiryWarningDays: number('planning-warning-days'),
+        expiryCriticalDays: number('planning-critical-days'),
+        workingHoursPerDay: number('planning-hours-day'),
+        criticalTimingBehavior: document.getElementById('planning-critical-behavior')?.value || 'override-required',
+        expiredCertificateBehavior: 'block',
+        overrideRoles: ['Admin', 'Certification Manager', 'Cert Manager']
+    };
+    window.saveData();
+    await window.DataService?.syncSettings?.({ saveLocal: false, silent: true });
+    window.showNotification('Audit planning policy saved.', 'success');
+};
 
 // Switch main tab
 window.switchSettingsMainTab = function (mainTab, _btnElement) {

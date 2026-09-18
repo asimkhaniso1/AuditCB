@@ -1319,6 +1319,7 @@ const SupabaseClient = {
                         profileUpdated: client.profileUpdated || null,
                         profileHistory: client.profileHistory || [],
                         certificates: client.certificates || [],
+                        certificationLifecycleEvents: client.certificationLifecycleEvents || [],
                         nextAudit: client.nextAudit || null
                     }
                 }));
@@ -1680,6 +1681,7 @@ const SupabaseClient = {
                     lead_auditor: plan.leadAuditor || null,
                     audit_team: auditTeam,
                     pre_audit: plan.preAudit || null,
+                    data: plan,
                     updated_at: new Date().toISOString()
                 };
             });

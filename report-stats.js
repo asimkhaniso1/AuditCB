@@ -638,7 +638,27 @@
             surveillancesDone = Math.min(2, Math.max(surveillancesDone, Math.max(slot, surveillancesDone + 1)));
         });
 
-        const completed = { certification: true, s1: surveillancesDone >= 1, s2: surveillancesDone >= 2, recert: recertDone };
+        // Append-only certification lifecycle events supplement finalized report
+        // history. They never overwrite certificate fields, and authorized stage
+        // overrides are interpreted by the planning domain rather than here.
+        const certificateId = String(cert.id || cert.certificateId || cert.certificateNo || '');
+        const lifecycleEvents = safeArr(client.certificationLifecycleEvents).filter((event) => {
+            if (!event) return false;
+            return !certificateId || String(event.certificateId || '') === certificateId;
+        });
+        const lifecycleTypes = new Set(lifecycleEvents.map((event) => trim(event.type).toLowerCase()));
+        if (lifecycleTypes.has('surveillance-1-completed')) surveillancesDone = Math.max(surveillancesDone, 1);
+        if (lifecycleTypes.has('surveillance-2-completed')) surveillancesDone = Math.max(surveillancesDone, 2);
+        if (lifecycleTypes.has('recertification-completed') || lifecycleTypes.has('certification-renewal')) recertDone = true;
+        const completed = {
+            certification: true,
+            s1: surveillancesDone >= 1,
+            s2: surveillancesDone >= 2,
+            recert: recertDone,
+            technicalReview: lifecycleTypes.has('technical-review'),
+            certificationDecision: lifecycleTypes.has('certification-decision'),
+            certificateIssued: lifecycleTypes.has('certificate-issue') || lifecycleTypes.has('certification-renewal')
+        };
         const hasHistory = history.length > 0;
 
         // stageSource discriminates the two derivations: 'history' stages are
@@ -690,7 +710,8 @@
             anchor, cycleEnd, rawExpiry, surv1Due, surv2Due, recertDue,
             completed, surveillancesDone, recertDone, hasHistory,
             stage, stageSource, progress, nextAudit,
-            expired: !recertDone && today > cycleEnd
+            expired: !recertDone && today > cycleEnd,
+            lifecycleEvents
         };
     }
 

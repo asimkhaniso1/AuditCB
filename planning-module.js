@@ -12,118 +12,25 @@ function parsePlanDate(value) {
     return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function toPlanDateValue(date) {
-    if (!date || Number.isNaN(date.getTime())) return '';
-    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-}
-
-function addPlanDays(date, days) {
-    const result = new Date(date);
-    result.setDate(result.getDate() + days);
-    return result;
-}
-
 function normalizeStandardFamily(standard) {
     const match = String(standard || '').toUpperCase().match(/ISO(?:\/IEC)?\s*(\d{4,5}(?:-\d)?)/);
     return match ? match[1] : String(standard || '').toUpperCase().replace(/:\d{4}.*/, '').trim();
 }
 
-function getAuditTypeForCycle(issueDate, expiryDate, now = new Date()) {
-    const first = new Date(issueDate); first.setFullYear(first.getFullYear() + 1);
-    const second = new Date(issueDate); second.setFullYear(second.getFullYear() + 2);
-    if (now < first) return { stage: 'Surveillance 1', auditType: 'Surveillance 1', target: first };
-    if (now < second) return { stage: 'Surveillance 2', auditType: 'Surveillance 2', target: second };
-    return { stage: now > expiryDate ? 'Recertification overdue' : 'Recertification', auditType: 'Recertification', target: expiryDate };
-}
-
 function getCertificationCycleContext(client, now = new Date()) {
-    const settings = window.state?.cbSettings || window.state?.settings || {};
-    const closureBufferDays = Math.max(0, parseInt(settings.ncClosureBufferDays ?? settings.requiredNcClosureBufferDays ?? 30, 10) || 30);
-    const candidates = (client?.certificates || []).filter(cert => cert.standard && (cert.currentIssue || cert.initialDate));
-    const recordsByScheme = new Map();
-    candidates.forEach((cert, index) => {
-        const key = normalizeStandardFamily(cert.standard);
-        const existing = recordsByScheme.get(key);
-        const certDate = parsePlanDate(cert.initialDate || cert.currentIssue)?.getTime() || 0;
-        const existingDate = existing ? (parsePlanDate(existing.cert.initialDate || existing.cert.currentIssue)?.getTime() || 0) : -1;
-        if (!existing || cert.status === 'Active' && existing.cert.status !== 'Active' || (cert.status === existing.cert.status && certDate > existingDate)) {
-            recordsByScheme.set(key, { cert, index });
-        }
-    });
-    const records = [...recordsByScheme.values()];
-    const cycles = records.map(({ cert, index }) => {
-        const issueDate = parsePlanDate(cert.initialDate || cert.currentIssue);
-        if (!issueDate) return null;
-        const expiryDate = parsePlanDate(cert.expiryDate) || (() => {
-            const value = new Date(issueDate);
-            value.setFullYear(value.getFullYear() + 3);
-            return value;
-        })();
-        let next = getAuditTypeForCycle(issueDate, expiryDate, now);
-        const authoritativeCycle = window.ReportStats?.cycleState?.({
+    if (window.AuditPlanningDomain) {
+        return window.AuditPlanningDomain.resolveCycleContext({
             client,
-            standard: cert.standard,
-            certificate: cert,
+            now,
+            settings: window.state?.cbSettings || window.state?.settings || {},
             allReports: window.state?.auditReports || [],
             allPlans: window.state?.auditPlans || [],
-            today: now
+            cycleStateResolver: window.ReportStats?.cycleState
         });
-        if (authoritativeCycle) {
-            if (!authoritativeCycle.completed.s1) next = { stage: authoritativeCycle.stage, auditType: 'Surveillance 1', target: authoritativeCycle.surv1Due };
-            else if (!authoritativeCycle.completed.s2) next = { stage: authoritativeCycle.stage, auditType: 'Surveillance 2', target: authoritativeCycle.surv2Due };
-            else next = { stage: authoritativeCycle.stage, auditType: 'Recertification', target: authoritativeCycle.recertDue || expiryDate };
-        }
-        const recordedStage = String(cert.currentStage || cert.cycleStage || cert.stage || '').trim();
-        if (/surveillance\s*1/i.test(recordedStage)) {
-            const target = new Date(issueDate); target.setFullYear(target.getFullYear() + 1);
-            next = { stage: 'Surveillance 1', auditType: 'Surveillance 1', target };
-        } else if (/surveillance\s*2/i.test(recordedStage)) {
-            const target = new Date(issueDate); target.setFullYear(target.getFullYear() + 2);
-            next = { stage: 'Surveillance 2', auditType: 'Surveillance 2', target };
-        } else if (/recert/i.test(recordedStage)) {
-            next = { stage: recordedStage, auditType: 'Recertification', target: expiryDate };
-        }
-        const recordClosureBufferDays = Math.max(0, parseInt(cert.ncClosureBufferDays ?? cert.requiredNcClosureBufferDays ?? closureBufferDays, 10) || closureBufferDays);
-        let windowEnd;
-        let windowStart;
-        if (next.auditType === 'Recertification') {
-            windowEnd = addPlanDays(expiryDate, -recordClosureBufferDays);
-            windowStart = addPlanDays(windowEnd, -60);
-        } else {
-            windowStart = addPlanDays(next.target, -30);
-            windowEnd = addPlanDays(next.target, 30);
-            const closureLimit = addPlanDays(expiryDate, -recordClosureBufferDays);
-            if (windowEnd > closureLimit) windowEnd = closureLimit;
-        }
-        return {
-            cycleRecordIndex: index,
-            certificateNo: cert.certificateNo || '',
-            standard: cert.standard,
-            standardFamily: normalizeStandardFamily(cert.standard),
-            scope: cert.scope || client.scope || '',
-            siteScopes: cert.siteScopes || {},
-            issueDate: toPlanDateValue(issueDate),
-            expiryDate: toPlanDateValue(expiryDate),
-            stage: next.stage,
-            auditType: next.auditType,
-            recommendedWindowStart: toPlanDateValue(windowStart),
-            recommendedWindowEnd: toPlanDateValue(windowEnd),
-            closureBufferDays: recordClosureBufferDays
-        };
-    }).filter(Boolean);
-
-    const stages = [...new Set(cycles.map(c => c.auditType))];
+    }
     return {
-        valid: cycles.length > 0 && stages.length === 1,
-        cycles,
-        standards: cycles.map(c => c.standard),
-        auditType: stages.length === 1 ? stages[0] : '',
-        stage: [...new Set(cycles.map(c => c.stage))].join(' / '),
-        recommendedWindowStart: cycles.length ? cycles.map(c => c.recommendedWindowStart).sort().at(-1) : '',
-        recommendedWindowEnd: cycles.length ? cycles.map(c => c.recommendedWindowEnd).sort()[0] : '',
-        certificateExpiry: cycles.length ? cycles.map(c => c.expiryDate).sort()[0] : '',
-        closureBufferDays: cycles.length ? Math.max(...cycles.map(c => c.closureBufferDays)) : closureBufferDays,
-        conflict: stages.length > 1 ? `Cycle records are at different stages (${stages.join(', ')}). Align the cycles before creating one combined plan.` : ''
+        valid: false, cycles: [], standards: [], auditType: '', stage: '',
+        conflict: 'Audit planning rules are unavailable. Reload the application before creating a plan.'
     };
 }
 
@@ -225,7 +132,7 @@ function renderAuditPlanningEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Scheduled</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${window.getVisiblePlans().filter(p => p.status === 'Confirmed').length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.getVisiblePlans().filter(p => ['Scheduled', 'Confirmed'].includes(p.status)).length}</div>
                     </div>
                 </div>
 
@@ -702,7 +609,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
     const btnCancel = document.getElementById('btn-plan-cancel');
 
     if (btnSave) btnSave.onclick = () => saveAuditPlan(false);
-    if (btnSavePrint) btnSavePrint.onclick = () => saveAuditPlan(true);
+    if (btnSavePrint) btnSavePrint.onclick = () => saveAuditPlan(true, true);
     if (btnCancel) btnCancel.onclick = () => renderAuditPlanningEnhanced();
 
     document.getElementById('btn-refresh-narratives')?.addEventListener('click', generatePlanNarratives);
@@ -776,17 +683,6 @@ function generatePlanNarratives() {
     if (document.getElementById('plan-objectives')) document.getElementById('plan-objectives').value = objectives;
     if (document.getElementById('plan-criteria')) document.getElementById('plan-criteria').value = criteria;
     if (document.getElementById('plan-methodology')) document.getElementById('plan-methodology').value = methodology;
-}
-
-function getDurationMethodology(standard) {
-    const family = normalizeStandardFamily(standard);
-    const configured = window.state?.cbSettings?.durationMethodologies?.[family];
-    if (configured) return configured;
-    if (family === '27001') return 'ISO/IEC 27006-1 scheme duration methodology';
-    if (family === '22000') return 'ISO 22003-1 scheme duration methodology';
-    if (family === '13485') return 'IAF MD 9 medical-device scheme methodology';
-    if (family === '50001') return 'ISO 50003 energy-management scheme methodology';
-    return 'Applicable IAF MD 5 management-system duration methodology';
 }
 
 function recalculateDurationAllocation() {
@@ -1134,17 +1030,25 @@ function autoCalculateDays() {
             window.showNotification(cycle.conflict || 'A valid certification cycle is required before duration can be calculated.', 'error');
             return;
         }
-        const results = typeof calculateManDays === 'function'
-            ? calculateManDays(totalEmployees, siteCount, 2, hasShiftWork, risk)
-            : { stage1: 1, stage2: Math.max(2, Math.ceil(totalEmployees / 50)), surveillance: Math.max(1, Math.ceil(totalEmployees / 150)) };
-        let baseline = cycle.auditType.startsWith('Surveillance') ? results.surveillance : Math.ceil(results.stage2 * 0.67 * 2) / 2;
-        const schemeFactors = { '27001': 1.1, '22000': 1.15, '13485': 1.15, '50001': 1.1 };
-        baseline = Math.max(...cycle.standards.map(std => baseline * (schemeFactors[normalizeStandardFamily(std)] || 1)));
-        baseline = Math.ceil(baseline * 2) / 2;
-        const imsDefault = cycle.standards.length > 1 ? Math.max(-20, -(cycle.standards.length - 1) * 10) : 0;
+        const domain = window.AuditPlanningDomain;
+        const methodology = domain?.resolveDurationMethodology(window.state?.cbSettings || {}, cycle.standards);
+        const calculated = domain?.calculateConfiguredDuration(methodology, {
+            employees: totalEmployees, sites: siteCount, riskLevel: risk, auditType: cycle.auditType, hasShiftWork
+        });
+        if (!calculated?.configured) {
+            document.getElementById('plan-duration-basis').value = `CB configuration required: ${calculated?.error || `approved methodology missing for ${methodology?.missingFamilies?.join(', ') || 'selected standards'}`}`;
+            document.getElementById('plan-baseline-days').value = '';
+            document.getElementById('plan-mandays').value = '';
+            window.showNotification('Duration cannot be calculated until an approved, versioned CB methodology is configured for every selected scheme.', 'warning');
+            return;
+        }
+        const baseline = calculated.baselineDays;
+        const imsConfig = window.state?.cbSettings?.imsMethodology;
+        const imsDefault = cycle.standards.length > 1 && Number.isFinite(Number(imsConfig?.defaultAdjustmentPercent))
+            ? Number(imsConfig.defaultAdjustmentPercent) : 0;
         document.getElementById('plan-baseline-days').value = baseline.toFixed(1);
         document.getElementById('plan-ims-adjustment').value = imsDefault;
-        document.getElementById('plan-duration-basis').value = [...new Set(cycle.standards.map(getDurationMethodology))].join('; ');
+        document.getElementById('plan-duration-basis').value = `${methodology.name} · version ${methodology.version}${cycle.standards.length > 1 ? ` · IMS ${imsConfig?.version || 'configuration required'}` : ''}`;
         recalculateDurationAllocation();
         window.showNotification(`Duration calculation recorded for ${cycle.auditType}: baseline ${baseline.toFixed(1)} days, with transparent allocation and adjustments.`, 'success');
     } else {
@@ -1260,12 +1164,12 @@ function viewAuditPlan(id) {
 
     // --- UI REDESIGN ---
     // Stepper Calculation
-    const _phases = ['Draft', 'Confirmed', 'In Progress', 'Reporting', 'Completed']; // Mapping logic might need adjustment based on statuses
+    const _phases = ['Draft', 'Scheduled', 'In Progress', 'Reporting', 'Completed']; // Mapping logic might need adjustment based on statuses
 
     // Determine active step (0-indexed)
     let activeStep = 0;
     if (plan.status === 'Draft') activeStep = 0;
-    else if (plan.status === 'Confirmed') {
+    else if (plan.status === 'Scheduled' || plan.status === 'Confirmed' || plan.status === 'Validated') {
         activeStep = 1;
         if (totalItems > 0) activeStep = 1; // Checklists assigned
     }
@@ -1776,6 +1680,25 @@ window.closeAuditPlan = async function (planId) {
 
     if (confirm('Are you sure you want to close this audit? This marks the audit cycle as complete. The certification decision is recorded separately in Certificates.')) {
         plan.status = 'Completed';
+        const lifecycleClient = state.clients.find(client => String(client.id) === String(plan.clientId) || client.name === plan.client);
+        if (lifecycleClient && window.AuditPlanningDomain) {
+            lifecycleClient.certificationLifecycleEvents = lifecycleClient.certificationLifecycleEvents || [];
+            const typeMap = {
+                'Surveillance 1': 'surveillance-1-completed',
+                'Surveillance 2': 'surveillance-2-completed',
+                'Recertification': 'recertification-completed'
+            };
+            const eventType = typeMap[plan.auditType || plan.type];
+            (plan.certificationCycle?.records || []).forEach(record => {
+                const exists = lifecycleClient.certificationLifecycleEvents.some(event => event.type === eventType
+                    && String(event.planId) === String(plan.id) && String(event.certificateId) === String(record.certificateId));
+                if (!exists && eventType) lifecycleClient.certificationLifecycleEvents.push(window.AuditPlanningDomain.createLifecycleEvent({
+                    certificateId: record.certificateId, planId: plan.id, type: eventType,
+                    stage: plan.certificationCycle?.stage,
+                    user: window.state.currentUser?.name || 'System', role: window.state.currentUser?.role || 'System'
+                }));
+            });
+        }
 
         // Persist locally AND to the cloud. saveData()/saveState() only writes
         // IndexedDB — syncAuditPlansFromSupabase (supabase-client.js) reads the
@@ -2807,6 +2730,16 @@ function validateAuditPlanForSave(planData) {
     if (end && expiry && end > expiry) errors.push('Scheduled audit dates extend beyond certificate expiry.');
     if (start && windowStart && windowEnd && (start < windowStart || start > windowEnd)) warnings.push('Scheduled dates are outside the recommended planning window.');
     if (end && windowEnd && end > windowEnd) warnings.push(`Scheduled completion leaves less than the required ${cycle.closureBufferDays}-day NC closure buffer before expiry.`);
+    if (end && expiry && cycle.policy) {
+        const daysRemaining = Math.ceil((expiry - end) / 86400000);
+        if (daysRemaining <= cycle.policy.expiryCriticalDays) {
+            const message = `Scheduled completion is within the configured critical threshold (${cycle.policy.expiryCriticalDays} days before expiry).`;
+            if (cycle.policy.criticalTimingBehavior === 'block') errors.push(message);
+            else warnings.push(`${message}${cycle.policy.criticalTimingBehavior === 'override-required' ? ' Authorized override and justification are required before approval.' : ''}`);
+        } else if (daysRemaining <= cycle.policy.expiryWarningDays) {
+            warnings.push(`Scheduled completion is within the configured expiry warning threshold (${cycle.policy.expiryWarningDays} days).`);
+        }
+    }
 
     if (!planData.objectives || !planData.criteria || !planData.methodology) errors.push('Objectives, criteria and methodology are required.');
     const methodText = String(planData.methodology || '').toLowerCase();
@@ -2820,6 +2753,12 @@ function validateAuditPlanForSave(planData) {
     if (planData.auditMethod === 'On-site' && duration.remoteDays > 0) errors.push('An On-site audit cannot have remote duration allocated.');
     if (planData.auditMethod === 'Hybrid' && (!duration.remoteDays || !duration.onsiteDays)) errors.push('A Hybrid audit requires both remote and on-site allocation.');
     if (duration.justifiedAdjustment !== 0 && !duration.justification.trim()) errors.push('Document justification for the duration adjustment.');
+    if (window.AuditPlanningDomain) {
+        const durationMethod = window.AuditPlanningDomain.resolveDurationMethodology(window.state?.cbSettings || {}, cycle.standards);
+        const durationValidation = window.AuditPlanningDomain.validateDuration(duration, durationMethod, cycle.standards.length);
+        errors.push(...durationValidation.errors);
+        warnings.push(...durationValidation.warnings);
+    }
     if (!planData.selectedSites.length) errors.push('Select at least one site for audit coverage.');
 
     const assignedAuditors = planData.team.map(name => window.state.auditors.find(a => a.name === name)).filter(Boolean);
@@ -2830,6 +2769,15 @@ function validateAuditPlanForSave(planData) {
     if (lead) cycle.standards.forEach(std => {
         if (!(lead.standards || []).some(c => normalizeStandardFamily(c) === normalizeStandardFamily(std))) errors.push(`Lead Auditor lacks recorded competence for ${std}.`);
     });
+    if (window.AuditPlanningDomain) {
+        const client = window.state.clients.find(item => item.name === planData.client) || {};
+        const competence = window.AuditPlanningDomain.validateCompetence({
+            auditors: assignedAuditors, leadAuditor: planData.team[0], standards: cycle.standards,
+            requiredTechnicalSectors: client.technicalSectors || [], auditDate: planData.date
+        });
+        errors.push(...competence.errors);
+        warnings.push(...competence.warnings);
+    }
     const allocatedDays = planData.teamAllocations.reduce((sum, item) => sum + item.days, 0);
     if (Math.abs(allocatedDays - duration.finalDays) > 0.01) errors.push('Planned auditor-day allocations must equal final audit duration.');
     if (planData.impartialityAssessment.risk === 'High') errors.push('High impartiality risk must be resolved before plan finalization.');
@@ -2848,6 +2796,16 @@ function validateAuditPlanForSave(planData) {
         const maxDay = Math.max(...planData.agenda.map(item => parseInt(String(item.day).match(/\d+/)?.[0] || '1', 10)));
         if (maxDay > Math.ceil(duration.finalDays)) errors.push('Agenda extends beyond the calculated audit duration.');
         if (maxDay < Math.ceil(duration.finalDays)) warnings.push('Agenda does not yet allocate activities across the full calculated duration.');
+    }
+    if (window.AuditPlanningDomain && planData.agenda.length && duration.finalDays > 0) {
+        const reconciliation = window.AuditPlanningDomain.reconcileAgenda({
+            agenda: planData.agenda, finalAuditorDays: duration.finalDays,
+            teamAllocations: planData.teamAllocations,
+            team: planData.team,
+            hoursPerDay: cycle.policy?.workingHoursPerDay || 8
+        });
+        errors.push(...reconciliation.errors);
+        planData.agendaReconciliation = reconciliation;
     }
     const datePairValid = (!start && !end) || (start && end && end >= start && (!expiry || end <= expiry));
     const narrativeValid = Boolean(planData.objectives && planData.criteria && planData.methodology)
@@ -2887,7 +2845,7 @@ function validateAuditPlanForSave(planData) {
 // Note: goToStep2, goToStep1, addAgendaRow, deleteAgendaRow are defined earlier in the file (around lines 1369-1461)
 // The saveAuditPlan function below is the definitive version with proper validation and sanitization
 
-function saveAuditPlan(shouldPrint = false) {
+function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
     // 1. Define Fields
     const fieldIds = {
         client: 'plan-client',
@@ -2997,7 +2955,7 @@ function saveAuditPlan(shouldPrint = false) {
         onsiteDays: onsiteDays,
         selectedSites: selectedSites,
         agenda: agenda,
-        status: date && endDate ? 'Scheduled' : 'Draft',
+        status: saveAsDraft ? 'Draft' : (date && endDate ? 'Scheduled' : 'Validated'),
         // ISO 17021-1 Compliance Fields
         auditType: auditType,
         auditMethod: auditMethod,
@@ -3010,6 +2968,9 @@ function saveAuditPlan(shouldPrint = false) {
             recommendedWindowEnd: cycleContext.recommendedWindowEnd,
             certificateExpiry: cycleContext.certificateExpiry,
             ncClosureBufferDays: cycleContext.closureBufferDays,
+            certificateIds: cycleContext.certificateIds || cycleContext.cycles.map(record => record.certificateId).filter(Boolean),
+            planningPolicyVersion: cycleContext.policy?.version || null,
+            planningPolicySnapshot: cycleContext.policy || null,
             confirmedBy: window.state.currentUser?.name || 'System',
             confirmedAt: new Date().toISOString()
         },
@@ -3028,6 +2989,10 @@ function saveAuditPlan(shouldPrint = false) {
             onsiteDays,
             justifiedAdjustment: parseFloat(document.getElementById('plan-justified-adjustment')?.value) || 0,
             justification: document.getElementById('plan-duration-justification')?.value || '',
+            methodologyVersion: window.AuditPlanningDomain?.resolveDurationMethodology(window.state?.cbSettings || {}, cycleContext.standards)?.version || null,
+            imsRuleVersion: cycleContext.standards.length > 1 ? (window.state?.cbSettings?.imsMethodology?.version || null) : null,
+            approvedBy: window.state.currentUser?.name || null,
+            approvedAt: saveAsDraft ? null : new Date().toISOString(),
             finalDays: manDays,
             calculatedAt: new Date().toISOString()
         },
@@ -3047,12 +3012,27 @@ function saveAuditPlan(shouldPrint = false) {
     const qa = validateAuditPlanForSave(planData);
     const passedChecks = qa.checks.filter(check => check.passed).length;
     const readinessSummary = `${passedChecks}/${qa.checks.length} checks passed · ${qa.warnings.length} warning${qa.warnings.length === 1 ? '' : 's'}`;
-    if (qa.errors.length) {
+    planData.validationSnapshot = { ...qa, validatedAt: new Date().toISOString(), validatedBy: window.state.currentUser?.name || 'System' };
+    planData.competenceValidation = window.AuditPlanningDomain?.validateCompetence({
+        auditors: (window.state.auditors || []).filter(auditor => planData.team.includes(auditor.name)),
+        leadAuditor,
+        standards: cycleContext.standards,
+        requiredTechnicalSectors: state.clients.find(client => client.name === clientName)?.technicalSectors || [],
+        auditDate: date
+    }) || null;
+    planData.coverageMatrix = window.AuditPlanningDomain?.buildCoverageMatrix({
+        standards: cycleContext.standards,
+        previousFindings: getPreviousPlanFindings(clientName, cycleContext.standards),
+        sites: selectedSites,
+        processes: state.clients.find(client => client.name === clientName)?.keyProcesses || [],
+        controls: state.clients.find(client => client.name === clientName)?.applicableControls || []
+    }) || null;
+    if (qa.errors.length && !saveAsDraft) {
         window.showNotification(`${readinessSummary} · ${qa.errors.length} blocking issue${qa.errors.length === 1 ? '' : 's'}. Review Pre-save QA.`, 'error');
         document.getElementById('plan-qa-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
-    window.showNotification(readinessSummary, qa.warnings.length ? 'warning' : 'success');
+    window.showNotification(saveAsDraft ? `Draft saved with ${qa.errors.length} incomplete/blocking item(s) and ${qa.warnings.length} warning(s).` : readinessSummary, saveAsDraft || qa.warnings.length ? 'warning' : 'success');
 
     // 7. Save to Supabase (CRITICAL FIX: Database Persistence)
     const btnSave = document.getElementById('btn-plan-save');
@@ -3093,6 +3073,34 @@ function saveAuditPlan(shouldPrint = false) {
                 state.auditPlans.push(newPlan);
                 // Temporarily set editingPlanId so we know what to update in DB
                 window.editingPlanId = newPlanId;
+            }
+
+            // Append lifecycle planning events once the plan has a stable ID.
+            // Events are historical facts and are never used to overwrite the
+            // certificate record itself.
+            const lifecycleClient = state.clients.find(c => c.name === planData.client);
+            if (lifecycleClient && planData.status !== 'Draft' && window.AuditPlanningDomain) {
+                lifecycleClient.certificationLifecycleEvents = lifecycleClient.certificationLifecycleEvents || [];
+                const eventTypeByAudit = {
+                    'Surveillance 1': 'surveillance-1-planned',
+                    'Surveillance 2': 'surveillance-2-planned',
+                    'Recertification': 'recertification-planned'
+                };
+                const eventType = eventTypeByAudit[planData.auditType];
+                (planData.certificationCycle.records || []).forEach(record => {
+                    const duplicate = lifecycleClient.certificationLifecycleEvents.some(event =>
+                        event.type === eventType && String(event.planId) === String(window.editingPlanId)
+                        && String(event.certificateId) === String(record.certificateId));
+                    if (!duplicate && eventType) lifecycleClient.certificationLifecycleEvents.push(window.AuditPlanningDomain.createLifecycleEvent({
+                        certificateId: record.certificateId,
+                        planId: window.editingPlanId,
+                        type: eventType,
+                        stage: planData.certificationCycle.stage,
+                        user: window.state.currentUser?.name || 'System',
+                        role: window.state.currentUser?.role || 'System',
+                        metadata: { scheduledStart: planData.date || null, scheduledEnd: planData.endDate || null }
+                    }));
+                });
             }
 
             // Persist to LocalStorage immediately
@@ -3262,6 +3270,13 @@ async function generateAIAgenda() {
             ...(clientObj?.keyProcesses || []).map(item => item.name || item),
             ...(clientObj?.goodsServices || []).map(item => item.name || item)
         ].filter(Boolean);
+        context.coverageMatrix = window.AuditPlanningDomain?.buildCoverageMatrix({
+            standards: cycle.standards,
+            previousFindings: getPreviousPlanFindings(clientName, cycle.standards),
+            sites: selectedSites,
+            processes: clientObj?.keyProcesses || [],
+            controls: clientObj?.applicableControls || clientObj?.statementOfApplicability || []
+        }) || null;
 
         // ── Inject previous audit report context (same client + same standard) ──
         const allReports = window.state.auditReports || [];
