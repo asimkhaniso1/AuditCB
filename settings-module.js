@@ -336,12 +336,74 @@ function getAuditPlanningPolicyHTML() {
             <label style="margin-top:1rem;"><input id="planning-placeholder" type="checkbox" ${value('developmentPlaceholder') ? 'checked' : ''}> Values remain development placeholders</label><br>
             <button class="btn btn-primary" type="submit" style="margin-top:1rem;">Save Planning Policy</button>
         </form>
-        <hr><h4>Versioned duration methodologies</h4>
-        <p>Enter only reviewed CB methodology data. Each scheme entry requires a name, version, and applicable tables. Saving configuration does not assert accreditation approval.</p>
-        <div class="form-group"><label>Scheme methodology registry (JSON)</label><textarea id="planning-duration-methodologies" class="form-control" rows="12" spellcheck="false">${window.UTILS.escapeHtml(JSON.stringify(window.state.cbSettings?.durationMethodologies || {}, null, 2))}</textarea></div>
-        <div class="form-group"><label>IMS methodology (JSON or null)</label><textarea id="planning-ims-methodology" class="form-control" rows="8" spellcheck="false">${window.UTILS.escapeHtml(JSON.stringify(window.state.cbSettings?.imsMethodology || null, null, 2))}</textarea></div>
-        <button class="btn btn-primary" type="button" data-action="saveDurationMethodologies">Validate & Save Methodologies</button>
-        <p style="margin-top:1rem;">Configured scheme families: ${Object.keys(window.state.cbSettings?.durationMethodologies || {}).join(', ') || 'None'} · IMS: ${window.UTILS.escapeHtml(window.state.cbSettings?.imsMethodology?.version || 'Not configured')}</p></div>`;
+        ${getDurationMethodologyManagerHTML()}</div>`;
+}
+
+function clonePlanningValue(value, fallback) {
+    try { return JSON.parse(JSON.stringify(value ?? fallback)); } catch (_error) { return fallback; }
+}
+
+function getDurationDraft() {
+    if (!window._durationMethodologyDraft) {
+        window._durationMethodologyDraft = {
+            registry: clonePlanningValue(window.state.cbSettings?.durationMethodologies, {}),
+            ims: clonePlanningValue(window.state.cbSettings?.imsMethodology, null)
+        };
+    }
+    return window._durationMethodologyDraft;
+}
+
+function renderDurationBandRow(family, stage, row, index) {
+    const esc = window.UTILS.escapeHtml;
+    return `<tr>
+        <td><select class="form-control" data-action-change="updateDurationBand" data-arg1="${esc(family)}" data-arg2="${esc(stage)}" data-arg3="${index}" data-arg4="stage" data-arg5="this.value">
+            ${['Surveillance 1', 'Surveillance 2', 'Recertification'].map(option => `<option ${option === stage ? 'selected' : ''}>${option}</option>`).join('')}
+        </select></td>
+        <td><input type="number" min="1" class="form-control" value="${row.minEmployees ?? ''}" data-action-change="updateDurationBand" data-arg1="${esc(family)}" data-arg2="${esc(stage)}" data-arg3="${index}" data-arg4="minEmployees" data-arg5="this.value"></td>
+        <td><input type="number" min="1" class="form-control" value="${row.maxEmployees ?? ''}" placeholder="No upper limit" data-action-change="updateDurationBand" data-arg1="${esc(family)}" data-arg2="${esc(stage)}" data-arg3="${index}" data-arg4="maxEmployees" data-arg5="this.value"></td>
+        <td><input type="number" min="0.5" step="0.5" class="form-control" value="${row.days ?? ''}" data-action-change="updateDurationBand" data-arg1="${esc(family)}" data-arg2="${esc(stage)}" data-arg3="${index}" data-arg4="days" data-arg5="this.value"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" data-action="removeDurationBand" data-arg1="${esc(family)}" data-arg2="${esc(stage)}" data-arg3="${index}" aria-label="Remove duration band"><i class="fa-solid fa-trash"></i></button></td>
+    </tr>`;
+}
+
+function getDurationMethodologyManagerHTML() {
+    const draft = getDurationDraft();
+    const esc = window.UTILS.escapeHtml;
+    const offered = window.state.cbSettings?.availableStandards || window.state.cbSettings?.standardsOffered || [];
+    const supportedFamilies = ['9001', '14001', '45001', '27001', '22301', '20000-1', '22000', '13485', '50001'];
+    const families = [...new Set([...supportedFamilies, ...offered.map(standard => window.AuditPlanningDomain?.standardFamily(standard)).filter(Boolean), ...Object.keys(draft.registry)])];
+    const cards = Object.entries(draft.registry).map(([family, method]) => {
+        const rows = Object.entries(method.tables || {}).flatMap(([stage, entries]) => (entries || []).map((row, index) => renderDurationBandRow(family, stage, row, index))).join('');
+        return `<div class="card" style="padding:1rem;margin:1rem 0;border-left:4px solid var(--primary-color);">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;"><h4 style="margin:0;">Scheme ${esc(family)}</h4><button type="button" class="btn btn-sm btn-outline-danger" data-action="removeDurationMethodology" data-id="${esc(family)}">Remove Scheme</button></div>
+            <div style="display:grid;grid-template-columns:2fr 1fr 2fr 1fr;gap:.75rem;margin-top:1rem;">
+                <div><label>Methodology name</label><input class="form-control" value="${esc(method.name || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="name" data-arg3="this.value"></div>
+                <div><label>Version</label><input class="form-control" value="${esc(method.version || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="version" data-arg3="this.value"></div>
+                <div><label>Controlled source/reference</label><input class="form-control" value="${esc(method.sourceReference || '')}" placeholder="Procedure/document and revision" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="sourceReference" data-arg3="this.value"></div>
+                <div><label>Approved by</label><input class="form-control" value="${esc(method.approvedBy || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="approvedBy" data-arg3="this.value"></div>
+            </div>
+            <div class="table-container" style="margin-top:1rem;"><table><thead><tr><th>Audit type</th><th>Min employees</th><th>Max employees</th><th>Auditor-days</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b;">No calculation bands defined.</td></tr>'}</tbody></table></div>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-id="${esc(family)}"><i class="fa-solid fa-plus"></i> Add employee band</button>
+        </div>`;
+    }).join('');
+    const ims = draft.ims || {};
+    return `<hr><div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;"><div><h4 style="margin:0;">Versioned duration methodologies</h4><p style="margin:.35rem 0;color:#64748b;">Maintain controlled calculation tables through structured fields. Values must come from an approved CB source.</p></div>
+        <div style="display:flex;gap:.5rem;"><select id="duration-new-family" class="form-control"><option value="">Select scheme</option>${families.filter(family => !draft.registry[family]).map(family => `<option value="${esc(family)}">${esc(family)}</option>`).join('')}</select><button type="button" class="btn btn-outline-primary" data-action="addDurationMethodology">Add Scheme</button></div></div>
+        ${cards || '<div class="alert alert-warning" style="margin-top:1rem;">No duration methodology is configured. Add each accredited scheme used by audit planning.</div>'}
+        <div class="card" style="padding:1rem;margin-top:1rem;border-left:4px solid #7c3aed;"><h4>Integrated Management System (IMS) rules</h4>
+            <label><input type="checkbox" ${draft.ims ? 'checked' : ''} data-action-change="toggleIMSMethodology" data-arg1="this.checked"> Enable IMS methodology</label>
+            ${draft.ims ? `<div style="display:grid;grid-template-columns:2fr 1fr 2fr 1fr;gap:.75rem;margin-top:1rem;">
+                <div><label>Name</label><input class="form-control" value="${esc(ims.name || '')}" data-action-change="updateIMSMethodologyField" data-arg1="name" data-arg2="this.value"></div>
+                <div><label>Version</label><input class="form-control" value="${esc(ims.version || '')}" data-action-change="updateIMSMethodologyField" data-arg1="version" data-arg2="this.value"></div>
+                <div><label>Controlled source/reference</label><input class="form-control" value="${esc(ims.sourceReference || '')}" data-action-change="updateIMSMethodologyField" data-arg1="sourceReference" data-arg2="this.value"></div>
+                <div><label>Approved by</label><input class="form-control" value="${esc(ims.approvedBy || '')}" data-action-change="updateIMSMethodologyField" data-arg1="approvedBy" data-arg2="this.value"></div>
+                <div><label>Default adjustment (%)</label><input type="number" step="0.5" class="form-control" value="${ims.defaultAdjustmentPercent ?? 0}" data-action-change="updateIMSMethodologyField" data-arg1="defaultAdjustmentPercent" data-arg2="this.value"></div>
+                <div><label>Maximum reduction (%)</label><input type="number" min="0" step="0.5" class="form-control" value="${ims.maximumReductionPercent ?? 0}" data-action-change="updateIMSMethodologyField" data-arg1="maximumReductionPercent" data-arg2="this.value"></div>
+                <div><label>Maximum increase (%)</label><input type="number" min="0" step="0.5" class="form-control" value="${ims.maximumIncreasePercent ?? 0}" data-action-change="updateIMSMethodologyField" data-arg1="maximumIncreasePercent" data-arg2="this.value"></div>
+                <div><label><input type="checkbox" ${ims.justificationRequired !== false ? 'checked' : ''} data-action-change="updateIMSMethodologyField" data-arg1="justificationRequired" data-arg2="this.checked"> Justification required</label></div>
+            </div>` : '<p style="color:#64748b;margin-top:.75rem;">Enable only after an approved IMS calculation rule is available.</p>'}
+        </div>
+        <button class="btn btn-primary" type="button" style="margin-top:1rem;" data-action="saveDurationMethodologies"><i class="fa-solid fa-clipboard-check"></i> Validate & Save Methodologies</button>`;
 }
 
 window.saveAuditPlanningPolicy = async function () {
@@ -365,20 +427,119 @@ window.saveAuditPlanningPolicy = async function () {
     window.showNotification('Audit planning policy saved.', 'success');
 };
 
+function rerenderDurationManager() {
+    const container = document.getElementById('settings-content');
+    if (container) container.innerHTML = getSettingsContent('policies', 'audit-planning');
+}
+
+window.addDurationMethodology = function () {
+    const family = document.getElementById('duration-new-family')?.value;
+    if (!family) { window.showNotification('Select a scheme to add.', 'warning'); return; }
+    const draft = getDurationDraft();
+    if (!draft.registry[family]) draft.registry[family] = { name: '', version: '', sourceReference: '', approvedBy: '', tables: {} };
+    rerenderDurationManager();
+};
+
+window.removeDurationMethodology = function (family) {
+    const draft = getDurationDraft();
+    delete draft.registry[family];
+    rerenderDurationManager();
+};
+
+window.updateDurationMethodologyField = function (family, field, value) {
+    const method = getDurationDraft().registry[family];
+    if (method) method[field] = value;
+};
+
+window.addDurationBand = function (family) {
+    const method = getDurationDraft().registry[family];
+    if (!method) return;
+    method.tables = method.tables || {};
+    method.tables.Recertification = method.tables.Recertification || [];
+    method.tables.Recertification.push({ minEmployees: 1, maxEmployees: null, days: '' });
+    rerenderDurationManager();
+};
+
+window.removeDurationBand = function (family, stage, index) {
+    const rows = getDurationDraft().registry[family]?.tables?.[stage];
+    if (rows) rows.splice(Number(index), 1);
+    rerenderDurationManager();
+};
+
+window.updateDurationBand = function (family, stage, index, field, value) {
+    const method = getDurationDraft().registry[family];
+    const rows = method?.tables?.[stage];
+    const row = rows?.[Number(index)];
+    if (!row) return;
+    if (field === 'stage') {
+        rows.splice(Number(index), 1);
+        method.tables[value] = method.tables[value] || [];
+        method.tables[value].push(row);
+        rerenderDurationManager();
+        return;
+    }
+    row[field] = value === '' && field === 'maxEmployees' ? null : Number(value);
+};
+
+window.toggleIMSMethodology = function (enabled) {
+    const draft = getDurationDraft();
+    draft.ims = enabled ? (draft.ims || { name: '', version: '', sourceReference: '', approvedBy: '', defaultAdjustmentPercent: 0, maximumReductionPercent: 0, maximumIncreasePercent: 0, justificationRequired: true }) : null;
+    rerenderDurationManager();
+};
+
+window.updateIMSMethodologyField = function (field, value) {
+    const ims = getDurationDraft().ims;
+    if (!ims) return;
+    if (['defaultAdjustmentPercent', 'maximumReductionPercent', 'maximumIncreasePercent'].includes(field)) ims[field] = Number(value);
+    else ims[field] = value;
+};
+
+function validateDurationMethodologyDraft(draft) {
+    const errors = [];
+    Object.entries(draft.registry).forEach(([family, method]) => {
+        if (!String(method.name || '').trim()) errors.push(`${family}: methodology name is required.`);
+        if (!String(method.version || '').trim()) errors.push(`${family}: version is required.`);
+        if (!String(method.sourceReference || '').trim()) errors.push(`${family}: controlled source/reference is required.`);
+        if (!String(method.approvedBy || '').trim()) errors.push(`${family}: approver is required.`);
+        const allRows = Object.entries(method.tables || {}).flatMap(([stage, rows]) => (rows || []).map(row => ({ stage, ...row })));
+        if (!allRows.length) errors.push(`${family}: add at least one employee-duration band.`);
+        allRows.forEach((row, index) => {
+            if (!(Number(row.minEmployees) >= 1)) errors.push(`${family} row ${index + 1}: minimum employees must be at least 1.`);
+            if (row.maxEmployees != null && Number(row.maxEmployees) < Number(row.minEmployees)) errors.push(`${family} row ${index + 1}: maximum employees cannot be below the minimum.`);
+            if (!(Number(row.days) > 0)) errors.push(`${family} row ${index + 1}: auditor-days must be greater than zero.`);
+        });
+        Object.entries(method.tables || {}).forEach(([stage, rows]) => {
+            const sorted = (rows || []).slice().sort((a, b) => Number(a.minEmployees) - Number(b.minEmployees));
+            sorted.forEach((row, index) => {
+                const previous = sorted[index - 1];
+                if (previous && (previous.maxEmployees == null || Number(row.minEmployees) <= Number(previous.maxEmployees))) errors.push(`${family} ${stage}: employee bands overlap.`);
+            });
+        });
+    });
+    if (draft.ims) {
+        if (!String(draft.ims.name || '').trim()) errors.push('IMS methodology name is required.');
+        if (!String(draft.ims.version || '').trim()) errors.push('IMS methodology version is required.');
+        if (!String(draft.ims.sourceReference || '').trim()) errors.push('IMS controlled source/reference is required.');
+        if (!String(draft.ims.approvedBy || '').trim()) errors.push('IMS approver is required.');
+        const adjustment = Number(draft.ims.defaultAdjustmentPercent || 0);
+        if (adjustment < -Number(draft.ims.maximumReductionPercent || 0) || adjustment > Number(draft.ims.maximumIncreasePercent || 0)) errors.push('IMS default adjustment exceeds the configured reduction/increase limits.');
+    }
+    return errors;
+}
+
 window.saveDurationMethodologies = async function () {
     try {
-        const registry = JSON.parse(document.getElementById('planning-duration-methodologies')?.value || '{}');
-        const ims = JSON.parse(document.getElementById('planning-ims-methodology')?.value || 'null');
-        if (!registry || Array.isArray(registry) || typeof registry !== 'object') throw new Error('Scheme registry must be a JSON object keyed by standard family.');
-        Object.entries(registry).forEach(([family, method]) => {
-            if (!method?.name || !method?.version) throw new Error(`${family}: name and version are required.`);
-            if (!method.tables && !Array.isArray(method.employeeBands)) throw new Error(`${family}: tables or employeeBands are required.`);
-        });
-        if (ims && (!ims.name || !ims.version)) throw new Error('IMS methodology requires name and version.');
-        window.state.cbSettings.durationMethodologies = registry;
-        window.state.cbSettings.imsMethodology = ims;
+        const draft = getDurationDraft();
+        const errors = validateDurationMethodologyDraft(draft);
+        if (errors.length) throw new Error(errors.join(' '));
+        const savedAt = new Date().toISOString();
+        Object.values(draft.registry).forEach(method => { method.configuredAt = savedAt; method.configuredBy = window.state.currentUser?.name || 'System'; });
+        if (draft.ims) { draft.ims.configuredAt = savedAt; draft.ims.configuredBy = window.state.currentUser?.name || 'System'; }
+        window.state.cbSettings.durationMethodologies = clonePlanningValue(draft.registry, {});
+        window.state.cbSettings.imsMethodology = clonePlanningValue(draft.ims, null);
         window.saveData();
         await window.DataService?.syncSettings?.({ saveLocal: false, silent: true });
+        delete window._durationMethodologyDraft;
         window.showNotification('Versioned duration methodologies saved.', 'success');
         window.switchSettingsSubTab('policies', 'audit-planning');
     } catch (error) {
