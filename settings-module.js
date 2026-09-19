@@ -374,34 +374,33 @@ function getDurationMethodologyManagerHTML() {
     const families = [...new Set([...supportedFamilies, ...offered.map(standard => window.AuditPlanningDomain?.standardFamily(standard)).filter(Boolean), ...Object.keys(draft.registry)])];
     const cards = Object.entries(draft.registry).map(([family, method]) => {
         const rows = Object.entries(method.tables || {}).flatMap(([stage, entries]) => (entries || []).map((row, index) => renderDurationBandRow(family, stage, row, index))).join('');
+        const ready = Boolean(method.name && method.version && method.sourceReference && method.approvedBy && rows);
         return `<div class="card" style="padding:1rem;margin:1rem 0;border-left:4px solid var(--primary-color);">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;"><h4 style="margin:0;">Scheme ${esc(family)}</h4><button type="button" class="btn btn-sm btn-outline-danger" data-action="removeDurationMethodology" data-id="${esc(family)}">Remove Scheme</button></div>
-            <div style="display:grid;grid-template-columns:2fr 1fr 2fr 1fr;gap:.75rem;margin-top:1rem;">
-                <div><label>Methodology name</label><input class="form-control" value="${esc(method.name || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="name" data-arg3="this.value"></div>
-                <div><label>Version</label><input class="form-control" value="${esc(method.version || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="version" data-arg3="this.value"></div>
-                <div><label>Controlled source/reference</label><input class="form-control" value="${esc(method.sourceReference || '')}" placeholder="Procedure/document and revision" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="sourceReference" data-arg3="this.value"></div>
-                <div><label>Approved by</label><input class="form-control" value="${esc(method.approvedBy || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="approvedBy" data-arg3="this.value"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;"><div style="display:flex;align-items:center;gap:.6rem;"><h4 style="margin:0;">ISO ${esc(family)}</h4><span class="status-badge" style="background:${ready ? '#dcfce7' : '#fef3c7'};color:${ready ? '#166534' : '#92400e'};">${ready ? 'Ready' : 'Incomplete'}</span></div><button type="button" class="btn btn-sm btn-outline-danger" data-action="removeDurationMethodology" data-id="${esc(family)}">Remove</button></div>
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:.75rem;margin-top:1rem;">
+                <div><label>Rule name</label><input class="form-control" value="${esc(method.name || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="name" data-arg3="this.value"></div>
+                <div><label>Version / revision</label><input class="form-control" value="${esc(method.version || '')}" placeholder="e.g. Rev 03" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="version" data-arg3="this.value"></div>
             </div>
-            <div class="table-container" style="margin-top:1rem;"><table><thead><tr><th>Audit type</th><th>Min employees</th><th>Max employees</th><th>Auditor-days</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b;">No calculation bands defined.</td></tr>'}</tbody></table></div>
-            <button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-id="${esc(family)}"><i class="fa-solid fa-plus"></i> Add employee band</button>
+            <div style="margin-top:1rem;font-weight:600;">Duration table</div><div style="font-size:.78rem;color:#64748b;margin-bottom:.35rem;">Enter the employee ranges and approved auditor-days for each audit type.</div>
+            <div class="table-container"><table><thead><tr><th>Audit type</th><th>Employees from</th><th>Employees to</th><th>Auditor-days</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b;">No duration rows yet.</td></tr>'}</tbody></table></div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;"><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Surveillance 1"><i class="fa-solid fa-plus"></i> S1 row</button><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Surveillance 2"><i class="fa-solid fa-plus"></i> S2 row</button><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Recertification"><i class="fa-solid fa-plus"></i> Recertification row</button></div>
+            <details style="margin-top:1rem;"><summary style="cursor:pointer;font-weight:600;color:#475569;">Approval details</summary><div style="display:grid;grid-template-columns:2fr 1fr;gap:.75rem;margin-top:.75rem;"><div><label>Controlled source/reference</label><input class="form-control" value="${esc(method.sourceReference || '')}" placeholder="Procedure/document and revision" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="sourceReference" data-arg3="this.value"></div><div><label>Approved by</label><input class="form-control" value="${esc(method.approvedBy || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="approvedBy" data-arg3="this.value"></div></div></details>
         </div>`;
     }).join('');
     const ims = draft.ims || {};
-    return `<hr><div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;"><div><h4 style="margin:0;">Versioned duration methodologies</h4><p style="margin:.35rem 0;color:#64748b;">Maintain controlled calculation tables through structured fields. Values must come from an approved CB source.</p></div>
-        <div style="display:flex;gap:.5rem;"><select id="duration-new-family" class="form-control"><option value="">Select scheme</option>${families.filter(family => !draft.registry[family]).map(family => `<option value="${esc(family)}">${esc(family)}</option>`).join('')}</select><button type="button" class="btn btn-outline-primary" data-action="addDurationMethodology">Add Scheme</button></div></div>
+    return `<hr><div class="alert alert-info"><strong>Set up duration in three steps:</strong> 1. Add a standard. 2. Enter its employee ranges and auditor-days. 3. Open Approval details, then validate and save.</div><div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;"><div><h4 style="margin:0;">Duration rules by standard</h4><p style="margin:.35rem 0;color:#64748b;">Only enter figures from your approved CB procedure.</p></div>
+        <div style="display:flex;gap:.5rem;"><select id="duration-new-family" class="form-control"><option value="">Choose standard</option>${families.filter(family => !draft.registry[family]).map(family => `<option value="${esc(family)}">ISO ${esc(family)}</option>`).join('')}</select><button type="button" class="btn btn-outline-primary" data-action="addDurationMethodology"><i class="fa-solid fa-plus"></i> Add</button></div></div>
         ${cards || '<div class="alert alert-warning" style="margin-top:1rem;">No duration methodology is configured. Add each accredited scheme used by audit planning.</div>'}
-        <div class="card" style="padding:1rem;margin-top:1rem;border-left:4px solid #7c3aed;"><h4>Integrated Management System (IMS) rules</h4>
-            <label><input type="checkbox" ${draft.ims ? 'checked' : ''} data-action-change="toggleIMSMethodology" data-arg1="this.checked"> Enable IMS methodology</label>
-            ${draft.ims ? `<div style="display:grid;grid-template-columns:2fr 1fr 2fr 1fr;gap:.75rem;margin-top:1rem;">
+        <div class="card" style="padding:1rem;margin-top:1rem;border-left:4px solid #7c3aed;"><h4 style="margin-bottom:.5rem;">Integrated audit adjustment</h4>
+            <label><input type="checkbox" ${draft.ims ? 'checked' : ''} data-action-change="toggleIMSMethodology" data-arg1="this.checked"> This CB uses an approved IMS adjustment rule</label>
+            ${draft.ims ? `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:.75rem;margin-top:1rem;">
                 <div><label>Name</label><input class="form-control" value="${esc(ims.name || '')}" data-action-change="updateIMSMethodologyField" data-arg1="name" data-arg2="this.value"></div>
                 <div><label>Version</label><input class="form-control" value="${esc(ims.version || '')}" data-action-change="updateIMSMethodologyField" data-arg1="version" data-arg2="this.value"></div>
-                <div><label>Controlled source/reference</label><input class="form-control" value="${esc(ims.sourceReference || '')}" data-action-change="updateIMSMethodologyField" data-arg1="sourceReference" data-arg2="this.value"></div>
-                <div><label>Approved by</label><input class="form-control" value="${esc(ims.approvedBy || '')}" data-action-change="updateIMSMethodologyField" data-arg1="approvedBy" data-arg2="this.value"></div>
                 <div><label>Default adjustment (%)</label><input type="number" step="0.5" class="form-control" value="${ims.defaultAdjustmentPercent ?? 0}" data-action-change="updateIMSMethodologyField" data-arg1="defaultAdjustmentPercent" data-arg2="this.value"></div>
                 <div><label>Maximum reduction (%)</label><input type="number" min="0" step="0.5" class="form-control" value="${ims.maximumReductionPercent ?? 0}" data-action-change="updateIMSMethodologyField" data-arg1="maximumReductionPercent" data-arg2="this.value"></div>
                 <div><label>Maximum increase (%)</label><input type="number" min="0" step="0.5" class="form-control" value="${ims.maximumIncreasePercent ?? 0}" data-action-change="updateIMSMethodologyField" data-arg1="maximumIncreasePercent" data-arg2="this.value"></div>
                 <div><label><input type="checkbox" ${ims.justificationRequired !== false ? 'checked' : ''} data-action-change="updateIMSMethodologyField" data-arg1="justificationRequired" data-arg2="this.checked"> Justification required</label></div>
-            </div>` : '<p style="color:#64748b;margin-top:.75rem;">Enable only after an approved IMS calculation rule is available.</p>'}
+            </div><details style="margin-top:.75rem;"><summary style="cursor:pointer;font-weight:600;color:#475569;">Approval details</summary><div style="display:grid;grid-template-columns:2fr 1fr;gap:.75rem;margin-top:.75rem;"><div><label>Controlled source/reference</label><input class="form-control" value="${esc(ims.sourceReference || '')}" data-action-change="updateIMSMethodologyField" data-arg1="sourceReference" data-arg2="this.value"></div><div><label>Approved by</label><input class="form-control" value="${esc(ims.approvedBy || '')}" data-action-change="updateIMSMethodologyField" data-arg1="approvedBy" data-arg2="this.value"></div></div></details>` : '<p style="color:#64748b;margin-top:.75rem;">Leave this off until an approved integrated-audit rule is available.</p>'}
         </div>
         <button class="btn btn-primary" type="button" style="margin-top:1rem;" data-action="saveDurationMethodologies"><i class="fa-solid fa-clipboard-check"></i> Validate & Save Methodologies</button>`;
 }
@@ -436,7 +435,14 @@ window.addDurationMethodology = function () {
     const family = document.getElementById('duration-new-family')?.value;
     if (!family) { window.showNotification('Select a scheme to add.', 'warning'); return; }
     const draft = getDurationDraft();
-    if (!draft.registry[family]) draft.registry[family] = { name: '', version: '', sourceReference: '', approvedBy: '', tables: {} };
+    if (!draft.registry[family]) draft.registry[family] = {
+        name: `ISO ${family} duration rules`, version: '', sourceReference: '', approvedBy: '',
+        tables: {
+            'Surveillance 1': [{ minEmployees: 1, maxEmployees: null, days: '' }],
+            'Surveillance 2': [{ minEmployees: 1, maxEmployees: null, days: '' }],
+            'Recertification': [{ minEmployees: 1, maxEmployees: null, days: '' }]
+        }
+    };
     rerenderDurationManager();
 };
 
@@ -451,12 +457,14 @@ window.updateDurationMethodologyField = function (family, field, value) {
     if (method) method[field] = value;
 };
 
-window.addDurationBand = function (family) {
+window.addDurationBand = function (family, stage = 'Recertification') {
     const method = getDurationDraft().registry[family];
     if (!method) return;
     method.tables = method.tables || {};
-    method.tables.Recertification = method.tables.Recertification || [];
-    method.tables.Recertification.push({ minEmployees: 1, maxEmployees: null, days: '' });
+    method.tables[stage] = method.tables[stage] || [];
+    const previous = method.tables[stage].at(-1);
+    const nextMinimum = previous?.maxEmployees != null ? Number(previous.maxEmployees) + 1 : 1;
+    method.tables[stage].push({ minEmployees: nextMinimum, maxEmployees: null, days: '' });
     rerenderDurationManager();
 };
 
