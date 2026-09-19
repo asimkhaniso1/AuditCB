@@ -20,6 +20,64 @@ if (!window.state.knowledgeBase) {
 // the data-id attribute is always a string. Compare loosely on both sides.
 const _idEq = (a, b) => String(a) === String(b);
 
+// Per-table UI sorting. Actions remain fixed in the last column.
+const _kbSortState = {
+    standard: { key: 'name', direction: 'asc' },
+    sop: { key: 'name', direction: 'asc' },
+    policy: { key: 'name', direction: 'asc' },
+    marketing: { key: 'name', direction: 'asc' }
+};
+
+function _sortedKnowledgeDocs(documents, type) {
+    const { key, direction } = _kbSortState[type] || _kbSortState.standard;
+    const multiplier = direction === 'desc' ? -1 : 1;
+    const statusRank = { processing: 0, pending: 1, ready: 2 };
+
+    return [...documents].sort((left, right) => {
+        let a = left?.[key] ?? '';
+        let b = right?.[key] ?? '';
+        if (key === 'status') {
+            a = statusRank[a] ?? 99;
+            b = statusRank[b] ?? 99;
+        } else if (key === 'uploadDate') {
+            a = Date.parse(a) || 0;
+            b = Date.parse(b) || 0;
+        } else {
+            a = String(a).toLocaleLowerCase();
+            b = String(b).toLocaleLowerCase();
+        }
+        if (a < b) return -1 * multiplier;
+        if (a > b) return 1 * multiplier;
+        return String(left?.name || '').localeCompare(String(right?.name || ''));
+    });
+}
+
+function _kbSortableHeader(label, type, key) {
+    const active = _kbSortState[type]?.key === key;
+    const direction = active ? _kbSortState[type].direction : 'none';
+    const icon = !active ? 'fa-sort' : direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
+    const nextLabel = active && direction === 'asc' ? 'descending' : 'ascending';
+    return `<th aria-sort="${active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}">
+        <button type="button" class="kb-sort-button" data-action="sortKnowledgeBase" data-arg1="${type}" data-arg2="${key}" aria-label="Sort ${label} ${nextLabel}">
+            ${label} <i class="fa-solid ${icon}" aria-hidden="true"></i>
+        </button>
+    </th>`;
+}
+
+window.sortKnowledgeBase = function (type, key) {
+    if (!_kbSortState[type] || !['name', 'fileName', 'uploadDate', 'status'].includes(key)) return;
+    const current = _kbSortState[type];
+    _kbSortState[type] = {
+        key,
+        direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    };
+    if (typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    } else {
+        renderSettings();
+    }
+};
+
 // Defensive check that a clause looks like a real standard clause reference
 // (not empty, not an internal FOCUS/SURV/ORG/DOC pseudo tag, not free
 // prose). Prefers the canonical window.Validator.isClauseRef; falls back to
@@ -96,15 +154,15 @@ function getKnowledgeBaseHTML() {
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Document</th>
-                                    <th>File</th>
-                                    <th>Uploaded</th>
-                                    <th>Status</th>
+                                    ${_kbSortableHeader('Document', 'standard', 'name')}
+                                    ${_kbSortableHeader('File', 'standard', 'fileName')}
+                                    ${_kbSortableHeader('Uploaded', 'standard', 'uploadDate')}
+                                    ${_kbSortableHeader('Status', 'standard', 'status')}
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${kb.standards.map(doc => `
+                                ${_sortedKnowledgeDocs(kb.standards, 'standard').map(doc => `
                                     <tr>
                                         <td><strong>${window.UTILS.escapeHtml(doc.name)}</strong></td>
                                         <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName)}</td>
@@ -170,15 +228,15 @@ function getKnowledgeBaseHTML() {
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Document</th>
-                                    <th>File</th>
-                                    <th>Uploaded</th>
-                                    <th>Status</th>
+                                    ${_kbSortableHeader('Document', 'sop', 'name')}
+                                    ${_kbSortableHeader('File', 'sop', 'fileName')}
+                                    ${_kbSortableHeader('Uploaded', 'sop', 'uploadDate')}
+                                    ${_kbSortableHeader('Status', 'sop', 'status')}
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${kb.sops.map(doc => `
+                                ${_sortedKnowledgeDocs(kb.sops, 'sop').map(doc => `
                                     <tr>
                                         <td><strong>${window.UTILS.escapeHtml(doc.name)}</strong></td>
                                         <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName || '-')}</td>
@@ -244,15 +302,15 @@ function getKnowledgeBaseHTML() {
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Document</th>
-                                    <th>File</th>
-                                    <th>Uploaded</th>
-                                    <th>Status</th>
+                                    ${_kbSortableHeader('Document', 'policy', 'name')}
+                                    ${_kbSortableHeader('File', 'policy', 'fileName')}
+                                    ${_kbSortableHeader('Uploaded', 'policy', 'uploadDate')}
+                                    ${_kbSortableHeader('Status', 'policy', 'status')}
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${kb.policies.map(doc => `
+                                ${_sortedKnowledgeDocs(kb.policies, 'policy').map(doc => `
                                     <tr>
                                         <td><strong>${window.UTILS.escapeHtml(doc.name)}</strong></td>
                                         <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName || '-')}</td>
@@ -318,15 +376,15 @@ function getKnowledgeBaseHTML() {
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Document</th>
-                                    <th>File</th>
-                                    <th>Uploaded</th>
-                                    <th>Status</th>
+                                    ${_kbSortableHeader('Document', 'marketing', 'name')}
+                                    ${_kbSortableHeader('File', 'marketing', 'fileName')}
+                                    ${_kbSortableHeader('Uploaded', 'marketing', 'uploadDate')}
+                                    ${_kbSortableHeader('Status', 'marketing', 'status')}
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${kb.marketing.map(doc => `
+                                ${_sortedKnowledgeDocs(kb.marketing, 'marketing').map(doc => `
                                     <tr>
                                         <td><strong>${window.UTILS.escapeHtml(doc.name)}</strong></td>
                                         <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName || '-')}</td>
