@@ -715,14 +715,15 @@ window.analyzeStandard = async function (docId, mode, auditType, clientId) {
         renderSettings();
     }
 
-    if (doc.status === 'ready') {
+    const savedToCloud = await window.DataService.syncSettings({ saveLocal: false, silent: true });
+
+    if (!savedToCloud && window.SupabaseClient?.isInitialized) {
+        window.showNotification('Analysis finished locally, but it could not be saved to the cloud. Please retry before refreshing.', 'warning');
+    } else if (doc.status === 'ready') {
         window.showNotification(`${doc.name} analysis complete! ${doc.clauses ? doc.clauses.length : 0} clauses, ${doc.checklistCount || 0} questions.`, 'success');
     } else {
         window.showNotification(`Analysis complete. Using fallback clause data.`, 'info');
     }
-
-    // Sync metadata
-    await window.DataService.syncSettings({ saveLocal: false, silent: true });
 };
 
 // Re-analyze a standard (for deeper extraction)
@@ -795,10 +796,14 @@ window.analyzeDocument = async function (type, docId) {
     // Small delay for visual feedback
     setTimeout(async () => {
         switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
-        window.showNotification(`${doc.name} analyzed! ${doc.clauses.length} sections indexed.`, 'success');
 
-        // Sync metadata
-        await window.DataService.syncSettings({ saveLocal: false, silent: true });
+        // Sync metadata and do not claim durable completion when cloud save fails.
+        const savedToCloud = await window.DataService.syncSettings({ saveLocal: false, silent: true });
+        if (!savedToCloud && window.SupabaseClient?.isInitialized) {
+            window.showNotification('Analysis finished locally, but it could not be saved to the cloud. Please retry before refreshing.', 'warning');
+        } else {
+            window.showNotification(`${doc.name} analyzed! ${doc.clauses.length} sections indexed.`, 'success');
+        }
     }, 300);
 };
 
@@ -1753,13 +1758,19 @@ window.analyzeCustomDocWithAI = async function (doc, type) {
         doc.status = 'ready';
         window.saveData();
 
+        const savedToCloud = await window.DataService.syncSettings({ saveLocal: false, silent: true });
+
         // Refresh UI
         if (typeof switchSettingsSubTab === 'function') {
             switchSettingsSubTab('knowledge', 'kb');
         } else {
             renderSettings();
         }
-        window.showNotification(`${doc.name} analyzed with AI!`, 'success');
+        if (!savedToCloud && window.SupabaseClient?.isInitialized) {
+            window.showNotification('Analysis finished locally, but it could not be saved to the cloud. Please retry before refreshing.', 'warning');
+        } else {
+            window.showNotification(`${doc.name} analyzed with AI!`, 'success');
+        }
         return true;
     } catch (e) {
         console.error('AI Parse Error', e);
@@ -2237,12 +2248,20 @@ window.reanalyzeStandard = async function (docId, mode = 'standard', auditType =
         // Reuse the main KB analysis function with selected mode
         await extractStandardClauses(doc, doc.name, mode, auditType, clientId);
 
+        const savedToCloud = await window.DataService.syncSettings({ saveLocal: false, silent: true });
+
         // Complete progress
         window._kbProgress?.show('✅ Re-analysis complete!', 100);
         setTimeout(() => window._kbProgress?.hide(), 1500);
 
         // After analysis, show result
-        if (doc.status === 'ready') {
+        if (!savedToCloud && window.SupabaseClient?.isInitialized) {
+            window.showNotification('Re-analysis finished locally, but it could not be saved to the cloud. Please retry before refreshing.', 'warning');
+            if (typeof switchSettingsSubTab === 'function') {
+                switchSettingsSubTab('knowledge', 'kb');
+            }
+            return;
+        } else if (doc.status === 'ready') {
             window.showNotification(`Re-analysis complete! ${doc.clauses?.length || 0} clauses, ${doc.checklistCount || 0} questions extracted.`, 'success');
             if (typeof switchSettingsSubTab === 'function') {
                 switchSettingsSubTab('knowledge', 'kb');
@@ -2261,10 +2280,14 @@ window.reanalyzeStandard = async function (docId, mode = 'standard', auditType =
     doc.lastAnalyzed = new Date().toISOString().split('T')[0];
     window.saveData();
 
-    window.showNotification(doc.clauses.length
+    const savedToCloud = await window.DataService.syncSettings({ saveLocal: false, silent: true });
+
+    window.showNotification(!savedToCloud && window.SupabaseClient?.isInitialized
+        ? 'Re-analysis finished locally, but it could not be saved to the cloud. Please retry before refreshing.'
+        : doc.clauses.length
         ? `Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`
         : `No built-in clause set for ${doc.name} — nothing was assumed from another standard. Upload the standard text and analyse it.`,
-        doc.clauses.length ? 'info' : 'warning');
+        !savedToCloud && window.SupabaseClient?.isInitialized ? 'warning' : doc.clauses.length ? 'info' : 'warning');
     if (typeof switchSettingsSubTab === 'function') {
         switchSettingsSubTab('knowledge', 'kb');
     } else {

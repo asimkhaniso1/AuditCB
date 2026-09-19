@@ -8,6 +8,41 @@ const SupabaseClient = {
     isInitialized: false,
 
     /**
+     * Build the durable Knowledge Base snapshot stored in Settings.
+     *
+     * The extracted source text can be recovered from the uploaded document and
+     * is often several megabytes per standard. Persisting it with every clause
+     * analysis made the Settings upsert unnecessarily large and could leave the
+     * UI showing a successful analysis that was never saved. Keep the authored
+     * analysis and checklist data, but omit recoverable/transient file content.
+     */
+    _buildKnowledgeBaseSnapshot(knowledgeBase) {
+        const snapshot = {};
+        const source = knowledgeBase || {};
+
+        Object.keys(source).forEach(key => {
+            const value = source[key];
+            if (!Array.isArray(value)) {
+                snapshot[key] = value;
+                return;
+            }
+
+            snapshot[key] = value.map(doc => {
+                if (!doc || typeof doc !== 'object') return doc;
+                const {
+                    extractedText: _extractedText,
+                    file: _file,
+                    blob: _blob,
+                    ...durableDocument
+                } = doc;
+                return durableDocument;
+            });
+        });
+
+        return snapshot;
+    },
+
+    /**
      * Initialize Supabase client
      * NOTE: Add your Supabase credentials to .env or settings
      */
@@ -2128,7 +2163,7 @@ const SupabaseClient = {
                 cb_settings: window.state.cbSettings || {},
                 organization: window.state.orgStructure || [],
                 policies: window.state.cbPolicies || {},
-                knowledge_base: window.state.knowledgeBase || {},
+                knowledge_base: this._buildKnowledgeBaseSnapshot(window.state.knowledgeBase),
                 updated_at: new Date().toISOString()
             };
 
