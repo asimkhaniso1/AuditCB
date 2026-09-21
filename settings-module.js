@@ -427,8 +427,25 @@ function hasEnteredDurationRows(method) {
     return Object.values(method?.tables || {}).some(rows => (rows || []).some(row => Number(row.days) > 0));
 }
 
+function backfillEmptyDurationStages(draft) {
+    let filledStages = 0;
+    Object.values(draft?.registry || {}).forEach(method => {
+        method.tables = method.tables || {};
+        Object.entries(BASIC_DURATION_BANDS).forEach(([stage, starterRows]) => {
+            const currentRows = method.tables[stage] || [];
+            if (!currentRows.some(row => Number(row.days) > 0)) {
+                method.tables[stage] = clonePlanningValue(starterRows, []);
+                method.starterTemplate = true;
+                filledStages++;
+            }
+        });
+    });
+    return filledStages;
+}
+
 function getDurationMethodologyManagerHTML() {
     const draft = getDurationDraft();
+    backfillEmptyDurationStages(draft);
     const esc = window.UTILS.escapeHtml;
     const families = [...new Set([...durationMethodologyFamilies(), ...Object.keys(draft.registry)])];
     const cards = Object.entries(draft.registry).map(([family, method]) => {
@@ -670,7 +687,6 @@ function validateDurationMethodologyDraft(draft) {
         if (!String(method.sourceReference || '').trim()) errors.push(`${family}: controlled source/reference is required.`);
         if (!String(method.approvedBy || '').trim()) errors.push(`${family}: approver is required.`);
         const allRows = Object.entries(method.tables || {}).flatMap(([stage, rows]) => (rows || []).map(row => ({ stage, ...row })));
-        if (!allRows.length) errors.push(`${family}: add at least one employee-duration band.`);
         allRows.forEach((row, index) => {
             if (!(Number(row.minEmployees) >= 1)) errors.push(`${family} row ${index + 1}: minimum employees must be at least 1.`);
             if (row.maxEmployees != null && Number(row.maxEmployees) < Number(row.minEmployees)) errors.push(`${family} row ${index + 1}: maximum employees cannot be below the minimum.`);
@@ -678,10 +694,7 @@ function validateDurationMethodologyDraft(draft) {
         });
         Object.entries(method.tables || {}).forEach(([stage, rows]) => {
             const sorted = (rows || []).slice().sort((a, b) => Number(a.minEmployees) - Number(b.minEmployees));
-            if (!sorted.length) {
-                errors.push(`${family} ${stage}: add employee bands.`);
-                return;
-            }
+            if (!sorted.length) return;
             if (Number(sorted[0].minEmployees) !== 1) errors.push(`${family} ${stage}: coverage must start at 1 employee.`);
             sorted.forEach((row, index) => {
                 const previous = sorted[index - 1];
@@ -707,6 +720,7 @@ function validateDurationMethodologyDraft(draft) {
 
 window.saveDurationMethodologyDrafts = async function () {
     const draft = getDurationDraft();
+    backfillEmptyDurationStages(draft);
     window.state.cbSettings.durationMethodologyDrafts = clonePlanningValue(draft.registry, {});
     window.state.cbSettings.imsMethodologyDraft = clonePlanningValue(draft.ims, null);
     window.saveData();
@@ -723,6 +737,7 @@ window.saveDurationMethodologyDrafts = async function () {
 window.saveDurationMethodologies = async function () {
     try {
         const draft = getDurationDraft();
+        backfillEmptyDurationStages(draft);
         const errors = validateDurationMethodologyDraft(draft);
         if (errors.length) {
             window._durationMethodologyValidationErrors = errors;

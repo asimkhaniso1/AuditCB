@@ -160,4 +160,27 @@ describe('duration methodology starter defaults', () => {
         expect(window._durationMethodologyValidationErrors).toContain('27001 Recertification: employee bands contain a gap before 300.');
         expect(window.state.cbSettings.durationMethodologies['27001']).toBeUndefined();
     });
+
+    it('automatically backfills empty stages in older saved drafts without replacing populated stages', async () => {
+        window._durationMethodologyDraft = {
+            registry: {
+                22301: {
+                    name: 'ISO 22301 rules', version: 'Rev 1', sourceReference: '', approvedBy: '',
+                    tables: {
+                        'Surveillance 1': [],
+                        'Surveillance 2': [{ minEmployees: 1, maxEmployees: null, days: 9 }]
+                    }
+                }
+            },
+            ims: null
+        };
+
+        await window.saveDurationMethodologyDrafts();
+        const method = window._durationMethodologyDraft.registry['22301'];
+
+        expect(method.tables['Surveillance 1']).toHaveLength(7);
+        expect(method.tables['Surveillance 2']).toEqual([{ minEmployees: 1, maxEmployees: null, days: 9 }]);
+        expect(method.tables.Recertification).toHaveLength(7);
+        expect(method.starterTemplate).toBe(true);
+    });
 });
