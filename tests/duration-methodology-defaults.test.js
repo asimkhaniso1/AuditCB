@@ -10,6 +10,8 @@ globalThis.Logger = window.Logger;
 window.UTILS = { escapeHtml: value => String(value ?? '') };
 window.AuditPlanningDomain = Domain;
 window.showNotification = vi.fn();
+window.saveData = vi.fn();
+window.DataService = { syncSettings: vi.fn().mockResolvedValue(true) };
 
 const fs = await import('fs');
 const path = await import('path');
@@ -18,6 +20,7 @@ const source = fs.readFileSync(path.resolve('./settings-module.js'), 'utf8');
 describe('duration methodology starter defaults', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        window.DataService.syncSettings.mockResolvedValue(true);
         delete window._durationMethodologyDraft;
         window.state = {
             cbSettings: {
@@ -69,5 +72,27 @@ describe('duration methodology starter defaults', () => {
         window.updateDurationBand('22301', 'Recertification', 0, 'days', '1.25');
         window.fillBasicDurationDefaults();
         expect(registry['22301'].tables.Recertification[0].days).toBe(1.25);
+    });
+
+    it('saves incomplete starter methodologies as drafts without activating them', async () => {
+        window.fillBasicDurationDefaults();
+        await window.saveDurationMethodologyDrafts();
+
+        expect(window.state.cbSettings.durationMethodologyDrafts['27001'].starterTemplate).toBe(true);
+        expect(window.state.cbSettings.durationMethodologies['27001']).toBeUndefined();
+        expect(window.saveData).toHaveBeenCalled();
+        expect(window.DataService.syncSettings).toHaveBeenCalled();
+    });
+
+    it('shows a concise validation warning instead of one toast containing every error', async () => {
+        window.fillBasicDurationDefaults();
+        await window.saveDurationMethodologies();
+
+        expect(window._durationMethodologyValidationErrors.length).toBeGreaterThan(10);
+        expect(window.showNotification).toHaveBeenLastCalledWith(
+            expect.stringMatching(/^\d+ approval items require attention/),
+            'warning'
+        );
+        expect(window.state.cbSettings.durationMethodologies['27001']).toBeUndefined();
     });
 });

@@ -346,11 +346,28 @@ function clonePlanningValue(value, fallback) {
 function getDurationDraft() {
     if (!window._durationMethodologyDraft) {
         window._durationMethodologyDraft = {
-            registry: clonePlanningValue(window.state.cbSettings?.durationMethodologies, {}),
-            ims: clonePlanningValue(window.state.cbSettings?.imsMethodology, null)
+            registry: clonePlanningValue(
+                window.state.cbSettings?.durationMethodologyDrafts ?? window.state.cbSettings?.durationMethodologies,
+                {}
+            ),
+            ims: clonePlanningValue(
+                window.state.cbSettings?.imsMethodologyDraft ?? window.state.cbSettings?.imsMethodology,
+                null
+            )
         };
     }
     return window._durationMethodologyDraft;
+}
+
+function durationValidationSummaryHTML() {
+    const errors = window._durationMethodologyValidationErrors || [];
+    if (!errors.length) return '';
+    const visible = errors.slice(0, 8);
+    return `<div class="alert alert-danger" id="duration-validation-summary" role="alert" style="margin-top:1rem;">
+        <strong><i class="fa-solid fa-circle-exclamation"></i> ${errors.length} approval item${errors.length === 1 ? '' : 's'} must be completed before activation.</strong>
+        <ul style="margin:.6rem 0 0 1.25rem;">${visible.map(error => `<li>${window.UTILS.escapeHtml(error)}</li>`).join('')}</ul>
+        ${errors.length > visible.length ? `<div style="margin-top:.5rem;">Plus ${errors.length - visible.length} more. Open each standard's <strong>Approval details</strong>, or use <strong>Save Drafts</strong> to finish later.</div>` : ''}
+    </div>`;
 }
 
 function renderDurationBandRow(family, stage, row, index) {
@@ -444,7 +461,11 @@ function getDurationMethodologyManagerHTML() {
                 <div><label><input type="checkbox" ${ims.justificationRequired !== false ? 'checked' : ''} data-action-change="updateIMSMethodologyField" data-arg1="justificationRequired" data-arg2="this.checked"> Justification required</label></div>
             </div><details style="margin-top:.75rem;"><summary style="cursor:pointer;font-weight:600;color:#475569;">Approval details</summary><div style="display:grid;grid-template-columns:2fr 1fr;gap:.75rem;margin-top:.75rem;"><div><label>Controlled source/reference</label><input class="form-control" value="${esc(ims.sourceReference || '')}" data-action-change="updateIMSMethodologyField" data-arg1="sourceReference" data-arg2="this.value"></div><div><label>Approved by</label><input class="form-control" value="${esc(ims.approvedBy || '')}" data-action-change="updateIMSMethodologyField" data-arg1="approvedBy" data-arg2="this.value"></div></div></details>` : '<p style="color:#64748b;margin-top:.75rem;">Leave this off until an approved integrated-audit rule is available.</p>'}
         </div>
-        <button class="btn btn-primary" type="button" style="margin-top:1rem;" data-action="saveDurationMethodologies"><i class="fa-solid fa-clipboard-check"></i> Validate & Save Methodologies</button>`;
+        ${durationValidationSummaryHTML()}
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem;">
+            <button class="btn btn-outline-primary" type="button" data-action="saveDurationMethodologyDrafts"><i class="fa-solid fa-floppy-disk"></i> Save Drafts</button>
+            <button class="btn btn-primary" type="button" data-action="saveDurationMethodologies"><i class="fa-solid fa-clipboard-check"></i> Validate & Activate Methodologies</button>
+        </div>`;
 }
 
 window.saveAuditPlanningPolicy = async function () {
@@ -618,23 +639,47 @@ function validateDurationMethodologyDraft(draft) {
     return errors;
 }
 
+window.saveDurationMethodologyDrafts = async function () {
+    const draft = getDurationDraft();
+    window.state.cbSettings.durationMethodologyDrafts = clonePlanningValue(draft.registry, {});
+    window.state.cbSettings.imsMethodologyDraft = clonePlanningValue(draft.ims, null);
+    window.saveData();
+    const savedToCloud = await window.DataService?.syncSettings?.({ saveLocal: false, silent: true });
+    if (savedToCloud === false && window.SupabaseClient?.isInitialized) {
+        window.showNotification('Drafts were saved locally, but cloud sync failed. Please retry before refreshing.', 'warning');
+        return;
+    }
+    window._durationMethodologyValidationErrors = [];
+    window.showNotification('Duration methodologies saved as drafts. They will not be used in audit calculations until validated and activated.', 'success');
+    rerenderDurationManager();
+};
+
 window.saveDurationMethodologies = async function () {
     try {
         const draft = getDurationDraft();
         const errors = validateDurationMethodologyDraft(draft);
-        if (errors.length) throw new Error(errors.join(' '));
+        if (errors.length) {
+            window._durationMethodologyValidationErrors = errors;
+            rerenderDurationManager();
+            document.getElementById('duration-validation-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            window.showNotification(`${errors.length} approval items require attention. Review the validation summary or save these methodologies as drafts.`, 'warning');
+            return;
+        }
         const savedAt = new Date().toISOString();
         Object.values(draft.registry).forEach(method => { method.configuredAt = savedAt; method.configuredBy = window.state.currentUser?.name || 'System'; });
         if (draft.ims) { draft.ims.configuredAt = savedAt; draft.ims.configuredBy = window.state.currentUser?.name || 'System'; }
         window.state.cbSettings.durationMethodologies = clonePlanningValue(draft.registry, {});
         window.state.cbSettings.imsMethodology = clonePlanningValue(draft.ims, null);
+        delete window.state.cbSettings.durationMethodologyDrafts;
+        delete window.state.cbSettings.imsMethodologyDraft;
         window.saveData();
         await window.DataService?.syncSettings?.({ saveLocal: false, silent: true });
         delete window._durationMethodologyDraft;
-        window.showNotification('Versioned duration methodologies saved.', 'success');
+        window._durationMethodologyValidationErrors = [];
+        window.showNotification('Versioned duration methodologies validated and activated.', 'success');
         window.switchSettingsSubTab('policies', 'audit-planning');
     } catch (error) {
-        window.showNotification(`Methodology configuration not saved: ${error.message}`, 'error');
+        window.showNotification(`Methodology configuration could not be activated: ${error.message}`, 'error');
     }
 };
 
