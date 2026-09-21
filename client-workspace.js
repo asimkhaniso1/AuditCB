@@ -235,11 +235,11 @@ function renderClientSidebarMenu(clientId) {
         <!-- Section: Records -->
         <li style="padding: 0.5rem 1rem 0.25rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600; pointer-events: none; margin-top: 0.5rem; border-top: 1px solid var(--border-color);">Records & Compliance</li>
 
+        <li data-hash="client/${clientId}/docs">
+            <i class="fa-solid fa-folder-open"></i> Document Center
+        </li>
         <li data-hash="client/${clientId}/compliance">
             <i class="fa-solid fa-shield-halved"></i> Compliance
-        </li>
-        <li data-hash="client/${clientId}/docs">
-            <i class="fa-solid fa-folder-open"></i> Documents
         </li>
     `;
 }
