@@ -366,12 +366,54 @@ function renderDurationBandRow(family, stage, row, index) {
     </tr>`;
 }
 
+const BASIC_DURATION_BANDS = Object.freeze({
+    'Surveillance 1': Object.freeze([
+        { minEmployees: 1, maxEmployees: 10, days: 0.5 },
+        { minEmployees: 11, maxEmployees: 25, days: 1 },
+        { minEmployees: 26, maxEmployees: 50, days: 1 },
+        { minEmployees: 51, maxEmployees: 100, days: 1.5 },
+        { minEmployees: 101, maxEmployees: 250, days: 2 },
+        { minEmployees: 251, maxEmployees: 500, days: 2.5 },
+        { minEmployees: 501, maxEmployees: null, days: 3 }
+    ]),
+    'Surveillance 2': Object.freeze([
+        { minEmployees: 1, maxEmployees: 10, days: 0.5 },
+        { minEmployees: 11, maxEmployees: 25, days: 1 },
+        { minEmployees: 26, maxEmployees: 50, days: 1 },
+        { minEmployees: 51, maxEmployees: 100, days: 1.5 },
+        { minEmployees: 101, maxEmployees: 250, days: 2 },
+        { minEmployees: 251, maxEmployees: 500, days: 2.5 },
+        { minEmployees: 501, maxEmployees: null, days: 3 }
+    ]),
+    'Recertification': Object.freeze([
+        { minEmployees: 1, maxEmployees: 10, days: 1 },
+        { minEmployees: 11, maxEmployees: 25, days: 1.5 },
+        { minEmployees: 26, maxEmployees: 50, days: 2 },
+        { minEmployees: 51, maxEmployees: 100, days: 2.5 },
+        { minEmployees: 101, maxEmployees: 250, days: 3 },
+        { minEmployees: 251, maxEmployees: 500, days: 4 },
+        { minEmployees: 501, maxEmployees: null, days: 5 }
+    ])
+});
+
+function basicDurationTables() {
+    return clonePlanningValue(BASIC_DURATION_BANDS, {});
+}
+
+function durationMethodologyFamilies() {
+    const offered = window.state.cbSettings?.availableStandards || window.state.cbSettings?.standardsOffered || [];
+    const supported = ['9001', '14001', '45001', '27001', '22301', '20000-1', '22000', '13485', '50001'];
+    return [...new Set([...supported, ...offered.map(standard => window.AuditPlanningDomain?.standardFamily(standard)).filter(Boolean)])];
+}
+
+function hasEnteredDurationRows(method) {
+    return Object.values(method?.tables || {}).some(rows => (rows || []).some(row => Number(row.days) > 0));
+}
+
 function getDurationMethodologyManagerHTML() {
     const draft = getDurationDraft();
     const esc = window.UTILS.escapeHtml;
-    const offered = window.state.cbSettings?.availableStandards || window.state.cbSettings?.standardsOffered || [];
-    const supportedFamilies = ['9001', '14001', '45001', '27001', '22301', '20000-1', '22000', '13485', '50001'];
-    const families = [...new Set([...supportedFamilies, ...offered.map(standard => window.AuditPlanningDomain?.standardFamily(standard)).filter(Boolean), ...Object.keys(draft.registry)])];
+    const families = [...new Set([...durationMethodologyFamilies(), ...Object.keys(draft.registry)])];
     const cards = Object.entries(draft.registry).map(([family, method]) => {
         const rows = Object.entries(method.tables || {}).flatMap(([stage, entries]) => (entries || []).map((row, index) => renderDurationBandRow(family, stage, row, index))).join('');
         const ready = Boolean(method.name && method.version && method.sourceReference && method.approvedBy && rows);
@@ -388,8 +430,8 @@ function getDurationMethodologyManagerHTML() {
         </div>`;
     }).join('');
     const ims = draft.ims || {};
-    return `<hr><div class="alert alert-info"><strong>Set up duration in three steps:</strong> 1. Add a standard. 2. Enter its employee ranges and auditor-days. 3. Open Approval details, then validate and save.</div><div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;"><div><h4 style="margin:0;">Duration rules by standard</h4><p style="margin:.35rem 0;color:#64748b;">Only enter figures from your approved CB procedure.</p></div>
-        <div style="display:flex;gap:.5rem;"><select id="duration-new-family" class="form-control"><option value="">Choose standard</option>${families.filter(family => !draft.registry[family]).map(family => `<option value="${esc(family)}">ISO ${esc(family)}</option>`).join('')}</select><button type="button" class="btn btn-outline-primary" data-action="addDurationMethodology"><i class="fa-solid fa-plus"></i> Add</button></div></div>
+    return `<hr><div class="alert alert-info"><strong>Set up duration in three steps:</strong> 1. Add a standard or load starter rows. 2. Verify every figure against the applicable scheme procedure. 3. Enter version and Approval details, then validate and save.</div><div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;"><div><h4 style="margin:0;">Duration rules by standard</h4><p style="margin:.35rem 0;color:#64748b;">Starter figures are planning examples only and remain incomplete until your CB verifies and approves them.</p></div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;"><button type="button" class="btn btn-outline-primary" data-action="fillBasicDurationDefaults"><i class="fa-solid fa-table-list"></i> Fill basic defaults for all standards</button><select id="duration-new-family" class="form-control"><option value="">Choose standard</option>${families.filter(family => !draft.registry[family]).map(family => `<option value="${esc(family)}">ISO ${esc(family)}</option>`).join('')}</select><button type="button" class="btn btn-outline-primary" data-action="addDurationMethodology"><i class="fa-solid fa-plus"></i> Add</button></div></div>
         ${cards || '<div class="alert alert-warning" style="margin-top:1rem;">No duration methodology is configured. Add each accredited scheme used by audit planning.</div>'}
         <div class="card" style="padding:1rem;margin-top:1rem;border-left:4px solid #7c3aed;"><h4 style="margin-bottom:.5rem;">Integrated audit adjustment</h4>
             <label><input type="checkbox" ${draft.ims ? 'checked' : ''} data-action-change="toggleIMSMethodology" data-arg1="this.checked"> This CB uses an approved IMS adjustment rule</label>
@@ -436,14 +478,42 @@ window.addDurationMethodology = function () {
     if (!family) { window.showNotification('Select a scheme to add.', 'warning'); return; }
     const draft = getDurationDraft();
     if (!draft.registry[family]) draft.registry[family] = {
-        name: `ISO ${family} duration rules`, version: '', sourceReference: '', approvedBy: '',
-        tables: {
-            'Surveillance 1': [{ minEmployees: 1, maxEmployees: null, days: '' }],
-            'Surveillance 2': [{ minEmployees: 1, maxEmployees: null, days: '' }],
-            'Recertification': [{ minEmployees: 1, maxEmployees: null, days: '' }]
-        }
+        name: `Draft ISO ${family} duration rules`, version: '', sourceReference: '', approvedBy: '',
+        starterTemplate: true,
+        tables: basicDurationTables()
     };
     rerenderDurationManager();
+};
+
+window.fillBasicDurationDefaults = function () {
+    const draft = getDurationDraft();
+    let added = 0;
+    let filled = 0;
+    let preserved = 0;
+
+    durationMethodologyFamilies().forEach(family => {
+        const existing = draft.registry[family];
+        if (!existing) {
+            draft.registry[family] = {
+                name: `Draft ISO ${family} duration rules`,
+                version: '',
+                sourceReference: '',
+                approvedBy: '',
+                starterTemplate: true,
+                tables: basicDurationTables()
+            };
+            added++;
+        } else if (!hasEnteredDurationRows(existing)) {
+            existing.tables = basicDurationTables();
+            existing.starterTemplate = true;
+            filled++;
+        } else {
+            preserved++;
+        }
+    });
+
+    rerenderDurationManager();
+    window.showNotification(`Starter duration rows loaded: ${added} standards added, ${filled} empty standards filled${preserved ? `, ${preserved} existing standards preserved` : ''}. Verify all figures and complete Approval details before saving.`, 'info');
 };
 
 window.removeDurationMethodology = function (family) {
