@@ -115,6 +115,24 @@ describe('NCR Register filters', () => {
     });
 });
 
+describe('NCR classification rule', () => {
+    it('treats only Major and Minor findings as active NCR/CAPA records', () => {
+        expect(window.NCRModule.isActiveNCR(ncr({ severity: 'Major' }))).toBe(true);
+        expect(window.NCRModule.isActiveNCR(ncr({ severity: 'minor' }))).toBe(true);
+        expect(window.NCRModule.isActiveNCR(ncr({ severity: 'Major NC' }))).toBe(true);
+        expect(window.NCRModule.isActiveNCR(ncr({ severity: 'Observation' }))).toBe(false);
+        expect(window.NCRModule.isActiveNCR(ncr({ severity: 'OFI' }))).toBe(false);
+        expect(window.NCRModule.isActiveNCR(ncr({ severity: 'Minor', status: 'Withdrawn' }))).toBe(false);
+    });
+
+    it('keeps Observation/OFI out of NCR analytics and CAPA UI definitions', () => {
+        expect(src).toMatch(/function getCAPATrackerHTML[\s\S]*?ncrs = ncrs\.filter\(isActiveNCR\)/);
+        expect(src).toMatch(/function getAnalyticsHTML[\s\S]*?ncrs = ncrs\.filter\(isActiveNCR\)/);
+        expect(src).toMatch(/labels: \['Major', 'Minor'\]/);
+        expect(src).not.toMatch(/labels: \['Major', 'Minor', 'Observation\/OFI'\]/);
+    });
+});
+
 describe('carStatusOptionsHTML — hideVerdicts blocks closing/effective-marking from the general status dropdown', () => {
     it('offers Effective and Closed by default (no opts) — unchanged behavior for any other caller', () => {
         const html = window.NCRModule.carStatusOptionsHTML('Draft');

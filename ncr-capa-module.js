@@ -801,8 +801,13 @@ function isMajorMinorNCR(record) {
     return ['major', 'minor'].includes(normalizedNCRSeverity(record));
 }
 
+function isActiveNCR(record) {
+    return isMajorMinorNCR(record) && !isWithdrawnNCR(record);
+}
+
 window.NCRModule.normalizedSeverity = normalizedNCRSeverity;
 window.NCRModule.isMajorMinor = isMajorMinorNCR;
+window.NCRModule.isActiveNCR = isActiveNCR;
 
 // --------------------------------------------
 // TAB 1: NCR REGISTER
@@ -1158,8 +1163,9 @@ function getCAPATrackerHTML() {
     let ncrs = window.state.ncrs || [];
     ncrs = ncrs.filter(matchesActiveNCRClient);
 
-    // CAPA Tracker is a default list view — Withdrawn NCRs no longer require action.
-    ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
+    // Only Major and Minor nonconformities require corrective action. OFIs and
+    // observations remain advisory findings in their own register.
+    ncrs = ncrs.filter(isActiveNCR);
 
     const showClosed = window.state.showClosedCAPAs || false;
     if (!showClosed) {
@@ -1231,10 +1237,10 @@ function getCAPATrackerHTML() {
 
 function getVerificationHTML() {
     let ncrs = window.state.ncrs || [];
-    ncrs = ncrs.filter(matchesActiveNCRClient);
+    ncrs = ncrs.filter(matchesActiveNCRClient).filter(isActiveNCR);
 
     // Filter for items ready for verification (Withdrawn records never need verification)
-    const pendingReview = ncrs.filter(n => !isWithdrawnNCR(n) &&
+    const pendingReview = ncrs.filter(n =>
         (n.status === 'Verification' || (n.capaImplementedDate && !n.verifiedDate && n.status === 'In Progress')));
 
     return `
@@ -1287,8 +1293,8 @@ function getVerificationHTML() {
 function getAnalyticsHTML() {
     let ncrs = window.state.ncrs || [];
     ncrs = ncrs.filter(matchesActiveNCRClient);
-    // Analytics exclude Withdrawn NCRs entirely
-    ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
+    // NCR/CAPA analytics classify only Major and Minor nonconformities.
+    ncrs = ncrs.filter(isActiveNCR);
 
     const total = ncrs.length;
     const open = ncrs.filter(n => n.status === 'Open').length;
@@ -1302,12 +1308,8 @@ function getAnalyticsHTML() {
     const effectivenessRate = closed > 0 ? Math.round((effective / closed) * 100) : 0;
 
     // Severity Breakdown
-    const _major = ncrs.filter(n => (n.severity || '').toLowerCase() === 'major').length;
-    const _minor = ncrs.filter(n => (n.severity || '').toLowerCase() === 'minor').length;
-    const _obs = ncrs.filter(n => {
-        const s = (n.severity || '').toLowerCase();
-        return s === 'observation' || s === 'ofi' || s === 'observation/ofi';
-    }).length;
+    const _major = ncrs.filter(n => normalizedNCRSeverity(n) === 'major').length;
+    const _minor = ncrs.filter(n => normalizedNCRSeverity(n) === 'minor').length;
 
     // Top clauses
     const clauseMap = {};
@@ -1445,21 +1447,17 @@ function initNCRAnalyticsCharts() {
 
         let ncrs = window.state.ncrs || [];
         ncrs = ncrs.filter(matchesActiveNCRClient);
-        ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
-        const major = ncrs.filter(n => (n.severity || '').toLowerCase() === 'major').length;
-        const minor = ncrs.filter(n => (n.severity || '').toLowerCase() === 'minor').length;
-        const obs = ncrs.filter(n => {
-            const s = (n.severity || '').toLowerCase();
-            return s === 'observation' || s === 'ofi' || s === 'observation/ofi';
-        }).length;
+        ncrs = ncrs.filter(isActiveNCR);
+        const major = ncrs.filter(n => normalizedNCRSeverity(n) === 'major').length;
+        const minor = ncrs.filter(n => normalizedNCRSeverity(n) === 'minor').length;
 
         new Chart(sevCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Major', 'Minor', 'Observation/OFI'],
+                labels: ['Major', 'Minor'],
                 datasets: [{
-                    data: [major || 0, minor || 0, obs || 0],
-                    backgroundColor: ['#dc2626', '#f59e0b', '#6366f1'],
+                    data: [major || 0, minor || 0],
+                    backgroundColor: ['#dc2626', '#f59e0b'],
                     borderWidth: 0,
                     hoverOffset: 6
                 }]
@@ -1480,7 +1478,7 @@ function initNCRAnalyticsCharts() {
 
         let ncrs = window.state.ncrs || [];
         ncrs = ncrs.filter(matchesActiveNCRClient);
-        ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
+        ncrs = ncrs.filter(isActiveNCR);
         const open = ncrs.filter(n => n.status === 'Open').length;
         const inProg = ncrs.filter(n => n.status === 'In Progress').length;
         const verif = ncrs.filter(n => n.status === 'Verification').length;
@@ -1515,8 +1513,8 @@ window.initNCRAnalyticsCharts = initNCRAnalyticsCharts;
 // --------------------------------------------
 
 function updateNCRAnalytics() {
-    // KPI/analytics counts exclude Withdrawn NCRs entirely
-    const ncrs = (window.state.ncrs || []).filter(n => !isWithdrawnNCR(n));
+    // KPI/analytics counts include Major and Minor NCRs only.
+    const ncrs = (window.state.ncrs || []).filter(isActiveNCR);
     const today = new Date();
 
     window.state.capaAnalytics = {
@@ -1704,7 +1702,6 @@ window.editNCR = function (ncrId) {
                     <select id="edit-severity" class="form-control">
                         <option value="Major" ${ncr.severity === 'Major' ? 'selected' : ''}>Major</option>
                         <option value="Minor" ${ncr.severity === 'Minor' ? 'selected' : ''}>Minor</option>
-                        <option value="Observation" ${(ncr.severity || '').includes('Observation') ? 'selected' : ''}>Observation/OFI</option>
                     </select>
                 </div>
                 <div class="form-group"><label>Status</label>
@@ -1758,6 +1755,10 @@ function riskScaleOptionsHTML(labels, selected) {
 window.openAddCAPAModal = function (ncrId) {
     const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
     if (!ncr) return;
+    if (!isMajorMinorNCR(ncr)) {
+        window.showNotification('CAPA applies only to Major or Minor NCRs. OFIs and observations remain advisory.', 'warning');
+        return;
+    }
 
     document.getElementById('modal-title').textContent = 'Add CAPA';
     document.getElementById('modal-body').innerHTML = `
@@ -1854,7 +1855,7 @@ window.printNCRRegister = function () {
     // applies on screen — a superseded/duplicate record (see
     // reconcileDuplicateNCRs above) would print looking exactly like a live
     // open finding, with nothing on the page distinguishing it.
-    const ncrs = (window.state.ncrs || []).filter(matchesActiveNCRClient).filter(n => !isWithdrawnNCR(n));
+    const ncrs = (window.state.ncrs || []).filter(matchesActiveNCRClient).filter(isActiveNCR);
     const printWindow = window.open('', '', 'width=1000,height=700');
 
     printWindow.document.write(`
@@ -1915,6 +1916,7 @@ window.printNCRRegister = function () {
 window.verifyCAPA = function (ncrId) {
     const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
     if (!ncr) return;
+    if (!isMajorMinorNCR(ncr)) return;
 
     document.getElementById('modal-title').textContent = 'Verify CAPA';
     document.getElementById('modal-body').innerHTML = `
@@ -1968,6 +1970,10 @@ window.verifyCAPA = function (ncrId) {
 window.updateCAPAProgress = function (ncrId) {
     const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
     if (!ncr) return;
+    if (!isMajorMinorNCR(ncr)) {
+        window.showNotification('CAPA applies only to Major or Minor NCRs.', 'warning');
+        return;
+    }
 
     document.getElementById('modal-title').textContent = 'Update CAPA Progress';
     document.getElementById('modal-body').innerHTML = `
