@@ -369,30 +369,30 @@ function renderDurationBandRow(family, stage, row, index) {
 const BASIC_DURATION_BANDS = Object.freeze({
     'Surveillance 1': Object.freeze([
         { minEmployees: 1, maxEmployees: 10, days: 0.5 },
-        { minEmployees: 11, maxEmployees: 25, days: 1 },
+        { minEmployees: 11, maxEmployees: 25, days: 0.5 },
         { minEmployees: 26, maxEmployees: 50, days: 1 },
-        { minEmployees: 51, maxEmployees: 100, days: 1.5 },
-        { minEmployees: 101, maxEmployees: 250, days: 2 },
-        { minEmployees: 251, maxEmployees: 500, days: 2.5 },
-        { minEmployees: 501, maxEmployees: null, days: 3 }
+        { minEmployees: 51, maxEmployees: 100, days: 1 },
+        { minEmployees: 101, maxEmployees: 250, days: 1.5 },
+        { minEmployees: 251, maxEmployees: 500, days: 2 },
+        { minEmployees: 501, maxEmployees: null, days: 2.5 }
     ]),
     'Surveillance 2': Object.freeze([
         { minEmployees: 1, maxEmployees: 10, days: 0.5 },
-        { minEmployees: 11, maxEmployees: 25, days: 1 },
+        { minEmployees: 11, maxEmployees: 25, days: 0.5 },
         { minEmployees: 26, maxEmployees: 50, days: 1 },
-        { minEmployees: 51, maxEmployees: 100, days: 1.5 },
-        { minEmployees: 101, maxEmployees: 250, days: 2 },
-        { minEmployees: 251, maxEmployees: 500, days: 2.5 },
-        { minEmployees: 501, maxEmployees: null, days: 3 }
+        { minEmployees: 51, maxEmployees: 100, days: 1 },
+        { minEmployees: 101, maxEmployees: 250, days: 1.5 },
+        { minEmployees: 251, maxEmployees: 500, days: 2 },
+        { minEmployees: 501, maxEmployees: null, days: 2.5 }
     ]),
     'Recertification': Object.freeze([
-        { minEmployees: 1, maxEmployees: 10, days: 1 },
-        { minEmployees: 11, maxEmployees: 25, days: 1.5 },
-        { minEmployees: 26, maxEmployees: 50, days: 2 },
-        { minEmployees: 51, maxEmployees: 100, days: 2.5 },
-        { minEmployees: 101, maxEmployees: 250, days: 3 },
-        { minEmployees: 251, maxEmployees: 500, days: 4 },
-        { minEmployees: 501, maxEmployees: null, days: 5 }
+        { minEmployees: 1, maxEmployees: 10, days: 0.5 },
+        { minEmployees: 11, maxEmployees: 25, days: 1 },
+        { minEmployees: 26, maxEmployees: 50, days: 1.5 },
+        { minEmployees: 51, maxEmployees: 100, days: 2 },
+        { minEmployees: 101, maxEmployees: 250, days: 2.5 },
+        { minEmployees: 251, maxEmployees: 500, days: 3 },
+        { minEmployees: 501, maxEmployees: null, days: 4 }
     ])
 });
 
@@ -489,6 +489,7 @@ window.fillBasicDurationDefaults = function () {
     const draft = getDurationDraft();
     let added = 0;
     let filled = 0;
+    let refreshed = 0;
     let preserved = 0;
 
     durationMethodologyFamilies().forEach(family => {
@@ -503,6 +504,9 @@ window.fillBasicDurationDefaults = function () {
                 tables: basicDurationTables()
             };
             added++;
+        } else if (existing.starterTemplate === true) {
+            existing.tables = basicDurationTables();
+            refreshed++;
         } else if (!hasEnteredDurationRows(existing)) {
             existing.tables = basicDurationTables();
             existing.starterTemplate = true;
@@ -513,7 +517,7 @@ window.fillBasicDurationDefaults = function () {
     });
 
     rerenderDurationManager();
-    window.showNotification(`Starter duration rows loaded: ${added} standards added, ${filled} empty standards filled${preserved ? `, ${preserved} existing standards preserved` : ''}. Verify all figures and complete Approval details before saving.`, 'info');
+    window.showNotification(`Starter duration rows loaded: ${added} standards added, ${filled} empty standards filled, ${refreshed} untouched starter standards refreshed${preserved ? `, ${preserved} edited standards preserved` : ''}. Verify all figures and complete Approval details before saving.`, 'info');
 };
 
 window.removeDurationMethodology = function (family) {
@@ -524,12 +528,16 @@ window.removeDurationMethodology = function (family) {
 
 window.updateDurationMethodologyField = function (family, field, value) {
     const method = getDurationDraft().registry[family];
-    if (method) method[field] = value;
+    if (method) {
+        method[field] = value;
+        method.starterTemplate = false;
+    }
 };
 
 window.addDurationBand = function (family, stage = 'Recertification') {
     const method = getDurationDraft().registry[family];
     if (!method) return;
+    method.starterTemplate = false;
     method.tables = method.tables || {};
     method.tables[stage] = method.tables[stage] || [];
     const previous = method.tables[stage].at(-1);
@@ -539,8 +547,12 @@ window.addDurationBand = function (family, stage = 'Recertification') {
 };
 
 window.removeDurationBand = function (family, stage, index) {
-    const rows = getDurationDraft().registry[family]?.tables?.[stage];
-    if (rows) rows.splice(Number(index), 1);
+    const method = getDurationDraft().registry[family];
+    const rows = method?.tables?.[stage];
+    if (rows) {
+        rows.splice(Number(index), 1);
+        method.starterTemplate = false;
+    }
     rerenderDurationManager();
 };
 
@@ -549,6 +561,7 @@ window.updateDurationBand = function (family, stage, index, field, value) {
     const rows = method?.tables?.[stage];
     const row = rows?.[Number(index)];
     if (!row) return;
+    method.starterTemplate = false;
     if (field === 'stage') {
         rows.splice(Number(index), 1);
         method.tables[value] = method.tables[value] || [];

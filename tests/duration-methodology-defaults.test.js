@@ -45,7 +45,8 @@ describe('duration methodology starter defaults', () => {
         ]));
         expect(registry['9001'].tables.Recertification[0].days).toBe(9);
         expect(registry['27001'].tables['Surveillance 1']).toHaveLength(7);
-        expect(registry['27001'].tables.Recertification.at(-1)).toEqual({ minEmployees: 501, maxEmployees: null, days: 5 });
+        expect(registry['27001'].tables['Surveillance 1'].at(-1)).toEqual({ minEmployees: 501, maxEmployees: null, days: 2.5 });
+        expect(registry['27001'].tables.Recertification.at(-1)).toEqual({ minEmployees: 501, maxEmployees: null, days: 4 });
     });
 
     it('keeps starter methodologies incomplete until controlled approval fields are supplied', () => {
@@ -56,5 +57,17 @@ describe('duration methodology starter defaults', () => {
         expect(starter.version).toBe('');
         expect(starter.sourceReference).toBe('');
         expect(starter.approvedBy).toBe('');
+    });
+
+    it('refreshes untouched starter rows but preserves a methodology after a user edits it', () => {
+        window.fillBasicDurationDefaults();
+        const registry = window._durationMethodologyDraft.registry;
+        registry['22301'].tables.Recertification[0].days = 99;
+        window.fillBasicDurationDefaults();
+        expect(registry['22301'].tables.Recertification[0].days).toBe(0.5);
+
+        window.updateDurationBand('22301', 'Recertification', 0, 'days', '1.25');
+        window.fillBasicDurationDefaults();
+        expect(registry['22301'].tables.Recertification[0].days).toBe(1.25);
     });
 });
