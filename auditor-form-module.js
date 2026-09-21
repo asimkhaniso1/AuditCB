@@ -4,6 +4,87 @@
 // Handles adding/editing auditors in a full-page view
 // Includes tabbed interface for better organization and ISO compliance details
 
+const DEFAULT_AUDITOR_QUALIFICATION_STANDARDS = [
+    'ISO 9001:2015',
+    'ISO 14001:2015',
+    'ISO 45001:2018',
+    'ISO/IEC 27001:2022',
+    'ISO 22301:2019',
+    'ISO/IEC 20000-1:2018',
+    'ISO 22000:2018',
+    'ISO 13485:2016',
+    'ISO 50001:2018',
+    'ISO 37001:2016',
+    'ISO/IEC 42001:2023'
+];
+
+function escapeAuditorFormHtml(value) {
+    if (window.UTILS?.escapeHtml) return window.UTILS.escapeHtml(String(value ?? ''));
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function normalizeQualificationStandard(value) {
+    const normalized = String(value || '').toUpperCase().replace(/ISO(?:\/IEC)?\s*/g, '');
+    return normalized.match(/\d{4,5}(?:-\d+)?/)?.[0] || normalized.replace(/[^A-Z0-9-]/g, '');
+}
+
+function getAuditorQualificationStandards(auditor = null) {
+    const settings = window.state?.cbSettings || {};
+    const configured = settings.availableStandards?.length
+        ? settings.availableStandards
+        : (settings.standardsOffered?.length ? settings.standardsOffered : DEFAULT_AUDITOR_QUALIFICATION_STANDARDS);
+    const values = [...configured, ...(auditor?.standards || [])].filter(Boolean);
+    const seen = new Set();
+    return values.filter(value => {
+        const key = String(value).trim().toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+window.addAuditorQualificationOption = async function () {
+    const input = document.getElementById('auditor-new-standard');
+    const select = document.getElementById('auditor-standards');
+    const rawValue = input?.value?.trim();
+    const value = window.Sanitizer?.sanitizeText ? window.Sanitizer.sanitizeText(rawValue) : rawValue;
+
+    if (!value) {
+        window.showNotification('Enter the missing standard and edition first', 'warning');
+        input?.focus();
+        return;
+    }
+
+    let option = Array.from(select.options).find(item => item.value.toLowerCase() === value.toLowerCase());
+    if (!option) {
+        option = new Option(value, value, true, true);
+        select.add(option);
+    } else {
+        option.selected = true;
+    }
+
+    window.state.cbSettings = window.state.cbSettings || {};
+    const masterList = window.state.cbSettings.availableStandards || [];
+    if (!masterList.some(item => String(item).toLowerCase() === value.toLowerCase())) {
+        window.state.cbSettings.availableStandards = [...masterList, value];
+        window.saveData?.();
+        try {
+            await window.DataService?.syncSettings?.({ saveLocal: false, silent: true });
+        } catch (error) {
+            console.error('Unable to sync the standards master list:', error);
+            window.showNotification('Standard added locally; cloud sync will retry later', 'warning');
+        }
+    }
+
+    input.value = '';
+    window.showNotification(`${value} added and selected`, 'success');
+};
+
 function renderAuditorForm(auditorId = null) {
     const isEdit = !!auditorId;
     let auditor = null;
@@ -24,7 +105,11 @@ function renderAuditorForm(auditorId = null) {
 
     // Helper for Selects
     const sel = (prop, value) => val(prop) === value ? 'selected' : '';
-    const hasStd = (std) => auditor && auditor.standards && auditor.standards.includes(std) ? 'selected' : '';
+    const hasStd = (std) => auditor?.standards?.some(selected =>
+        String(selected).trim().toLowerCase() === String(std).trim().toLowerCase()
+        || normalizeQualificationStandard(selected) === normalizeQualificationStandard(std)
+    ) ? 'selected' : '';
+    const qualificationStandards = getAuditorQualificationStandards(auditor);
 
     const title = isEdit ? `Edit Auditor: ${auditor.name}` : 'Add New Auditor';
     const btnText = isEdit ? 'Update Auditor' : 'Create Auditor';
@@ -120,15 +205,15 @@ function renderAuditorForm(auditorId = null) {
                         <div class="form-group">
                             <label>Qualified Standards <span style="color: #ef4444;">*</span></label>
                             <select class="form-control" id="auditor-standards" multiple style="height: 120px;">
-                                <option value="ISO 9001" ${hasStd('ISO 9001')}>ISO 9001 (QMS)</option>
-                                <option value="ISO 14001" ${hasStd('ISO 14001')}>ISO 14001 (EMS)</option>
-                                <option value="ISO 45001" ${hasStd('ISO 45001')}>ISO 45001 (OHS)</option>
-                                <option value="ISO 27001" ${hasStd('ISO 27001')}>ISO 27001 (ISMS)</option>
-                                <option value="ISO 22000" ${hasStd('ISO 22000')}>ISO 22000 (FSMS)</option>
-                                <option value="ISO 13485" ${hasStd('ISO 13485')}>ISO 13485 (Medical Devices)</option>
-                                <option value="ISO 50001" ${hasStd('ISO 50001')}>ISO 50001 (Energy)</option>
+                                ${qualificationStandards.map(std => `<option value="${escapeAuditorFormHtml(std)}" ${hasStd(std)}>${escapeAuditorFormHtml(std)}</option>`).join('')}
                             </select>
-                            <small style="color: #64748b;">Hold Ctrl/Cmd to select multiple</small>
+                            <small style="color: #64748b; display:block; margin-bottom:.65rem;">Hold Ctrl/Cmd to select multiple. This list comes from Settings → Standards Offered.</small>
+                            <div style="display:flex; gap:.5rem; align-items:center;">
+                                <input type="text" class="form-control" id="auditor-new-standard" placeholder="e.g. ISO 22301:2019" aria-label="Missing standard">
+                                <button type="button" class="btn btn-secondary" data-action="addAuditorQualificationOption" style="white-space:nowrap;">
+                                    <i class="fa-solid fa-plus"></i> Add missing
+                                </button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>Man-Day Rate ($ USD)</label>
