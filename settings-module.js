@@ -364,9 +364,9 @@ function durationValidationSummaryHTML() {
     if (!errors.length) return '';
     const visible = errors.slice(0, 8);
     return `<div class="alert alert-danger" id="duration-validation-summary" role="alert" style="margin-top:1rem;">
-        <strong><i class="fa-solid fa-circle-exclamation"></i> ${errors.length} approval item${errors.length === 1 ? '' : 's'} must be completed before activation.</strong>
+        <strong><i class="fa-solid fa-circle-exclamation"></i> ${errors.length} duration rule issue${errors.length === 1 ? '' : 's'} must be fixed before saving.</strong>
         <ul style="margin:.6rem 0 0 1.25rem;">${visible.map(error => `<li>${window.UTILS.escapeHtml(error)}</li>`).join('')}</ul>
-        ${errors.length > visible.length ? `<div style="margin-top:.5rem;">Plus ${errors.length - visible.length} more. Open each standard's <strong>Approval details</strong>, or use <strong>Save Drafts</strong> to finish later.</div>` : ''}
+        ${errors.length > visible.length ? `<div style="margin-top:.5rem;">Plus ${errors.length - visible.length} more. Correct the highlighted duration tables or save a draft to finish later.</div>` : ''}
     </div>`;
 }
 
@@ -450,34 +450,18 @@ function getDurationMethodologyManagerHTML() {
     const families = [...new Set([...durationMethodologyFamilies(), ...Object.keys(draft.registry)])];
     const cards = Object.entries(draft.registry).map(([family, method]) => {
         const rows = Object.entries(method.tables || {}).flatMap(([stage, entries]) => (entries || []).map((row, index) => renderDurationBandRow(family, stage, row, index))).join('');
-        const ready = Boolean(method.name && method.version && method.sourceReference && method.approvedBy && rows);
+        const ready = Boolean(rows);
         return `<div class="card" style="padding:1rem;margin:1rem 0;border-left:4px solid var(--primary-color);">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;"><div style="display:flex;align-items:center;gap:.6rem;"><h4 style="margin:0;">ISO ${esc(family)}</h4><span class="status-badge" style="background:${ready ? '#dcfce7' : '#fef3c7'};color:${ready ? '#166534' : '#92400e'};">${ready ? 'Ready' : 'Incomplete'}</span></div><button type="button" class="btn btn-sm btn-outline-danger" data-action="removeDurationMethodology" data-id="${esc(family)}">Remove</button></div>
-            <div style="display:grid;grid-template-columns:2fr 1fr;gap:.75rem;margin-top:1rem;">
-                <div><label>Rule name</label><input class="form-control" value="${esc(method.name || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="name" data-arg3="this.value"></div>
-                <div><label>Version / revision</label><input class="form-control" value="${esc(method.version || '')}" placeholder="e.g. Rev 03" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="version" data-arg3="this.value"></div>
-            </div>
             <div style="margin-top:1rem;font-weight:600;">Duration table</div><div style="font-size:.78rem;color:#64748b;margin-bottom:.35rem;">Enter the employee ranges and approved auditor-days for each audit type.</div>
             <div class="table-container"><table><thead><tr><th>Audit type</th><th>Employees from</th><th>Employees to</th><th>Auditor-days</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b;">No duration rows yet.</td></tr>'}</tbody></table></div>
             <div style="display:flex;gap:.4rem;flex-wrap:wrap;"><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Surveillance 1"><i class="fa-solid fa-plus"></i> S1 row</button><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Surveillance 2"><i class="fa-solid fa-plus"></i> S2 row</button><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Recertification"><i class="fa-solid fa-plus"></i> Recertification row</button><button type="button" class="btn btn-sm btn-outline-secondary" data-action="replaceDurationWithStarterBands" data-id="${esc(family)}"><i class="fa-solid fa-rotate"></i> Replace with complete starter bands</button></div>
-            <details style="margin-top:1rem;"><summary style="cursor:pointer;font-weight:600;color:#475569;">Approval details</summary><div style="display:grid;grid-template-columns:2fr 1fr;gap:.75rem;margin-top:.75rem;"><div><label>Controlled source/reference</label><input class="form-control" value="${esc(method.sourceReference || '')}" placeholder="Procedure/document and revision" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="sourceReference" data-arg3="this.value"></div><div><label>Approved by</label><input class="form-control" value="${esc(method.approvedBy || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="approvedBy" data-arg3="this.value"></div></div></details>
+            <details style="margin-top:1rem;"><summary style="cursor:pointer;font-weight:600;color:#475569;">Optional reference</summary><div style="margin-top:.75rem;"><label>Procedure or document reference</label><input class="form-control" value="${esc(method.sourceReference || '')}" placeholder="Optional" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="sourceReference" data-arg3="this.value"></div></details>
         </div>`;
     }).join('');
     const ims = draft.ims || {};
-    return `<hr><div class="alert alert-info"><strong>Set up duration in three steps:</strong> 1. Add a standard or load starter rows. 2. Verify every figure against the applicable scheme procedure. 3. Enter version and Approval details, then validate and save.</div><div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;"><div><h4 style="margin:0;">Duration rules by standard</h4><p style="margin:.35rem 0;color:#64748b;">Starter figures are planning examples only and remain incomplete until your CB verifies and approves them.</p></div>
+    return `<hr><div class="alert alert-info"><strong>Simple setup:</strong> Load the starter rows, adjust the auditor-days if needed, then confirm and save.</div><div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;"><div><h4 style="margin:0;">Duration rules by standard</h4><p style="margin:.35rem 0;color:#64748b;">Review the figures before using them for final audit plans.</p></div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;"><button type="button" class="btn btn-outline-primary" data-action="fillBasicDurationDefaults"><i class="fa-solid fa-table-list"></i> Fill basic defaults for all standards</button><select id="duration-new-family" class="form-control"><option value="">Choose standard</option>${families.filter(family => !draft.registry[family]).map(family => `<option value="${esc(family)}">ISO ${esc(family)}</option>`).join('')}</select><button type="button" class="btn btn-outline-primary" data-action="addDurationMethodology"><i class="fa-solid fa-plus"></i> Add</button></div></div>
-        ${Object.keys(draft.registry).length ? `<div class="card" style="padding:1rem;margin-top:1rem;border-left:4px solid #0ea5e9;">
-            <h4 style="margin:0 0 .35rem;">Bulk approval details</h4>
-            <p style="margin:0 0 .8rem;color:#64748b;">Use this only when the same controlled procedure, revision and approver apply to every draft scheme below.</p>
-            <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:.75rem;">
-                <div><label>Version / revision</label><input id="duration-bulk-version" class="form-control" placeholder="e.g. Rev 03"></div>
-                <div><label>Controlled source/reference</label><input id="duration-bulk-source" class="form-control" placeholder="Procedure/document and revision"></div>
-                <div><label>Approved by</label><input id="duration-bulk-approver" class="form-control" placeholder="Name or role"></div>
-            </div>
-            <label style="display:block;margin-top:.75rem;"><input id="duration-bulk-include-ims" type="checkbox" ${draft.ims ? 'checked' : ''}> Apply the same approval details to the IMS rule</label>
-            <label style="display:block;margin-top:.5rem;font-weight:600;"><input id="duration-bulk-confirm" type="checkbox"> I confirm the starter figures have been checked against this CB's controlled, approved methodology.</label>
-            <button type="button" class="btn btn-outline-primary" style="margin-top:.75rem;" data-action="applyBulkDurationApproval"><i class="fa-solid fa-stamp"></i> Apply to all drafts</button>
-        </div>` : ''}
         ${cards || '<div class="alert alert-warning" style="margin-top:1rem;">No duration methodology is configured. Add each accredited scheme used by audit planning.</div>'}
         <div class="card" style="padding:1rem;margin-top:1rem;border-left:4px solid #7c3aed;"><h4 style="margin-bottom:.5rem;">Integrated audit adjustment</h4>
             <label><input type="checkbox" ${draft.ims ? 'checked' : ''} data-action-change="toggleIMSMethodology" data-arg1="this.checked"> This CB uses an approved IMS adjustment rule</label>
@@ -488,12 +472,13 @@ function getDurationMethodologyManagerHTML() {
                 <div><label>Maximum reduction (%)</label><input type="number" min="0" step="0.5" class="form-control" value="${ims.maximumReductionPercent ?? 0}" data-action-change="updateIMSMethodologyField" data-arg1="maximumReductionPercent" data-arg2="this.value"></div>
                 <div><label>Maximum increase (%)</label><input type="number" min="0" step="0.5" class="form-control" value="${ims.maximumIncreasePercent ?? 0}" data-action-change="updateIMSMethodologyField" data-arg1="maximumIncreasePercent" data-arg2="this.value"></div>
                 <div><label><input type="checkbox" ${ims.justificationRequired !== false ? 'checked' : ''} data-action-change="updateIMSMethodologyField" data-arg1="justificationRequired" data-arg2="this.checked"> Justification required</label></div>
-            </div><details style="margin-top:.75rem;"><summary style="cursor:pointer;font-weight:600;color:#475569;">Approval details</summary><div style="display:grid;grid-template-columns:2fr 1fr;gap:.75rem;margin-top:.75rem;"><div><label>Controlled source/reference</label><input class="form-control" value="${esc(ims.sourceReference || '')}" data-action-change="updateIMSMethodologyField" data-arg1="sourceReference" data-arg2="this.value"></div><div><label>Approved by</label><input class="form-control" value="${esc(ims.approvedBy || '')}" data-action-change="updateIMSMethodologyField" data-arg1="approvedBy" data-arg2="this.value"></div></div></details>` : '<p style="color:#64748b;margin-top:.75rem;">Leave this off until an approved integrated-audit rule is available.</p>'}
+            </div>` : '<p style="color:#64748b;margin-top:.75rem;">Leave this off when integrated-audit adjustment is not used.</p>'}
         </div>
         ${durationValidationSummaryHTML()}
+        <label style="display:block;margin-top:1rem;font-weight:600;"><input id="duration-rules-confirmed" type="checkbox"> I have reviewed these duration figures and they are ready to use.</label>
         <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem;">
             <button class="btn btn-outline-primary" type="button" data-action="saveDurationMethodologyDrafts"><i class="fa-solid fa-floppy-disk"></i> Save Drafts</button>
-            <button class="btn btn-primary" type="button" data-action="saveDurationMethodologies"><i class="fa-solid fa-clipboard-check"></i> Validate & Activate Methodologies</button>
+            <button class="btn btn-primary" type="button" data-action="saveDurationMethodologies"><i class="fa-solid fa-check"></i> Save & Use Duration Rules</button>
         </div>`;
 }
 
@@ -567,7 +552,7 @@ window.fillBasicDurationDefaults = function () {
     });
 
     rerenderDurationManager();
-    window.showNotification(`Starter duration rows loaded: ${added} standards added, ${filled} empty standards filled, ${refreshed} untouched starter standards refreshed${preserved ? `, ${preserved} edited standards preserved` : ''}. Verify all figures and complete Approval details before saving.`, 'info');
+    window.showNotification(`Starter duration rows loaded: ${added} standards added, ${filled} empty standards filled, ${refreshed} untouched starter standards refreshed${preserved ? `, ${preserved} edited standards preserved` : ''}. Review the figures, confirm, and save.`, 'info');
 };
 
 window.applyBulkDurationApproval = function () {
@@ -682,10 +667,6 @@ window.updateIMSMethodologyField = function (field, value) {
 function validateDurationMethodologyDraft(draft) {
     const errors = [];
     Object.entries(draft.registry).forEach(([family, method]) => {
-        if (!String(method.name || '').trim()) errors.push(`${family}: methodology name is required.`);
-        if (!String(method.version || '').trim()) errors.push(`${family}: version is required.`);
-        if (!String(method.sourceReference || '').trim()) errors.push(`${family}: controlled source/reference is required.`);
-        if (!String(method.approvedBy || '').trim()) errors.push(`${family}: approver is required.`);
         const allRows = Object.entries(method.tables || {}).flatMap(([stage, rows]) => (rows || []).map(row => ({ stage, ...row })));
         allRows.forEach((row, index) => {
             if (!(Number(row.minEmployees) >= 1)) errors.push(`${family} row ${index + 1}: minimum employees must be at least 1.`);
@@ -708,10 +689,6 @@ function validateDurationMethodologyDraft(draft) {
         });
     });
     if (draft.ims) {
-        if (!String(draft.ims.name || '').trim()) errors.push('IMS methodology name is required.');
-        if (!String(draft.ims.version || '').trim()) errors.push('IMS methodology version is required.');
-        if (!String(draft.ims.sourceReference || '').trim()) errors.push('IMS controlled source/reference is required.');
-        if (!String(draft.ims.approvedBy || '').trim()) errors.push('IMS approver is required.');
         const adjustment = Number(draft.ims.defaultAdjustmentPercent || 0);
         if (adjustment < -Number(draft.ims.maximumReductionPercent || 0) || adjustment > Number(draft.ims.maximumIncreasePercent || 0)) errors.push('IMS default adjustment exceeds the configured reduction/increase limits.');
     }
@@ -738,6 +715,11 @@ window.saveDurationMethodologies = async function () {
     try {
         const draft = getDurationDraft();
         backfillEmptyDurationStages(draft);
+        const confirmation = document.getElementById('duration-rules-confirmed');
+        if (confirmation && !confirmation.checked) {
+            window.showNotification('Confirm that you reviewed the duration figures before saving.', 'warning');
+            return;
+        }
         const errors = validateDurationMethodologyDraft(draft);
         if (errors.length) {
             window.state.cbSettings.durationMethodologyDrafts = clonePlanningValue(draft.registry, {});
@@ -747,12 +729,27 @@ window.saveDurationMethodologies = async function () {
             window._durationMethodologyValidationErrors = errors;
             rerenderDurationManager();
             document.getElementById('duration-validation-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            window.showNotification(`${errors.length} approval items require attention. Review the validation summary or save these methodologies as drafts.`, 'warning');
+            window.showNotification(`${errors.length} duration rule issues require attention. Review the summary or save as a draft.`, 'warning');
             return;
         }
         const savedAt = new Date().toISOString();
-        Object.values(draft.registry).forEach(method => { method.configuredAt = savedAt; method.configuredBy = window.state.currentUser?.name || 'System'; });
-        if (draft.ims) { draft.ims.configuredAt = savedAt; draft.ims.configuredBy = window.state.currentUser?.name || 'System'; }
+        const configuredBy = window.state.currentUser?.name || 'System';
+        const automaticVersion = `Configuration ${savedAt}`;
+        Object.entries(draft.registry).forEach(([family, method]) => {
+            method.name = method.name || `ISO ${family} duration rules`;
+            method.version = method.version || automaticVersion;
+            method.approvedBy = method.approvedBy || configuredBy;
+            method.starterTemplate = false;
+            method.configuredAt = savedAt;
+            method.configuredBy = configuredBy;
+        });
+        if (draft.ims) {
+            draft.ims.name = draft.ims.name || 'Integrated audit adjustment';
+            draft.ims.version = draft.ims.version || automaticVersion;
+            draft.ims.approvedBy = draft.ims.approvedBy || configuredBy;
+            draft.ims.configuredAt = savedAt;
+            draft.ims.configuredBy = configuredBy;
+        }
         window.state.cbSettings.durationMethodologies = clonePlanningValue(draft.registry, {});
         window.state.cbSettings.imsMethodology = clonePlanningValue(draft.ims, null);
         delete window.state.cbSettings.durationMethodologyDrafts;
@@ -761,7 +758,7 @@ window.saveDurationMethodologies = async function () {
         await window.DataService?.syncSettings?.({ saveLocal: false, silent: true });
         delete window._durationMethodologyDraft;
         window._durationMethodologyValidationErrors = [];
-        window.showNotification('Versioned duration methodologies validated and activated.', 'success');
+        window.showNotification('Duration rules saved and ready to use.', 'success');
         window.switchSettingsSubTab('policies', 'audit-planning');
     } catch (error) {
         window.showNotification(`Methodology configuration could not be activated: ${error.message}`, 'error');

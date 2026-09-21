@@ -84,16 +84,20 @@ describe('duration methodology starter defaults', () => {
         expect(window.DataService.syncSettings).toHaveBeenCalled();
     });
 
-    it('shows a concise validation warning instead of one toast containing every error', async () => {
+    it('activates complete duration tables without requiring document-control fields', async () => {
         window.fillBasicDurationDefaults();
+        window.switchSettingsSubTab = vi.fn();
         await window.saveDurationMethodologies();
 
-        expect(window._durationMethodologyValidationErrors.length).toBeGreaterThan(10);
+        const activated = window.state.cbSettings.durationMethodologies['27001'];
+        expect(window._durationMethodologyValidationErrors).toEqual([]);
+        expect(activated.version).toMatch(/^Configuration /);
+        expect(activated.approvedBy).toBe('System');
+        expect(activated.sourceReference).toBe('');
         expect(window.showNotification).toHaveBeenLastCalledWith(
-            expect.stringMatching(/^\d+ approval items require attention/),
-            'warning'
+            'Duration rules saved and ready to use.',
+            'success'
         );
-        expect(window.state.cbSettings.durationMethodologies['27001']).toBeUndefined();
     });
 
     it('applies common approval details only after explicit confirmation', () => {
