@@ -449,6 +449,18 @@ function getDurationMethodologyManagerHTML() {
     const ims = draft.ims || {};
     return `<hr><div class="alert alert-info"><strong>Set up duration in three steps:</strong> 1. Add a standard or load starter rows. 2. Verify every figure against the applicable scheme procedure. 3. Enter version and Approval details, then validate and save.</div><div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;"><div><h4 style="margin:0;">Duration rules by standard</h4><p style="margin:.35rem 0;color:#64748b;">Starter figures are planning examples only and remain incomplete until your CB verifies and approves them.</p></div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;"><button type="button" class="btn btn-outline-primary" data-action="fillBasicDurationDefaults"><i class="fa-solid fa-table-list"></i> Fill basic defaults for all standards</button><select id="duration-new-family" class="form-control"><option value="">Choose standard</option>${families.filter(family => !draft.registry[family]).map(family => `<option value="${esc(family)}">ISO ${esc(family)}</option>`).join('')}</select><button type="button" class="btn btn-outline-primary" data-action="addDurationMethodology"><i class="fa-solid fa-plus"></i> Add</button></div></div>
+        ${Object.keys(draft.registry).length ? `<div class="card" style="padding:1rem;margin-top:1rem;border-left:4px solid #0ea5e9;">
+            <h4 style="margin:0 0 .35rem;">Bulk approval details</h4>
+            <p style="margin:0 0 .8rem;color:#64748b;">Use this only when the same controlled procedure, revision and approver apply to every draft scheme below.</p>
+            <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:.75rem;">
+                <div><label>Version / revision</label><input id="duration-bulk-version" class="form-control" placeholder="e.g. Rev 03"></div>
+                <div><label>Controlled source/reference</label><input id="duration-bulk-source" class="form-control" placeholder="Procedure/document and revision"></div>
+                <div><label>Approved by</label><input id="duration-bulk-approver" class="form-control" placeholder="Name or role"></div>
+            </div>
+            <label style="display:block;margin-top:.75rem;"><input id="duration-bulk-include-ims" type="checkbox" ${draft.ims ? 'checked' : ''}> Apply the same approval details to the IMS rule</label>
+            <label style="display:block;margin-top:.5rem;font-weight:600;"><input id="duration-bulk-confirm" type="checkbox"> I confirm the starter figures have been checked against this CB's controlled, approved methodology.</label>
+            <button type="button" class="btn btn-outline-primary" style="margin-top:.75rem;" data-action="applyBulkDurationApproval"><i class="fa-solid fa-stamp"></i> Apply to all drafts</button>
+        </div>` : ''}
         ${cards || '<div class="alert alert-warning" style="margin-top:1rem;">No duration methodology is configured. Add each accredited scheme used by audit planning.</div>'}
         <div class="card" style="padding:1rem;margin-top:1rem;border-left:4px solid #7c3aed;"><h4 style="margin-bottom:.5rem;">Integrated audit adjustment</h4>
             <label><input type="checkbox" ${draft.ims ? 'checked' : ''} data-action-change="toggleIMSMethodology" data-arg1="this.checked"> This CB uses an approved IMS adjustment rule</label>
@@ -539,6 +551,37 @@ window.fillBasicDurationDefaults = function () {
 
     rerenderDurationManager();
     window.showNotification(`Starter duration rows loaded: ${added} standards added, ${filled} empty standards filled, ${refreshed} untouched starter standards refreshed${preserved ? `, ${preserved} edited standards preserved` : ''}. Verify all figures and complete Approval details before saving.`, 'info');
+};
+
+window.applyBulkDurationApproval = function () {
+    const version = document.getElementById('duration-bulk-version')?.value.trim() || '';
+    const sourceReference = document.getElementById('duration-bulk-source')?.value.trim() || '';
+    const approvedBy = document.getElementById('duration-bulk-approver')?.value.trim() || '';
+    const confirmed = Boolean(document.getElementById('duration-bulk-confirm')?.checked);
+    if (!version || !sourceReference || !approvedBy) {
+        window.showNotification('Enter the common version, controlled source/reference and approver.', 'warning');
+        return;
+    }
+    if (!confirmed) {
+        window.showNotification('Confirm that the starter figures were checked against the controlled CB methodology.', 'warning');
+        return;
+    }
+
+    const draft = getDurationDraft();
+    Object.values(draft.registry).forEach(method => {
+        method.version = version;
+        method.sourceReference = sourceReference;
+        method.approvedBy = approvedBy;
+        method.starterTemplate = false;
+    });
+    if (draft.ims && document.getElementById('duration-bulk-include-ims')?.checked) {
+        draft.ims.version = version;
+        draft.ims.sourceReference = sourceReference;
+        draft.ims.approvedBy = approvedBy;
+    }
+    window._durationMethodologyValidationErrors = [];
+    rerenderDurationManager();
+    window.showNotification('Common approval details applied. Review the schemes, then select Validate & Activate Methodologies.', 'success');
 };
 
 window.removeDurationMethodology = function (family) {

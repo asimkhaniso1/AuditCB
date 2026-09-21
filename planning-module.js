@@ -559,6 +559,9 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                             <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1.25rem; height: 36px;" data-action="autoCalculateDays" disabled aria-label="Auto-generate">
                                 <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.4rem;"></i>Calculate Days
                             </button>
+                            <button type="button" id="btn-open-duration-setup" class="btn btn-outline-primary btn-sm" style="width:100%;margin:-.65rem 0 1.25rem;display:none;" data-action="openDurationMethodologySetup">
+                                <i class="fa-solid fa-gear" style="margin-right:.4rem;"></i>Open Duration Setup
+                            </button>
 
                             <div style="display:grid; gap:0.75rem; padding:1rem; background:#f8fafc; border:1px dashed var(--border-color); border-radius:8px;">
                                 <div><label style="font-size:.8rem;">Calculation basis</label><textarea id="plan-duration-basis" rows="2" class="form-control" readonly style="background:#fff;"></textarea></div>
@@ -1039,9 +1042,13 @@ function autoCalculateDays() {
             document.getElementById('plan-duration-basis').value = `CB configuration required: ${calculated?.error || `approved methodology missing for ${methodology?.missingFamilies?.join(', ') || 'selected standards'}`}`;
             document.getElementById('plan-baseline-days').value = '';
             document.getElementById('plan-mandays').value = '';
+            const setupButton = document.getElementById('btn-open-duration-setup');
+            if (setupButton) setupButton.style.display = 'block';
             window.showNotification('Duration cannot be calculated until an approved, versioned CB methodology is configured for every selected scheme.', 'warning');
             return;
         }
+        const setupButton = document.getElementById('btn-open-duration-setup');
+        if (setupButton) setupButton.style.display = 'none';
         const baseline = calculated.baselineDays;
         const imsConfig = window.state?.cbSettings?.imsMethodology;
         const imsDefault = cycle.standards.length > 1 && Number.isFinite(Number(imsConfig?.defaultAdjustmentPercent))
@@ -1055,6 +1062,12 @@ function autoCalculateDays() {
         window.showNotification('No employee data available for selected sites. Please verify client/site information.', 'warning');
     }
 }
+
+window.openDurationMethodologySetup = function () {
+    window.state.settingsMainTab = 'policies';
+    window.state.settingsSubTab = 'audit-planning';
+    window.location.hash = '#settings';
+};
 
 // Note: The definitive saveAuditPlan function is defined below (around line 1660) with proper validation and sanitization
 

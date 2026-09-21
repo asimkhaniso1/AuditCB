@@ -95,4 +95,23 @@ describe('duration methodology starter defaults', () => {
         );
         expect(window.state.cbSettings.durationMethodologies['27001']).toBeUndefined();
     });
+
+    it('applies common approval details only after explicit confirmation', () => {
+        window.fillBasicDurationDefaults();
+        document.body.innerHTML = `
+            <input id="duration-bulk-version" value="Rev 03">
+            <input id="duration-bulk-source" value="CB-PRO-DUR-01">
+            <input id="duration-bulk-approver" value="Technical Manager">
+            <input id="duration-bulk-include-ims" type="checkbox">
+            <input id="duration-bulk-confirm" type="checkbox" checked>
+        `;
+
+        window.applyBulkDurationApproval();
+
+        const method = window._durationMethodologyDraft.registry['27001'];
+        expect(method.version).toBe('Rev 03');
+        expect(method.sourceReference).toBe('CB-PRO-DUR-01');
+        expect(method.approvedBy).toBe('Technical Manager');
+        expect(method.starterTemplate).toBe(false);
+    });
 });
