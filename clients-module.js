@@ -1222,8 +1222,10 @@ function recoverClientDocumentReferences(client) {
 
 function getClientDocumentsHTML(client) {
     const savedDocs = client.documents || [];
-    const recoveredDocs = savedDocs.length ? [] : recoverClientDocumentReferences(client);
-    const docs = savedDocs.length ? savedDocs : recoveredDocs;
+    const savedNames = new Set(savedDocs.map(doc => String(doc.name || '').trim().toLowerCase()));
+    const recoveredDocs = recoverClientDocumentReferences(client)
+        .filter(doc => !savedNames.has(String(doc.name || '').trim().toLowerCase()));
+    const docs = [...savedDocs, ...recoveredDocs];
     return `
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -1280,7 +1282,7 @@ function getClientDocumentsHTML(client) {
                                     <td style="font-size: 0.85rem;">${doc.linkedClauses ? '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-size:0.78rem;">' + window.UTILS.escapeHtml(doc.linkedClauses) + '</span>' : '<span style="color:#94a3b8;">—</span>'}</td>
                                     <td>${window.UTILS.escapeHtml(doc.date)}</td>
                                     <td>
-                                        ${doc.recovered ? '<span style="font-size:.75rem;color:#b45309;">Re-upload file</span>' : `<button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="viewDocumentNotes" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" title="View Notes" aria-label="View"><i class="fa-solid fa-eye"></i></button>`}
+                                        ${doc.recovered ? `<button class="btn btn-sm btn-outline-primary" data-action="openClientDocumentModal" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.name)}"><i class="fa-solid fa-cloud-arrow-up"></i> Re-upload</button>` : `<button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="viewDocumentNotes" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" title="View Notes" aria-label="View"><i class="fa-solid fa-eye"></i></button>`}
                                         ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                                         ${doc.recovered ? '' : `<button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteDocument" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>`}
                                         ` : ''}
@@ -2454,7 +2456,7 @@ window.handleIndustryChange = function (select) {
     }
 
     // Upload Document Modal
-    window.openClientDocumentModal = function (clientId) {
+    window.openClientDocumentModal = function (clientId, presetName = '') {
         const client = window.DataService.findClient(clientId);
         if (!client) return;
 
@@ -2462,7 +2464,7 @@ window.handleIndustryChange = function (select) {
         <form id="upload-form">
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
-                <input type="text" class="form-control" id="doc-name" required placeholder="e.g. Quality Management System Manual">
+                <input type="text" class="form-control" id="doc-name" required value="${window.UTILS.escapeHtml(presetName)}" placeholder="e.g. Quality Management System Manual">
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
