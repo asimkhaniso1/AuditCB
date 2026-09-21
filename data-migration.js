@@ -108,6 +108,82 @@ const DataMigration = {
         return result;
     },
 
+    // ── Plan text and checklist-to-standard heal ─────────────────────
+    // Two more records written by older builds:
+    //  * audit-plan agenda text stored HTML-escaped (Sanitizer.sanitizeText
+    //    escaped on WRITE, the edit form escaped again on the way back in, so
+    //    "Patch & Vulnerability" grew an "&amp;" layer on every save and printed
+    //    as literal "&amp;"). Escaping is a render concern; the record holds text.
+    //  * checklists that lost the ids linking them to their standards (they live
+    //    only inside qa_context on the cloud row), which made coverage report
+    //    "not tied to a standard" for a checklist that names three.
+    // Both idempotent: clean data is untouched and nothing is reported.
+
+    /**
+     * @param {Array} plans - window.state.auditPlans (mutated)
+     * @returns {{changed: Array, fields: number}}
+     */
+    healPlanText: function (plans) {
+        const list = Array.isArray(plans) ? plans : [];
+        const changed = [];
+        let fields = 0;
+        const fix = (holder, key) => {
+            if (!holder || typeof holder[key] !== 'string') return false;
+            const next = window.UTILS.decodeEntities(holder[key]);
+            if (next === holder[key]) return false;
+            holder[key] = next; fields++;
+            return true;
+        };
+        list.forEach(plan => {
+            if (!plan || typeof plan !== 'object') return;
+            let touched = false;
+            (Array.isArray(plan.agenda) ? plan.agenda : []).forEach(row => {
+                ['day', 'time', 'item', 'dept', 'auditor'].forEach(k => { if (fix(row, k)) touched = true; });
+            });
+            ['objectives', 'criteria', 'methodology', 'auditObjectives', 'auditCriteria', 'auditMethodology', 'scope'].forEach(k => { if (fix(plan, k)) touched = true; });
+            if (touched) changed.push(plan);
+        });
+        return { changed: changed, fields: fields };
+    },
+
+    /**
+     * @param {Array} checklists - window.state.checklists (mutated)
+     * @returns {{changed: Array, unresolved: Array}} unresolved = checklists no
+     *   source could link to a registry standard (they need a person)
+     */
+    healChecklistStandards: function (checklists) {
+        const list = Array.isArray(checklists) ? checklists : [];
+        const changed = [];
+        const unresolved = [];
+        const CC = window.ChecklistCoverage;
+        if (!CC || typeof CC.healStandardAssociation !== 'function') return { changed: changed, unresolved: unresolved };
+        list.forEach(ck => {
+            if (!ck || typeof ck !== 'object') return;
+            const r = CC.healStandardAssociation(ck);
+            if (r.changed) changed.push(ck);
+            else if (!r.ids.length) unresolved.push(ck);
+        });
+        return { changed: changed, unresolved: unresolved };
+    },
+
+    /**
+     * Run both heals against current state, persist locally and push only the
+     * repaired records. Safe to call on every startup.
+     */
+    healPlansAndChecklists: function () {
+        const st = window.state || {};
+        const plans = DataMigration.healPlanText(st.auditPlans);
+        const checklists = DataMigration.healChecklistStandards(st.checklists);
+        if (plans.changed.length || checklists.changed.length) {
+            window.Logger && Logger.info(`Healed ${plans.changed.length} plan(s) (${plans.fields} text fields) and ${checklists.changed.length} checklist standard association(s)`);
+            if (checklists.changed.length && window.SupabaseClient && typeof window.SupabaseClient.syncChecklistsToSupabase === 'function') {
+                Promise.resolve(window.SupabaseClient.syncChecklistsToSupabase(checklists.changed)).catch(() => { /* re-healed next start */ });
+            }
+            if (typeof window.saveData === 'function') window.saveData();
+        }
+        return { plans: plans, checklists: checklists };
+    },
+
     /**
      * Count what a client would take with it if deleted, so a duplicate pair can
      * be told apart: the record carrying work is the one to keep.

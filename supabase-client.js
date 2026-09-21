@@ -555,6 +555,9 @@ const SupabaseClient = {
                 if (window.DataMigration && typeof window.DataMigration.healClientTextAndSync === 'function') {
                     window.DataMigration.healClientTextAndSync();
                 }
+                if (window.DataMigration && typeof window.DataMigration.healPlansAndChecklists === 'function') {
+                    window.DataMigration.healPlansAndChecklists();
+                }
             } catch (healErr) {
                 Logger.warn('Client text heal skipped:', healErr);
             }
@@ -2077,6 +2080,14 @@ const SupabaseClient = {
                 readyForAudit: checklist.ready_for_audit || undefined,
                 resolvedIssues: checklist.resolved_issues || undefined,
                 qaContext: checklist.qa_context || undefined,
+                // The standards a checklist is tied to are stored only inside
+                // qa_context. Lift them back onto the checklist on read so the
+                // association survives the round-trip — without them, coverage
+                // could not be assessed for a checklist that plainly names its
+                // standards. (ChecklistCoverage.healStandardAssociation
+                // re-derives them from the standard names if they are absent.)
+                standardIds: Array.isArray(checklist.qa_context?.standardIds) && checklist.qa_context.standardIds.length
+                    ? checklist.qa_context.standardIds : undefined,
                 sourceDocumentSnapshot: checklist.qa_context?.sourceDocuments || [],
                 createdAt: checklist.created_at,
                 updatedAt: checklist.updated_at

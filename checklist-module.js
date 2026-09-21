@@ -1765,17 +1765,25 @@ function deleteChecklist(id) {
  */
 function runChecklistQA(checklist) {
     if (!window.ChecklistQA) return null;
+    // ONE association between checklist and standards, shared with the coverage
+    // pass. QA used to fall back to parsing `checklist.standard` while coverage
+    // read only stored ids, so a checklist that had lost its ids passed QA and
+    // was reported "not tied to a standard" by coverage in the same document.
+    if (window.ChecklistCoverage && window.ChecklistCoverage.healStandardAssociation) {
+        window.ChecklistCoverage.healStandardAssociation(checklist);
+    }
     let ctx = checklist.qaContext;
-    if (!ctx) {
-        if (!window.ChecklistStandards) return null;
-        const resolved = window.ChecklistStandards.resolve(checklist.standard || '');
-        if (!resolved.standards.length) return null;
-        ctx = {
-            standardIds: resolved.standards.map(s => s.id),
+    if (!ctx || !(ctx.standardIds || []).length) {
+        const ids = window.ChecklistCoverage && window.ChecklistCoverage.resolveStandardIds
+            ? window.ChecklistCoverage.resolveStandardIds(checklist).ids
+            : (window.ChecklistStandards ? window.ChecklistStandards.resolve(checklist.standard || '').standards.map(s => s.id) : []);
+        if (!ids.length) return null;
+        ctx = Object.assign({}, ctx || {}, {
+            standardIds: ids,
             auditType: checklist.auditType || '',
             ceiling: checklist.targetItems || null,
-            soaApplicable: []
-        };
+            soaApplicable: (ctx && ctx.soaApplicable) || []
+        });
     }
     try {
         return window.ChecklistQA.validate(checklist, ctx);
@@ -1794,30 +1802,7 @@ function runChecklistQA(checklist) {
  * @returns {string} HTML, or '' when QA could not run
  */
 function qaPanelHTML(qa) {
-    if (!qa) return '';
-    const esc = window.UTILS.escapeHtml;
-    if (qa.ok) {
-        return `<div class="qa-panel qa-pass">
-            <h2>Checklist QA Validation</h2>
-            <p><strong>Passed.</strong> ${qa.itemCount} questions. Every clause and control cited belongs to a standard in the audit scope; no duplicate, contradictory or out-of-scope requirements were found.</p>
-        </div>`;
-    }
-    const cls = qa.blocking ? 'qa-fail' : 'qa-warn';
-    // Criticals first, then warnings, then the notes — the order an auditor
-    // needs to act on them.
-    const order = { critical: 0, warning: 1, info: 2 };
-    const rows = qa.issues.slice()
-        .sort((a, b) => order[a.severity] - order[b.severity])
-        .slice(0, 25)
-        .map(i => `<li><span class="qa-tag qa-tag-${i.severity}">${esc(i.severity)}</span>${i.itemRef ? `<strong>${esc(i.itemRef)}</strong> — ` : ''}${esc(i.message)}</li>`)
-        .join('');
-    const hidden = qa.issues.length - Math.min(qa.issues.length, 25);
-    return `<div class="qa-panel ${cls}">
-        <h2>Checklist QA Validation</h2>
-        <p><strong>${esc(window.ChecklistQA.summarize(qa))}</strong>${qa.blocking ? ' Resolve the critical items before the checklist is used as an audit record.' : ''}</p>
-        <ul>${rows}</ul>
-        ${hidden > 0 ? `<p style="margin-top:6px;">…and ${hidden} further item(s).</p>` : ''}
-    </div>`;
+    return window.ChecklistDocument ? window.ChecklistDocument.qaPanel(qa) : '';
 }
 
 /**
@@ -1836,8 +1821,10 @@ function qaPanelHTML(qa) {
 function runChecklistCoverage(checklist) {
     if (!window.ChecklistCoverage) return null;
     try {
+        window.ChecklistCoverage.healStandardAssociation(checklist);
+        const plan = planForChecklist(checklist);
         const ctx = window.ChecklistCoverage.buildContext(checklist, {
-            planId: checklist.planId || null,
+            planId: (plan && plan.id) || checklist.planId || null,
             soaApplicable: (checklist.qaContext && checklist.qaContext.soaApplicable) || []
         });
         return window.ChecklistCoverage.assess(checklist, ctx);
@@ -1845,6 +1832,20 @@ function runChecklistCoverage(checklist) {
         if (window.Logger) window.Logger.error('ChecklistCoverage', 'Assessment failed: ' + err.message);
         return null;
     }
+}
+
+/**
+ * The audit plan a checklist belongs to: its own planId, else the plan that
+ * lists it in selectedChecklists. Null when it has not been attached to one.
+ */
+function planForChecklist(checklist) {
+    const plans = (window.state && window.state.auditPlans) || [];
+    if (!checklist) return null;
+    if (checklist.planId != null) {
+        const direct = plans.find(p => String(p.id) === String(checklist.planId));
+        if (direct) return direct;
+    }
+    return plans.find(p => (p.selectedChecklists || []).some(id => String(id) === String(checklist.id))) || null;
 }
 
 /**
@@ -1896,43 +1897,7 @@ function annexACoverageLabel(ct) {
  * @returns {string} HTML, or '' when coverage could not be assessed
  */
 function coveragePanelHTML(cov, checklist) {
-    if (!cov || !cov.coverage) return '';
-    const esc = window.UTILS.escapeHtml;
-    const c = cov.coverage;
-    const cls = cov.blocking ? 'qa-fail' : (cov.counts.warning ? 'qa-warn' : 'qa-pass');
-    const rows = [];
-    (c.clauses || []).forEach(cl => {
-        rows.push(`<tr><td>${esc(cl.label)} — requirements</td><td>${cl.thisAudit} / ${cl.total}</td><td>${cl.cycle} / ${cl.total}</td></tr>`);
-    });
-    (c.controls || []).forEach(ct => {
-        rows.push(`<tr><td>${esc(ct.label)} — Annex A applicable (${esc(annexACoverageLabel(ct))})</td><td>${ct.thisAudit} / ${ct.pool}</td><td>${ct.cycle} / ${ct.pool}</td></tr>`);
-    });
-    if (c.processes && c.processes.total) {
-        rows.push(`<tr><td>Critical processes</td><td>&mdash;</td><td>${c.processes.covered} / ${c.processes.total}</td></tr>`);
-    }
-    const order = { critical: 0, warning: 1, info: 2 };
-    const list = (cov.issues || []).slice().sort((a, b) => order[a.severity] - order[b.severity]).slice(0, 20)
-        .map(i => `<li><span class="qa-tag qa-tag-${i.severity}">${esc(i.severity === 'critical' ? 'gap' : i.severity)}</span>${esc(i.message)}</li>`)
-        .join('');
-    const cycle = c.cycle || {};
-    // Recorded dispositions print with the checklist: an assessor reading it
-    // needs the reasoning that let a flagged item stand, not just the flag.
-    const resolved = Object.keys((checklist && checklist.resolvedIssues) || {})
-        .map(k => checklist.resolvedIssues[k]);
-    const disp = resolved.length
-        ? `<p style="margin-top:8px;"><strong>Dispositioned by the auditor:</strong></p><ul>${resolved
-            .map(r => `<li>${esc(r.note || r.action)} <em>(${esc(r.by || '')}, ${esc(r.at || '')})</em></li>`).join('')}</ul>`
-        : '';
-    return `<div class="qa-panel ${cls}">
-        <h2>Recertification Coverage Validation</h2>
-        <p><strong>${esc(window.ChecklistCoverage ? window.ChecklistCoverage.summarize(cov) : '')}</strong>
-        Certification cycle ${esc(cycle.start || '—')} to ${esc(cycle.end || '—')}${cycle.anchored ? ` (anchored on ${esc(cycle.anchored)})` : ''},
-        ${cycle.priorAudits || 0} prior audit(s) on file, ${cycle.priorChecklists || 0} of their checklists read for coverage.</p>
-        ${rows.length ? `<table class="cov-table"><thead><tr><th>Coverage</th><th>This audit</th><th>Over the cycle</th></tr></thead><tbody>${rows.join('')}</tbody></table>` : ''}
-        ${list ? `<ul>${list}</ul>` : ''}
-        ${disp}
-        <p class="cov-note">Annex A controls are selected risk-based from the applicable set — the Statement of Applicability, the risk assessment, changes since the previous audit, incidents and previous audit results. Auditing every control at every audit is not required; covering the applicable set across the certification cycle is.</p>
-    </div>`;
+    return window.ChecklistDocument ? window.ChecklistDocument.coveragePanel(cov, checklist) : '';
 }
 
 /** Library / detail chip showing whether a checklist has been released for audit. */
@@ -2060,7 +2025,15 @@ function soaSupplyActionsHTML(ct, checklistId) {
  * @param {Object} [checklist] - source of the id the SoA-supply buttons act on
  */
 function coverageCardHTML(cov, checklist) {
-    if (!cov || !cov.coverage) return '';
+    // A coverage pass that could not run is shown, not hidden: silence here is
+    // what let an unassessed checklist read as a validated one.
+    if (!cov || !cov.coverage) {
+        return `
+        <div class="card" style="margin-bottom:1.5rem;border-left:4px solid #dc2626;">
+            <h3 style="margin:0 0 0.25rem;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:0.5rem;color:#dc2626;"></i>Recertification Coverage — Blocked</h3>
+            <p style="margin:0;color:var(--text-secondary);font-size:0.85rem;">Blocked — coverage could not be assessed. The coverage pass did not run for this checklist; this is an internal error, not a finding about the audit.</p>
+        </div>`;
+    }
     const esc = window.UTILS.escapeHtml;
     const c = cov.coverage;
     const cycle = c.cycle || {};
@@ -2084,6 +2057,7 @@ function coverageCardHTML(cov, checklist) {
                 <i class="fa-solid fa-shield-halved" style="margin-right:0.5rem;color:var(--primary-color);"></i>
                 Recertification Coverage — this audit and the three-year programme
             </h3>
+            <p style="margin:0 0 0.5rem;font-size:0.88rem;font-weight:600;color:${cov.outcome === 'blocked' || cov.outcome === 'failed' ? '#b91c1c' : cov.outcome === 'passed-with-notes' ? '#a16207' : '#166534'};">${esc(window.ChecklistCoverage ? window.ChecklistCoverage.summarize(cov) : '')}</p>
             <p style="margin:0 0 1rem;color:var(--text-secondary);font-size:0.85rem;">
                 Cycle ${esc(cycle.start || '—')} to ${esc(cycle.end || '—')}${cycle.anchored ? ` (anchored on ${esc(cycle.anchored)})` : ''} &middot;
                 ${cycle.priorAudits || 0} prior audit(s), ${cycle.priorChecklists || 0} checklist(s) read for coverage.
@@ -2563,44 +2537,10 @@ function brandPalette() {
 function printChecklist(id) {
     const checklist = state.checklists.find(c => String(c.id) === String(id));
     if (!checklist) return;
-
-    // Build items from both old (items) and new (clauses) structures
-    let printItems = [];
-    if (checklist.clauses && checklist.clauses.length > 0) {
-        checklist.clauses.forEach(main => {
-            // Add main clause as a header row (Level 1)
-            printItems.push({ clause: main.mainClause || main.clause, requirement: main.title || main.requirement, isHeader: true, level: 1 });
-            (main.subClauses || []).forEach(sub => {
-                // Helper to get text from nested items
-                const getNestedReq = (obj) => {
-                    if (!obj.items || !obj.items[0]) return null;
-                    return obj.items[0].requirement || obj.items[0].text || obj.items[0].title;
-                };
-                if (sub.items && sub.items.length > 0) {
-                    // Sub-clause header (Level 2). A scope-driven item carries
-                    // the exact standard(s) and clause(s) it tests in
-                    // `citation` — printed here so the audit criterion is on
-                    // the record and not inferred from a bare clause number
-                    // that means different things in different standards.
-                    const subTitle = sub.title || sub.requirement || sub.text || '';
-                    const cited = sub.citation ? `${subTitle} — ${sub.citation}` : subTitle;
-                    printItems.push({ clause: sub.clause, requirement: cited, isHeader: true, level: 2 });
-                    // Individual items (Level 3+)
-                    sub.items.forEach(item => {
-                        printItems.push({ clause: item.clause, requirement: item.requirement || item.text || item.title || '' });
-                    });
-                } else {
-                    // Flat sub-clause — check all possible text fields
-                    const reqText = sub.requirement || sub.title || sub.requirement_text || sub.text || getNestedReq(sub) || '';
-                    printItems.push({ clause: sub.clause, requirement: reqText });
-                }
-            });
-        });
-    } else if (checklist.items && checklist.items.length > 0) {
-        printItems = checklist.items;
+    if (!window.ChecklistDocument || !window.PrintShell) {
+        window.showNotification('The print module is not loaded. Reload the page and try again.', 'warning');
+        return;
     }
-
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://audit.companycertification.com/#/verify/checklist/${checklist.id}`)}`;
 
     // ── Automated QA validation, before anything is rendered ──────────
     // The checklist that goes to an auditor has to be defensible: no clauses
@@ -2620,179 +2560,40 @@ function printChecklist(id) {
         if (!proceed) return;
     }
 
-    const brand = brandPalette();
+    // One status for the whole checklist, from both passes. Never "QA passed"
+    // and "coverage validated" beside "coverage could not be assessed".
+    const combined = window.ChecklistCoverage
+        ? window.ChecklistCoverage.combine(qa, coverage)
+        : { outcome: 'blocked', label: 'Blocked \u2014 coverage could not be assessed', reasons: ['The coverage module is not loaded.'] };
 
-    let content = `
-        <html>
-        <head>
-            <title>Audit Checklist Report  ${checklist.name}</title>
-            <style>
-                * { box-sizing: border-box; }
-                body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; padding: 30px 40px; color: #1e293b; max-width: 960px; margin: 0 auto; font-size: 13px; line-height: 1.5; }
-                .print-bar { text-align: right; margin-bottom: 12px; }
-                .print-bar button { padding: 10px 28px; cursor: pointer; background: ${brand.primary}; color: #fff; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; }
-                .print-bar button:hover { background: ${brand.dark}; }
-                .header { margin-bottom: 24px; border-bottom: 3px solid ${brand.primary}; padding-bottom: 16px; position: relative; }
-                .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
-                .header-left { flex: 1; }
-                .header-right { text-align: right; }
-                .cb-name { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 4px 0; }
-                h1 { color: #0f172a; margin: 0 0 8px 0; font-size: 18px; line-height: 1.3; }
-                .meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 8px; }
-                .meta span { font-size: 12px; color: #475569; }
-                .meta strong { color: #1e293b; }
-                .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
-                .badge-green { background: #dcfce7; color: #166534; }
-                .badge-blue { background: ${brand.tint}; color: ${brand.text}; }
-                table { width: 100%; border-collapse: collapse; margin-top: 16px; page-break-inside: auto; }
-                thead { display: table-header-group; }
-                tr { page-break-inside: avoid; }
-                th { background: ${brand.deep}; color: #f8fafc; padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-                td { padding: 9px 12px; border: 1px solid #e2e8f0; vertical-align: top; font-size: 12.5px; }
-                td.clause { font-weight: 700; background: #f8fafc; width: 75px; color: #334155; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; }
-                tr:nth-child(even):not(.section-header):not(.sub-header) td:not(.clause) { background: #fafbfc; }
-                tr.section-header td { background: ${brand.primary}; color: #fff; font-weight: 700; font-size: 13px; border-color: ${brand.primary}; padding: 8px 12px; }
-                tr.sub-header td { background: ${brand.tint}; color: ${brand.text}; font-weight: 600; font-size: 12px; border-bottom: 2px solid ${brand.tintBorder}; }
-                .status-col { width: 100px; text-align: center; font-size: 11px; }
-                .evidence-col { width: 200px; }
-                .footer { margin-top: 40px; padding-top: 16px; border-top: 2px solid #e2e8f0; }
-                .sig-row { display: flex; justify-content: space-between; gap: 40px; margin-top: 20px; }
-                .sig-block { flex: 1; }
-                .sig-line { border-bottom: 1px solid #94a3b8; margin-top: 30px; }
-                .sig-label { font-size: 11px; color: #64748b; margin-top: 4px; }
-                .footer-note { font-size: 10px; color: #94a3b8; text-align: center; margin-top: 20px; }
-                .qa-panel { margin-top: 16px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; page-break-inside: avoid; }
-                .qa-panel.qa-pass { border-left: 4px solid #059669; background: #f0fdf4; }
-                .qa-panel.qa-warn { border-left: 4px solid #f59e0b; background: #fffbeb; }
-                .qa-panel.qa-fail { border-left: 4px solid #dc2626; background: #fef2f2; }
-                .qa-panel h2 { font-size: 12px; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.6px; color: #334155; }
-                .qa-panel p { margin: 0 0 6px 0; font-size: 12px; color: #475569; }
-                .qa-panel ul { margin: 6px 0 0 0; padding-left: 18px; }
-                .qa-panel li { font-size: 11.5px; color: #475569; margin-bottom: 3px; }
-                .qa-tag { display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: 0.4px; padding: 1px 6px; border-radius: 8px; margin-right: 6px; text-transform: uppercase; }
-                .qa-tag-critical { background: #fee2e2; color: #991b1b; }
-                .qa-tag-warning { background: #fef3c7; color: #92400e; }
-                .qa-tag-info { background: #e0f2fe; color: #075985; }
-                .cov-table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; }
-                .cov-table th { background: transparent; color: #64748b; padding: 4px 6px; font-size: 9.5px; text-transform: none; letter-spacing: 0; }
-                .cov-table td { border: none; border-bottom: 1px solid #e2e8f0; padding: 4px 6px; font-size: 11px; color: #475569; }
-                .cov-table td:not(:first-child) { text-align: right; width: 90px; font-variant-numeric: tabular-nums; }
-                .cov-note { font-size: 10.5px; color: #64748b; margin-top: 6px; }
-                @media print {
-                    .print-bar { display: none !important; }
-                    body { padding: 15px; }
-                }
-            </style>
-        </head>
-        <body>
-            <div class="print-bar">
-                <button data-action="print">🖨️ Print / Save PDF</button>
-            </div>
-            <div class="header">
-                <div class="header-top">
-                    <div class="header-left">
-                        ${(() => {
-            const cbSettings = window.state?.cbSettings || {};
-            const logoUrl = cbSettings.logoUrl || '';
-            const cbName = cbSettings.cbName || 'ISOXPERT Audit360';
-            if (logoUrl && (logoUrl.startsWith('data:') || logoUrl.startsWith('http'))) {
-                return '<img src="' + logoUrl + '" style="max-height: 45px; max-width: 180px; object-fit: contain; margin-bottom: 6px;" alt="' + window.UTILS.escapeHtml(cbName) + '"><br>';
-            }
-            return '';
-        })()}
-                        <p class="cb-name">${window.UTILS.escapeHtml((window.state?.cbSettings?.cbName) || 'ISOXPERT Audit360')}</p>
-                        <h1>${window.UTILS.escapeHtml(checklist.name)}</h1>
-                        <div class="meta">
-                            <span><strong>Standard:</strong> <span class="badge badge-blue">${window.UTILS.escapeHtml(checklist.standard)}</span></span>
-                            <span><strong>Type:</strong> <span class="badge ${checklist.type === 'global' ? 'badge-green' : 'badge-blue'}">${checklist.type === 'global' ? 'Global' : 'Custom'}</span></span>
-                            <span><strong>Items:</strong> ${printItems.filter(i => !i.isHeader).length}</span>
-                            ${checklist.auditType ? '<span><strong>Audit:</strong> ' + window.UTILS.escapeHtml(checklist.auditType) + '</span>' : ''}
-                            ${checklist.auditScope ? '<span><strong>Scope:</strong> ' + window.UTILS.escapeHtml(checklist.auditScope) + '</span>' : ''}
-                            <span><strong>Date:</strong> ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                        </div>
-                    </div>
-                    <div class="header-right">
-                        <img src="${qrUrl}" alt="QR" style="width: 72px; height: 72px; border: 1px solid #e2e8f0; border-radius: 6px;">
-                    </div>
-                </div>
-            </div>
-            ${qaPanelHTML(qa)}
-            ${coveragePanelHTML(coverage, checklist)}
+    const plan = planForChecklist(checklist);
+    const report = plan ? (state.auditReports || []).find(r => String(r.planId) === String(plan.id)) : null;
+    const client = (state.clients || []).find(c => String(c.id) === String(checklist.clientId))
+        || (state.clients || []).find(c => c.name === checklist.clientName) || null;
+    const cb = window.state?.cbSettings || {};
+    const logoUrl = cb.logoUrl && (cb.logoUrl.startsWith('data:') || cb.logoUrl.startsWith('http')) ? cb.logoUrl : '';
 
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 75px;">Clause</th>
-                        <th>Requirement</th>
-                        <th class="status-col">Status</th>
-                        <th class="evidence-col">Auditor Comments / Evidence</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${printItems.map(item => item.isHeader ? `
-                        <tr class="${item.level === 2 ? 'sub-header' : 'section-header'}">
-                            <td>${window.UTILS.escapeHtml(item.clause)}</td>
-                            <td colspan="3">${window.UTILS.escapeHtml(item.requirement || '')}</td>
-                        </tr>
-                    ` : `
-                        <tr>
-                            <td class="clause">${window.UTILS.escapeHtml(item.clause || '')}</td>
-                            <td>${window.UTILS.escapeHtml(item.requirement || '')}</td>
-                            <td class="status-col" style="color: #94a3b8;">Not Checked</td>
-                            <td class="evidence-col">-</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+    const html = window.ChecklistDocument.build(checklist, {
+        brand: brandPalette(),
+        cbName: cb.cbName || 'ISOXPERT Audit360',
+        logoUrl,
+        // The QR carries a verification URL only — no client name leaves the app.
+        qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://audit.companycertification.com/#/verify/checklist/${checklist.id}`)}`,
+        plan, report, client, siblings: state.checklists || [],
+        qa, coverage, combined,
+        classification: cb.documentClassification || cb.confidentialityLabel || ''
+    });
 
-            <div class="footer">
-                <div class="sig-row">
-                    <div class="sig-block">
-                        <div class="sig-line"></div>
-                        <div class="sig-label">Lead Auditor Signature</div>
-                    </div>
-                    <div class="sig-block">
-                        <div class="sig-line"></div>
-                        <div class="sig-label">Client Representative</div>
-                    </div>
-                    <div class="sig-block">
-                        <div class="sig-line"></div>
-                        <div class="sig-label">Date</div>
-                    </div>
-                </div>
-                <p class="footer-note">Generated by ${window.UTILS.escapeHtml((window.state?.cbSettings?.cbName) || 'ISOXPERT Audit360')} &bull; This is a controlled document</p>
-            </div>
-        </body>
-        </html>
-    `;
+    // Static defects (raw entities, numeric dates, browser-print dependence)
+    // are logged rather than blocking: the document already decodes and
+    // escapes every string, so a hit here means a regression to investigate.
+    const problems = window.PrintShell.lint(html);
+    if (problems.length && window.Logger) window.Logger.warn('ChecklistDocument', 'Print lint: ' + problems.map(p => p.code).join(', '));
 
-    const win = window.open('', '_blank');
+    const win = window.PrintShell.open(html);
     if (!win) {
         window.showNotification('Pop-up blocked. Allow pop-ups for this site to print the checklist.', 'warning');
-        return;
     }
-    win.document.write(content);
-    win.document.close();
-
-    // Wire the print button from here. The button carries data-action="print",
-    // but the app's event delegator only runs in the main document, and the site
-    // CSP has no 'unsafe-inline' so the popup cannot carry a script of its own -
-    // between the two, the button rendered but did nothing. The popup is a
-    // same-origin about:blank document, so its DOM is reachable from the opener,
-    // which is the one wiring route that needs neither.
-    const wirePrintButton = () => {
-        const btn = win.document.querySelector('[data-action="print"]');
-        if (!btn) return false;
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            try { win.focus(); } catch (_e) { /* focus is best-effort */ }
-            win.print();
-        });
-        return true;
-    };
-    // document.close() finishes parsing, so the button is normally present at
-    // once; the load handler is the fallback for any browser that defers it.
-    if (!wirePrintButton()) win.addEventListener('load', wirePrintButton);
 }
 // Permanently delete an archived checklist (no recovery)
 function permanentDeleteChecklist(id) {
@@ -2838,6 +2639,7 @@ window.pasteChecklistSoA = pasteChecklistSoA;
 // Exposed so the plan and execution screens can run the same coverage pass the
 // checklist was released under, rather than re-deriving one of their own.
 window.runChecklistCoverage = runChecklistCoverage;
+window.planForChecklist = planForChecklist;
 window.checklistReadiness = checklistReadiness;
 // Exposed so the PDF export path in enhancements.js runs the same QA gate.
 window.runChecklistQA = runChecklistQA;

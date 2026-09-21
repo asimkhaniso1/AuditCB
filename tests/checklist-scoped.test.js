@@ -19,6 +19,9 @@ const CS = (await import('../checklist-standards.js')).default || window.Checkli
 const QA = (await import('../checklist-qa.js')).default || window.ChecklistQA;
 window.ChecklistStandards = CS;
 window.ChecklistQA = QA;
+// Document relevance is decided by SupportingDocs; production loads it before
+// client-docs-bulk.js, so the harness must too.
+window.SupportingDocs = (await import('../supporting-docs.js')).default || window.SupportingDocs;
 
 const src = fs.readFileSync(path.resolve('./client-docs-bulk.js'), 'utf8');
 eval(src);
@@ -629,6 +632,10 @@ describe('Standard attribution on uploaded documents', () => {
     it('evidence hints are matched per standard, not on the clause number alone', () => {
         const docs = [{ name: 'ITSMS Objectives Procedure', linkedClauses: '6.2', linkedStandards: 'iso20000' }];
         expect(B.evidenceHint(docs, [{ stdId: 'iso20000', ref: '6.2' }])).toContain('ITSMS Objectives Procedure');
-        expect(B.evidenceHint(docs, [{ stdId: 'iso27001', ref: '6.2' }])).toBe('');
+        // Not offered for ISO 27001 — and, since a controlled objectives document is
+        // expected there, the gap is stated rather than silent (B4).
+        const other = B.evidenceHint(docs, [{ stdId: 'iso27001', ref: '6.2' }]);
+        expect(other).not.toContain('ITSMS Objectives Procedure');
+        expect(other).toContain('No validated supporting document mapped');
     });
 });

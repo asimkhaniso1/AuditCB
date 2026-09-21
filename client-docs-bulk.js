@@ -920,16 +920,21 @@
      * already exists because the standard requires it. A document title can
      * never create a question or decide its clause.
      */
-    function evidenceHint(docs, refs, cap) {
+    function evidenceHint(docs, refs, cap, opts) {
         if (!refs || !refs.length) return '';
-        // Matched per {standard, clause} pair, not on the clause number alone:
-        // an ISO/IEC 20000-1 objectives procedure tagged "6.2" is not evidence
-        // for ISO/IEC 27001 6.2, even though the numbers are identical.
-        const hits = (docs || [])
-            .filter(d => refs.some(r => docCoversRef(d, r.stdId, r.ref)))
-            .slice(0, cap || 3);
-        if (!hits.length) return '';
-        return ` Documented information on file that should support this: ${hits.map(docRef).join('; ')}.`;
+        // Relevance is decided by SupportingDocs (supporting-docs.js): a document
+        // must state applicability to THIS question's standard and be about its
+        // subject. The previous matcher (docCoversRef) treated "names no
+        // standard" as "applies to all" and let a parent clause cover any
+        // sub-clause, which is how a 27001 supplier procedure came to evidence
+        // 22301 continuity plans and 20000-1 capacity management. There is
+        // deliberately NO fallback to it: a wrong recommendation is worse than
+        // "No validated supporting document mapped".
+        const SD = window.SupportingDocs;
+        if (!SD) return '';
+        const o = opts || {};
+        if (o.skip) return '';
+        return SD.hint(docs, refs, { cap: cap || 3, topic: o.topic, client: o.client, text: o.text });
     }
 
     // A client's key-process names against the standard themes that already
@@ -982,12 +987,23 @@
         if (goods.length) {
             const names = goods.slice(0, 12).map(g => g.name || g).join(', ');
             const refs = refFor('scope');
+            // The certificate's own wording is printed so the auditor compares
+            // against the text itself, not a memory of it. Verbatim, never
+            // paraphrased; where the certificates disagree, all variants are shown.
+            const certScopes = Array.from(new Set((client.certificates || [])
+                .filter(c => c && !/withdrawn|expired/i.test(String(c.status || '')))
+                .map(c => String(c.scope || '').replace(/\s+/g, ' ').trim()).filter(Boolean)));
+            const certScopeLine = certScopes.length === 1
+                ? ` The certificate reads: “${certScopes[0]}”`
+                : (certScopes.length > 1
+                    ? ` The certificates carry ${certScopes.length} different wordings: ${certScopes.map((t, i) => `(${i + 1}) “${t}”`).join(' ')}`
+                    : '');
             // Deliberately a certificate-reconciliation question. The scope
             // STATEMENT of each system is examined by the consolidated 4.3
             // question in the IMS section; asking both the same way produced
             // two questions that read identically.
             out.push(scopedQuestion(displayRefFor(refs) || 'ORG', 'Certified scope against the certificate',
-                `Compare the certificate as issued against what the organisation supplies today: ${names}. Identify anything added, withdrawn, renamed or moved since the last certificate was issued, and decide whether the certificate wording still describes the business accurately.`,
+                `Compare the certificate as issued against what the organisation supplies today: ${names}.${certScopeLine} Identify anything added, withdrawn, renamed or moved since the last certificate was issued, and decide whether the certificate wording still describes the business accurately.`,
                 refs, { source: 'org-context' }));
         }
 
@@ -1037,7 +1053,7 @@
             if (p.category === 'Outsourced') {
                 const refs = refFor('outsourced');
                 out.push(scopedQuestion(displayRefFor(refs) || 'ORG', label,
-                    `${name} is performed by an external provider${owner}. Verify the controls applied to it, the criteria for selecting and monitoring the provider, the requirements placed on them in the agreement, and that responsibility for conformity is retained.${evidenceHint(docs, refs)}`,
+                    `${name} is performed by an external provider${owner}. Verify the controls applied to it, the criteria for selecting and monitoring the provider, the requirements placed on them in the agreement, and that responsibility for conformity is retained.${evidenceHint(docs, refs, 3, { topic: 'isms-supplier', client: client })}`,
                     refs, { source: 'org-context', auditorReview: refs.length === 0 }));
             } else {
                 const refs = refFor('process');
@@ -1057,22 +1073,32 @@
      * all of A.5. Controls a process theme already walks are excluded rather
      * than asked a second time.
      */
-    function sampleAnnexAControls(std, plan, budget, soaApplicable) {
+    /**
+     * @param {Object} [required] refs the audit's own risk drivers (previous
+     *   findings, incidents, changes, risk documents) point at. They are taken
+     *   FIRST and are not subject to the sample budget: a control a finding
+     *   points at is sampled whatever the cap. Without this the generator and
+     *   the cycle-coverage check disagreed, and a checklist failed its own
+     *   coverage assessment the moment it was built.
+     */
+    function sampleAnnexAControls(std, plan, budget, soaApplicable, required) {
         const pool = (soaApplicable && soaApplicable.length)
             ? std.controls.filter(c => soaApplicable.indexOf(c.ref) !== -1)
             : std.controls.filter(c => c.tier === 1);
         const fresh = pool.filter(c => !plan.themeCovered.has(`${std.id}::${c.ref}`));
+        const must = (required || []).map(r => (typeof r === 'string' ? r : r.ref));
+        const out = fresh.filter(c => must.indexOf(c.ref) !== -1);
         const byTheme = {};
-        fresh.forEach(c => { (byTheme[c.theme] = byTheme[c.theme] || []).push(c); });
+        fresh.filter(c => must.indexOf(c.ref) === -1).forEach(c => { (byTheme[c.theme] = byTheme[c.theme] || []).push(c); });
         const keys = Object.keys(byTheme).sort();
-        const out = [];
+        const cap = Math.max(budget.annexASample, out.length);
         let i = 0;
-        while (out.length < budget.annexASample && keys.some(k => byTheme[k].length)) {
+        while (out.length < cap && keys.some(k => byTheme[k].length)) {
             const k = keys[i % keys.length];
             if (byTheme[k].length) out.push(byTheme[k].shift());
             i++;
         }
-        return { sample: out, poolSize: pool.length, soaDriven: !!(soaApplicable && soaApplicable.length) };
+        return { sample: out, poolSize: pool.length, soaDriven: !!(soaApplicable && soaApplicable.length), riskDriven: out.filter(c => must.indexOf(c.ref) !== -1).map(c => c.ref) };
     }
 
     /**
@@ -1188,8 +1214,16 @@
                         if (CS.isKnownRef(id, ref)) refs.push({ stdId: id, ref });
                     }));
                 }
+                // Evidence for most priorities is RECORDS (previous reports, the
+                // NC register, incident logs), not a procedure, so no procedure
+                // is proposed for them. Where a controlled document really is
+                // expected — risk treatment, objectives, internal audit,
+                // management review — the engine names it, or says none is mapped.
+                const RECERT_DOC_TOPIC = { 'risk-treatment': 'ims-risk-actions', 'objectives': 'ims-objectives',
+                    'internal-audit': 'ims-internal-audit', 'mgmt-review': 'ims-mgmt-review' };
+                const recertTopic = RECERT_DOC_TOPIC[p.id];
                 return scopedQuestion(displayRefFor(refs) || 'RECERT', p.label,
-                    p.prompt + evidenceHint(list, refs),
+                    p.prompt + evidenceHint(list, refs, 3, { topic: recertTopic, client: client, skip: !recertTopic }),
                     refs, { source: 'recert-priority', auditorReview: refs.length === 0 });
             });
             if (auditType === 'recertification') {
@@ -1303,7 +1337,7 @@
                     const prompt = (CS.SHARED_PROMPT[g.shared] || `Verify the requirements of ${g.label} are met.`)
                         .replace(/\{systems\}/g, systems);
                     return scopedQuestion(displayRefFor(refs), g.label,
-                        prompt + evidenceHint(list, refs),
+                        prompt + evidenceHint(list, refs, 3, { topic: g.shared, client: client }),
                         refs, { source: 'ims-consolidated' });
                 })
             });
@@ -1316,14 +1350,14 @@
             themes.forEach(t => {
                 const refs = t.refs.filter(r => CS.isKnownRef(std.id, r)).map(r => ({ stdId: std.id, ref: r }));
                 subs.push(scopedQuestion(displayRefFor(refs) || 'THEME', t.label,
-                    t.prompt + evidenceHint(list, refs),
+                    t.prompt + evidenceHint(list, refs, 3, { topic: t.id, client: client }),
                     refs, { source: 'process-theme', auditorReview: refs.length === 0 }));
             });
             if (budget.coverAllClauses) {
                 plan.residual.filter(c => c.stdId === std.id).forEach(c => {
                     const refs = [{ stdId: std.id, ref: c.ref }];
                     subs.push(scopedQuestion(c.ref, c.title,
-                        `${c.title} — examine how the organisation satisfies ${std.label} ${c.ref}, and obtain evidence that it operates as described for the services in the certified scope.${evidenceHint(list, refs)}`,
+                        `${c.title} — examine how the organisation satisfies ${std.label} ${c.ref}, and obtain evidence that it operates as described for the services in the certified scope.${evidenceHint(list, refs, 3, { client: client })}`,
                         refs, { source: 'standard-specific' }));
                 });
             }
@@ -1338,7 +1372,19 @@
 
         // ── Annex A / Statement of Applicability sample ───────────────
         scope.standards.filter(s => s.hasSoA).forEach(std => {
-            const { sample, poolSize, soaDriven } = sampleAnnexAControls(std, plan, budget, o.soaApplicable);
+            // Controls this audit's risk drivers point at, computed by the SAME
+            // function the coverage check uses, so the two cannot disagree.
+            let required = [];
+            const CC = window.ChecklistCoverage;
+            if (CC && typeof CC.buildContext === 'function' && typeof CC.riskDrivenControls === 'function') {
+                try {
+                    const stub = { clientId: client.id, clientName: client.name, standard: scope.labels.join(', '), auditType,
+                        qaContext: { standardIds: scope.ids, soaApplicable: o.soaApplicable || [] } };
+                    const ctx = CC.buildContext(stub, { client: client, planId: o.planId || null, soaApplicable: o.soaApplicable || [] });
+                    required = CC.riskDrivenControls(std, ctx).required.map(r => r.ref);
+                } catch (_e) { required = []; }
+            }
+            const { sample, poolSize, soaDriven } = sampleAnnexAControls(std, plan, budget, o.soaApplicable, required);
             if (!sample.length) return;
             // Grouped by control theme rather than one question per control.
             // Controls of the same theme are sampled in one conversation with
@@ -1354,7 +1400,7 @@
                 const named = controls.map(c => `${c.ref} ${c.title}`).join('; ');
                 return scopedQuestion(controls.map(c => c.ref).join(', '),
                     controls.length > 1 ? `Annex A control sample — ${theme}` : controls[0].title,
-                    `Sample ${named}. ${CS.CONTROL_THEME_PROMPT[theme] || 'Obtain objective evidence that each control operates as the Statement of Applicability and the risk treatment plan describe it.'} Record the evidence seen against each control reference separately.${evidenceHint(list, refs)}`,
+                    `Sample ${named}. ${CS.CONTROL_THEME_PROMPT[theme] || 'Obtain objective evidence that each control operates as the Statement of Applicability and the risk treatment plan describe it.'} Record the evidence seen against each control reference separately.${evidenceHint(list, refs, 3, { client: client })}`,
                     refs, { source: 'annex-a-sample' });
             });
             clauses.push({

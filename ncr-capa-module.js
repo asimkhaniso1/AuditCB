@@ -1037,7 +1037,7 @@ function getOFIOBSHTML() {
         if (!matchesActiveNCRClient(report)) return;
 
         const progress = report.checklistProgress || [];
-        progress.forEach(item => {
+        progress.forEach((item, itemIdx) => {
             if (item.status !== 'nc') return;
             const t = (item.ncrType || '').toLowerCase();
             if (t !== 'observation' && t !== 'ofi') return;
@@ -1062,13 +1062,14 @@ function getOFIOBSHTML() {
                 client: report.client || '',
                 auditDate: report.date || '',
                 standard: report.standard || '',
-                reportId: report.id
+                reportId: report.id,
+                ref: { list: 'checklistProgress', index: itemIdx }, record: item
             });
         });
 
         // Also collect from report.findings[] (manually added findings)
         const manualFindings = report.findings || [];
-        manualFindings.forEach(f => {
+        manualFindings.forEach((f, findingIdx) => {
             const t = (f.type || '').toLowerCase();
             if (t !== 'observation' && t !== 'ofi') return;
 
@@ -1080,7 +1081,8 @@ function getOFIOBSHTML() {
                 client: report.client || '',
                 auditDate: report.date || '',
                 standard: report.standard || '',
-                reportId: report.id
+                reportId: report.id,
+                ref: { list: 'findings', index: findingIdx }, record: f
             });
         });
     });
@@ -1115,7 +1117,7 @@ function getOFIOBSHTML() {
 
             <div style="background: #f0fdf4; border-left: 3px solid #22c55e; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.85rem; color: #166534;">
                 <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                OFI/OBS findings are informational — they highlight good practices or areas for improvement but do not require corrective action.
+                Observations and opportunities for improvement do not require corrective action. An observation needs the organisation's evaluation and a disposition; an opportunity for improvement needs its decision to accept or reject it (a rationale is optional). Neither needs a root cause or an effectiveness check unless the organisation chooses to open a corrective action.
             </div>
 
             ${findings.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No OFI/OBS findings recorded across audits.</p>' : `
@@ -1129,6 +1131,7 @@ function getOFIOBSHTML() {
                             <th>Client</th>
                             <th>Audit Date</th>
                             <th>Standard</th>
+                            <th>Organisation's response</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1144,6 +1147,7 @@ function getOFIOBSHTML() {
                                 <td>${window.UTILS.escapeHtml(f.client)}</td>
                                 <td>${window.UTILS.formatDate(f.auditDate)}</td>
                                 <td>${window.UTILS.escapeHtml(f.standard || '-')}</td>
+                                <td>${findingResponseCellHTML(f)}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -1153,6 +1157,111 @@ function getOFIOBSHTML() {
         </div>
     `;
 }
+
+// --------------------------------------------
+// OBSERVATION / OFI RESPONSE (finding-workflow.js)
+// --------------------------------------------
+// Each finding type carries its own treatment. An observation needs the
+// organisation's evaluation, an impact consideration and a disposition; an OFI
+// needs its decision (accept / reject / defer — a rationale is optional). Neither
+// is asked for a root cause or an effectiveness review. An observation becomes a
+// nonconformity only on objective evidence, by a named person, and the original
+// stays linked — it is never converted silently.
+
+function findingRecordFor(reportId, ref) {
+    const report = (window.state.auditReports || []).find(r => String(r.id) === String(reportId));
+    if (!report || !ref) return { report: null, record: null };
+    const list = ref.list === 'findings' ? report.findings : report.checklistProgress;
+    return { report, record: (list || [])[ref.index] || null };
+}
+
+function findingResponseCellHTML(f) {
+    const FW = window.FindingWorkflow;
+    if (!FW || !f.record) return '<span style="color:#94a3b8;">&mdash;</span>';
+    const esc = window.UTILS.escapeHtml;
+    const rec = Object.assign({}, f.record, { type: f.type === 'OFI' ? 'ofi' : 'observation' });
+    const ev = FW.evaluate(rec);
+    const what = f.type === 'OFI'
+        ? (rec.ofiDecision ? `Decision: ${esc(rec.ofiDecision)}${rec.improvementRegisterRef ? ` &middot; ${esc(rec.improvementRegisterRef)}` : ''}` : 'Awaiting the organisation\u2019s decision')
+        : (ev.complete ? `Evaluated &middot; ${esc(rec.disposition || '')}` : `Awaiting: ${esc(ev.missing.map(m => m.label.toLowerCase()).join(', '))}`);
+    const arg = `data-arg1="${esc(String(f.reportId))}" data-arg2="${esc(f.ref.list)}" data-arg3="${esc(String(f.ref.index))}"`;
+    return `<div style="font-size:0.8rem;color:${ev.complete ? '#166534' : '#92400e'};">${what}</div>
+        <div style="margin-top:0.25rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-secondary" data-action="openFindingResponse" ${arg}>${ev.complete ? 'Edit' : 'Record'} response</button>
+            ${f.type === 'OBS' && !rec.escalatedToNcr ? `<button class="btn btn-sm btn-secondary" data-action="escalateObservationToNCR" ${arg} title="Only on objective evidence that a requirement was not fulfilled">Escalate to NCR</button>` : ''}
+            ${rec.escalatedToNcr ? `<span style="font-size:0.75rem;color:#7c3aed;">Escalated &rarr; ${esc(String(rec.escalatedToNcr))}</span>` : ''}
+        </div>`;
+}
+
+window.openFindingResponse = function (reportId, list, index) {
+    const { record } = findingRecordFor(reportId, { list, index: Number(index) });
+    if (!record) return;
+    const isOfi = String(record.ncrType || record.type || '').toLowerCase() === 'ofi';
+    const esc = window.UTILS.escapeHtml;
+    const v = (k) => esc(record[k] || '');
+    document.getElementById('modal-title').textContent = isOfi ? 'Opportunity for improvement \u2014 organisation\u2019s decision' : 'Observation \u2014 organisation\u2019s response';
+    document.getElementById('modal-body').innerHTML = isOfi ? `
+        <p style="font-size:0.85rem;color:var(--text-secondary);">The organisation may accept the suggestion, reject it, or defer it. A rationale is optional. No root-cause analysis or effectiveness review is required unless a formal corrective action is voluntarily opened.</p>
+        <div class="form-group"><label>Decision</label>
+            <select class="form-control" id="fr-decision">${['accepted', 'rejected', 'deferred'].map(d => `<option value="${d}" ${record.ofiDecision === d ? 'selected' : ''}>${d[0].toUpperCase() + d.slice(1)}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Rationale (optional)</label><textarea class="form-control" id="fr-rationale" rows="2">${v('ofiRationale')}</textarea></div>
+        <div class="form-group"><label>Voluntary improvement action (optional)</label><textarea class="form-control" id="fr-action" rows="2">${v('improvementAction')}</textarea></div>
+        <div class="form-group"><label>Improvement register reference (optional)</label><input class="form-control" id="fr-register" value="${v('improvementRegisterRef')}"></div>`
+        : `
+        <p style="font-size:0.85rem;color:var(--text-secondary);">An observation is not a failure to fulfil a requirement. Record the organisation's evaluation, the risk or impact considered, and its disposition. Corrective action is not required.</p>
+        <div class="form-group"><label>Management evaluation</label><textarea class="form-control" id="fr-eval" rows="2">${v('managementEvaluation')}</textarea></div>
+        <div class="form-group"><label>Risk / impact consideration</label><textarea class="form-control" id="fr-impact" rows="2">${v('impactConsideration')}</textarea></div>
+        <div class="form-group"><label>Disposition</label>
+            <select class="form-control" id="fr-disposition">${['', 'Accepted', 'Monitor', 'Action planned'].map(d => `<option value="${d}" ${record.disposition === d ? 'selected' : ''}>${d || '\u2014 select \u2014'}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Improvement, preventive or risk-treatment action (optional)</label><textarea class="form-control" id="fr-action" rows="2">${v('voluntaryAction')}</textarea></div>`;
+    document.getElementById('modal-save').style.display = 'block';
+    document.getElementById('modal-save').onclick = function () {
+        const get = (id) => (document.getElementById(id)?.value || '').trim();
+        const user = window.state.currentUser?.name || 'Unknown';
+        if (isOfi) {
+            const updated = window.FindingWorkflow.recordOfiDecision({ type: 'ofi' }, { decision: get('fr-decision'), rationale: get('fr-rationale'), action: get('fr-action'), improvementRegisterRef: get('fr-register'), decidedBy: user });
+            ['ofiDecision', 'ofiRationale', 'improvementAction', 'improvementRegisterRef', 'ofiDecidedBy', 'ofiDecidedAt'].forEach(k => { if (updated[k] !== undefined) record[k] = updated[k]; });
+        } else {
+            Object.assign(record, { managementEvaluation: get('fr-eval'), impactConsideration: get('fr-impact'), disposition: get('fr-disposition'), voluntaryAction: get('fr-action'), respondedBy: user, respondedAt: new Date().toISOString() });
+        }
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Response recorded.', 'success');
+        if (typeof window.switchNCRTab === 'function') window.switchNCRTab('ofi-obs');
+    };
+    window.openModal();
+};
+
+window.escalateObservationToNCR = async function (reportId, list, index) {
+    const { report, record } = findingRecordFor(reportId, { list, index: Number(index) });
+    if (!report || !record) return;
+    const evidence = window.prompt('Objective evidence that a requirement was NOT fulfilled (required). An observation is never converted without it:');
+    if (!evidence || !evidence.trim()) { window.showNotification('Not escalated: objective evidence is required.', 'warning'); return; }
+    const requirement = window.prompt('Requirement (clause) that was not fulfilled:', record.criterionRef || record.clause || '');
+    if (!requirement || !requirement.trim()) { window.showNotification('Not escalated: name the requirement.', 'warning'); return; }
+    const severity = /major/i.test(window.prompt('Severity (Minor or Major):', 'Minor') || '') ? 'Major' : 'Minor';
+    const user = window.state.currentUser?.name || '';
+    let ncr;
+    try {
+        ncr = window.FindingWorkflow.escalateObservation(
+            { id: record.id || `${reportId}:${list}:${index}`, type: 'observation', description: record.ncrDescription || record.comment || record.description || '', auditId: report.planId, clientId: report.clientId },
+            { objectiveEvidence: evidence, requirementRef: requirement, escalatedBy: user, severity });
+    } catch (e) { window.showNotification(e.message, 'error'); return; }
+    const client = (window.state.clients || []).find(c => String(c.id) === String(report.clientId) || c.name === report.client);
+    const raised = new Date().toISOString().split('T')[0];
+    const full = Object.assign({}, ncr, {
+        id: `NCR-${Date.now()}`, clientId: client ? client.id : report.clientId, clientName: report.client, standard: report.standard, severity, level: severity,
+        raisedBy: user, raisedDate: raised, status: 'Open', source: 'Escalated from observation'
+    });
+    window.state.ncrs = window.state.ncrs || [];
+    window.state.ncrs.push(full);
+    // The observation stays what it is, linked to the NCR raised from it.
+    record.escalatedToNcr = full.id;
+    window.saveData();
+    if (typeof persistNCR === 'function') { try { await persistNCR(full); } catch (_e) { /* local record kept; sync retried on next save */ } }
+    window.showNotification(`Nonconformity ${full.id} raised from the observation, on your evidence.`, 'success');
+    if (typeof window.switchNCRTab === 'function') window.switchNCRTab('ofi-obs');
+};
 
 // --------------------------------------------
 // TAB 3: CAPA TRACKER

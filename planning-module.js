@@ -456,7 +456,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 </h3>
                                 <div style="display: flex; gap: 0.5rem;">
                                     <button type="button" class="btn btn-sm btn-outline-primary" data-action="generateAIAgenda" id="btn-ai-generate" aria-label="Auto-generate">
-                                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI Generate
+                                        <i class="fa-solid fa-wand-magic-sparkles"></i> Build Agenda
                                     </button>
                                     <button type="button" class="btn btn-sm btn-secondary" data-action="addAgendaRow" aria-label="Add">
                                         <i class="fa-solid fa-plus"></i> Add Row
@@ -511,6 +511,25 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                         <option value="Remote">Remote</option>
                                         <option value="Hybrid">Hybrid</option>
                                     </select>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Audit time zone</label>
+                                    <select class="form-control" id="plan-timezone" data-action-change="planTimeZoneChanged">
+                                        <option value="">Client site's local time zone (default)</option>
+                                        <option value="America/New_York">Eastern &mdash; America/New_York</option>
+                                        <option value="America/Chicago">Central &mdash; America/Chicago</option>
+                                        <option value="America/Denver">Mountain &mdash; America/Denver</option>
+                                        <option value="America/Los_Angeles">Pacific &mdash; America/Los_Angeles</option>
+                                        <option value="Europe/London">Europe/London</option>
+                                        <option value="Europe/Berlin">Europe/Berlin</option>
+                                        <option value="Asia/Dubai">Asia/Dubai</option>
+                                        <option value="Asia/Karachi">Asia/Karachi</option>
+                                        <option value="Asia/Kolkata">Asia/Kolkata</option>
+                                        <option value="Asia/Singapore">Asia/Singapore</option>
+                                        <option value="Australia/Sydney">Australia/Sydney</option>
+                                        <option value="UTC">UTC</option>
+                                    </select>
+                                    <small id="plan-timezone-note" style="color:var(--text-secondary);">Remote and hybrid agendas are shown in this zone.</small>
                                 </div>
                                 <div class="form-group" style="margin: 0;">
                                     <label style="font-size: 0.8rem;">Impartiality Risk</label>
@@ -660,6 +679,18 @@ function getCurrentFormCycleContext() {
 }
 
 function getPreviousPlanFindings(clientName, standards) {
+    // The NC register (state.ncrs) is authoritative, then findings recorded on
+    // prior audit reports; observations and OFIs are findings too. The old
+    // version read only checklistProgress items with status 'nc', capped at 20,
+    // so the count and the agenda could disagree with the register.
+    const client = (window.state.clients || []).find(c => c.name === clientName);
+    if (window.AuditPlanIntegrity && client) {
+        const ids = window.ChecklistStandards
+            ? window.ChecklistStandards.resolve(standards.join(', ')).standards.map(x => x.id) : [];
+        return window.AuditPlanIntegrity.collectPreviousFindings({
+            state: window.state, client, plan: { id: window.editingPlanId || '', date: document.getElementById('plan-date')?.value || '' }, standards: ids
+        }).filter(f => f.requiresFollowUp);
+    }
     const families = standards.map(normalizeStandardFamily);
     const reports = (window.state.auditReports || []).filter(report => {
         if (report.client !== clientName) return false;
@@ -667,7 +698,7 @@ function getPreviousPlanFindings(clientName, standards) {
         const source = `${report.standard || ''} ${linked?.standard || ''}`;
         return families.some(family => source.toUpperCase().includes(family));
     });
-    return reports.flatMap(report => (report.checklistProgress || []).filter(item => item.status === 'nc')).slice(0, 20);
+    return reports.flatMap(report => (report.checklistProgress || []).filter(item => item.status === 'nc'));
 }
 
 function generatePlanNarratives() {
@@ -677,20 +708,23 @@ function generatePlanNarratives() {
     if (!client || !cycle.cycles.length) return;
     const method = document.getElementById('plan-audit-method')?.value || 'On-site';
     const sites = Array.from(document.querySelectorAll('.site-checkbox:checked')).map(cb => cb.dataset.name);
-    const scopes = [...new Set(cycle.cycles.map(c => c.scope).filter(Boolean))];
-    const previousFindings = getPreviousPlanFindings(clientName, cycle.standards);
-    const standards = cycle.standards.join(', ');
-    const activityText = method === 'Remote'
-        ? 'Activities will be performed remotely using secure communication, document-sharing and interview tools; no physical site activity is planned.'
-        : method === 'Hybrid'
-            ? 'Remote activities will cover document review and suitable interviews. On-site activities will cover physical verification, operational controls, sampling and the facility tour.'
-            : 'Activities will be performed on-site and include interviews, document and record sampling, operational-control verification and a facility tour.';
-    const objectives = `For the ${cycle.auditType} stage, determine conformity and effectiveness against ${standards}; confirm continued fulfilment of certification requirements; verify action on previous findings and significant changes; and identify audit conclusions within the approved certification scope.`;
-    const criteria = `${standards}; the approved certification scope${scopes.length ? ` (${scopes.join(' | ')})` : ''}; the organization's documented management system; applicable legal, regulatory and contractual requirements; and relevant certification-programme requirements. Sites: ${sites.join(', ') || 'to be confirmed'}. Previous findings requiring risk-based follow-up: ${previousFindings.length}.`;
-    const methodology = `${activityText} Evidence will be obtained through interviews, review of documented information and records, and risk-based sampling across ${sites.length || 0} selected site(s). Previous findings and significant changes will be prioritized. Sampling does not remove mandatory audit activities or applicable scheme requirements.`;
-    if (document.getElementById('plan-objectives')) document.getElementById('plan-objectives').value = objectives;
-    if (document.getElementById('plan-criteria')) document.getElementById('plan-criteria').value = criteria;
-    if (document.getElementById('plan-methodology')) document.getElementById('plan-methodology').value = methodology;
+    // The certificate's scope wording is reproduced exactly (see checkScope):
+    // it is never expanded, shortened or reworded here.
+    const scope = window.AuditPlanIntegrity
+        ? window.AuditPlanIntegrity.checkScope({ plan: {}, client, standards: window.AuditPlanIntegrity.standardIdsOf({ standard: cycle.standards.join(', ') }) }).certificateScope
+        : ([...new Set(cycle.cycles.map(c => c.scope).filter(Boolean))][0] || '');
+    let n;
+    if (window.AuditPlanIntegrity) {
+        n = window.AuditPlanIntegrity.buildNarratives({
+            auditType: cycle.auditType, standards: window.AuditPlanIntegrity.standardIdsOf({ standard: cycle.standards.join(', ') }),
+            scope, sites, method
+        });
+    } else {
+        n = { objectives: '', criteria: '', methodology: planMethodologyDefault(method) };
+    }
+    if (document.getElementById('plan-objectives')) document.getElementById('plan-objectives').value = n.objectives;
+    if (document.getElementById('plan-criteria')) document.getElementById('plan-criteria').value = n.criteria;
+    if (document.getElementById('plan-methodology')) document.getElementById('plan-methodology').value = n.methodology;
 }
 
 function recalculateDurationAllocation() {
@@ -753,6 +787,8 @@ function editAuditPlan(id) {
         document.getElementById('plan-date').value = plan.date || '';
         document.getElementById('plan-end-date').value = plan.endDate || '';
         document.getElementById('plan-audit-method').value = plan.auditMethod || 'On-site';
+        if (document.getElementById('plan-timezone')) document.getElementById('plan-timezone').value = plan.timeZone && plan.timeZone.source === 'plan-agreed' ? plan.timeZone.iana : '';
+        window._currentTraceability = plan.traceability || null;
         document.getElementById('plan-impartiality-risk').value = plan.impartialityAssessment?.risk || 'None';
         document.getElementById('plan-impartiality-notes').value = plan.impartialityAssessment?.notes || '';
         document.getElementById('plan-objectives').value = plan.objectives || '';
@@ -1096,6 +1132,42 @@ window.openDurationMethodologySetup = function () {
 
 // Note: The definitive saveAuditPlan function is defined below (around line 1660) with proper validation and sanitization
 
+/** Document status, who may move it, and exactly what is blocking it. */
+function planStatusCardHTML(plan) {
+    const IPI = window.AuditPlanIntegrity;
+    if (!IPI || !window.PlanDocument || !window.DocFormat) return '';
+    const esc = window.UTILS.escapeHtml;
+    let built;
+    try { built = buildPlanDocumentContext(plan); } catch (e) { return `<div class="card" style="margin-bottom:1rem;border-left:4px solid #dc2626;"><strong>Issue readiness could not be computed:</strong> ${esc(e.message)}</div>`; }
+    const v = built.validation;
+    const status = effectivePlanStatus(plan, v);
+    const role = (window.state.currentUser?.role || '').toLowerCase();
+    const authorised = IPI.APPROVER_ROLES.map(r => r.toLowerCase()).includes(role);
+    const idx = IPI.STATUSES.indexOf(status);
+    const next = IPI.STATUSES[idx + 1];
+    const action = { 1: 'approvePlanForClientIssue', 2: 'issuePlanToClient', 3: 'recordPlanClientAcknowledgement' }[idx + 1];
+    const label = { 1: 'Approve for Client Issue', 2: 'Issue to Client', 3: 'Record Client Acknowledgement' }[idx + 1];
+    const f = v.summary.findings || { required: 0, mapped: 0, unmapped: 0 };
+    const list = v.blockers.slice(0, 8).map(b => `<li style="color:#b91c1c;">${esc(b.message)}</li>`).join('');
+    return `
+        <div class="card" style="margin-bottom:1.5rem;border-left:4px solid ${v.blockers.length ? '#f59e0b' : '#059669'};">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+                <div>
+                    <h3 style="margin:0 0 .25rem;"><i class="fa-solid fa-file-shield" style="margin-right:.5rem;"></i>Document status: ${esc(status)}</h3>
+                    <p style="margin:0;font-size:.85rem;color:var(--text-secondary);">
+                        ${v.blockers.length ? `${v.blockers.length} blocking issue(s) \u2014 not ready for client issue.` : 'All blocking validations pass.'}
+                        Previous findings requiring follow-up: ${f.required} \u00b7 mapped: ${f.mapped} \u00b7 unmapped: ${f.unmapped}.
+                    </p>
+                </div>
+                <div style="display:flex;gap:.5rem;">
+                    ${next && action ? `<button class="btn ${v.blockers.length || !authorised ? 'btn-secondary' : 'btn-primary'}" data-action="${action}" data-id="${esc(String(plan.id))}" ${authorised ? '' : 'disabled title="Only an authorised role may do this"'}>${label}</button>` : ''}
+                    ${idx > 0 ? `<button class="btn btn-secondary" data-action="returnPlanToDraft" data-id="${esc(String(plan.id))}" ${authorised ? '' : 'disabled'}>Return to Draft</button>` : ''}
+                </div>
+            </div>
+            ${v.blockers.length ? `<details style="margin-top:.75rem;"><summary style="cursor:pointer;font-weight:600;">View blocking issues</summary><ul style="margin:.5rem 0 0 1.1rem;font-size:.85rem;">${list}${v.blockers.length > 8 ? `<li>\u2026and ${v.blockers.length - 8} more (see the Internal Record)</li>` : ''}</ul></details>` : ''}
+        </div>`;
+}
+
 function viewAuditPlan(id) {
     if (!window.state) {
         alert('ERROR: window.state is undefined');
@@ -1253,10 +1325,13 @@ function viewAuditPlan(id) {
                 </div>
                 <div style="display: flex; gap: 1rem;">
                      ${report ? `<button class="btn btn-secondary" data-action="printAuditPlan" data-id="${plan.id}" aria-label="Print"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Checklist</button>` : ''}
+                     <button class="btn btn-secondary" data-action="printAuditPlanInternalRecord" data-id="${plan.id}" aria-label="Internal record"><i class="fa-solid fa-lock" style="margin-right: 0.5rem;"></i> Internal Record</button>
                      <button class="btn btn-secondary" data-action="printAuditPlanDetails" data-id="${plan.id}" aria-label="Export PDF"><i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Print Plan</button>
                      <button class="btn btn-primary" data-action="editAuditPlan" data-id="${plan.id}" aria-label="Edit"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit</button>
                 </div>
             </div>
+
+            ${planStatusCardHTML(plan)}
 
             <!--Stepper-->
                 ${stepperHTML}
@@ -2490,32 +2565,52 @@ window._applyMergedSelections = async function (planId) {
 function addAgendaRow(data = {}) {
     const tbody = document.getElementById('agenda-tbody');
     const row = document.createElement('tr');
+    const df = window.DocFormat;
+    const plain = (v) => (df ? df.decodeEntities(String(v == null ? '' : v)) : String(v == null ? '' : v));
+    const esc = window.UTILS.escapeHtml;
 
-    // Get Auditors for dropdown
-    const leadVal = document.getElementById('plan-lead-auditor').value;
-    const teamSelect = document.getElementById('plan-team');
-    const teamVals = Array.from(teamSelect.selectedOptions).map(o => o.value);
-    const allAuditors = [leadVal, ...teamVals].filter(Boolean);
-    const uniqueAuditors = [...new Set(allAuditors)];
+    // The auditors ON THIS PLAN are the only choices. There is no "Other": that
+    // option used to be selected whenever the stored value matched no other
+    // option (the prompt taught the model to answer "All Team", which matched
+    // nothing), so every row saved as "Other". A row whose auditor cannot be
+    // resolved is left BLANK, which the plan gate reports by row.
+    const leadVal = document.getElementById('plan-lead-auditor')?.value || '';
+    const teamVals = Array.from(document.getElementById('plan-team')?.selectedOptions || []).map(o => o.value);
+    const team = [...new Set([leadVal, ...teamVals].filter(Boolean))];
+    const isBreak = data.kind === 'lunch' || /^lunch|^break/i.test(String(data.item || ''));
+    const wanted = plain(data.auditor).trim();
+    let chosen = team.find(a => a.toLowerCase() === wanted.toLowerCase()) || '';
+    // On a one-person team "All Team" / "All" / a legacy "Other" can only mean the lead.
+    if (!chosen && team.length === 1 && /^(all team|all|other|none)?$/i.test(wanted)) chosen = team[0];
+    // On a real team "All Team" is a legitimate joint activity (not a person, so not in `team`).
+    if (!chosen && team.length > 1 && /^(all team|all)$/i.test(wanted)) chosen = 'All Team';
+    if (isBreak) chosen = 'N/A';
 
-    const auditorOptions = uniqueAuditors.map(a => `<option value="${a}" ${data.auditor === a ? 'selected' : ''}>${a}</option>`).join('');
+    const options = [
+        isBreak ? '<option value="N/A" selected>N/A</option>' : '',
+        !isBreak && !chosen ? '<option value="" selected>\u2014 select auditor \u2014</option>' : '',
+        team.length > 1 && !isBreak ? `<option value="All Team" ${chosen === 'All Team' ? 'selected' : ''}>All Team</option>` : '',
+        ...team.map(a => `<option value="${esc(a)}" ${chosen === a ? 'selected' : ''}>${esc(a)}</option>`)
+    ].join('');
 
     row.innerHTML = `
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.day || 'Day 1')}" placeholder="Day"></td>
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.time || '')}" placeholder="Time"></td>
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.item || '')}" placeholder="Activity/Clause"></td>
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.dept || '')}" placeholder="Dept"></td>
+        <td><input type="text" class="form-control" style="padding: 4px;" value="${esc(plain(data.day || 'Day 1'))}" placeholder="Day"></td>
+        <td><input type="text" class="form-control" style="padding: 4px;" value="${esc(plain(data.time || ''))}" placeholder="Time"></td>
+        <td><input type="text" class="form-control" style="padding: 4px;" value="${esc(plain(data.item || ''))}" placeholder="Activity/Clause"></td>
+        <td><input type="text" class="form-control" style="padding: 4px;" value="${esc(plain(data.dept || ''))}" placeholder="Dept"></td>
         <td>
-            <select class="form-control" style="padding: 4px;">
-                <option value="All" ${data.auditor === 'All' ? 'selected' : ''}>All Team</option>
-                ${auditorOptions}
-                <option value="Other" ${!uniqueAuditors.includes(data.auditor) && data.auditor !== 'All' ? 'selected' : ''}>Other</option>
-            </select>
+            <select class="form-control" style="padding: 4px;">${options}</select>
         </td>
         <td style="text-align: center;">
             <button type="button" class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="removeClosestTR" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
         </td>
     `;
+    // Traceability travels with the row so editing its text never loses which
+    // standard, clauses, checklist questions, findings and auditor ID it stands for.
+    row.dataset.meta = JSON.stringify({
+        kind: data.kind || (isBreak ? 'lunch' : 'custom'), sessionId: data.sessionId || null, date: data.date || '', start: data.start || '', end: data.end || '',
+        standards: data.standards || [], findingIds: data.findingIds || [], processes: data.processes || [], subject: data.subject || ''
+    });
 
     tbody.appendChild(row);
 }
@@ -2541,184 +2636,125 @@ window.openChecklistSelectionModal = window.renderConfigureChecklist; // Legacy 
 // without the alias the delegator finds no handler and the buttons do nothing.
 window.configureChecklists = window.renderConfigureChecklist;
 
+/** Everything the plan documents need, and the gate's verdict, in one place. */
+function buildPlanDocumentContext(plan) {
+    const IPI = window.AuditPlanIntegrity;
+    const client = window.state.clients.find(c => c.name === plan.client) || {};
+    const gctx = gateContext(plan, {});
+    const team = IPI.resolveAuditors(plan, window.state.auditors || []);
+    const scope = IPI.checkScope({ plan, client, standards: gctx.standards, processes: [...new Set((plan.agenda || []).flatMap(r => r.processes || []))] });
+    const site = (client.sites || []).find(s => (plan.selectedSites || [])[0] && s.name === plan.selectedSites[0].name);
+    const timeZone = window.DocFormat.resolveTimeZone({ plan, client, site });
+    const cb = window.state.cbSettings || {};
+    const logoUrl = cb.logoUrl && (cb.logoUrl.startsWith('data:') || cb.logoUrl.startsWith('http')) ? cb.logoUrl : '';
+    const durationRecord = plan.durationRecord || IPI.buildDurationRecord(plan, { standards: gctx.standards, settings: cb, domain: window.AuditPlanningDomain });
+    const ctx = {
+        client, assigned: team.assigned, standards: gctx.standards, timeZone, scope, scopeCheck: scope, findings: gctx.findings, durationRecord,
+        brand: { name: cb.cbName || 'ISOXPERT Audit360', logoUrl }, planRef: window.UTILS.getPlanRef(plan),
+        // The QR carries a verification URL only; no client name leaves the app.
+        qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://audit.companycertification.com/#/verify/plan/${plan.id}`)}`,
+        classification: cb.documentClassification || cb.confidentialityLabel || '', checklists: gctx.checklists, traceability: plan.traceability
+    };
+    // Validate against the document exactly as it will be printed.
+    const html = window.PlanDocument.build(plan, ctx);
+    const lint = window.PrintShell.lint(html);
+    const validation = IPI.validate(plan, Object.assign(gctx, { html, lint }));
+    ctx.validation = validation;
+    return { ctx, validation };
+}
+
+// A status counts only while the gate still passes and the plan is unchanged
+// since it was approved. Otherwise the plan reads as a draft again.
+function effectivePlanStatus(plan, validation) {
+    const IPI = window.AuditPlanIntegrity;
+    const status = plan.documentStatus || IPI.STATUSES[0];
+    if (status === IPI.STATUSES[0]) return status;
+    const changed = plan.approval && plan.approval.contentHash && plan.approval.contentHash !== IPI.contentHash(plan);
+    return (validation.blockers.length || changed) ? IPI.STATUSES[0] : status;
+}
+
 window.printAuditPlanDetails = function (planId) {
-    const plan = state.auditPlans.find(p => p.id === planId);
+    const plan = state.auditPlans.find(p => String(p.id) === String(planId));
     if (!plan) return;
+    if (!window.PlanDocument || !window.PrintShell || !window.AuditPlanIntegrity || !window.DocFormat) {
+        window.showNotification('The plan print module is not loaded. Reload the page and try again.', 'warning');
+        return;
+    }
+    const { ctx, validation } = buildPlanDocumentContext(plan);
+    const shown = Object.assign({}, plan, { documentStatus: effectivePlanStatus(plan, validation) });
+    const html = window.PlanDocument.build(shown, ctx);
+    const win = window.PrintShell.open(html);
+    if (!win) window.showNotification('Pop-up blocked. Allow pop-ups for this site to print the plan.', 'warning');
+};
 
-    const client = state.clients.find(c => c.name === plan.client);
+window.printAuditPlanInternalRecord = function (planId) {
+    const plan = state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan || !window.PlanDocument) return;
+    const { ctx, validation } = buildPlanDocumentContext(plan);
+    const shown = Object.assign({}, plan, { documentStatus: effectivePlanStatus(plan, validation) });
+    const win = window.PrintShell.open(window.PlanDocument.buildInternal(shown, ctx));
+    if (!win) window.showNotification('Pop-up blocked. Allow pop-ups for this site to print the record.', 'warning');
+};
 
-    // Resolve team names
-    const teamNames = ((plan.team && Array.isArray(plan.team))
-        ? plan.team
-        : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown'));
+// The "Checklist" button on the plan view named a handler that did not exist.
+window.printAuditPlan = function (planId) {
+    const plan = state.auditPlans.find(p => String(p.id) === String(planId));
+    const first = plan && (plan.selectedChecklists || [])[0];
+    if (!first) { window.showNotification('No checklist is linked to this plan.', 'warning'); return; }
+    window.printChecklist(first);
+};
 
-    const leadAuditor = teamNames[0] || 'Unknown';
-    const otherMembers = teamNames.slice(1);
+async function persistPlanRecord(plan) {
+    window.saveData();
+    if (window.SupabaseClient && window.navigator.onLine) {
+        try { await window.SupabaseClient.db.update('audit_plans', String(plan.id), { data: plan, status: plan.status }); } catch (e) { console.warn('Plan sync failed:', e); }
+    }
+}
 
-    // Calculate breakdowns
-    let totalEmployees = 0;
-    const siteDetails = (plan.selectedSites || []).map(s => {
-        const siteData = (client?.sites || []).find(cs => cs.name === s.name);
-        const emps = siteData?.employees || 0;
-        totalEmployees += emps;
-        return { ...s, employees: emps, address: siteData?.address || '' };
-    });
+/**
+ * Move the plan's DOCUMENT status (Draft -> Approved for Client Issue -> Issued
+ * to Client -> Client Acknowledged). Approval and issue need an authorised role
+ * and a passing gate; the specific blockers are listed when it does not.
+ */
+async function transitionPlanStatus(planId, to, extra) {
+    const plan = state.auditPlans.find(p => String(p.id) === String(planId));
+    const IPI = window.AuditPlanIntegrity;
+    if (!plan || !IPI) return;
+    const { validation } = buildPlanDocumentContext(plan);
+    const user = window.state.currentUser || {};
+    const from = plan.documentStatus || IPI.STATUSES[0];
+    const result = IPI.canTransition(from, to, Object.assign({ role: user.role, validation, plan }, extra || {}));
+    if (!result.allowed) {
+        const detail = (result.blockers || []).slice(0, 8).map(b => `\u2022 ${b.message}`).join('\n');
+        window.showNotification(result.reason, 'error');
+        if (detail) window.alert(`${result.reason}\n\n${detail}${(result.blockers || []).length > 8 ? `\n\u2026and ${result.blockers.length - 8} more` : ''}`);
+        return;
+    }
+    plan.documentStatus = to;
+    if (to === IPI.STATUSES[1]) plan.approval = { by: user.name || '', role: user.role || '', at: new Date().toISOString(), contentHash: IPI.contentHash(plan) };
+    plan.statusHistory = (plan.statusHistory || []).concat([{ status: to, by: user.name || 'System', role: user.role || '', at: new Date().toISOString(), note: (extra && extra.note) || '' }]);
+    await persistPlanRecord(plan);
+    window.showNotification(`Plan status: ${to}`, 'success');
+    window.viewAuditPlan(planId);
+}
+window.approvePlanForClientIssue = (planId) => transitionPlanStatus(planId, window.AuditPlanIntegrity.STATUSES[1]);
+window.issuePlanToClient = (planId) => transitionPlanStatus(planId, window.AuditPlanIntegrity.STATUSES[2]);
+window.recordPlanClientAcknowledgement = (planId) => {
+    const who = window.prompt('Who acknowledged the plan for the client?');
+    if (who && who.trim()) transitionPlanStatus(planId, window.AuditPlanIntegrity.STATUSES[3], { acknowledgedBy: who.trim(), note: `Acknowledged by ${who.trim()}` });
+};
+window.returnPlanToDraft = (planId) => transitionPlanStatus(planId, window.AuditPlanIntegrity.STATUSES[0], { note: 'Returned to draft for internal review.' });
 
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
-
-    let content = `
-        <html>
-        <head>
-            <title>Audit Plan - ${plan.client}</title>
-            <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; padding: 40px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                @media print { thead { display: table-header-group; } tr { break-inside: avoid; } .section-title { break-after: avoid; } }
-                .header { border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
-                .logo { font-size: 24px; font-weight: bold; color: #0f172a; }
-                .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                .meta-table td { padding: 10px; border-bottom: 1px solid #e2e8f0; width: 50%; vertical-align: top; }
-                .meta-label { font-weight: bold; color: #64748b; font-size: 0.9em; display: block; margin-bottom: 4px; }
-                .section-title { background: #f1f5f9; padding: 10px 15px; font-weight: bold; margin-bottom: 15px; border-left: 4px solid #0f172a; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em; }
-                th { background: #f8fafc; text-align: left; padding: 10px; border-bottom: 2px solid #e2e8f0; font-weight: 600; }
-                td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
-                .footer { margin-top: 50px; font-size: 0.8em; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <div>
-                    <div style="font-size: 11px; letter-spacing: 2px; color: #64748b; font-weight: 600;">AUDIT360</div>
-                    <div class="logo">AUDIT PLAN</div>
-                    <div style="color: #475569; font-size: 0.9em;">Ref: <strong>${window.UTILS.getPlanRef(plan)}</strong> &nbsp;·&nbsp; ${window.UTILS.escapeHtml(plan.client)}</div>
-                </div>
-                <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
-            </div>
-
-            <table class="meta-table">
-                <tr>
-                    <td><span class="meta-label">Client</span>${window.UTILS.escapeHtml(plan.client)}</td>
-                    <td><span class="meta-label">Audit Standard</span>${window.UTILS.escapeHtml(plan.standard)}</td>
-                </tr>
-                <tr>
-                    <td><span class="meta-label">Scheduled Audit</span>${plan.date ? `${window.UTILS.formatDate(plan.date)}${plan.endDate ? ` – ${window.UTILS.formatDate(plan.endDate)}` : ''}` : 'Not yet booked'}</td>
-                    <td><span class="meta-label">Audit Type</span>${window.UTILS.escapeHtml(plan.type)}</td>
-                </tr>
-                <tr>
-                    <td><span class="meta-label">Recommended Audit Window</span>${plan.certificationCycle ? `${window.UTILS.formatDate(plan.certificationCycle.recommendedWindowStart)} – ${window.UTILS.formatDate(plan.certificationCycle.recommendedWindowEnd)} (planning guidance)` : 'Not recorded'}</td>
-                    <td><span class="meta-label">Certificate Expiry</span>${plan.certificationCycle?.certificateExpiry ? window.UTILS.formatDate(plan.certificationCycle.certificateExpiry) : 'Not recorded'}</td>
-                </tr>
-                <tr>
-                    <td><span class="meta-label">Audit Method</span>${window.UTILS.escapeHtml(plan.auditMethod || 'Not recorded')}</td>
-                    <td><span class="meta-label">Impartiality Risk</span>${window.UTILS.escapeHtml(plan.impartialityAssessment?.risk || 'None Identified')}${plan.impartialityAssessment?.notes ? ' — ' + window.UTILS.escapeHtml(plan.impartialityAssessment.notes) : ''}</td>
-                </tr>
-                 <tr>
-                    <td><span class="meta-label">Lead Auditor</span>${window.UTILS.escapeHtml(leadAuditor)}</td>
-                    <td><span class="meta-label">Audit Team</span>${window.UTILS.escapeHtml(otherMembers.join(', ') || 'None')}</td>
-                </tr>
-                 <tr>
-                    <td><span class="meta-label">Duration Calculation</span>${window.UTILS.escapeHtml(plan.durationCalculation?.baselineDays ?? plan.manDays)} baseline → ${window.UTILS.escapeHtml(plan.durationCalculation?.imsAdjustmentPercent ?? 0)}% IMS → ${window.UTILS.escapeHtml(plan.durationCalculation?.remoteDays ?? 0)} remote / ${window.UTILS.escapeHtml(plan.onsiteDays)} on-site → ${window.UTILS.escapeHtml(plan.durationCalculation?.justifiedAdjustment ?? 0)} justified adjustment → <strong>${window.UTILS.escapeHtml(plan.manDays)} final days</strong></td>
-                    <td><span class="meta-label">Operational Risk</span>${window.UTILS.escapeHtml(plan.riskLevel || 'Medium')}</td>
-                </tr>
-            </table>
-
-            <div class="section-title">AUDIT SCOPE, MAN-DAYS & ALLOCATION</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Site Name</th>
-                        <th>Address</th>
-                        <th style="text-align: right;">Employees</th>
-                        <th style="text-align: right;">Auditor(s)</th>
-                        <th style="text-align: right;">Days</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${siteDetails.map((site, index) => {
-        let allocatedDays;
-        if (totalEmployees > 0) {
-            allocatedDays = (site.employees / totalEmployees) * plan.manDays;
-        } else {
-            allocatedDays = plan.manDays / siteDetails.length;
-        }
-
-        // Simple distribution logic: Lead Auditor on first/largest site, others distributed
-        const auditorAssigned = index === 0 ? `<b>${leadAuditor}</b>` : (otherMembers[index - 1] || 'Assigned Team');
-
-        return `
-                        <tr>
-                            <td>${window.UTILS.escapeHtml(site.name)} ${site.geotag ? '<span style="font-size:0.8em; color:#64748b;">(GPS)</span>' : ''}</td>
-                            <td>${site.address || '-'}</td>
-                            <td style="text-align: right;">${site.employees}</td>
-                            <td style="text-align: right;">${auditorAssigned}</td>
-                            <td style="text-align: right; font-weight: bold;">${(allocatedDays || 0).toFixed(2)}</td>
-                        </tr>
-                        `;
-    }).join('')}
-                    <tr style="background: #f8fafc; font-weight: bold;">
-                        <td colspan="2">TOTAL</td>
-                        <td style="text-align: right;">${totalEmployees}</td>
-                        <td style="text-align: right;">-</td>
-                        <td style="text-align: right;">${(plan.manDays || 0).toFixed(2)}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            ${plan.agenda && plan.agenda.length > 0 ? `
-            <div class="section-title">AUDIT AGENDA / ITINERARY</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 10%">Day</th>
-                        <th style="width: 15%">Time</th>
-                        <th style="width: 45%">Activity / Clause</th>
-                        <th style="width: 15%">Dept/Auditee</th>
-                        <th style="width: 15%">Auditor</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${plan.agenda.map(item => `
-                        <tr>
-                            <td>${item.day}</td>
-                            <td>${item.time}</td>
-                            <td>${item.item}</td>
-                            <td>${item.dept}</td>
-                            <td>${item.auditor}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-            ` : ''}
-
-            <div class="section-title">AUDIT OBJECTIVES</div>
-            <div style="white-space: pre-line; color: #333; line-height: 1.8; padding-left: 10px;">
-${plan.objectives || plan.auditObjectives || 'Not recorded'}
-            </div>
-
-            <div class="section-title">AUDIT CRITERIA</div>
-            <div style="white-space: pre-line; color: #333; line-height: 1.8; padding-left: 10px;">
-${plan.criteria || plan.auditCriteria || 'Not recorded'}
-            </div>
-
-            <div class="section-title">AUDIT METHODOLOGY</div>
-            <div style="white-space: pre-line; color: #333; line-height: 1.8; padding-left: 10px;">
-${plan.methodology || plan.auditMethodology || planMethodologyDefault(plan.auditMethod)}
-            </div>
-
-            <div class="footer">
-                Generated by ISOXPERT Audit360 • ${new Date().toLocaleString()} • Page 1 of 1
-            </div>
-
-            <script>
-                window.onload = function() { window.print(); }
-            </script>
-        </body>
-        </html>
-    `;
-
-    const printWin = window.open('', '', 'width=900,height=800');
-    printWin.document.write(content);
-    printWin.document.close();
+window.planTimeZoneChanged = function () {
+    const note = document.getElementById('plan-timezone-note');
+    if (!note || !window.DocFormat) return;
+    const chosen = document.getElementById('plan-timezone')?.value || '';
+    const clientName = document.getElementById('plan-client')?.value;
+    const client = (window.state.clients || []).find(c => c.name === clientName);
+    const start = document.getElementById('plan-date')?.value || '';
+    const tz = chosen ? { iana: chosen } : window.DocFormat.resolveTimeZone({ client });
+    const info = tz.iana && start ? window.DocFormat.describeTimeZone(tz.iana, start) : null;
+    note.textContent = info ? `${chosen ? 'Agreed' : 'Client site'}: ${info.label} on the first audit day.` : 'No time zone can be derived from the client\u2019s location \u2014 select the agreed zone.';
 };
 
 // Toggle Planning Analytics Dashboard
@@ -2875,6 +2911,14 @@ function validateAuditPlanForSave(planData) {
         { label: 'Impartiality and conflict status is acceptable', passed: planData.impartialityAssessment.risk !== 'High' && (!['Medium', 'High'].includes(planData.impartialityAssessment.risk) || Boolean(planData.impartialityAssessment.notes.trim())) },
         { label: 'Agenda contains mandatory activities and fits the plan', passed: agendaValid }
     ];
+    // The single plan gate: structural blockers stop the save, approval-only
+    // blockers are shown as warnings (they stop APPROVAL, not saving a draft).
+    if (window.AuditPlanIntegrity && planData.agenda.length) {
+        const gate = window.AuditPlanIntegrity.validate(planData, gateContext(planData, {}));
+        const STRUCTURAL = /^(AUDITOR_|UNTIMED_ROW|ACTIVITY_AFTER_CLOSING|OPENING_MISSING|CLOSING_MISSING|CONSOLIDATION_|INVALID_CLAUSE|CLAUSE_TITLE_MISMATCH|FINDING_UNMAPPED|DURATION_MISMATCH|DOUBLE_BOOKED|DAY_TOO_LONG|OUTSIDE_SCHEDULED_DATES|TIMEZONE_|SCOPE_MISMATCH|SITE_MISMATCH|EDITION_MISMATCH|STANDARD_OUT_OF_SCOPE|ROW_INCOMPLETE)/;
+        gate.blockers.forEach(b => (STRUCTURAL.test(b.code) ? errors : warnings).push(STRUCTURAL.test(b.code) ? b.message : `Blocks approval for client issue: ${b.message}`));
+        gate.warnings.forEach(w => warnings.push(w.message));
+    }
     const qa = { errors: [...new Set(errors)], warnings: [...new Set(warnings)], checks };
     renderPlanQA(qa);
     return qa;
@@ -2962,12 +3006,30 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
         // Manual validation for agenda rows?
         // Let's just sanitize them for now
 
+        // Stored as PLAIN TEXT. Sanitizer.sanitizeText HTML-escapes ("&" ->
+        // "&amp;"), the edit form escaped again on the way in, and each
+        // edit->save cycle added a layer until the PDF printed "&amp;". Escaping
+        // is a render concern; every output path escapes exactly once.
+        const clean = (v) => (window.DocFormat ? window.DocFormat.toPlainText(v) : Sanitizer.sanitizeText(v));
+        let meta = {};
+        try { meta = JSON.parse(row.dataset.meta || '{}'); } catch (_e) { /* keep {} */ }
+        const time = clean(inputs[1].value);
+        const tm = time.match(/(\d{1,2}):(\d{2})\s*(?:-|\u2013|to)\s*(\d{1,2}):(\d{2})/i);
+        const pad = (n) => String(n).padStart(2, '0');
+        const auditorName = clean(inputs[4].value);
+        const rec = (window.state.auditors || []).find(a => String(a.name || '').toLowerCase() === auditorName.toLowerCase());
         agenda.push({
-            day: Sanitizer.sanitizeText(inputs[0].value),
-            time: Sanitizer.sanitizeText(inputs[1].value),
-            item: Sanitizer.sanitizeText(inputs[2].value), // Critical: Activity description
-            dept: Sanitizer.sanitizeText(inputs[3].value),
-            auditor: inputs[4].value // Select value
+            day: clean(inputs[0].value),
+            time,
+            start: tm ? `${pad(tm[1])}:${tm[2]}` : (meta.start || ''),
+            end: tm ? `${pad(tm[3])}:${tm[4]}` : (meta.end || ''),
+            date: meta.date || '',
+            item: clean(inputs[2].value), // Critical: Activity description
+            dept: clean(inputs[3].value),
+            auditor: auditorName,
+            auditorId: rec ? String(rec.id) : null,
+            kind: meta.kind || 'custom', sessionId: meta.sessionId || null,
+            standards: meta.standards || [], findingIds: meta.findingIds || [], processes: meta.processes || [], subject: meta.subject || ''
         });
     }
 
@@ -3012,9 +3074,9 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
             confirmedBy: window.state.currentUser?.name || 'System',
             confirmedAt: new Date().toISOString()
         },
-        objectives: Sanitizer.sanitizeText(document.getElementById('plan-objectives')?.value || ''),
-        criteria: Sanitizer.sanitizeText(document.getElementById('plan-criteria')?.value || ''),
-        methodology: Sanitizer.sanitizeText(document.getElementById('plan-methodology')?.value || ''),
+        objectives: (window.DocFormat ? window.DocFormat.toPlainText : Sanitizer.sanitizeText)(document.getElementById('plan-objectives')?.value || ''),
+        criteria: (window.DocFormat ? window.DocFormat.toPlainText : Sanitizer.sanitizeText)(document.getElementById('plan-criteria')?.value || ''),
+        methodology: (window.DocFormat ? window.DocFormat.toPlainText : Sanitizer.sanitizeText)(document.getElementById('plan-methodology')?.value || ''),
         narrativeTemplateVersion: AUDIT_PLAN_TEMPLATE_VERSION,
         durationCalculation: {
             employees: parseInt(document.getElementById('plan-employees')?.value, 10) || 0,
@@ -3053,6 +3115,30 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
         auditCriteria: document.getElementById('plan-criteria')?.value || '',
         auditMethodology: document.getElementById('plan-methodology')?.value || ''
     };
+
+    // Records the certification file needs, derived from the plan itself.
+    const tzChoice = document.getElementById('plan-timezone')?.value || '';
+    if (tzChoice) {
+        const role = (window.state.currentUser?.role || '').toLowerCase();
+        if (!['admin', 'certification manager', 'cert manager', 'lead auditor'].includes(role)) {
+            window.showNotification('Only an authorised user can select an agreed time zone other than the client site\u2019s.', 'error');
+            return;
+        }
+        planData.timeZone = { iana: tzChoice, source: 'plan-agreed', agreedBy: window.state.currentUser?.name || '', agreedAt: new Date().toISOString().slice(0, 10) };
+    }
+    derivePlanRecords(planData);
+    const existing = window.editingPlanId ? state.auditPlans.find(p => String(p.id) === String(window.editingPlanId)) : null;
+    planData.traceability = window._currentTraceability || existing?.traceability || null;
+    // A plan edited after approval is no longer the approved plan.
+    const statuses = window.AuditPlanIntegrity ? window.AuditPlanIntegrity.STATUSES : ['Draft \u2014 Internal Review'];
+    planData.documentStatus = existing?.documentStatus || statuses[0];
+    planData.approval = existing?.approval || null;
+    planData.statusHistory = existing?.statusHistory || [];
+    if (existing && existing.approval && existing.approval.contentHash && window.AuditPlanIntegrity
+        && existing.approval.contentHash !== window.AuditPlanIntegrity.contentHash(planData)) {
+        planData.documentStatus = statuses[0];
+        planData.statusHistory = planData.statusHistory.concat([{ status: statuses[0], by: window.state.currentUser?.name || 'System', role: window.state.currentUser?.role || '', at: new Date().toISOString(), note: 'Plan edited after approval; approval withdrawn.' }]);
+    }
 
     const qa = validateAuditPlanForSave(planData);
     const passedChecks = qa.checks.filter(check => check.passed).length;
@@ -3250,167 +3336,124 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
 }
 
 async function generateAIAgenda() {
-    if (!window.AI_SERVICE) {
-        window.showNotification('AI Service not loaded', 'error');
+    // The agenda is BUILT, not written by a language model. Every clause label
+    // comes from the controlled clause registry, every session carries a
+    // traceability record, every previous finding is placed in a session and
+    // the hours are reconciled with the approved duration (see
+    // audit-plan-integrity.js). The name is kept for the existing button.
+    if (!window.AuditPlanIntegrity) {
+        window.showNotification('The audit-plan rules are not loaded. Reload the page.', 'error');
         return;
     }
-
     const btn = document.getElementById('btn-ai-generate');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
-    btn.disabled = true;
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Building...'; btn.disabled = true; }
 
     try {
-        // Collect Context
         const clientName = document.getElementById('plan-client').value;
+        const client = window.state.clients.find(c => c.name === clientName);
         const cycle = getCurrentFormCycleContext();
-        const standard = cycle.standards.join(', ');
-        const type = cycle.auditType;
         const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
-        const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
-        const method = document.getElementById('plan-audit-method')?.value || 'On-site';
-
-        const selectedSites = [];
-        document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
-            selectedSites.push({ name: cb.dataset.name });
-        });
-
+        const selectedSites = Array.from(document.querySelectorAll('.site-checkbox:checked')).map(cb => ({ name: cb.dataset.name }));
         const leadAuditor = document.getElementById('plan-lead-auditor').value;
         const team = Array.from(document.getElementById('plan-team').selectedOptions).map(o => o.value);
         const fullTeam = [leadAuditor, ...team].filter(Boolean);
-        if (!cycle.valid || !clientName || !selectedSites.length || !manDays || !fullTeam.length) {
+        if (!cycle.valid || !client || !selectedSites.length || !manDays || !fullTeam.length) {
             throw new Error(cycle.conflict || 'Establish the cycle stage, standards, sites, method, duration and audit team before generating the agenda.');
         }
+        const planLike = planFromForm(cycle, selectedSites, fullTeam, manDays);
+        const checklist = pickChecklistForPlan(client, cycle.standards);
+        const asm = window.AuditPlanIntegrity.assemble({
+            plan: planLike, client, auditors: window.state.auditors || [], state: window.state, checklist,
+            settings: window.state.cbSettings || {}, hoursPerDay: cycle.policy?.workingHoursPerDay || 8, competenceValid: true, domain: window.AuditPlanningDomain
+        });
+        if (asm.agenda.errors.length) throw new Error(asm.agenda.errors.join(' '));
 
-        // Fetch Client Departments & Contacts for Context
-        const clientObj = window.state.clients.find(c => c.name === clientName);
-        const departments = clientObj ? (clientObj.departments || []) : [];
-        const contacts = clientObj ? (clientObj.contacts || []) : [];
-
-        const context = {
-            client: clientName,
-            standard: standard,
-            type: type,
-            cycleStage: cycle.stage,
-            method: method,
-            manDays: manDays,
-            onsiteDays: onsiteDays,
-            remoteDays: parseFloat(document.getElementById('plan-remote-days')?.value) || 0,
-            sites: selectedSites,
-            team: fullTeam,
-            departments: departments,
-            designations: clientObj ? (clientObj.designations || []) : [],
-            contacts: contacts.map(c => ({
-                name: c.name,
-                designation: c.designation || '',
-                department: c.department || '',
-                email: c.email || ''
-            })).filter(c => c.name),
-            clientDocumentContext: window.KB_HELPERS?.getClientDocumentContext?.(clientObj) || ''
-        };
-        context.scope = cycle.cycles.map(c => c.scope).filter(Boolean).join(' | ');
-        context.significantChanges = clientObj?.significantChanges || clientObj?.changes || [];
-        context.riskLevel = document.getElementById('plan-risk')?.value || 'Medium';
-        context.operationalAreas = [
-            ...(clientObj?.keyProcesses || []).map(item => item.name || item),
-            ...(clientObj?.goodsServices || []).map(item => item.name || item)
-        ].filter(Boolean);
-        context.coverageMatrix = window.AuditPlanningDomain?.buildCoverageMatrix({
-            standards: cycle.standards,
-            previousFindings: getPreviousPlanFindings(clientName, cycle.standards),
-            sites: selectedSites,
-            processes: clientObj?.keyProcesses || [],
-            controls: clientObj?.applicableControls || clientObj?.statementOfApplicability || []
-        }) || null;
-
-        // ── Inject previous audit report context (same client + same standard) ──
-        const allReports = window.state.auditReports || [];
-        const standardTokens = standard.toLowerCase().split(/[,\s]+/).filter(Boolean);
-        const previousReports = allReports
-            .filter(r => {
-                if (r.client !== clientName) return false;
-                if (!r.status || (r.status !== 'Finalized' && r.status !== 'Approved' && r.status !== 'Published')) return false;
-                // Match standard: report.standard OR linked plan.standard
-                const rStd = (r.standard || '').toLowerCase();
-                const linkedPlan = r.planId ? window.DataService.findAuditPlan(r.planId) : null;
-                const pStd = (linkedPlan?.standard || '').toLowerCase();
-                return standardTokens.some(tok => rStd.includes(tok) || pStd.includes(tok));
-            })
-            .sort((a, b) => new Date(b.finalizedAt || b.date || 0) - new Date(a.finalizedAt || a.date || 0));
-
-        if (previousReports.length > 0) {
-            const lastReport = previousReports[0];
-            const ncFindings = (lastReport.checklistProgress || [])
-                .filter(item => item.status === 'nc')
-                .map(item => {
-                    const clause = item.clauseRef || item.clause || '';
-                    const severity = item.severity || item.ncrType || 'Minor';
-                    const desc = item.ncrDescription || item.comment || item.requirement || '';
-                    return { clause, severity, description: desc.substring(0, 200) };
-                });
-
-            context.previousAudit = {
-                date: lastReport.date || lastReport.finalizedAt || 'Unknown',
-                auditType: lastReport.auditType || '',
-                recommendation: lastReport.recommendation || '',
-                ncCount: ncFindings.length,
-                ncFindings: ncFindings.slice(0, 15), // Top 15 to keep prompt manageable
-                ofiSummary: (lastReport.ofi || '').substring(0, 500),
-                positiveObservations: (lastReport.positiveObservations || '').substring(0, 300),
-                conclusion: (lastReport.conclusion || '').substring(0, 300)
-            };
-        }
-
-        const agenda = await window.AI_SERVICE.generateAuditAgenda(context);
-
-        // Clear existing rows
         const tbody = document.getElementById('agenda-tbody');
         tbody.innerHTML = '';
-
-        let requiredActivities = [
-            { day: 'Day 1', time: '09:00 - 09:30', item: 'Mandatory opening meeting', dept: 'Top Management', auditor: 'All' },
-            ...(context.previousAudit?.ncCount ? [{ day: 'Day 1', time: '09:30 - 10:00', item: 'Follow-up of previous findings and nonconformities', dept: 'Process Owners', auditor: leadAuditor }] : []),
-            { day: 'Day 1', time: '', item: `Management system clauses and operational controls — ${standard}`, dept: 'Relevant Functions', auditor: 'All' },
-            { day: `Day ${Math.max(1, Math.ceil(manDays))}`, time: '', item: 'Mandatory audit conclusions and closing meeting', dept: 'Top Management', auditor: 'All' }
-        ];
-        if (method === 'Hybrid') {
-            requiredActivities = requiredActivities.map(item => {
-                const dayNumber = parseInt(String(item.day).match(/\d+/)?.[0] || '1', 10);
-                return { ...item, item: `[${dayNumber <= Math.ceil(context.remoteDays || 0) ? 'Remote' : 'On-site'}] ${item.item}` };
-            });
-        }
-        let optimized = Array.isArray(agenda) ? agenda : [];
-        if (method === 'Remote') {
-            optimized = optimized.filter(item => !/(facility tour|site tour|physical presence|on-site review|onsite review)/i.test(String(item.item || '')));
-        } else if (method === 'Hybrid') {
-            const remoteAllocation = context.remoteDays || 0;
-            optimized = optimized.map(item => {
-                if (/^\[(remote|on-site)\]/i.test(String(item.item || ''))) return item;
-                const dayNumber = parseInt(String(item.day || '').match(/\d+/)?.[0] || '1', 10);
-                const mode = dayNumber <= Math.ceil(remoteAllocation) ? 'Remote' : 'On-site';
-                return { ...item, item: `[${mode}] ${item.item}` };
-            });
-        }
-        requiredActivities.forEach(required => {
-            const token = required.item.toLowerCase().includes('opening') ? 'opening' : required.item.toLowerCase().includes('closing') ? 'closing' : required.item.toLowerCase().includes('previous') ? 'previous' : 'management system';
-            if (!optimized.some(item => String(item.item || '').toLowerCase().includes(token))) optimized.push(required);
-        });
-        optimized.forEach(item => {
-            addAgendaRow(item);
-        });
-
-        window.showNotification('Agenda generated successfully!', 'success');
-
+        asm.agenda.rows.forEach(item => addAgendaRow(item));
+        window._currentTraceability = asm.patch.traceability;
+        const summary = asm.patch.traceability.summary;
+        window.showNotification(
+            `Agenda built: ${asm.agenda.rows.filter(r => r.kind !== 'lunch').length} sessions; ${summary.findingsMapped} of ${summary.findingsRequiringFollowUp} previous finding(s) scheduled.` +
+            (asm.agenda.warnings.length ? ' ' + asm.agenda.warnings.join(' ') : ''),
+            summary.findingsUnmapped ? 'warning' : 'success');
     } catch (error) {
         window.showNotification(error.message, 'error');
     } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+        if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
     }
+}
+
+/** A plan-shaped object from the form's current values, for the builders. */
+function planFromForm(cycle, selectedSites, fullTeam, manDays) {
+    const num = (id) => parseFloat(document.getElementById(id)?.value) || 0;
+    return {
+        id: window.editingPlanId || '', client: document.getElementById('plan-client')?.value || '',
+        date: document.getElementById('plan-date')?.value || '', endDate: document.getElementById('plan-end-date')?.value || '',
+        type: cycle.auditType, auditType: cycle.auditType, standard: cycle.standards.join(', '),
+        auditMethod: document.getElementById('plan-audit-method')?.value || 'On-site',
+        team: fullTeam, selectedSites, manDays,
+        teamAllocations: Array.from(document.querySelectorAll('.team-day-allocation')).map(i => ({ auditor: i.dataset.auditor, days: parseFloat(i.value) || 0 })),
+        certificationCycle: { standards: cycle.standards, recommendedWindowStart: cycle.recommendedWindowStart, recommendedWindowEnd: cycle.recommendedWindowEnd, certificateExpiry: cycle.certificateExpiry },
+        durationCalculation: {
+            employees: parseInt(document.getElementById('plan-employees')?.value, 10) || 0, sites: parseInt(document.getElementById('plan-sites')?.value, 10) || 0,
+            riskLevel: document.getElementById('plan-risk')?.value || 'Medium', basis: document.getElementById('plan-duration-basis')?.value || '',
+            baselineDays: num('plan-baseline-days'), imsAdjustmentPercent: num('plan-ims-adjustment'), remoteDays: num('plan-remote-days'), onsiteDays: num('plan-onsite-days'),
+            justifiedAdjustment: num('plan-justified-adjustment'), justification: document.getElementById('plan-duration-justification')?.value || '', finalDays: manDays
+        },
+        timeZone: (document.getElementById('plan-timezone')?.value) ? { iana: document.getElementById('plan-timezone').value, source: 'plan-agreed' } : null
+    };
+}
+
+/** The client's most recent checklist covering these standards, if there is one. */
+function pickChecklistForPlan(client, standards) {
+    const ids = window.ChecklistStandards ? window.ChecklistStandards.resolve(standards.join(', ')).standards.map(s => s.id) : [];
+    const own = (window.state.checklists || []).filter(c => String(c.clientId) === String(client.id) || c.clientName === client.name);
+    const covers = (c) => {
+        const have = window.ChecklistCoverage ? window.ChecklistCoverage.resolveStandardIds(c).ids : [];
+        return ids.every(id => have.includes(id));
+    };
+    const linked = (window.editingPlanId && (window.state.auditPlans.find(p => String(p.id) === String(window.editingPlanId)) || {}).selectedChecklists) || [];
+    return own.find(c => linked.map(String).includes(String(c.id)) && covers(c)) || own.filter(covers).slice(-1)[0] || null;
+}
+
+/** Fill the records the certification file needs into planData (mutates). */
+function derivePlanRecords(planData) {
+    const IPI = window.AuditPlanIntegrity;
+    if (!IPI) return planData;
+    const client = window.state.clients.find(c => c.name === planData.client);
+    if (!client) return planData;
+    const asm = IPI.assemble({ plan: planData, client, auditors: window.state.auditors || [], state: window.state, settings: window.state.cbSettings || {}, competenceValid: true, domain: window.AuditPlanningDomain });
+    planData.assignedAuditors = asm.patch.assignedAuditors;
+    planData.durationRecord = asm.patch.durationRecord;
+    if (!planData.timeZone && asm.patch.timeZone) planData.timeZone = asm.patch.timeZone;
+    // The certificate's wording, reproduced exactly (never reworded).
+    planData.scope = asm.scope.certificateScope || planData.scope || '';
+    return planData;
+}
+
+/** Everything IPI.validate needs, gathered once for save, view, print and approval. */
+function gateContext(plan, extra) {
+    const client = window.state.clients.find(c => c.name === plan.client) || {};
+    const standards = window.AuditPlanIntegrity.standardIdsOf(plan);
+    const checklists = (plan.selectedChecklists || []).map(id => (window.state.checklists || []).find(c => String(c.id) === String(id))).filter(Boolean)
+        .map(ck => {
+            const cov = typeof window.runChecklistCoverage === 'function' ? window.runChecklistCoverage(ck) : null;
+            return { id: ck.id, name: ck.name, standardIds: window.ChecklistCoverage ? window.ChecklistCoverage.resolveStandardIds(ck).ids : (ck.standardIds || []), coverage: cov };
+        });
+    const findings = window.AuditPlanIntegrity.collectPreviousFindings({ state: window.state, client, plan, standards });
+    return Object.assign({
+        client, auditors: window.state.auditors || [], standards, state: window.state, checklists, findings,
+        hoursPerDay: (window.state.cbSettings?.auditPlanningPolicy?.workingHoursPerDay) || 8, cbCountry: window.state.cbSettings?.country || ''
+    }, extra || {});
 }
 
 // Exports
 window.generateAIAgenda = generateAIAgenda;
+window.planStatusCardHTML = planStatusCardHTML;
+window.derivePlanRecords = derivePlanRecords;
+window.buildPlanDocumentContext = buildPlanDocumentContext;
 window.addAgendaRow = addAgendaRow;
 window.deleteAgendaRow = deleteAgendaRow; // Added export
 window.saveAuditPlan = saveAuditPlan;

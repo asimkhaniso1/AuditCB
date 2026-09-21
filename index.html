@@ -261,17 +261,27 @@
     <script src="./auth-manager.js?v=19.0_HERO_LOGIN"></script>
     <script src="./email-service.js?v=16.3_FINAL" defer></script>
     <script src="./supabase-config.js?v=16.3_FINAL"></script>
-    <script src="./supabase-client.js?v=33.3_TEXT_HEAL"></script>
+    <script src="./supabase-client.js?v=33.4_STD_IDS"></script>
     <script src="./data-service.js?v=22.0_DATA_SVC"></script>
     <script src="./api-cache.js?v=16.3_FINAL" defer></script>
-    <script src="./data-migration.js?v=17.4_DUPES" defer></script>
+    <script src="./data-migration.js?v=17.5_PLAN_HEAL" defer></script>
     <script src="./password-utils.js?v=16.3_FINAL" defer></script>
     <script src="./form-validator.js?v=16.3_FINAL" defer></script>
     <script src="./audit-logger.js?v=16.3_FINAL"></script>
     <script src="./notifications-module.js?v=16.3_FINAL" defer></script>
     <script src="./advanced-modules.js?v=16.3_FINAL" defer></script>
-    <script src="./audit-planning-domain.js?v=1.0_LIFECYCLE" defer></script>
-    <script src="./planning-module.js?v=34.0_LIFECYCLE" defer></script>
+    <script src="./audit-planning-domain.js?v=1.1_LUNCH" defer></script>
+    <!-- Controlled documents: written dates + time zones, page furniture, finding treatment,
+         supporting-document relevance, the plan rules and both printable documents.
+         All pure modules; they resolve each other lazily, so order among them is free. -->
+    <script src="./doc-format.js?v=1.0_DOCFMT" defer></script>
+    <script src="./print-shell.js?v=1.0_SHELL" defer></script>
+    <script src="./finding-workflow.js?v=1.0_FINDINGS" defer></script>
+    <script src="./supporting-docs.js?v=1.0_DOCREL" defer></script>
+    <script src="./audit-plan-integrity.js?v=1.0_INTEGRITY" defer></script>
+    <script src="./plan-document.js?v=1.0_PLANDOC" defer></script>
+    <script src="./checklist-document.js?v=1.0_CHKDOC" defer></script>
+    <script src="./planning-module.js?v=35.0_PLAN_INTEGRITY" defer></script>
     <script src="./api-usage-tracker.js?v=17.2_PRICING" defer></script>
     <script src="./ai-service.js?v=30.0_GOVERNANCE" defer></script>
     <script src="./execution-tab-helpers.js?v=17.0_CLAUSE_DATA" defer></script>
@@ -287,9 +297,9 @@
     <!-- Scope-gated clause/control registry and the checklist QA pass. Pure
          data + pure functions, loaded before checklist-module.js and
          client-docs-bulk.js, which both read them off window. -->
-    <script src="./checklist-standards.js?v=33.0_SCOPED_CHECKLIST" defer></script>
+    <script src="./checklist-standards.js?v=35.0_CITATION" defer></script>
     <script src="./checklist-qa.js?v=33.0_SCOPED_CHECKLIST" defer></script>
-    <script src="./checklist-coverage.js?v=34.0_CYCLE_COVERAGE" defer></script>
+    <script src="./checklist-coverage.js?v=35.0_OUTCOMES" defer></script>
     <script src="./report-operational.js?v=31.0_EVPACK" defer></script>
     <script src="./report-findings-ops.js?v=31.0_EVPACK" defer></script>
     <script src="./report-frameworks.js?v=31.0_EVPACK" defer></script>
@@ -304,10 +314,10 @@
     <script src="./clients-detail.js?v=16.3_FINAL" defer></script>
     <script src="./clients-modals.js?v=16.3_FINAL" defer></script>
     <script src="./client-workspace.js?v=33.1_ACCORDION" defer></script>
-    <script src="./checklist-module.js?v=33.3_BUILD_BTN" defer></script>
+    <script src="./checklist-module.js?v=35.0_CHKDOC" defer></script>
     <script src="./export-module.js?v=16.3_FINAL" defer></script>
     <script src="./documents-module.js?v=16.3_FINAL" defer></script>
-    <script src="./client-docs-bulk.js?v=33.3_BUILD_BTN" defer></script>
+    <script src="./client-docs-bulk.js?v=35.0_DOCREL" defer></script>
     <script src="./client-ai-suggest.js?v=32.2_DOC_REFINE" defer></script>
     <script src="./certifications-module.js?v=30.0_GOVERNANCE" defer></script>
     <script src="./appeals-complaints-module.js?v=16.3_FINAL" defer></script>

@@ -379,6 +379,9 @@
         let scheduledAuditorHours = 0;
         const errors = [];
         safeArray(input.agenda).forEach((item, index) => {
+            // Lunch and breaks are not audit time: counting them let an agenda with
+            // a lunch row reconcile against hours nobody audited.
+            if (item.kind === 'lunch' || item.kind === 'break' || /^\s*(lunch|break)\b/i.test(String(item.item || ''))) return;
             const hours = Number(item.hours) || parseTimeRange(item.time);
             if (!hours) { errors.push(`Agenda row ${index + 1} needs a valid time range or hours value.`); return; }
             let auditors = safeArray(item.auditors).length ? item.auditors : String(item.auditor || '').split(',').map((x) => x.trim()).filter(Boolean);

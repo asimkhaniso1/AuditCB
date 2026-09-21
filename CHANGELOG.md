@@ -1,5 +1,36 @@
 # AuditCB360 - Recent Enhancements Summary
 
+## ✅ Audit Plan & Checklist Integrity (v35.0) - September 21, 2026
+
+Driven by the PC CONNECTION, INC. recertification (3–5 November 2026), whose plan and checklist PDFs carried numeric dates, an `Other` auditor on every row, "Audit Team: None", invented clause numbers, `&amp;`, browser headers and a blank sixth page — and whose checklist printed both "Coverage validated" and "Coverage could not be assessed". Full root causes: `docs/PLAN_CHECKLIST_INTEGRITY.md`.
+
+### Audit plan
+- **The agenda is built, not written by a model** (`audit-plan-integrity.js`): every clause label resolves through the clause registry (`ChecklistStandards`); a label the registry does not hold cannot be printed. Each session carries a traceability record (standard, clauses, checklist questions, previous findings, process, auditee, auditor).
+- **Auditors**: the row editor offers only the auditors on the plan — there is no `Other`. Rows carry an auditor ID; the team of one prints "Lead Auditor only".
+- **Previous findings** are read from the NC register (all types), each mapped to a session; approval is blocked, naming the finding, if one is not.
+- **Written dates and a verified time zone** (`doc-format.js`): "3–5 November 2026"; zone resolved from the site and labelled for the audit dates (EST on 3 November 2026, not EDT).
+- **Certified scope** reproduced exactly from the active certificate; a mismatch blocks issue; current activities that differ are flagged for authorised certification review.
+- **Duration record** (basis by standard, effective personnel, IMS, remote, adjustments, approval) kept internally; the agenda is reconciled to the approved auditor-days with lunch excluded.
+- **Document status workflow**: Draft — Internal Review → Approved for Client Issue → Issued to Client → Client Acknowledged. Approval/issue need an authorised role and a passing gate; an edit after approval withdraws it.
+- **Internal certification record** (landscape): readiness, full duration calculation, finding map, traceability matrix, scope verification, coverage.
+
+### Checklist
+- **One standard resolver** for QA and coverage. "Could not be assessed" is now **Blocked** (an internal error), never "validated". Four exclusive outcomes; coverage reported per standard as planned / inherited / remaining, plus an integrated view; unavailable prior-audit evidence is told apart from genuine noncoverage.
+- **Previous-findings wording** no longer applies corrective-action verification to observations and OFIs (`finding-workflow.js`); Observations/OFIs get a response UI (evaluation, disposition, OFI decision) and can become an NCR only on objective evidence, by a named person.
+- **Supporting documents** (`supporting-docs.js`): status, stated standard and subject must all match; text similarity only ranks. Nothing validated → "No validated supporting document mapped — auditor to select or confirm".
+- **Scheduled audit date** replaces the generation date; lifecycle "Prepared — audit not started"; item status key with N/A requiring justification.
+- The generator now includes the Annex A controls the audit's own risk drivers point at, so a checklist no longer fails its own coverage check when built.
+
+### Printing (`print-shell.js`)
+- Header/footer are CSS page-margin boxes with `counter(page)`/`counter(pages)`: Chrome then drops its own date/title/`about:blank`/`1/6`, and "Page X of Y" is always true. No in-flow footer, so no blank trailing page. `PrintShell.lint` and the plan gate reject the old patterns.
+
+### Data
+- `migrations/HEAL_PLAN_TEXT_AND_CHECKLIST_STANDARDS.sql` (optional, idempotent, no schema change); the app heals the same records on sign-in (`DataMigration.healPlansAndChecklists`).
+
+### Tools
+- `tools/render-pcc-pdfs.mjs`, `tools/pdf_qa.py`, `tools/compare_pdfs.py`: render the documents through the real modules, print with Chrome's default headers/footers ON, and check the PDF (Page X of Y, blank pages, browser decoration, entities, dates, clipping, overlap).
+
+
 ## ✅ Recertification Coverage Validation & Ready-for-Audit Gate (v34.0) - August 20, 2026
 
 ### Recertification Coverage Validation (`checklist-coverage.js`)

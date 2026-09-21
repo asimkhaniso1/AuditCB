@@ -457,7 +457,13 @@
     const RECERT_PRIORITIES = [
         ['prev-findings', 'Previous audit findings and their corrective actions',
             SHARED.IMP_NONCONFORMITY,
-            'Review every nonconformity, observation and opportunity for improvement raised at the previous audits in this certification cycle. Verify root cause analysis, action taken, evidence of implementation, and the organisation’s own verification of effectiveness. Confirm no finding has recurred.',
+            // Each finding type carries its OWN treatment. Corrective action, cause
+            // evaluation and an effectiveness review are requirements of a
+            // NONCONFORMITY (10.2 / 10.1 / 10.1); observations and opportunities
+            // for improvement carry none, so asking an auditor to verify a root
+            // cause for them manufactures nonconformities out of advice. Must
+            // equal FindingWorkflow.PREVIOUS_FINDINGS_REQUIREMENT (tested).
+            'Review all findings raised during previous audits in the certification cycle. For nonconformities, verify correction, evaluation of cause, corrective action, implementation and effectiveness. For observations and opportunities for improvement, verify management evaluation, disposition and any voluntary actions taken. Confirm whether any issue has recurred or developed into a nonconformity.',
             null],
         ['changes', 'Changes since the previous audit',
             SHARED.PLAN_CHANGES,
@@ -689,10 +695,48 @@
         return { common, specific };
     }
 
-    /** Display citation, e.g. "ISO/IEC 27001:2022 4.1 / ISO 22301:2019 4.1". */
+    /**
+     * Runs of consecutive references collapse to a range, in the order given:
+     * "A.5.24, A.5.25, A.5.26, A.5.27, A.6.8" -> "A.5.24–A.5.27, A.6.8".
+     * Order is preserved (not sorted) because refs of different standards can
+     * share a citation and their numbers mean different things; a range is only
+     * made from three or more consecutive refs of the same parent, both ends
+     * keeping their prefix.
+     */
+    function compressRuns(refs) {
+        const list = (refs || []).map(String).filter(Boolean);
+        const parts = r => ({ annex: /^A\./.test(r), nums: r.replace(/^A\./, '').split('.').map(Number) });
+        const next = (a, b) => {
+            const pa = parts(a); const pb = parts(b);
+            if (pa.annex !== pb.annex || pa.nums.length !== pb.nums.length || pa.nums.some(isNaN) || pb.nums.some(isNaN)) return false;
+            for (let i = 0; i < pa.nums.length - 1; i++) if (pa.nums[i] !== pb.nums[i]) return false;
+            return pb.nums[pb.nums.length - 1] - pa.nums[pa.nums.length - 1] === 1;
+        };
+        const out = [];
+        for (let i = 0; i < list.length;) {
+            let j = i;
+            while (j + 1 < list.length && next(list[j], list[j + 1])) j++;
+            if (j - i >= 2) out.push(list[i] + '–' + list[j]);
+            else for (let k = i; k <= j; k++) out.push(list[k]);
+            i = j + 1;
+        }
+        return out.join(', ');
+    }
+
+    /**
+     * Display citation, e.g. "ISO/IEC 27001:2022 4.1 / ISO 22301:2019 4.1".
+     * A standard's name is stated once, however many of its clauses are cited:
+     * "ISO/IEC 27001:2022 A.5.24–A.5.27, A.6.8".
+     */
     function citation(members) {
-        return (members || [])
-            .map(m => `${BY_ID[m.stdId] ? BY_ID[m.stdId].label : m.stdId} ${m.ref}`)
+        const order = [];
+        const byStd = {};
+        (members || []).forEach(m => {
+            if (!byStd[m.stdId]) { byStd[m.stdId] = []; order.push(m.stdId); }
+            byStd[m.stdId].push(m.ref);
+        });
+        return order
+            .map(id => `${BY_ID[id] ? BY_ID[id].label : id} ${compressRuns(byStd[id])}`)
             .join(' / ');
     }
 
@@ -747,6 +791,7 @@
         isKnownRef,
         lookupRef,
         citation,
+        compressRuns,
         rank
     };
 

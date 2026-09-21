@@ -376,8 +376,19 @@ describe('ChecklistCoverage.readiness — nothing could be validated', () => {
     });
 
     it('does not add that blocker when the QA pass did run', () => {
-        const r = window.ChecklistCoverage.readiness({}, { qa: { issues: [] }, coverage: null });
+        const r = window.ChecklistCoverage.readiness({}, { qa: { issues: [] } });
         expect(r.ready).toBe(true);
+        expect(r.blockers.map(b => b.code)).not.toContain('VALIDATION_UNAVAILABLE');
+    });
+
+    // This used to assert `ready: true` for { qa: passed, coverage: null } —
+    // i.e. a checklist whose coverage pass could not run was released. That was
+    // the defect: "could not be assessed" must block, never read as validated.
+    it('blocks when coverage was requested but could not run, even though QA passed', () => {
+        const r = window.ChecklistCoverage.readiness({}, { qa: { issues: [] }, coverage: null });
+        expect(r.ready).toBe(false);
+        expect(r.blockers.map(b => b.code)).toEqual(['COVERAGE_NOT_ASSESSED']);
+        expect(r.blockers.map(b => b.code)).not.toContain('VALIDATION_UNAVAILABLE');
     });
 });
 

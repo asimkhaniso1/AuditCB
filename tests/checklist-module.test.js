@@ -509,6 +509,9 @@ describe('printChecklist — print button and brand colours', () => {
             clients: []
         };
         loadModule('./validation.js');
+        loadModule('./doc-format.js');
+        loadModule('./print-shell.js');
+        loadModule('./checklist-document.js');
         loadModule('./checklist-module.js');
     });
 
