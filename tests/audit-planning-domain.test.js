@@ -80,13 +80,16 @@ describe('certification-cycle-driven audit planning domain', () => {
         expect(context.conflict).toContain('separate plans');
     });
 
-    it('does not invent duration when approved scheme tables are absent', () => {
+    it('provides reviewable default duration rules when scheme tables are absent', () => {
         const standards = pcConnectionFixture().certificates.map((certificate) => certificate.standard);
         const methodology = Domain.resolveDurationMethodology({}, standards);
         const result = Domain.calculateConfiguredDuration(methodology, { employees: 250, sites: 1, auditType: 'Surveillance 2' });
-        expect(methodology.configured).toBe(false);
-        expect(result.configured).toBe(false);
-        expect(methodology.missingFamilies).toEqual(['27001', '22301', '20000-1']);
+        expect(methodology.configured).toBe(true);
+        expect(methodology.usesDefaults).toBe(true);
+        expect(methodology.version).toBe('Audit360 default v1');
+        expect(result.configured).toBe(true);
+        expect(result.baselineDays).toBe(1.5);
+        expect(methodology.missingFamilies).toEqual([]);
     });
 
     it('uses only configured, versioned duration tables and IMS rules', () => {

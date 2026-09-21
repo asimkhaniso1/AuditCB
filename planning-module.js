@@ -575,7 +575,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 </div>
                                 <div><label style="font-size:.8rem;">Adjustment justification</label><textarea id="plan-duration-justification" class="form-control" rows="2" placeholder="Required when a justified adjustment is applied"></textarea></div>
                             </div>
-                            <small id="manday-hint" style="color:#6b7280;display:block;margin-top:8px;font-size:.75rem;text-align:center;">Uses each selected scheme's approved duration methodology and IMS rules.</small>
+                            <small id="manday-hint" style="color:#6b7280;display:block;margin-top:8px;font-size:.75rem;text-align:center;">Uses the CB rule when configured; otherwise Audit360 defaults are provided for auditor review.</small>
                         </div>
 
                         <div class="card" style="margin:0;padding:1.5rem;">
@@ -1068,7 +1068,7 @@ function autoCalculateDays() {
         const setupButton = document.getElementById('btn-open-duration-setup');
         if (setupButton) setupButton.style.display = 'none';
         const baseline = calculated.baselineDays;
-        const imsConfig = window.state?.cbSettings?.imsMethodology;
+        const imsConfig = window.state?.cbSettings?.imsMethodology || domain?.DEFAULT_IMS_RULE;
         const draftIMS = window.state?.cbSettings?.imsMethodologyDraft;
         const calculationIMS = provisional ? draftIMS : imsConfig;
         const imsDefault = cycle.standards.length > 1 && Number.isFinite(Number(calculationIMS?.defaultAdjustmentPercent))
@@ -1077,7 +1077,7 @@ function autoCalculateDays() {
         document.getElementById('plan-ims-adjustment').value = imsDefault;
         document.getElementById('plan-duration-basis').value = provisional
             ? `PROVISIONAL PLANNING ONLY — ${calculationMethodology.name} · unapproved draft${cycle.standards.length > 1 ? ` · IMS ${draftIMS?.version || 'draft/unapproved'}` : ''}`
-            : `${calculationMethodology.name} · version ${calculationMethodology.version}${cycle.standards.length > 1 ? ` · IMS ${imsConfig?.version || 'configuration required'}` : ''}`;
+            : `${calculationMethodology.name} · version ${calculationMethodology.version}${calculationMethodology.usesDefaults ? ' · default guide for auditor review' : ''}${cycle.standards.length > 1 ? ` · IMS ${imsConfig?.version}` : ''}`;
         recalculateDurationAllocation();
         window.showNotification(provisional
             ? `Provisional planning duration calculated: ${baseline.toFixed(1)} days. Save as Draft; activate the approved methodology before final validation.`
@@ -3032,7 +3032,7 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
             imsRuleVersion: cycleContext.standards.length > 1
                 ? (/^PROVISIONAL PLANNING ONLY/.test(document.getElementById('plan-duration-basis')?.value || '')
                     ? (window.state?.cbSettings?.imsMethodologyDraft?.version || 'DRAFT')
-                    : (window.state?.cbSettings?.imsMethodology?.version || null))
+                    : (window.state?.cbSettings?.imsMethodology?.version || window.AuditPlanningDomain?.DEFAULT_IMS_RULE?.version || null))
                 : null,
             provisional: /^PROVISIONAL PLANNING ONLY/.test(document.getElementById('plan-duration-basis')?.value || ''),
             approvedBy: /^PROVISIONAL PLANNING ONLY/.test(document.getElementById('plan-duration-basis')?.value || '') ? null : (window.state.currentUser?.name || null),

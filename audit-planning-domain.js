@@ -17,6 +17,34 @@
         workingHoursPerDay: 8,
         overrideRoles: ['Admin', 'Certification Manager', 'Cert Manager']
     });
+    const DEFAULT_DURATION_VERSION = 'Audit360 default v1';
+    const DEFAULT_IMS_RULE = Object.freeze({
+        name: 'Audit360 default integrated-audit rule',
+        version: DEFAULT_DURATION_VERSION,
+        defaultAdjustmentPercent: 0,
+        maximumReductionPercent: 0,
+        maximumIncreasePercent: 0,
+        justificationRequired: true,
+        builtInDefault: true
+    });
+    const DEFAULT_DURATION_TABLES = Object.freeze({
+        'Surveillance 1': Object.freeze([
+            { minEmployees: 1, maxEmployees: 25, days: 0.5 }, { minEmployees: 26, maxEmployees: 100, days: 1 },
+            { minEmployees: 101, maxEmployees: 250, days: 1.5 }, { minEmployees: 251, maxEmployees: 500, days: 2 },
+            { minEmployees: 501, maxEmployees: null, days: 2.5 }
+        ]),
+        'Surveillance 2': Object.freeze([
+            { minEmployees: 1, maxEmployees: 25, days: 0.5 }, { minEmployees: 26, maxEmployees: 100, days: 1 },
+            { minEmployees: 101, maxEmployees: 250, days: 1.5 }, { minEmployees: 251, maxEmployees: 500, days: 2 },
+            { minEmployees: 501, maxEmployees: null, days: 2.5 }
+        ]),
+        Recertification: Object.freeze([
+            { minEmployees: 1, maxEmployees: 10, days: 0.5 }, { minEmployees: 11, maxEmployees: 25, days: 1 },
+            { minEmployees: 26, maxEmployees: 50, days: 1.5 }, { minEmployees: 51, maxEmployees: 100, days: 2 },
+            { minEmployees: 101, maxEmployees: 250, days: 2.5 }, { minEmployees: 251, maxEmployees: 500, days: 3 },
+            { minEmployees: 501, maxEmployees: null, days: 4 }
+        ])
+    });
 
     const EVENT_TYPES = Object.freeze([
         'certification-decision', 'certificate-issue',
@@ -196,11 +224,22 @@
 
     function resolveDurationMethodology(settings, standards) {
         const registry = settings?.durationMethodologies || {};
-        const methods = [...new Set(safeArray(standards).map(standardFamily))].map((family) => registry[family]).filter(Boolean);
-        if (!methods.length) return { configured: false, version: null, name: null, missingFamilies: safeArray(standards).map(standardFamily) };
-        const missingFamilies = safeArray(standards).map(standardFamily).filter((family) => !registry[family]);
-        const versions = [...new Set(methods.map((method) => method.version).filter(Boolean))];
-        return { configured: missingFamilies.length === 0 && versions.length === 1, version: versions.length === 1 ? versions[0] : null, name: methods.map((m) => m.name).join(' + '), methods, missingFamilies };
+        const families = [...new Set(safeArray(standards).map(standardFamily).filter(Boolean))];
+        const methods = families.map((family) => registry[family] || {
+            name: `ISO ${family} default duration rules`,
+            version: DEFAULT_DURATION_VERSION,
+            tables: DEFAULT_DURATION_TABLES,
+            builtInDefault: true
+        });
+        const versions = [...new Set(methods.map((method) => method.version || DEFAULT_DURATION_VERSION))];
+        return {
+            configured: methods.length > 0,
+            version: versions.length === 1 ? versions[0] : versions.join(' + '),
+            name: methods.map((method) => method.name).join(' + '),
+            methods,
+            missingFamilies: [],
+            usesDefaults: methods.some((method) => method.builtInDefault)
+        };
     }
 
     function resolveProvisionalDurationMethodology(settings, standards) {
@@ -364,7 +403,7 @@
     }
 
     const api = {
-        POLICY_VERSION, PLAN_STATES, DEFAULT_POLICY, EVENT_TYPES, policy, standardFamily,
+        POLICY_VERSION, PLAN_STATES, DEFAULT_POLICY, DEFAULT_DURATION_VERSION, DEFAULT_DURATION_TABLES, DEFAULT_IMS_RULE, EVENT_TYPES, policy, standardFamily,
         lifecycleEvents, createLifecycleEvent, resolveCycleContext, resolveDurationMethodology, resolveProvisionalDurationMethodology,
         calculateConfiguredDuration, validateDuration, validateCompetence, buildCoverageMatrix, reconcileAgenda, canTransition, createOverride
     };
