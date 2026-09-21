@@ -203,6 +203,21 @@
         return { configured: missingFamilies.length === 0 && versions.length === 1, version: versions.length === 1 ? versions[0] : null, name: methods.map((m) => m.name).join(' + '), methods, missingFamilies };
     }
 
+    function resolveProvisionalDurationMethodology(settings, standards) {
+        const registry = settings?.durationMethodologyDrafts || {};
+        const families = [...new Set(safeArray(standards).map(standardFamily))];
+        const missingFamilies = families.filter(family => !registry[family]);
+        const methods = families.map(family => registry[family]).filter(Boolean);
+        return {
+            configured: methods.length > 0 && missingFamilies.length === 0,
+            provisional: true,
+            version: 'DRAFT',
+            name: methods.map(method => method.name || 'Draft duration rules').join(' + '),
+            methods,
+            missingFamilies
+        };
+    }
+
     function calculateConfiguredDuration(methodology, input) {
         if (!methodology?.configured) return { configured: false, error: 'Approved duration methodology configuration is incomplete.' };
         const results = methodology.methods.map((method) => {
@@ -350,7 +365,7 @@
 
     const api = {
         POLICY_VERSION, PLAN_STATES, DEFAULT_POLICY, EVENT_TYPES, policy, standardFamily,
-        lifecycleEvents, createLifecycleEvent, resolveCycleContext, resolveDurationMethodology,
+        lifecycleEvents, createLifecycleEvent, resolveCycleContext, resolveDurationMethodology, resolveProvisionalDurationMethodology,
         calculateConfiguredDuration, validateDuration, validateCompetence, buildCoverageMatrix, reconcileAgenda, canTransition, createOverride
     };
     global.AuditPlanningDomain = api;

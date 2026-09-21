@@ -593,6 +593,9 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                             <button type="button" id="btn-plan-save" class="btn btn-primary" style="height: 48px; font-weight: 600;" aria-label="Save">
                                 <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i> Validate & Save Audit Plan
                             </button>
+                            <button type="button" id="btn-plan-draft" class="btn btn-outline-primary" style="height:42px;" aria-label="Save draft">
+                                <i class="fa-solid fa-floppy-disk" style="margin-right:.5rem;"></i> Save Draft Audit Plan
+                            </button>
                             <button type="button" id="btn-plan-save-print" class="btn btn-outline-primary" style="height: 42px;" aria-label="Print">
                                 <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Save & Print Draft
                             </button>
@@ -608,10 +611,12 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
 
     // Set Initial Buttons
     const btnSave = document.getElementById('btn-plan-save');
+    const btnDraft = document.getElementById('btn-plan-draft');
     const btnSavePrint = document.getElementById('btn-plan-save-print');
     const btnCancel = document.getElementById('btn-plan-cancel');
 
     if (btnSave) btnSave.onclick = () => saveAuditPlan(false);
+    if (btnDraft) btnDraft.onclick = () => saveAuditPlan(false, true);
     if (btnSavePrint) btnSavePrint.onclick = () => saveAuditPlan(true, true);
     if (btnCancel) btnCancel.onclick = () => renderAuditPlanningEnhanced();
 
@@ -1035,9 +1040,21 @@ function autoCalculateDays() {
         }
         const domain = window.AuditPlanningDomain;
         const methodology = domain?.resolveDurationMethodology(window.state?.cbSettings || {}, cycle.standards);
-        const calculated = domain?.calculateConfiguredDuration(methodology, {
+        const durationInput = {
             employees: totalEmployees, sites: siteCount, riskLevel: risk, auditType: cycle.auditType, hasShiftWork
-        });
+        };
+        let calculated = domain?.calculateConfiguredDuration(methodology, durationInput);
+        let calculationMethodology = methodology;
+        let provisional = false;
+        if (!calculated?.configured) {
+            const draftMethodology = domain?.resolveProvisionalDurationMethodology(window.state?.cbSettings || {}, cycle.standards);
+            const draftCalculation = domain?.calculateConfiguredDuration(draftMethodology, durationInput);
+            if (draftCalculation?.configured) {
+                calculated = draftCalculation;
+                calculationMethodology = draftMethodology;
+                provisional = true;
+            }
+        }
         if (!calculated?.configured) {
             document.getElementById('plan-duration-basis').value = `CB configuration required: ${calculated?.error || `approved methodology missing for ${methodology?.missingFamilies?.join(', ') || 'selected standards'}`}`;
             document.getElementById('plan-baseline-days').value = '';
@@ -1052,13 +1069,19 @@ function autoCalculateDays() {
         if (setupButton) setupButton.style.display = 'none';
         const baseline = calculated.baselineDays;
         const imsConfig = window.state?.cbSettings?.imsMethodology;
-        const imsDefault = cycle.standards.length > 1 && Number.isFinite(Number(imsConfig?.defaultAdjustmentPercent))
-            ? Number(imsConfig.defaultAdjustmentPercent) : 0;
+        const draftIMS = window.state?.cbSettings?.imsMethodologyDraft;
+        const calculationIMS = provisional ? draftIMS : imsConfig;
+        const imsDefault = cycle.standards.length > 1 && Number.isFinite(Number(calculationIMS?.defaultAdjustmentPercent))
+            ? Number(calculationIMS.defaultAdjustmentPercent) : 0;
         document.getElementById('plan-baseline-days').value = baseline.toFixed(1);
         document.getElementById('plan-ims-adjustment').value = imsDefault;
-        document.getElementById('plan-duration-basis').value = `${methodology.name} · version ${methodology.version}${cycle.standards.length > 1 ? ` · IMS ${imsConfig?.version || 'configuration required'}` : ''}`;
+        document.getElementById('plan-duration-basis').value = provisional
+            ? `PROVISIONAL PLANNING ONLY — ${calculationMethodology.name} · unapproved draft${cycle.standards.length > 1 ? ` · IMS ${draftIMS?.version || 'draft/unapproved'}` : ''}`
+            : `${calculationMethodology.name} · version ${calculationMethodology.version}${cycle.standards.length > 1 ? ` · IMS ${imsConfig?.version || 'configuration required'}` : ''}`;
         recalculateDurationAllocation();
-        window.showNotification(`Duration calculation recorded for ${cycle.auditType}: baseline ${baseline.toFixed(1)} days, with transparent allocation and adjustments.`, 'success');
+        window.showNotification(provisional
+            ? `Provisional planning duration calculated: ${baseline.toFixed(1)} days. Save as Draft; activate the approved methodology before final validation.`
+            : `Duration calculation recorded for ${cycle.auditType}: baseline ${baseline.toFixed(1)} days, with transparent allocation and adjustments.`, provisional ? 'warning' : 'success');
     } else {
         window.showNotification('No employee data available for selected sites. Please verify client/site information.', 'warning');
     }
@@ -3003,10 +3026,17 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
             onsiteDays,
             justifiedAdjustment: parseFloat(document.getElementById('plan-justified-adjustment')?.value) || 0,
             justification: document.getElementById('plan-duration-justification')?.value || '',
-            methodologyVersion: window.AuditPlanningDomain?.resolveDurationMethodology(window.state?.cbSettings || {}, cycleContext.standards)?.version || null,
-            imsRuleVersion: cycleContext.standards.length > 1 ? (window.state?.cbSettings?.imsMethodology?.version || null) : null,
-            approvedBy: window.state.currentUser?.name || null,
-            approvedAt: saveAsDraft ? null : new Date().toISOString(),
+            methodologyVersion: /^PROVISIONAL PLANNING ONLY/.test(document.getElementById('plan-duration-basis')?.value || '')
+                ? 'DRAFT'
+                : (window.AuditPlanningDomain?.resolveDurationMethodology(window.state?.cbSettings || {}, cycleContext.standards)?.version || null),
+            imsRuleVersion: cycleContext.standards.length > 1
+                ? (/^PROVISIONAL PLANNING ONLY/.test(document.getElementById('plan-duration-basis')?.value || '')
+                    ? (window.state?.cbSettings?.imsMethodologyDraft?.version || 'DRAFT')
+                    : (window.state?.cbSettings?.imsMethodology?.version || null))
+                : null,
+            provisional: /^PROVISIONAL PLANNING ONLY/.test(document.getElementById('plan-duration-basis')?.value || ''),
+            approvedBy: /^PROVISIONAL PLANNING ONLY/.test(document.getElementById('plan-duration-basis')?.value || '') ? null : (window.state.currentUser?.name || null),
+            approvedAt: saveAsDraft || /^PROVISIONAL PLANNING ONLY/.test(document.getElementById('plan-duration-basis')?.value || '') ? null : new Date().toISOString(),
             finalDays: manDays,
             calculatedAt: new Date().toISOString()
         },

@@ -159,6 +159,7 @@ describe('duration methodology starter defaults', () => {
 
         expect(window._durationMethodologyValidationErrors).toContain('27001 Recertification: employee bands contain a gap before 300.');
         expect(window.state.cbSettings.durationMethodologies['27001']).toBeUndefined();
+        expect(window.state.cbSettings.durationMethodologyDrafts['27001']).toBeDefined();
     });
 
     it('automatically backfills empty stages in older saved drafts without replacing populated stages', async () => {

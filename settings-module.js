@@ -740,6 +740,10 @@ window.saveDurationMethodologies = async function () {
         backfillEmptyDurationStages(draft);
         const errors = validateDurationMethodologyDraft(draft);
         if (errors.length) {
+            window.state.cbSettings.durationMethodologyDrafts = clonePlanningValue(draft.registry, {});
+            window.state.cbSettings.imsMethodologyDraft = clonePlanningValue(draft.ims, null);
+            window.saveData();
+            await window.DataService?.syncSettings?.({ saveLocal: false, silent: true });
             window._durationMethodologyValidationErrors = errors;
             rerenderDurationManager();
             document.getElementById('duration-validation-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' });

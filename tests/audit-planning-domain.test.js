@@ -101,6 +101,34 @@ describe('certification-cycle-driven audit planning domain', () => {
         expect(result.baselineDays).toBe(3);
     });
 
+    it('resolves complete draft tables for provisional planning without treating them as approved', () => {
+        const standards = ['ISO/IEC 27001:2022', 'ISO 22301:2019'];
+        const draftMethod = (name) => ({
+            name,
+            tables: {
+                Recertification: [{ minEmployees: 1, maxEmployees: null, days: 2.5 }]
+            }
+        });
+        const methodology = Domain.resolveProvisionalDurationMethodology({
+            durationMethodologyDrafts: {
+                27001: draftMethod('Draft ISMS duration rules'),
+                22301: draftMethod('Draft BCMS duration rules')
+            }
+        }, standards);
+        const result = Domain.calculateConfiguredDuration(methodology, {
+            employees: 300,
+            sites: 1,
+            auditType: 'Recertification',
+            riskLevel: 'Medium'
+        });
+
+        expect(methodology.configured).toBe(true);
+        expect(methodology.provisional).toBe(true);
+        expect(methodology.version).toBe('DRAFT');
+        expect(result.configured).toBe(true);
+        expect(result.baselineDays).toBe(2.5);
+    });
+
     it('validates lead authorization separately from collective scheme and technical coverage', () => {
         const auditors = [
             { name: 'Lead One', competenceRecords: [{ scheme: 'ISO/IEC 27001:2022', roles: ['Lead Auditor'], status: 'Approved', validUntil: '2027-01-01' }] },
