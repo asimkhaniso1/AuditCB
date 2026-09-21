@@ -1426,6 +1426,19 @@
             itemCount,
             targetItems: ceiling,
             documentsUsed: list.length,
+            sourceDocumentSnapshot: list.map(doc => ({
+                id: doc.id || null,
+                name: doc.name,
+                category: doc.category || 'General',
+                revision: doc.revision || '',
+                linkedClauses: doc.linkedClauses || '',
+                linkedStandards: doc.linkedStandards || '',
+                linkedStandardLabels: doc.linkedStandardLabels || '',
+                date: doc.date || '',
+                type: doc.type || '',
+                storagePath: doc.storagePath || '',
+                url: doc.url || ''
+            })),
             // Kept on the checklist so the print/export QA pass validates
             // against the scope the checklist was actually built for, rather
             // than re-deriving it from a free-text standard field.
@@ -1655,6 +1668,19 @@
             itemCount,
             targetItems: budget || null,
             documentsUsed: list.length,
+            sourceDocumentSnapshot: list.map(doc => ({
+                id: doc.id || null,
+                name: doc.name,
+                category: doc.category || 'General',
+                revision: doc.revision || '',
+                linkedClauses: doc.linkedClauses || '',
+                linkedStandards: doc.linkedStandards || '',
+                linkedStandardLabels: doc.linkedStandardLabels || '',
+                date: doc.date || '',
+                type: doc.type || '',
+                storagePath: doc.storagePath || '',
+                url: doc.url || ''
+            })),
             createdBy: (window.state && window.state.currentUser && window.state.currentUser.name) || 'Admin',
             createdAt: new Date().toISOString().split('T')[0],
             updatedAt: new Date().toISOString().split('T')[0],
@@ -3542,6 +3568,10 @@
                     client_id: checklist.clientId || null,
                     client_name: checklist.clientName || null,
                     clauses: checklist.clauses,
+                    qa_context: {
+                        ...(checklist.qaContext || {}),
+                        sourceDocuments: checklist.sourceDocumentSnapshot || []
+                    },
                     created_by: checklist.createdBy,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()

@@ -1177,8 +1177,53 @@ function getClientAuditsHTML(client) {
 `;
 }
 
+function recoverClientDocumentReferences(client) {
+    const clientId = String(client.id || '');
+    const clientName = String(client.name || '').trim().toLowerCase();
+    const related = (window.state.checklists || []).filter(checklist =>
+        String(checklist.clientId || '') === clientId
+        || String(checklist.clientName || '').trim().toLowerCase() === clientName
+        || String(checklist.name || '').toLowerCase().includes(clientName)
+    );
+    const recovered = [];
+    related.forEach(checklist => {
+        const snapshot = checklist.sourceDocumentSnapshot || checklist.qaContext?.sourceDocuments || [];
+        snapshot.forEach(doc => recovered.push({ ...doc, recovered: true }));
+        if (snapshot.length) return;
+        const strings = [];
+        const visit = value => {
+            if (typeof value === 'string') strings.push(value);
+            else if (Array.isArray(value)) value.forEach(visit);
+            else if (value && typeof value === 'object') Object.values(value).forEach(visit);
+        };
+        visit(checklist.clauses || []);
+        strings.forEach(text => {
+            const marker = 'Documented information on file that should support this:';
+            const position = text.indexOf(marker);
+            if (position < 0) return;
+            text.slice(position + marker.length).replace(/\.$/, '').split(';').forEach(reference => {
+                const name = reference.trim().replace(/\s+\([^)]*\)$/, '').trim();
+                if (name) recovered.push({ name, category: 'Recovered reference', recovered: true });
+            });
+        });
+    });
+    const unique = new Map();
+    recovered.filter(doc => doc?.name).forEach((doc, index) => {
+        const key = String(doc.name).trim().toLowerCase();
+        if (!unique.has(key)) unique.set(key, {
+            ...doc,
+            id: doc.id || `recovered-${index}`,
+            date: doc.date || '',
+            notes: doc.notes || 'Reference recovered from the generated checklist. Re-upload the file if the attachment is required.'
+        });
+    });
+    return [...unique.values()];
+}
+
 function getClientDocumentsHTML(client) {
-    const docs = client.documents || [];
+    const savedDocs = client.documents || [];
+    const recoveredDocs = savedDocs.length ? [] : recoverClientDocumentReferences(client);
+    const docs = savedDocs.length ? savedDocs : recoveredDocs;
     return `
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -1209,6 +1254,7 @@ function getClientDocumentsHTML(client) {
                 ` : ''}
         </div>
             
+            ${recoveredDocs.length ? `<div class="alert alert-warning" style="margin-bottom:1rem;"><strong>Document references recovered from the client-specific checklist.</strong> Their original attachments were not retained by the previous sync. Re-upload any files you need to open or download.</div>` : ''}
             ${docs.length > 0 ? `
                 <div class="table-container">
                     <table>
@@ -1234,9 +1280,9 @@ function getClientDocumentsHTML(client) {
                                     <td style="font-size: 0.85rem;">${doc.linkedClauses ? '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-size:0.78rem;">' + window.UTILS.escapeHtml(doc.linkedClauses) + '</span>' : '<span style="color:#94a3b8;">—</span>'}</td>
                                     <td>${window.UTILS.escapeHtml(doc.date)}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="viewDocumentNotes" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" title="View Notes" aria-label="View"><i class="fa-solid fa-eye"></i></button>
+                                        ${doc.recovered ? '<span style="font-size:.75rem;color:#b45309;">Re-upload file</span>' : `<button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="viewDocumentNotes" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" title="View Notes" aria-label="View"><i class="fa-solid fa-eye"></i></button>`}
                                         ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
-                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteDocument" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
+                                        ${doc.recovered ? '' : `<button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteDocument" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>`}
                                         ` : ''}
                                     </td>
                                 </tr>
@@ -2490,7 +2536,7 @@ window.handleIndustryChange = function (select) {
 
                 client.documents.push(newDoc);
 
-                window.saveData();
+                window.DataService.syncClient(client);
                 window.closeModal();
                 renderClientDetail(clientId);
                 setTimeout(() => {
@@ -2528,13 +2574,13 @@ window.handleIndustryChange = function (select) {
     };
 
     // Delete Document Helper
-    window.deleteDocument = function (clientId, docId) {
+    window.deleteDocument = async function (clientId, docId) {
         const client = window.DataService.findClient(clientId);
         if (!client || !client.documents) return;
 
         if (confirm('Are you sure you want to delete this document?')) {
             client.documents = client.documents.filter(d => d.id !== docId);
-            window.saveData();
+            await window.DataService.syncClient(client);
             renderClientDetail(clientId);
             setTimeout(() => {
                 document.querySelector('.tab-btn[data-tab="documents"]')?.click();

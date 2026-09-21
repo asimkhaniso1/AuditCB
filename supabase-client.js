@@ -1288,6 +1288,7 @@ const SupabaseClient = {
                     profileUpdated: client.profileUpdated || null,
                     profileHistory: client.profileHistory || [],
                     certificates: client.certificates || [],
+                    documents: client.documents || [],
                     nextAudit: client.nextAudit || null
                 }
             };
@@ -1355,6 +1356,7 @@ const SupabaseClient = {
                         profileHistory: client.profileHistory || [],
                         certificates: client.certificates || [],
                         certificationLifecycleEvents: client.certificationLifecycleEvents || [],
+                        documents: client.documents || [],
                         nextAudit: client.nextAudit || null
                     }
                 }));
@@ -1458,6 +1460,7 @@ const SupabaseClient = {
                     profileUpdated: (client.data && client.data.profileUpdated) || null,
                     profileHistory: (client.data && client.data.profileHistory) || [],
                     certificates: (client.data && client.data.certificates) || [],
+                    documents: (client.data && client.data.documents) || [],
                     nextAudit: (client.data && client.data.nextAudit) || null
                 };
 
@@ -2016,7 +2019,10 @@ const SupabaseClient = {
                 // made them.
                 ready_for_audit: checklist.readyForAudit || null,
                 resolved_issues: checklist.resolvedIssues || null,
-                qa_context: checklist.qaContext || null,
+                qa_context: {
+                    ...(checklist.qaContext || {}),
+                    sourceDocuments: checklist.sourceDocumentSnapshot || checklist.qaContext?.sourceDocuments || []
+                },
                 updated_at: new Date().toISOString()
             }));
 
@@ -2071,6 +2077,7 @@ const SupabaseClient = {
                 readyForAudit: checklist.ready_for_audit || undefined,
                 resolvedIssues: checklist.resolved_issues || undefined,
                 qaContext: checklist.qa_context || undefined,
+                sourceDocumentSnapshot: checklist.qa_context?.sourceDocuments || [],
                 createdAt: checklist.created_at,
                 updatedAt: checklist.updated_at
             }));
