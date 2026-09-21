@@ -61,12 +61,57 @@ describe('NCR Register Search field has no inline event handler', () => {
         expect(src).not.toMatch(/\bon(click|change|keyup|keydown|input|blur|submit|focus)\s*=\s*"/);
     });
 
-    it('filterNCRs is declared with no top-level IIFE wrapper around it, so a real classic-script page load (index.html loads this file without type="module") attaches it to window the way every other data-action-change="filterNCRs" control on this same filter bar already relies on', () => {
-        expect(src).toMatch(/^function filterNCRs\(\)/m);
-        // Guard against a future refactor silently wrapping the file in an
-        // IIFE, which would break that window-attachment assumption for
-        // filterNCRs and every other un-exported top-level function here.
-        expect(src.trimStart().startsWith('(function')).toBe(false);
+    it('exports filterNCRs explicitly for delegated change and input events', () => {
+        expect(src).toMatch(/window\.filterNCRs\s*=\s*function/);
+        expect(typeof window.filterNCRs).toBe('function');
+    });
+});
+
+describe('NCR Register filters', () => {
+    beforeEach(() => {
+        window.state = { ncrs: [], auditPlans: [], activeClientId: null, ncrContextClientId: null };
+        document.body.innerHTML = `
+            <select id="filter-level"><option value="all" selected>All</option><option value="client">Client</option></select>
+            <select id="filter-severity"><option value="all">All</option><option value="Major">Major</option><option value="Minor" selected>Minor</option></select>
+            <select id="filter-status"><option value="all" selected>All</option><option value="Open">Open</option></select>
+            <input id="filter-search" value="">
+            <div id="ncr-table-container"></div>
+        `;
+    });
+
+    it('matches lowercase stored severities and keeps advisory findings out of the NCR Register', () => {
+        window.state.ncrs = [
+            ncr({ id: 'minor-lower', severity: 'minor', description: 'Lowercase minor record' }),
+            ncr({ id: 'major-upper', severity: 'Major', description: 'Major record' }),
+            ncr({ id: 'legacy-observation', severity: 'observation', description: 'Advisory observation' }),
+            ncr({ id: 'legacy-ofi', severity: 'OFI', description: 'Advisory opportunity' })
+        ];
+
+        window.filterNCRs();
+        const html = document.getElementById('ncr-table-container').innerHTML;
+
+        expect(html).toContain('Lowercase minor record');
+        expect(html).not.toContain('Major record');
+        expect(html).not.toContain('Advisory observation');
+        expect(html).not.toContain('Advisory opportunity');
+    });
+
+    it('applies level, status and search filters together', () => {
+        window.state.ncrs = [
+            ncr({ id: 'match-101', level: 'CLIENT', severity: 'Minor', status: 'open', description: 'Backup restoration evidence' }),
+            ncr({ id: 'wrong-level', level: 'cb-internal', severity: 'Minor', status: 'Open', description: 'Backup restoration evidence' }),
+            ncr({ id: 'wrong-status', level: 'client', severity: 'Minor', status: 'Closed', description: 'Backup restoration evidence' })
+        ];
+        document.getElementById('filter-level').value = 'client';
+        document.getElementById('filter-status').value = 'Open';
+        document.getElementById('filter-search').value = 'restoration';
+
+        window.filterNCRs();
+        const html = document.getElementById('ncr-table-container').innerHTML;
+
+        expect(html).toContain('match-101');
+        expect(html).not.toContain('wrong-level');
+        expect(html).not.toContain('wrong-status');
     });
 });
 

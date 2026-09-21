@@ -790,6 +790,20 @@ function matchesActiveNCRClient(rec) {
     return !!client && String(recName).trim().toLowerCase() === String(client.name || '').trim().toLowerCase();
 }
 
+function normalizedNCRSeverity(record) {
+    const value = String(record?.severity || record?.ncrType || record?.type || '').trim().toLowerCase();
+    if (value === 'major' || value === 'major nc' || value === 'major nonconformity') return 'major';
+    if (value === 'minor' || value === 'minor nc' || value === 'minor nonconformity') return 'minor';
+    return value;
+}
+
+function isMajorMinorNCR(record) {
+    return ['major', 'minor'].includes(normalizedNCRSeverity(record));
+}
+
+window.NCRModule.normalizedSeverity = normalizedNCRSeverity;
+window.NCRModule.isMajorMinor = isMajorMinorNCR;
+
 // --------------------------------------------
 // TAB 1: NCR REGISTER
 // --------------------------------------------
@@ -800,6 +814,9 @@ function getNCRRegisterHTML() {
     // Filter by Context (if viewing a specific client) — matchesActiveNCRClient
     // also covers legacy records that only carry clientName, not clientId.
     ncrs = ncrs.filter(matchesActiveNCRClient);
+
+    // Advisory findings are shown under OFI / OBS, not in the NCR Register.
+    ncrs = ncrs.filter(isMajorMinorNCR);
 
     // Default register view excludes Withdrawn records (still inspectable via the
     // Status filter dropdown, which offers an explicit "Withdrawn" option).
@@ -841,7 +858,6 @@ function getNCRRegisterHTML() {
                             <option value="all">All</option>
                             <option value="Major">Major</option>
                             <option value="Minor">Minor</option>
-                            <option value="Observation">Observation</option>
                         </select>
                     </div>
                     <div class="form-group" style="margin: 0;">
@@ -913,8 +929,8 @@ function renderNCRTable(ncrs) {
                             <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(resolveAuditRef(ncr))}</td>
                             <td>${renderClauseCell(ncr)}</td>
                             <td>
-                                <span class="badge" style="background: ${ncr.severity === 'Major' ? '#dc2626' : ncr.severity === 'Minor' ? '#f59e0b' : '#3b82f6'}; color: white;">
-                                    ${ncr.severity}
+                                <span class="badge" style="background: ${normalizedNCRSeverity(ncr) === 'major' ? '#dc2626' : '#f59e0b'}; color: white;">
+                                    ${normalizedNCRSeverity(ncr) === 'major' ? 'Major' : 'Minor'}
                                 </span>
                             </td>
                             <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -961,36 +977,38 @@ function renderNCRTable(ncrs) {
     `;
 }
 
-// eslint-disable-next-line no-unused-vars
-function filterNCRs() {
-    const level = document.getElementById('filter-level').value;
-    const severity = document.getElementById('filter-severity').value;
-    const status = document.getElementById('filter-status').value;
-    const search = document.getElementById('filter-search').value.toLowerCase();
+window.filterNCRs = function () {
+    const level = String(document.getElementById('filter-level')?.value || 'all').toLowerCase();
+    const severity = String(document.getElementById('filter-severity')?.value || 'all').toLowerCase();
+    const status = String(document.getElementById('filter-status')?.value || 'all').toLowerCase();
+    const search = String(document.getElementById('filter-search')?.value || '').trim().toLowerCase();
 
     let ncrs = window.state.ncrs || [];
 
     // Always apply context filter first
     ncrs = ncrs.filter(matchesActiveNCRClient);
+    ncrs = ncrs.filter(isMajorMinorNCR);
 
     let filtered = ncrs.filter(ncr => {
         // Withdrawn records are hidden from the default ("all") view — they're
         // still inspectable by explicitly selecting the "Withdrawn" status filter.
         if (status === 'all' && isWithdrawnNCR(ncr)) return false;
-        if (level !== 'all' && ncr.level !== level) return false;
-        if (severity !== 'all' && ncr.severity !== severity) return false;
-        if (status !== 'all' && ncr.status !== status) return false;
+        if (level !== 'all' && String(ncr.level || '').toLowerCase() !== level) return false;
+        if (severity !== 'all' && normalizedNCRSeverity(ncr) !== severity) return false;
+        if (status !== 'all' && String(ncr.status || '').toLowerCase() !== status) return false;
         if (search) {
             const match = (ncr.description || '').toLowerCase().includes(search) ||
                 (ncr.clause || '').toLowerCase().includes(search) ||
-                (ncr.clientName || '').toLowerCase().includes(search);
+                (ncr.clientName || ncr.client || '').toLowerCase().includes(search) ||
+                String(ncr.id || '').toLowerCase().includes(search) ||
+                resolveAuditRef(ncr).toLowerCase().includes(search);
             if (!match) return false;
         }
         return true;
     });
 
     document.getElementById('ncr-table-container').innerHTML = renderNCRTable(filtered);
-}
+};
 
 // --------------------------------------------
 // TAB 2: OFI / OBS (Read-Only Tracking)
@@ -1560,7 +1578,6 @@ window.openNewNCRModal = function () {
                 <select class="form-control" id="ncr-severity" required>
                     <option value="Major">Major</option>
                     <option value="Minor">Minor</option>
-                    <option value="Observation">Observation/OFI</option>
                 </select>
             </div>
             <div class="form-group">
