@@ -442,7 +442,7 @@ function getDurationMethodologyManagerHTML() {
             </div>
             <div style="margin-top:1rem;font-weight:600;">Duration table</div><div style="font-size:.78rem;color:#64748b;margin-bottom:.35rem;">Enter the employee ranges and approved auditor-days for each audit type.</div>
             <div class="table-container"><table><thead><tr><th>Audit type</th><th>Employees from</th><th>Employees to</th><th>Auditor-days</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b;">No duration rows yet.</td></tr>'}</tbody></table></div>
-            <div style="display:flex;gap:.4rem;flex-wrap:wrap;"><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Surveillance 1"><i class="fa-solid fa-plus"></i> S1 row</button><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Surveillance 2"><i class="fa-solid fa-plus"></i> S2 row</button><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Recertification"><i class="fa-solid fa-plus"></i> Recertification row</button></div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;"><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Surveillance 1"><i class="fa-solid fa-plus"></i> S1 row</button><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Surveillance 2"><i class="fa-solid fa-plus"></i> S2 row</button><button type="button" class="btn btn-sm btn-outline-primary" data-action="addDurationBand" data-arg1="${esc(family)}" data-arg2="Recertification"><i class="fa-solid fa-plus"></i> Recertification row</button><button type="button" class="btn btn-sm btn-outline-secondary" data-action="replaceDurationWithStarterBands" data-id="${esc(family)}"><i class="fa-solid fa-rotate"></i> Replace with complete starter bands</button></div>
             <details style="margin-top:1rem;"><summary style="cursor:pointer;font-weight:600;color:#475569;">Approval details</summary><div style="display:grid;grid-template-columns:2fr 1fr;gap:.75rem;margin-top:.75rem;"><div><label>Controlled source/reference</label><input class="form-control" value="${esc(method.sourceReference || '')}" placeholder="Procedure/document and revision" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="sourceReference" data-arg3="this.value"></div><div><label>Approved by</label><input class="form-control" value="${esc(method.approvedBy || '')}" data-action-change="updateDurationMethodologyField" data-arg1="${esc(family)}" data-arg2="approvedBy" data-arg3="this.value"></div></div></details>
         </div>`;
     }).join('');
@@ -590,6 +590,19 @@ window.removeDurationMethodology = function (family) {
     rerenderDurationManager();
 };
 
+window.replaceDurationWithStarterBands = function (family) {
+    const method = getDurationDraft().registry[family];
+    if (!method) return;
+    method.tables = basicDurationTables();
+    method.version = '';
+    method.sourceReference = '';
+    method.approvedBy = '';
+    method.starterTemplate = true;
+    window._durationMethodologyValidationErrors = [];
+    rerenderDurationManager();
+    window.showNotification(`ISO ${family} now has complete starter bands. Re-verify the figures and approval details before activation.`, 'info');
+};
+
 window.updateDurationMethodologyField = function (family, field, value) {
     const method = getDurationDraft().registry[family];
     if (method) {
@@ -665,10 +678,20 @@ function validateDurationMethodologyDraft(draft) {
         });
         Object.entries(method.tables || {}).forEach(([stage, rows]) => {
             const sorted = (rows || []).slice().sort((a, b) => Number(a.minEmployees) - Number(b.minEmployees));
+            if (!sorted.length) {
+                errors.push(`${family} ${stage}: add employee bands.`);
+                return;
+            }
+            if (Number(sorted[0].minEmployees) !== 1) errors.push(`${family} ${stage}: coverage must start at 1 employee.`);
             sorted.forEach((row, index) => {
                 const previous = sorted[index - 1];
                 if (previous && (previous.maxEmployees == null || Number(row.minEmployees) <= Number(previous.maxEmployees))) errors.push(`${family} ${stage}: employee bands overlap.`);
+                if (previous && previous.maxEmployees != null && Number(row.minEmployees) !== Number(previous.maxEmployees) + 1) errors.push(`${family} ${stage}: employee bands contain a gap before ${row.minEmployees}.`);
             });
+            if (sorted.at(-1)?.maxEmployees != null) errors.push(`${family} ${stage}: the final employee band must have no upper limit.`);
+        });
+        ['Surveillance 1', 'Surveillance 2', 'Recertification'].forEach(stage => {
+            if (!Array.isArray(method.tables?.[stage]) || !method.tables[stage].length) errors.push(`${family}: ${stage} duration bands are required.`);
         });
     });
     if (draft.ims) {

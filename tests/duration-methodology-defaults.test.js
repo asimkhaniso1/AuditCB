@@ -114,4 +114,50 @@ describe('duration methodology starter defaults', () => {
         expect(method.approvedBy).toBe('Technical Manager');
         expect(method.starterTemplate).toBe(false);
     });
+
+    it('can replace an incomplete approved table with complete starter bands for re-approval', () => {
+        window._durationMethodologyDraft = {
+            registry: {
+                27001: {
+                    name: 'ISO 27001 rules', version: 'Rev 1', sourceReference: 'PROC-1', approvedBy: 'Manager',
+                    tables: { Recertification: [{ minEmployees: 1, maxEmployees: 250, days: 2 }] }
+                }
+            },
+            ims: null
+        };
+
+        window.replaceDurationWithStarterBands('27001');
+        const method = window._durationMethodologyDraft.registry['27001'];
+
+        expect(method.tables.Recertification).toHaveLength(7);
+        expect(method.tables.Recertification.at(-1).maxEmployees).toBeNull();
+        expect(method.version).toBe('');
+        expect(method.approvedBy).toBe('');
+        expect(method.starterTemplate).toBe(true);
+    });
+
+    it('blocks activation when an employee-band gap would leave a client without a duration row', async () => {
+        const complete = [
+            { minEmployees: 1, maxEmployees: 250, days: 1 },
+            { minEmployees: 300, maxEmployees: null, days: 2 }
+        ];
+        window._durationMethodologyDraft = {
+            registry: {
+                27001: {
+                    name: 'ISO 27001 rules', version: 'Rev 1', sourceReference: 'PROC-1', approvedBy: 'Manager',
+                    tables: {
+                        'Surveillance 1': structuredClone(complete),
+                        'Surveillance 2': structuredClone(complete),
+                        Recertification: structuredClone(complete)
+                    }
+                }
+            },
+            ims: null
+        };
+
+        await window.saveDurationMethodologies();
+
+        expect(window._durationMethodologyValidationErrors).toContain('27001 Recertification: employee bands contain a gap before 300.');
+        expect(window.state.cbSettings.durationMethodologies['27001']).toBeUndefined();
+    });
 });

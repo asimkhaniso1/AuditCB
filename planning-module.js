@@ -1044,6 +1044,7 @@ function autoCalculateDays() {
             document.getElementById('plan-mandays').value = '';
             const setupButton = document.getElementById('btn-open-duration-setup');
             if (setupButton) setupButton.style.display = 'block';
+            window.Validator?.clearErrors?.({ manDays: 'plan-mandays', onsiteDays: 'plan-onsite-days' });
             window.showNotification('Duration cannot be calculated until an approved, versioned CB methodology is configured for every selected scheme.', 'warning');
             return;
         }
