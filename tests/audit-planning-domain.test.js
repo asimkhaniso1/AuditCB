@@ -104,6 +104,21 @@ describe('certification-cycle-driven audit planning domain', () => {
         expect(result.baselineDays).toBe(3);
     });
 
+    it('falls back to defaults when a legacy configured rule has no applicable stage row', () => {
+        const methodology = Domain.resolveDurationMethodology({
+            durationMethodologies: {
+                27001: { name: 'Legacy ISMS rules', version: 'Rev 1', tables: { Recertification: [] } }
+            }
+        }, ['ISO/IEC 27001:2022']);
+        const result = Domain.calculateConfiguredDuration(methodology, {
+            employees: 300, sites: 1, auditType: 'Recertification', riskLevel: 'Medium'
+        });
+
+        expect(result.configured).toBe(true);
+        expect(result.baselineDays).toBe(3);
+        expect(result.results[0].defaultUsed).toBe(true);
+    });
+
     it('resolves complete draft tables for provisional planning without treating them as approved', () => {
         const standards = ['ISO/IEC 27001:2022', 'ISO 22301:2019'];
         const draftMethod = (name) => ({

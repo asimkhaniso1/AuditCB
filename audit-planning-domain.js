@@ -225,11 +225,21 @@
     function resolveDurationMethodology(settings, standards) {
         const registry = settings?.durationMethodologies || {};
         const families = [...new Set(safeArray(standards).map(standardFamily).filter(Boolean))];
-        const methods = families.map((family) => registry[family] || {
-            name: `ISO ${family} default duration rules`,
-            version: DEFAULT_DURATION_VERSION,
-            tables: DEFAULT_DURATION_TABLES,
-            builtInDefault: true
+        const methods = families.map((family) => {
+            const configured = registry[family];
+            if (!configured) return {
+                name: `ISO ${family} default duration rules`,
+                version: DEFAULT_DURATION_VERSION,
+                tables: DEFAULT_DURATION_TABLES,
+                builtInDefault: true
+            };
+            return {
+                ...configured,
+                name: configured.name || `ISO ${family} duration rules`,
+                version: configured.version || DEFAULT_DURATION_VERSION,
+                fallbackTables: DEFAULT_DURATION_TABLES,
+                usesDefaultFallback: true
+            };
         });
         const versions = [...new Set(methods.map((method) => method.version || DEFAULT_DURATION_VERSION))];
         return {
@@ -238,7 +248,7 @@
             name: methods.map((method) => method.name).join(' + '),
             methods,
             missingFamilies: [],
-            usesDefaults: methods.some((method) => method.builtInDefault)
+            usesDefaults: methods.some((method) => method.builtInDefault || method.usesDefaultFallback)
         };
     }
 
@@ -261,15 +271,21 @@
         if (!methodology?.configured) return { configured: false, error: 'Approved duration methodology configuration is incomplete.' };
         const results = methodology.methods.map((method) => {
             const table = safeArray(method.tables?.[input.auditType] || method.employeeBands);
-            const band = table.find((row) => Number(input.employees) >= Number(row.minEmployees || 0)
+            let band = table.find((row) => Number(input.employees) >= Number(row.minEmployees || 0)
                 && (row.maxEmployees == null || Number(input.employees) <= Number(row.maxEmployees)));
+            let defaultUsed = Boolean(method.builtInDefault);
+            if (!band || !(Number(band.days) > 0)) {
+                band = safeArray(method.fallbackTables?.[input.auditType]).find((row) => Number(input.employees) >= Number(row.minEmployees || 0)
+                    && (row.maxEmployees == null || Number(input.employees) <= Number(row.maxEmployees)));
+                defaultUsed = Boolean(band && Number(band.days) > 0);
+            }
             if (!band || !(Number(band.days) > 0)) return { error: `${method.name || 'Methodology'} has no applicable duration table row.` };
             let days = Number(band.days);
             const siteRule = method.siteAdjustment;
             if (siteRule && Number(input.sites) > 1) days += (Number(input.sites) - 1) * Number(siteRule.daysPerAdditionalSite || 0);
             const riskAdjustment = Number(method.riskAdjustments?.[input.riskLevel] || 0);
             days += riskAdjustment;
-            return { name: method.name, version: method.version, days, band, riskAdjustment, siteAdjustment: days - Number(band.days) - riskAdjustment };
+            return { name: method.name, version: method.version, days, band, defaultUsed, riskAdjustment, siteAdjustment: days - Number(band.days) - riskAdjustment };
         });
         const failed = results.find((result) => result.error);
         if (failed) return { configured: false, error: failed.error, results };

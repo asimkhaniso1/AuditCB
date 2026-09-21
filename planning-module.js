@@ -1071,13 +1071,14 @@ function autoCalculateDays() {
         const imsConfig = window.state?.cbSettings?.imsMethodology || domain?.DEFAULT_IMS_RULE;
         const draftIMS = window.state?.cbSettings?.imsMethodologyDraft;
         const calculationIMS = provisional ? draftIMS : imsConfig;
+        const defaultDurationUsed = Boolean(calculated.results?.some(result => result.defaultUsed));
         const imsDefault = cycle.standards.length > 1 && Number.isFinite(Number(calculationIMS?.defaultAdjustmentPercent))
             ? Number(calculationIMS.defaultAdjustmentPercent) : 0;
         document.getElementById('plan-baseline-days').value = baseline.toFixed(1);
         document.getElementById('plan-ims-adjustment').value = imsDefault;
         document.getElementById('plan-duration-basis').value = provisional
             ? `PROVISIONAL PLANNING ONLY — ${calculationMethodology.name} · unapproved draft${cycle.standards.length > 1 ? ` · IMS ${draftIMS?.version || 'draft/unapproved'}` : ''}`
-            : `${calculationMethodology.name} · version ${calculationMethodology.version}${calculationMethodology.usesDefaults ? ' · default guide for auditor review' : ''}${cycle.standards.length > 1 ? ` · IMS ${imsConfig?.version}` : ''}`;
+            : `${calculationMethodology.name} · version ${calculationMethodology.version}${defaultDurationUsed ? ' · default guide for auditor review' : ''}${cycle.standards.length > 1 ? ` · IMS ${imsConfig?.version}` : ''}`;
         recalculateDurationAllocation();
         window.showNotification(provisional
             ? `Provisional planning duration calculated: ${baseline.toFixed(1)} days. Save as Draft; activate the approved methodology before final validation.`
