@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { buildScenario, M } from '../tools/pcc-scenario.mjs';
@@ -109,6 +109,58 @@ describe('agenda row editor — no "Other", no auditor guessed, no text re-escap
         // auditorId still points at "Second Auditor" — id wins over name.
         window.addAgendaRow({ item: 'session', dept: 'IT', auditor: 'Some Other Name', auditorId: 'aud-2' });
         expect(selectOf(lastRow()).value).toBe('Second Auditor');
+    });
+});
+
+describe('reopening a saved plan for editing', () => {
+    beforeEach(() => {
+        window.UTILS = M.UTILS;
+        document.body.innerHTML = '';
+        window.contentArea = document.createElement('div');
+        document.body.appendChild(window.contentArea);
+        window.state = s.state;
+        window.state.activeClientId = null;
+        window.editingPlanId = null;
+    });
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('restores the agenda AFTER the Lead Auditor/Team selects, not before — the plan is a single Lead Auditor and every saved row must show them, never "select auditor"', () => {
+        vi.useFakeTimers();
+        window.editAuditPlan(s.plan.id);
+        vi.advanceTimersByTime(1000);
+        vi.useRealTimers();
+
+        expect(document.getElementById('plan-lead-auditor').value).toBe('Muhammad Asim Khan');
+        const rows = Array.from(document.querySelectorAll('#agenda-tbody tr'));
+        expect(rows.length).toBeGreaterThan(0);
+        rows.forEach(row => {
+            const sel = row.querySelector('select');
+            const meta = JSON.parse(row.dataset.meta || '{}');
+            if (meta.kind === 'lunch') { expect(sel.value).toBe('N/A'); return; }
+            expect(sel.value, row.innerHTML).toBe('Muhammad Asim Khan');
+            expect(sel.options[0].textContent).not.toMatch(/select auditor/);
+        });
+    });
+
+    it('keeps a checklist linked through Configure attached after re-saving the plan through this form — the form has no field for it, so the save must carry it forward itself', () => {
+        expect(s.plan.selectedChecklists).toEqual([s.checklist.id]); // sanity: really linked going in
+
+        vi.useFakeTimers();
+        window.editAuditPlan(s.plan.id);
+        vi.advanceTimersByTime(1000);
+        vi.useRealTimers();
+
+        window.Validator = { validateFormElements: () => ({ valid: true, errors: {} }), displayErrors: () => { }, clearErrors: () => { } };
+        window.saveData = () => { };
+        window.viewAuditPlan = () => { };
+        window.SupabaseClient = null;
+        window.alert = () => { };
+
+        window.saveAuditPlan(false, true); // Save Draft — no field on this form sets selectedChecklists
+
+        const saved = state.auditPlans.find(p => String(p.id) === String(s.plan.id));
+        expect(saved.selectedChecklists).toEqual([s.checklist.id]);
+        expect(saved.validationSnapshot.warnings.join(' ')).not.toMatch(/No audit checklist is linked to the plan/);
     });
 });
 
