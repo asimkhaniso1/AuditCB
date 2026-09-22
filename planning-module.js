@@ -435,13 +435,13 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                     <label>Lead Auditor</label>
                                     <select class="form-control" id="plan-lead-auditor">
                                         <option value="">-- Select Lead Auditor --</option>
-                                        ${state.auditors.filter(a => a.role === 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                                        ${state.auditors.filter(a => a.role === 'Lead Auditor').map(a => `<option value="${a.name}" data-id="${a.id}">${a.name}</option>`).join('')}
                                     </select>
                                 </div>
                                 <div class="form-group" style="margin: 0;">
                                     <label>Team Members</label>
                                     <select class="form-control" id="plan-team" multiple style="height: 100px;">
-                                        ${state.auditors.filter(a => a.role !== 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                                        ${state.auditors.filter(a => a.role !== 'Lead Auditor').map(a => `<option value="${a.name}" data-id="${a.id}">${a.name}</option>`).join('')}
                                     </select>
                                     <small style="color: var(--text-secondary); display: block; margin-top: 4px;">Hold Ctrl/Cmd to select multiple</small>
                                 </div>
@@ -2568,20 +2568,32 @@ function addAgendaRow(data = {}) {
     const df = window.DocFormat;
     const plain = (v) => (df ? df.decodeEntities(String(v == null ? '' : v)) : String(v == null ? '' : v));
     const esc = window.UTILS.escapeHtml;
+    // Trim + collapse whitespace before comparing names: two independently
+    // sourced strings (the row's saved auditor and the live <select> option)
+    // can carry incidental whitespace/case differences even when they name
+    // the same person, and a mismatch must never silently blank the row.
+    const norm = (v) => plain(v).trim().replace(/\s+/g, ' ').toLowerCase();
 
     // The auditors ON THIS PLAN are the only choices. There is no "Other": that
     // option used to be selected whenever the stored value matched no other
     // option (the prompt taught the model to answer "All Team", which matched
     // nothing), so every row saved as "Other". A row whose auditor cannot be
-    // resolved is left BLANK, which the plan gate reports by row.
-    const leadVal = document.getElementById('plan-lead-auditor')?.value || '';
-    const teamVals = Array.from(document.getElementById('plan-team')?.selectedOptions || []).map(o => o.value);
-    const team = [...new Set([leadVal, ...teamVals].filter(Boolean))];
+    // resolved is left BLANK, which the plan gate reports by row \u2014 UNLESS the
+    // team has exactly one person, who is then the only possible answer and
+    // is never left for the auditor to re-pick.
+    const leadOpt = document.getElementById('plan-lead-auditor')?.selectedOptions[0];
+    const teamOpts = Array.from(document.getElementById('plan-team')?.selectedOptions || []);
+    const seen = new Set();
+    const team = [leadOpt, ...teamOpts].filter(o => o && o.value && !seen.has(o.value) && seen.add(o.value))
+        .map(o => ({ name: o.value, id: o.dataset.id || '' }));
+
     const isBreak = data.kind === 'lunch' || /^lunch|^break/i.test(String(data.item || ''));
-    const wanted = plain(data.auditor).trim();
-    let chosen = team.find(a => a.toLowerCase() === wanted.toLowerCase()) || '';
-    // On a one-person team "All Team" / "All" / a legacy "Other" can only mean the lead.
-    if (!chosen && team.length === 1 && /^(all team|all|other|none)?$/i.test(wanted)) chosen = team[0];
+    const wantedId = data.auditorId != null ? String(data.auditorId) : '';
+    const wanted = norm(data.auditor);
+    // ID first (immune to name drift), then a normalised name match.
+    let match = (wantedId && team.find(t => t.id && t.id === wantedId)) || team.find(t => norm(t.name) === wanted) || null;
+    if (!match && team.length === 1 && !isBreak) match = team[0];
+    let chosen = match ? match.name : '';
     // On a real team "All Team" is a legitimate joint activity (not a person, so not in `team`).
     if (!chosen && team.length > 1 && /^(all team|all)$/i.test(wanted)) chosen = 'All Team';
     if (isBreak) chosen = 'N/A';
@@ -2590,7 +2602,7 @@ function addAgendaRow(data = {}) {
         isBreak ? '<option value="N/A" selected>N/A</option>' : '',
         !isBreak && !chosen ? '<option value="" selected>\u2014 select auditor \u2014</option>' : '',
         team.length > 1 && !isBreak ? `<option value="All Team" ${chosen === 'All Team' ? 'selected' : ''}>All Team</option>` : '',
-        ...team.map(a => `<option value="${esc(a)}" ${chosen === a ? 'selected' : ''}>${esc(a)}</option>`)
+        ...team.map(t => `<option value="${esc(t.name)}" data-id="${esc(t.id)}" ${chosen === t.name ? 'selected' : ''}>${esc(t.name)}</option>`)
     ].join('');
 
     row.innerHTML = `
@@ -3017,7 +3029,11 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
         const tm = time.match(/(\d{1,2}):(\d{2})\s*(?:-|\u2013|to)\s*(\d{1,2}):(\d{2})/i);
         const pad = (n) => String(n).padStart(2, '0');
         const auditorName = clean(inputs[4].value);
-        const rec = (window.state.auditors || []).find(a => String(a.name || '').toLowerCase() === auditorName.toLowerCase());
+        // The selected <option> carries the auditor's id (see addAgendaRow); prefer
+        // it over a fresh name lookup, which can silently miss on a duplicate or
+        // differently-cased auditor record.
+        const auditorOptId = inputs[4].selectedOptions && inputs[4].selectedOptions[0] ? inputs[4].selectedOptions[0].dataset.id : '';
+        const rec = (window.state.auditors || []).find(a => (auditorOptId && String(a.id) === auditorOptId) || String(a.name || '').toLowerCase() === auditorName.toLowerCase());
         agenda.push({
             day: clean(inputs[0].value),
             time,
