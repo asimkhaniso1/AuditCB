@@ -75,8 +75,8 @@ describe('observation — optional-action workflow', () => {
         expect(ev.notes.join(' ')).toMatch(/not required for this finding type/i);
     });
 
-    it('is settled once evaluated and dispositioned', () => {
-        expect(FW.requiresFollowUp({ type: 'observation' })).toBe(true);
+    it('never forces a scheduled agenda session — only a nonconformity does', () => {
+        expect(FW.requiresFollowUp({ type: 'observation' })).toBe(false);
         expect(FW.requiresFollowUp({ type: 'observation', managementEvaluation: 'x', disposition: 'Accepted' })).toBe(false);
     });
 
@@ -116,6 +116,10 @@ describe('opportunity for improvement — optional-action workflow', () => {
         expect(rejected.ofiRationale).toBeUndefined();
         expect(FW.evaluate(rejected).complete).toBe(true);
         expect(FW.requiresFollowUp(rejected)).toBe(false);
+    });
+
+    it('never forces a scheduled agenda session, decided or not', () => {
+        expect(FW.requiresFollowUp({ type: 'ofi' })).toBe(false);
     });
 
     it('records a voluntary action and improvement-register link when the organisation chooses to', () => {

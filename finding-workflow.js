@@ -183,23 +183,28 @@
     }
 
     /**
-     * Does this finding still need looking at during the next audit?
-     * A nonconformity is settled only when closed AND its effectiveness was
-     * reviewed. An observation or OFI is settled once the organisation has
-     * evaluated / decided it. Anything unclassified or without a recorded
-     * status is treated as open — absence of a record is not closure.
+     * Does this finding force a SCHEDULED session on the next audit plan?
+     * Only a nonconformity does: it is a failure to fulfil a requirement, so
+     * the next audit must verify correction, cause evaluation, corrective
+     * action, implementation and effectiveness (ISO/IEC 27001 10.2, ISO 22301
+     * 10.1, ISO/IEC 20000-1 10.1) — and it is unsettled until closed AND its
+     * effectiveness was reviewed.
+     *
+     * An observation or OFI carries no such obligation: the organisation
+     * evaluates/decides it, not the auditor's next visit. They are reviewed
+     * through the checklist's own "previous findings" item (which asks about
+     * every type — see PREVIOUS_FINDINGS_REQUIREMENT below) and can be raised
+     * to a nonconformity through escalateObservation()/formalCorrectiveActionOpened
+     * if warranted, but they never force an agenda session or block the plan
+     * gate on their own.
      */
     function requiresFollowUp(finding) {
         const f = finding || {};
         const type = normalizeType(f);
         if (/^withdrawn|^cancel/i.test(str(f.status))) return false;
-        if (type === TYPES.NC) {
-            const settled = closedStatus(f) && (has(f.effectiveness) || has(f.verifiedDate) || /verified|effective/i.test(str(f.carStatus || f.status)));
-            return !settled;
-        }
-        if (type === TYPES.OBS) return !(has(f.disposition) && has(f.managementEvaluation));
-        if (type === TYPES.OFI) return !has(f.ofiDecision);
-        return true;
+        if (type !== TYPES.NC) return false;
+        const settled = closedStatus(f) && (has(f.effectiveness) || has(f.verifiedDate) || /verified|effective/i.test(str(f.carStatus || f.status)));
+        return !settled;
     }
 
     /**

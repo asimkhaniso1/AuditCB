@@ -364,14 +364,25 @@ describe('previous findings', () => {
         expect(m.mapped).toBe(true);
         expect(m.via).toBe('added-to-isms-risk-soa');
     });
-    it('includes observations and opportunities for improvement as findings, typed and not flattened to NC', async () => {
+    it('includes observations and opportunities for improvement as findings, typed and not flattened to NC — but only nonconformities are scheduled', async () => {
         const s = await buildScenario({ mutate: ({ state }) => state.ncrs.push(
             { id: 'OBS-1', clientId: CLIENT_ID, auditId: 'plan-pcc-s2-2025', clause: '7.2', type: 'observation', status: 'Open', description: 'Competence records thin' },
             { id: 'OFI-1', clientId: CLIENT_ID, auditId: 'plan-pcc-s2-2025', clause: '9.1', type: 'ofi', description: 'Trend the KPIs' }) });
         const types = Object.fromEntries(s.asm.findings.map(f => [f.id, f.type]));
         expect(types['OBS-1']).toBe('observation');
         expect(types['OFI-1']).toBe('ofi');
-        expect(s.validation.summary.findings.unmapped).toBe(0);
+        // Present in the findings list (the register holds them), but they do
+        // not force an agenda session: only the 8 nonconformities do.
+        expect(s.asm.findings).toHaveLength(10);
+        expect(s.asm.findings.find(f => f.id === 'OBS-1').requiresFollowUp).toBe(false);
+        expect(s.asm.findings.find(f => f.id === 'OFI-1').requiresFollowUp).toBe(false);
+        expect(s.plan.traceability.summary.findingsRequiringFollowUp).toBe(8);
+        expect(s.validation.summary.findings).toMatchObject({ required: 8, unmapped: 0 });
+        // Never scheduled into any agenda session and never named by the gate.
+        const mapped = new Set(s.plan.agenda.flatMap(r => r.findingIds));
+        expect(mapped.has('OBS-1')).toBe(false);
+        expect(mapped.has('OFI-1')).toBe(false);
+        expect(s.validation.blockers.some(b => b.code === 'FINDING_UNMAPPED' && /OBS-1|OFI-1/.test(b.message))).toBe(false);
     });
     it('does not count a closed, effectiveness-verified nonconformity, or a withdrawn record, as needing follow-up', async () => {
         const s = await buildScenario({ mutate: ({ state }) => {

@@ -89,6 +89,27 @@ describe('agenda row editor — no "Other", no auditor guessed, no text re-escap
         expect(meta).toMatchObject({ sessionId: 'S07', findingIds: ['NCR-1'], date: '2026-11-04', start: '09:30', end: '10:45' });
         expect(meta.standards[0].refs).toEqual(['A.5.24']);
     });
+
+    it('selects the sole auditor on a one-person team even when the stored name does not match exactly (whitespace/case drift between two independent lookups)', () => {
+        mountForm(['Muhammad Asim Khan']);
+        ['muhammad asim khan', 'Muhammad  Asim Khan', 'Muhammad Asim Khan ', 'MUHAMMAD ASIM KHAN'].forEach(a => {
+            window.addAgendaRow({ item: 'session', dept: 'IT', auditor: a });
+            expect(selectOf(lastRow()).value, a).toBe('Muhammad Asim Khan');
+            expect(selectOf(lastRow()).options[0].textContent, a).not.toMatch(/select auditor/);
+        });
+    });
+
+    it('matches by auditor ID first, so a stale/renamed auditor name on the row still resolves', () => {
+        document.body.innerHTML = `
+            <select id="plan-lead-auditor"><option value="Muhammad Asim Khan" data-id="aud-1">Muhammad Asim Khan</option></select>
+            <select id="plan-team" multiple><option value="Second Auditor" data-id="aud-2" selected>Second Auditor</option></select>
+            <table><tbody id="agenda-tbody"></tbody></table>`;
+        document.getElementById('plan-lead-auditor').value = 'Muhammad Asim Khan';
+        // The row's saved NAME belongs to nobody on this plan any more, but its
+        // auditorId still points at "Second Auditor" — id wins over name.
+        window.addAgendaRow({ item: 'session', dept: 'IT', auditor: 'Some Other Name', auditorId: 'aud-2' });
+        expect(selectOf(lastRow()).value).toBe('Second Auditor');
+    });
 });
 
 describe('printing the plan through the application', () => {
