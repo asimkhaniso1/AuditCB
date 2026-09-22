@@ -862,16 +862,21 @@ function editAuditPlan(id) {
             if (plan.criteria) document.getElementById('plan-criteria').value = plan.criteria;
             if (plan.methodology) document.getElementById('plan-methodology').value = plan.methodology;
 
+            // Fill Agenda (Step 2) — AFTER the Lead Auditor/Team Member selects
+            // above are restored. addAgendaRow() reads those selects live to
+            // know who is on the team; doing this earlier (it used to run
+            // right after scheduling this very setTimeout, not after it
+            // fires) built every row against an empty team, so every
+            // dropdown was baked in blank regardless of who the plan is
+            // actually assigned to.
+            const tbody = document.getElementById('agenda-tbody');
+            tbody.innerHTML = '';
+            if (plan.agenda && plan.agenda.length > 0) {
+                plan.agenda.forEach(item => addAgendaRow(item));
+            } else {
+                addAgendaRow({ day: 'Day 1', time: '09:00 - 09:30', item: 'Opening Meeting', dept: 'Top Management', auditor: 'All' });
+            }
         }, 300);
-
-        // Fill Agenda (Step 2)
-        const tbody = document.getElementById('agenda-tbody');
-        tbody.innerHTML = '';
-        if (plan.agenda && plan.agenda.length > 0) {
-            plan.agenda.forEach(item => addAgendaRow(item));
-        } else {
-            addAgendaRow({ day: 'Day 1', time: '09:00 - 09:30', item: 'Opening Meeting', dept: 'Top Management', auditor: 'All' });
-        }
 
         // Fill Audit Objectives, Criteria & Methodology
         if (plan.auditObjectives && document.getElementById('plan-objectives')) {
@@ -3144,6 +3149,13 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
     }
     derivePlanRecords(planData);
     const existing = window.editingPlanId ? state.auditPlans.find(p => String(p.id) === String(window.editingPlanId)) : null;
+    // The checklist link is set separately (Checklist Config > Configure), not
+    // on this form, so it has to be carried forward explicitly — otherwise
+    // every save's own QA computation runs the gate with no checklist at all
+    // and reports "No audit checklist is linked to the plan" even though one
+    // genuinely is (the persisted record itself survives via the state merge
+    // below either way; it's this save's own QA snapshot that was wrong).
+    planData.selectedChecklists = existing?.selectedChecklists || [];
     planData.traceability = window._currentTraceability || existing?.traceability || null;
     // A plan edited after approval is no longer the approved plan.
     const statuses = window.AuditPlanIntegrity ? window.AuditPlanIntegrity.STATUSES : ['Draft \u2014 Internal Review'];
