@@ -564,12 +564,54 @@
         };
     }
 
+    // Milestones a completed audit can be recorded against, and the append-only
+    // event each one writes. Used where an audit WAS performed but never
+    // captured in the app — the surveillance happened, the record did not.
+    const COMPLETION_MILESTONES = Object.freeze({
+        'Surveillance 1': 'surveillance-1-completed',
+        'Surveillance 2': 'surveillance-2-completed',
+        'Recertification': 'recertification-completed'
+    });
+
+    function createCompletionRecord(input) {
+        const cfg = policy(input.settings || {});
+        const milestone = Object.keys(COMPLETION_MILESTONES)
+            .find((name) => name.toLowerCase() === String(input.milestone || '').trim().toLowerCase());
+        if (!milestone) throw new Error('Record Surveillance 1, Surveillance 2, or Recertification.');
+        if (!cfg.overrideRoles.some((role) => String(role).toLowerCase() === String(input.role || '').toLowerCase())) {
+            throw new Error('Current role is not authorized to record a completed audit.');
+        }
+        const performedAt = date(input.performedAt);
+        if (!performedAt) throw new Error('Enter the date the audit was performed (YYYY-MM-DD).');
+        const now = date(input.now) || new Date();
+        if (performedAt > now) throw new Error('An audit cannot be recorded as performed in the future.');
+        return {
+            id: global.crypto?.randomUUID?.() || `CMP-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            milestone, type: COMPLETION_MILESTONES[milestone],
+            performedAt: isoDate(performedAt),
+            note: String(input.note || '').trim(),
+            user: input.user || 'Unknown user', role: input.role,
+            createdAt: input.createdAt || new Date().toISOString()
+        };
+    }
+
+    // Does a completion dated here count towards the cycle on screen? Events
+    // are read within the cycle window, so one dated outside it is filed but
+    // never ticks anything — worth saying before it is written, not after.
+    function completionFallsInCycle(cycleState, performedAt) {
+        const when = date(performedAt);
+        const anchor = date(cycleState?.anchor);
+        if (!when || !anchor) return false;
+        return when >= addDays(anchor, -60);
+    }
+
     const api = {
         POLICY_VERSION, PLAN_STATES, DEFAULT_POLICY, DEFAULT_DURATION_VERSION, DEFAULT_DURATION_TABLES, DEFAULT_IMS_RULE, EVENT_TYPES, policy, standardFamily,
         lifecycleEvents, createLifecycleEvent, resolveCycleContext, resolveCertificateCycle, describeCycleWindow,
         resolveDurationMethodology, resolveProvisionalDurationMethodology,
         calculateConfiguredDuration, validateDuration, validateCompetence, buildCoverageMatrix, reconcileAgenda, canTransition,
-        createOverride, createOverrideRevocation, latestAuthorizedStageOverride
+        createOverride, createOverrideRevocation, latestAuthorizedStageOverride,
+        COMPLETION_MILESTONES, createCompletionRecord, completionFallsInCycle
     };
     global.AuditPlanningDomain = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
