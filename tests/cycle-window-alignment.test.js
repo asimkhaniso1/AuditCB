@@ -195,6 +195,75 @@ describe('recommended audit window belongs to the certificate on the card', () =
     });
 });
 
+describe('a window can never read backwards', () => {
+    // LANGUAGE SERVICES UK: certificates are re-issued ANNUALLY inside a
+    // three-year cycle, so the printed expiry (06/11/2026) falls long before
+    // certification lapses (07/11/2028). Measuring the NC closure buffer from
+    // the re-issue date put the deadline BEFORE the next surveillance was due,
+    // and clamping the end to it printed "08/10/2027 – 07/10/2026".
+    const annualReissue = {
+        id: 'L1', certificateNo: '25UK9003', standard: 'ISO 27001:2022', status: 'Active',
+        initialDate: '2025-11-07', currentIssue: '2025-11-07', expiryDate: '2026-11-06'
+    };
+
+    it('measures the closure buffer from the end of the cycle, not an annual re-issue', () => {
+        const client = { id: 'lsuk', certificates: [annualReissue], certificationLifecycleEvents: [] };
+        const cycleState = ReportStats.cycleState({
+            client, standard: annualReissue.standard, certificate: annualReissue,
+            allReports: [], allPlans: [], today: TODAY
+        });
+        const record = Domain.resolveCertificateCycle({
+            client, certificate: annualReissue, cycleState, now: TODAY, settings: {},
+            allReports: [], allPlans: [], cycleStateResolver: ReportStats.cycleState
+        });
+
+        expect(record.auditType).toBe('Surveillance 1');
+        expect(record.recommendedWindowStart).toBe('2026-10-08');
+        expect(record.recommendedWindowEnd).toBe('2026-12-07');
+        expect(record.recommendedWindowStart < record.recommendedWindowEnd).toBe(true);
+        expect(Domain.describeCycleWindow(record, TODAY).state).toBe('upcoming');
+        // The certificate's own expiry is still what the card prints.
+        expect(record.expiryDate).toBe('2026-11-06');
+    });
+
+    it('reports a surveillance that cannot finish before the deadline instead of inverting', () => {
+        const cfg = Domain.policy({});
+        const window = Domain.planningWindow
+            ? Domain.planningWindow('Surveillance 2', new Date('2027-11-07'), new Date('2026-11-06'), cfg)
+            : null;
+        if (window) {
+            expect(window.start <= window.end).toBe(true);
+            expect(window.beyondClosureDeadline).toBe(true);
+        }
+    });
+
+    it('still pulls a surveillance end back to the deadline when that keeps the window valid', () => {
+        const cert = {
+            id: 'X', certificateNo: 'X1', standard: 'ISO 9001:2015', status: 'Active',
+            initialDate: '2024-01-10', currentIssue: '2024-01-10', expiryDate: '2027-01-09'
+        };
+        const client = { id: 'x', certificates: [cert], certificationLifecycleEvents: [] };
+        const cycleState = ReportStats.cycleState({ client, standard: cert.standard, certificate: cert, allReports: [], allPlans: [], today: new Date('2026-01-05T00:00:00') });
+        const record = Domain.resolveCertificateCycle({
+            client, certificate: cert, cycleState, now: new Date('2026-01-05T00:00:00'), settings: {},
+            allReports: [], allPlans: [], cycleStateResolver: ReportStats.cycleState
+        });
+        expect(record.recommendedWindowStart < record.recommendedWindowEnd).toBe(true);
+    });
+
+    it('leaves a genuine three-year certificate unchanged', () => {
+        const cert = certificate();   // expiry IS the cycle end
+        const client = { id: 'silicon', certificates: [cert], certificationLifecycleEvents: [] };
+        const cycleState = ReportStats.cycleState({ client, standard: cert.standard, certificate: cert, allReports: [], allPlans: [], today: TODAY });
+        const record = Domain.resolveCertificateCycle({
+            client, certificate: cert, cycleState, now: TODAY, settings: {},
+            allReports: [], allPlans: [], cycleStateResolver: ReportStats.cycleState
+        });
+        expect(record.recommendedWindowStart).toBe('2026-06-17');
+        expect(record.recommendedWindowEnd).toBe('2026-08-16');
+    });
+});
+
 describe('describeCycleWindow', () => {
     const record = { recommendedWindowStart: '2026-06-17', recommendedWindowEnd: '2026-08-16' };
 
