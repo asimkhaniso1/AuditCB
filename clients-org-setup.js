@@ -180,6 +180,7 @@ window.getClientCertificatesHTML = function (client) {
                             <button type="button" class="btn btn-sm" style="color:#b91c1c;border:1px solid #fecaca;" data-action="cancelCertificationStageOverride" data-arg1="${client.id}" data-arg2="${index}">Cancel Override</button>
                         </div>`;
         })()}
+                        ${certificateCompletionsHTML(client, cert, index)}
                     </div>
                     <div>
                         <label style="font-size:0.8rem;">NC Closure Buffer</label>
@@ -209,6 +210,84 @@ function certificateStageOverride(client, certificate) {
         .sort((a, b) => String(a.occurredAt || a.createdAt || '').localeCompare(String(b.occurredAt || b.createdAt || '')));
     return domain.latestAuthorizedStageOverride(events);
 }
+
+// Audits already performed but never captured in the app. A milestone ticks
+// green only from a finalized report or a completion event, so without this a
+// client audited every year still reads "no finalized audit on file".
+function certificateCompletionsHTML(client, certificate, index) {
+    const domain = window.AuditPlanningDomain;
+    if (!domain || !domain.COMPLETION_MILESTONES) return '';
+    const esc = window.UTILS.escapeHtml;
+    const certificateId = String(certificate?.id || certificate?.certificateId || certificate?.certificateNo || '');
+    const byType = {};
+    Object.entries(domain.COMPLETION_MILESTONES).forEach(([name, type]) => { byType[type] = name; });
+    const recorded = (client?.certificationLifecycleEvents || [])
+        .filter(event => event && byType[event.type]
+            && (!certificateId || String(event.certificateId || '') === certificateId))
+        .sort((a, b) => String(a.occurredAt || '').localeCompare(String(b.occurredAt || '')));
+
+    return `<div style="margin-top:.6rem;border-top:1px dashed #e2e8f0;padding-top:.5rem;">
+        <div style="font-size:.75rem;color:#475569;font-weight:600;">Audits performed</div>
+        ${recorded.length
+            ? `<ul style="margin:.25rem 0 0;padding-left:1rem;font-size:.75rem;color:#15803d;">${recorded.map(event => `<li>${esc(byType[event.type])} — ${window.UTILS.formatDate(event.occurredAt)}${event.user ? ' (' + esc(event.user) + ')' : ''}</li>`).join('')}</ul>`
+            : '<div style="font-size:.72rem;color:#64748b;margin-top:.15rem;">None recorded. Milestones tick only from a finalized report or a recorded audit.</div>'}
+        <button type="button" class="btn btn-sm btn-outline-secondary" style="margin-top:.4rem;" data-action="recordCompletedCertificationAudit" data-arg1="${client.id}" data-arg2="${index}">Record Completed Audit</button>
+    </div>`;
+}
+
+window.recordCompletedCertificationAudit = async function (clientId, certificateIndex) {
+    const client = window.state.clients.find(item => String(item.id) === String(clientId));
+    const certificate = client?.certificates?.[Number(certificateIndex)];
+    if (!client || !certificate || !window.AuditPlanningDomain) {
+        window.showNotification('Certification lifecycle service is unavailable.', 'error');
+        return;
+    }
+    const milestone = window.prompt('Which audit was performed? Enter Surveillance 1, Surveillance 2, or Recertification.');
+    if (!milestone) return;
+    const performedAt = window.prompt('Date the audit was performed (YYYY-MM-DD):');
+    if (!performedAt) return;
+    const note = window.prompt('Reference or note for the record (optional):') || '';
+
+    try {
+        const record = window.AuditPlanningDomain.createCompletionRecord({
+            milestone, performedAt, note,
+            user: window.state.currentUser?.name || 'Unknown user',
+            role: window.state.currentUser?.role || 'Unknown role',
+            settings: window.state.cbSettings || {}
+        });
+
+        // A date outside the current cycle is filed but ticks nothing, so say
+        // so before writing it rather than leaving the node stubbornly amber.
+        const cycleState = window.ReportStats?.cycleState?.({
+            client, standard: certificate.standard, certificate,
+            allReports: window.state.auditReports || [], allPlans: window.state.auditPlans || []
+        });
+        if (cycleState && !window.AuditPlanningDomain.completionFallsInCycle(cycleState, record.performedAt)) {
+            const cycleStart = window.UTILS.formatDate(cycleState.anchor);
+            const proceed = window.confirm(`That date falls before the current cycle, which began ${cycleStart}. It will be kept on the record but will not tick this cycle's milestone. Record it anyway?`);
+            if (!proceed) return;
+        }
+
+        const event = window.AuditPlanningDomain.createLifecycleEvent({
+            certificateId: certificate.id || certificate.certificateNo,
+            type: record.type,
+            stage: record.milestone,
+            occurredAt: new Date(record.performedAt).toISOString(),
+            user: record.user,
+            role: record.role,
+            reason: record.note,
+            metadata: { category: 'completion', recordedAt: record.createdAt }
+        });
+        client.certificationLifecycleEvents = client.certificationLifecycleEvents || [];
+        client.certificationLifecycleEvents.push(event);
+        window.saveData();
+        await window.SupabaseClient?.syncClientsToSupabase?.([client]);
+        window.showNotification(`${record.milestone} recorded as performed on ${window.UTILS.formatDate(record.performedAt)}.`, 'success');
+        if (typeof window.renderClientOrgSetup === 'function') window.renderClientOrgSetup(clientId);
+    } catch (error) {
+        window.showNotification(`Audit not recorded: ${error.message}`, 'error');
+    }
+};
 
 window.cancelCertificationStageOverride = async function (clientId, certificateIndex) {
     const client = window.state.clients.find(item => String(item.id) === String(clientId));
