@@ -1058,23 +1058,25 @@ function renderCertificationCycleWidget(client) {
                         </div>
 
                         <!-- Current Stage Info -->
-                        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
-                            <div>
+                        <!-- Fixed grid tracks (see .cycle-info-grid): stacked
+                             cards must line their columns up with each other. -->
+                        <div class="cycle-info-grid">
+                            <div style="min-width: 0;">
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Current Stage</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-top: 0.25rem;">${currentStage}</div>
                                 ${isProjectedStage ? '<div style="font-size: 0.7rem; color: #b45309; margin-top: 0.15rem;" title="Stage nodes tick only when the corresponding audit report is finalized in ISOXPERT Audit360."><i class="fa-solid fa-circle-info" style="margin-right: 3px;"></i>Projected from certificate dates — no finalized audit on file yet</div>' : ''}
                             </div>
                             ${scheduledPlan ? `
-                            <div>
+                            <div style="min-width: 0;">
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Scheduled Audit</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: ${expiryWarning ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">
                                     ${window.UTILS.formatDate(scheduledPlan.date)}${scheduledPlan.endDate && scheduledPlan.endDate !== scheduledPlan.date ? ` – ${window.UTILS.formatDate(scheduledPlan.endDate)}` : ''}
                                 </div>
                                 ${expiryWarning ? `<div style="font-size:.75rem;color:#dc2626;margin-top:.25rem;"><i class="fa-solid fa-triangle-exclamation"></i> Scheduled dates approach certificate expiry and may not preserve the NC closure buffer.</div>` : ''}
                             </div>
-                            ` : nextAudit ? `<div><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Next Audit Stage</div><div style="font-size:1.1rem;font-weight:600;color:${isUrgent ? '#dc2626' : '#1e293b'};margin-top:.25rem;">${cycleRecord?.auditType || currentStage}</div></div>` : ''}
-                            ${cycleRecord ? `<div><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Recommended Audit Window</div><div style="font-size:1.1rem;font-weight:600;color:${windowState?.state === 'closed' ? '#b91c1c' : '#1e293b'};margin-top:.25rem;">${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}</div>${cycleWindowCaption(cycleRecord, windowState)}</div>` : ''}
-                            <div>
+                            ` : nextAudit ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Next Audit Stage</div><div style="font-size:1.1rem;font-weight:600;color:${isUrgent ? '#dc2626' : '#1e293b'};margin-top:.25rem;">${cycleRecord?.auditType || currentStage}</div></div>` : '<div></div>'}
+                            ${cycleRecord ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Recommended Audit Window</div><div style="font-size:1.1rem;font-weight:600;color:${windowState?.state === 'closed' ? '#b91c1c' : '#1e293b'};margin-top:.25rem;">${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}</div>${cycleWindowCaption(cycleRecord, windowState)}</div>` : '<div></div>'}
+                            <div style="min-width: 0;">
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Certificate Expiry</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: ${expired ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(rawExpiry || cycleEnd)}</div>
                                 ${rawExpiry && rawExpiry.getTime() !== cycleEnd.getTime() ? `<div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem;">Certification cycle ends ${window.UTILS.formatDate(cycleEnd)}</div>` : ''}
@@ -1088,10 +1090,15 @@ function renderCertificationCycleWidget(client) {
         // shown from the calendar alone); amber ! = that stage's period has
         // already passed on the calendar but no finalized audit is on file —
         // the milestone is DUE/MISSED, not blank. Grey = genuinely upcoming.
-        const node = (done, dueDate, sym, label, name) => {
+        const node = (done, dueDate, sym, label, name, sharedFrom) => {
             const overdue = !done && dueDate && today > dueDate;
             const bg = done ? '#10b981' : overdue ? '#f59e0b' : '#cbd5e1';
-            const title = done ? `${name} audit finalized`
+            // A tick earned on a sibling certificate of the same cycle names that
+            // certificate, so the evidence behind it stays traceable.
+            const title = done
+                ? (sharedFrom
+                    ? `${name} recorded on certificate ${sharedFrom} — same certification cycle`
+                    : `${name} audit finalized`)
                 : overdue ? `${name} period passed (${window.UTILS.formatDate(dueDate)}) — no finalized audit on file`
                     : `${name} not yet due`;
             return `<div style="text-align: center;" title="${title}">
@@ -1106,11 +1113,11 @@ function renderCertificationCycleWidget(client) {
                             <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">Cert</div>
                         </div>
                         ${link(s1Done)}
-                        ${node(s1Done, surv1, '1', 'S1', 'Surveillance 1')}
+                        ${node(s1Done, surv1, '1', 'S1', 'Surveillance 1', cs && cs.sharedEvidence && cs.sharedEvidence.s1)}
                         ${link(s2Done)}
-                        ${node(s2Done, surv2, '2', 'S2', 'Surveillance 2')}
+                        ${node(s2Done, surv2, '2', 'S2', 'Surveillance 2', cs && cs.sharedEvidence && cs.sharedEvidence.s2)}
                         ${link(recertDone)}
-                        ${node(recertDone, recertAudit, '↻', 'Re', 'Recertification')}
+                        ${node(recertDone, recertAudit, '↻', 'Re', 'Recertification', cs && cs.sharedEvidence && cs.sharedEvidence.recert)}
                     </div>`;
     })()}
                 </div>

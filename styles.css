@@ -1962,3 +1962,30 @@ textarea:focus:invalid {
 /* Dark mode removed — was incomplete (only modals/some elements styled)
    and produced inconsistent appearance (dark inputs/headers on light cards).
    Reintroduce later as an explicit user toggle, not OS-driven. */
+
+/* ============================================
+   Certification cycle cards — column alignment
+   ============================================
+   One card per certificate, stacked. Sizing each column to its own card's
+   content (flex) staggered them: one card's "Recommended Audit Window" sat
+   under another's "Certificate Expiry", and the widths shifted whenever a
+   card carried an extra note. Fixed tracks, plus an empty cell for any slot a
+   card does not use, keep every label reading straight down the page. */
+.cycle-info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 1200px) {
+    .cycle-info-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .cycle-info-grid {
+        grid-template-columns: 1fr;
+    }
+}
