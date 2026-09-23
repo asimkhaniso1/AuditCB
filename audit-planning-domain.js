@@ -52,7 +52,11 @@
         'surveillance-2-planned', 'surveillance-2-completed',
         'recertification-planned', 'recertification-completed',
         'technical-review', 'certification-renewal',
-        'suspension', 'withdrawal', 'expiry', 'authorized-override'
+        'suspension', 'withdrawal', 'expiry', 'authorized-override',
+        // Cancelling an override is itself a recorded decision. The events are
+        // append-only, so the override is never removed: a later revocation
+        // simply takes it out of force and the derived stage governs again.
+        'authorized-override-revoked'
     ]);
 
     function safeArray(value) { return Array.isArray(value) ? value : []; }
@@ -120,9 +124,18 @@
         };
     }
 
+    // The stage override in force, if any. Walked in order so a revocation
+    // recorded after an override cancels it, and an override recorded after a
+    // revocation takes effect again. Both are kept on the record; only the last
+    // decision governs.
     function latestAuthorizedStageOverride(events) {
-        return safeArray(events).filter((event) => event.type === 'authorized-override'
-            && event.metadata?.category === 'stage' && event.overrideValue && event.reason && event.user && event.role).at(-1) || null;
+        let inForce = null;
+        safeArray(events).forEach((event) => {
+            if (!event || event.metadata?.category !== 'stage') return;
+            if (event.type === 'authorized-override-revoked') { inForce = null; return; }
+            if (event.type === 'authorized-override' && event.overrideValue && event.reason && event.user && event.role) inForce = event;
+        });
+        return inForce;
     }
 
     function auditTypeFromCycleState(cycleState, events, resolvedPolicy, now) {
@@ -535,11 +548,28 @@
         };
     }
 
+    // Cancelling an override needs the same authority and a documented reason
+    // as recording one: it changes which audit the client is judged to owe.
+    function createOverrideRevocation(input) {
+        const cfg = policy(input.settings || {});
+        if (!cfg.overrideRoles.some((role) => String(role).toLowerCase() === String(input.role || '').toLowerCase())) throw new Error('Current role is not authorized to cancel this override.');
+        if (!String(input.reason || '').trim()) throw new Error('A reason for cancelling the override is required.');
+        return {
+            id: global.crypto?.randomUUID?.() || `OVR-REV-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            category: input.category || 'stage',
+            revokesOverrideId: input.revokesOverrideId || null,
+            originalValue: input.originalValue ?? null,
+            reason: String(input.reason).trim(), user: input.user || 'Unknown user', role: input.role,
+            createdAt: input.createdAt || new Date().toISOString()
+        };
+    }
+
     const api = {
         POLICY_VERSION, PLAN_STATES, DEFAULT_POLICY, DEFAULT_DURATION_VERSION, DEFAULT_DURATION_TABLES, DEFAULT_IMS_RULE, EVENT_TYPES, policy, standardFamily,
         lifecycleEvents, createLifecycleEvent, resolveCycleContext, resolveCertificateCycle, describeCycleWindow,
         resolveDurationMethodology, resolveProvisionalDurationMethodology,
-        calculateConfiguredDuration, validateDuration, validateCompetence, buildCoverageMatrix, reconcileAgenda, canTransition, createOverride
+        calculateConfiguredDuration, validateDuration, validateCompetence, buildCoverageMatrix, reconcileAgenda, canTransition,
+        createOverride, createOverrideRevocation, latestAuthorizedStageOverride
     };
     global.AuditPlanningDomain = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

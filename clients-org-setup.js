@@ -161,9 +161,25 @@ window.getClientCertificatesHTML = function (client) {
                     </div>
                     <div>
                         <label style="font-size:0.8rem;">Current Cycle Stage</label>
-                        <div class="form-control" style="background:#f8fafc;color:#475569;">Derived from lifecycle history</div>
+                        ${(() => {
+            // Name the override in force, if any: it decides which audit this
+            // certificate is treated as owing, and until it is cancelled the
+            // certificate's own dates do not.
+            const inForce = certificateStageOverride(client, cert);
+            if (!inForce) {
+                return `<div class="form-control" style="background:#f8fafc;color:#475569;">Derived from lifecycle history</div>
                         <small style="color:#64748b;">Changes require an authorized lifecycle override; certificate data is not overwritten.</small>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" style="margin-top:.4rem;" data-action="recordCertificationStageOverride" data-arg1="${client.id}" data-arg2="${index}">Record Override</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" style="margin-top:.4rem;" data-action="recordCertificationStageOverride" data-arg1="${client.id}" data-arg2="${index}">Record Override</button>`;
+            }
+            const esc = window.UTILS.escapeHtml;
+            const when = inForce.occurredAt ? new Date(inForce.occurredAt) : null;
+            return `<div class="form-control" style="background:#fffbeb;color:#92400e;border-color:#fcd34d;">${esc(inForce.overrideValue)} <span style="font-size:.75rem;">(authorized override)</span></div>
+                        <small style="color:#92400e;">Set by ${esc(inForce.user || 'unknown user')}${when && !isNaN(when) ? ' on ' + window.UTILS.formatDate(when) : ''}${inForce.reason ? ' — ' + esc(inForce.reason) : ''}. The certificate's own dates are not in force while this stands.</small>
+                        <div style="display:flex;gap:.4rem;margin-top:.4rem;flex-wrap:wrap;">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="recordCertificationStageOverride" data-arg1="${client.id}" data-arg2="${index}">Replace Override</button>
+                            <button type="button" class="btn btn-sm" style="color:#b91c1c;border:1px solid #fecaca;" data-action="cancelCertificationStageOverride" data-arg1="${client.id}" data-arg2="${index}">Cancel Override</button>
+                        </div>`;
+        })()}
                     </div>
                     <div>
                         <label style="font-size:0.8rem;">NC Closure Buffer</label>
@@ -179,6 +195,70 @@ window.getClientCertificatesHTML = function (client) {
         </div>`;
     }).join('')}
 </div>`;
+};
+
+// The stage override in force for one certificate, or null. Mirrors the
+// domain's own rule, so what the form shows is what planning obeys.
+function certificateStageOverride(client, certificate) {
+    const domain = window.AuditPlanningDomain;
+    if (!domain || typeof domain.latestAuthorizedStageOverride !== 'function') return null;
+    const certificateId = String(certificate?.id || certificate?.certificateId || certificate?.certificateNo || '');
+    const events = (client?.certificationLifecycleEvents || [])
+        .filter(event => event && (!certificateId || String(event.certificateId || '') === certificateId))
+        .slice()
+        .sort((a, b) => String(a.occurredAt || a.createdAt || '').localeCompare(String(b.occurredAt || b.createdAt || '')));
+    return domain.latestAuthorizedStageOverride(events);
+}
+
+window.cancelCertificationStageOverride = async function (clientId, certificateIndex) {
+    const client = window.state.clients.find(item => String(item.id) === String(clientId));
+    const certificate = client?.certificates?.[Number(certificateIndex)];
+    if (!client || !certificate || !window.AuditPlanningDomain) {
+        window.showNotification('Certification lifecycle service is unavailable.', 'error');
+        return;
+    }
+    const inForce = certificateStageOverride(client, certificate);
+    if (!inForce) {
+        window.showNotification('No stage override is in force for this certificate.', 'info');
+        return;
+    }
+    const reason = window.prompt(`Cancel the ${inForce.overrideValue} override? Enter the documented reason.`);
+    if (!reason?.trim()) {
+        if (reason !== null) window.showNotification('A reason for cancelling the override is required.', 'error');
+        return;
+    }
+    try {
+        const revocation = window.AuditPlanningDomain.createOverrideRevocation({
+            category: 'stage',
+            revokesOverrideId: inForce.metadata?.overrideId || inForce.id || null,
+            originalValue: inForce.overrideValue,
+            reason,
+            user: window.state.currentUser?.name || 'Unknown user',
+            role: window.state.currentUser?.role || 'Unknown role',
+            settings: window.state.cbSettings || {}
+        });
+        // Recorded, not deleted: the override stays on the certificate's history
+        // and this event takes it out of force.
+        const event = window.AuditPlanningDomain.createLifecycleEvent({
+            certificateId: certificate.id || certificate.certificateNo,
+            type: 'authorized-override-revoked',
+            stage: inForce.overrideValue,
+            user: revocation.user,
+            role: revocation.role,
+            reason: revocation.reason,
+            originalValue: inForce.overrideValue,
+            overrideValue: null,
+            metadata: { category: 'stage', revokesOverrideId: revocation.revokesOverrideId }
+        });
+        client.certificationLifecycleEvents = client.certificationLifecycleEvents || [];
+        client.certificationLifecycleEvents.push(event);
+        window.saveData();
+        await window.SupabaseClient?.syncClientsToSupabase?.([client]);
+        window.showNotification(`${inForce.overrideValue} override cancelled. The cycle is derived from the certificate's own dates again.`, 'success');
+        if (typeof window.renderClientOrgSetup === 'function') window.renderClientOrgSetup(clientId);
+    } catch (error) {
+        window.showNotification(`Override not cancelled: ${error.message}`, 'error');
+    }
 };
 
 window.recordCertificationStageOverride = async function (clientId, certificateIndex) {
