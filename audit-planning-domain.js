@@ -246,13 +246,14 @@
         const derived = auditTypeFromCycleState(cycleState, events, cfg, now);
         const anchor = date(cert.initialDate || cert.issueDate || cert.currentIssue);
         const expiry = date(cert.expiryDate) || cycleState?.cycleEnd || (anchor ? new Date(anchor.getFullYear() + 3, anchor.getMonth(), anchor.getDate()) : null);
-        // Many certificates on file are ANNUAL re-issues inside a three-year
-        // cycle, so the printed expiry falls long before certification actually
-        // lapses. Planning — and the NC closure buffer that protects it — runs
-        // to the END OF THE CYCLE; measuring from the re-issue date put the
-        // deadline before the next surveillance was even due.
+        // Planning — and the NC closure buffer that protects it — runs to the
+        // END OF THE CYCLE, never to the date the certificate on file happens
+        // to carry. That date is re-issued on its own schedule: usually short
+        // of the cycle (an annual re-issue, which put the deadline before the
+        // next surveillance was due) and sometimes years past it (which pushed
+        // a recertification window out to 2030 for a cycle ending in 2027).
         const cycleEnd = cycleState?.cycleEnd || null;
-        const horizon = (cycleEnd && (!expiry || cycleEnd > expiry)) ? cycleEnd : expiry;
+        const horizon = cycleEnd || expiry;
         const target = derived.auditType === 'Surveillance 1' ? cycleState?.surv1Due
             : derived.auditType === 'Surveillance 2' ? cycleState?.surv2Due
                 : cycleState?.recertDue || horizon;
