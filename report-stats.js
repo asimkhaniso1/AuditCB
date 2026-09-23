@@ -641,15 +641,56 @@
         // Append-only certification lifecycle events supplement finalized report
         // history. They never overwrite certificate fields, and authorized stage
         // overrides are interpreted by the planning domain rather than here.
-        const certificateId = String(cert.id || cert.certificateId || cert.certificateNo || '');
-        const lifecycleEvents = safeArr(client.certificationLifecycleEvents).filter((event) => {
-            if (!event) return false;
-            return !certificateId || String(event.certificateId || '') === certificateId;
+        const certIdOf = (c) => String((c && (c.id || c.certificateId || c.certificateNo)) || '');
+        const certificateId = certIdOf(cert);
+        const allEvents = safeArr(client.certificationLifecycleEvents).filter(Boolean);
+        const lifecycleEvents = allEvents.filter((event) => !certificateId || String(event.certificateId || '') === certificateId);
+
+        // Certificates issued on the same dates are maintained by ONE audit
+        // programme: an integrated visit surveils every management system in
+        // that cycle, but the completion is recorded against a single
+        // certificate. Reading only that certificate's own events left the
+        // other standard's card claiming the surveillance never happened, with
+        // amber nodes and a projected stage beside an identical certificate
+        // showing green. Siblings sharing this cycle's anchor AND expiry lend
+        // completion evidence — and only that: an authorized stage override is
+        // specific to the certificate it names and is never shared.
+        const siblings = new Map();
+        certs.forEach((c) => {
+            if (!c || c === cert || certIdOf(c) === certificateId) return;
+            const cAnchor = parseDateSafe(c.initialDate) || parseDateSafe(c.issueDate) || parseDateSafe(c.currentIssue);
+            const cExpiry = parseDateSafe(c.expiryDate);
+            const sameAnchor = !!cAnchor && cAnchor.getTime() === anchor.getTime();
+            const sameExpiry = (!cExpiry && !rawExpiry) || (!!cExpiry && !!rawExpiry && cExpiry.getTime() === rawExpiry.getTime());
+            if (sameAnchor && sameExpiry) siblings.set(certIdOf(c), c);
         });
+        const COMPLETION_TYPES = new Set(['surveillance-1-completed', 'surveillance-2-completed', 'recertification-completed', 'certification-renewal']);
         const lifecycleTypes = new Set(lifecycleEvents.map((event) => trim(event.type).toLowerCase()));
+
+        // Sharing fills a SILENT record, it never edits one that is being kept.
+        // A certificate with a milestone of its own is tracked individually, and
+        // may legitimately sit at a different stage than the others in its cycle
+        // — an integrated client whose standards genuinely diverge must still be
+        // caught by the planner and split into separate plans.
+        const tracksOwnEvidence = history.length > 0
+            || [...lifecycleTypes].some((type) => COMPLETION_TYPES.has(type));
+        const sharedEvents = tracksOwnEvidence ? [] : allEvents.filter((event) => siblings.has(String(event.certificateId || ''))
+            && COMPLETION_TYPES.has(trim(event.type).toLowerCase()));
+        // Which certificate evidenced each milestone, when it was not this one —
+        // the widget names it, so a tick is always traceable to its record.
+        const sharedEvidence = { s1: null, s2: null, recert: null };
+        const sharedFrom = (type) => {
+            const event = sharedEvents.find((e) => trim(e.type).toLowerCase() === type);
+            if (!event) return null;
+            const source = siblings.get(String(event.certificateId || ''));
+            return (source && (source.certificateNo || source.standard)) || String(event.certificateId || '');
+        };
         if (lifecycleTypes.has('surveillance-1-completed')) surveillancesDone = Math.max(surveillancesDone, 1);
+        else if (surveillancesDone < 1 && (sharedEvidence.s1 = sharedFrom('surveillance-1-completed'))) surveillancesDone = 1;
         if (lifecycleTypes.has('surveillance-2-completed')) surveillancesDone = Math.max(surveillancesDone, 2);
+        else if (surveillancesDone < 2 && (sharedEvidence.s2 = sharedFrom('surveillance-2-completed'))) surveillancesDone = 2;
         if (lifecycleTypes.has('recertification-completed') || lifecycleTypes.has('certification-renewal')) recertDone = true;
+        else if ((sharedEvidence.recert = sharedFrom('recertification-completed') || sharedFrom('certification-renewal'))) recertDone = true;
         const completed = {
             certification: true,
             s1: surveillancesDone >= 1,
@@ -708,7 +749,7 @@
 
         return {
             anchor, cycleEnd, rawExpiry, surv1Due, surv2Due, recertDue,
-            completed, surveillancesDone, recertDone, hasHistory,
+            completed, surveillancesDone, recertDone, hasHistory, sharedEvidence,
             stage, stageSource, progress, nextAudit,
             expired: !recertDone && today > cycleEnd,
             lifecycleEvents
