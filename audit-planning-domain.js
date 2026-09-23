@@ -180,7 +180,16 @@
         }
         const start = addDays(target, -cfg.surveillanceWindowBeforeDays);
         const proposedEnd = addDays(target, cfg.surveillanceWindowAfterDays);
-        return { start, end: closureDeadline && proposedEnd > closureDeadline ? closureDeadline : proposedEnd };
+        // Pulling the end back to the closure deadline only helps while it stays
+        // on or after the start. A surveillance due beyond that deadline cannot
+        // be squeezed before it, and clamping there printed the window
+        // backwards — "08/10/2027 – 07/10/2026". Report the real window and say
+        // it runs past the deadline instead of inverting it.
+        if (closureDeadline && proposedEnd > closureDeadline) {
+            if (start <= closureDeadline) return { start, end: closureDeadline };
+            return { start, end: proposedEnd, beyondClosureDeadline: true };
+        }
+        return { start, end: proposedEnd };
     }
 
     // One certificate in, one cycle record out. The client overview renders a
@@ -206,10 +215,17 @@
         const derived = auditTypeFromCycleState(cycleState, events);
         const anchor = date(cert.initialDate || cert.issueDate || cert.currentIssue);
         const expiry = date(cert.expiryDate) || cycleState?.cycleEnd || (anchor ? new Date(anchor.getFullYear() + 3, anchor.getMonth(), anchor.getDate()) : null);
+        // Many certificates on file are ANNUAL re-issues inside a three-year
+        // cycle, so the printed expiry falls long before certification actually
+        // lapses. Planning — and the NC closure buffer that protects it — runs
+        // to the END OF THE CYCLE; measuring from the re-issue date put the
+        // deadline before the next surveillance was even due.
+        const cycleEnd = cycleState?.cycleEnd || null;
+        const horizon = (cycleEnd && (!expiry || cycleEnd > expiry)) ? cycleEnd : expiry;
         const target = derived.auditType === 'Surveillance 1' ? cycleState?.surv1Due
             : derived.auditType === 'Surveillance 2' ? cycleState?.surv2Due
-                : cycleState?.recertDue || expiry;
-        const window = planningWindow(derived.auditType, target, expiry, cfg);
+                : cycleState?.recertDue || horizon;
+        const window = planningWindow(derived.auditType, target, horizon, cfg);
         return {
             certificateId, cycleRecordIndex: index, certificateNo: cert.certificateNo || '',
             standard: cert.standard, standardFamily: standardFamily(cert.standard),
