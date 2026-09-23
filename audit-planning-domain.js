@@ -168,6 +168,72 @@
         return { start, end: closureDeadline && proposedEnd > closureDeadline ? closureDeadline : proposedEnd };
     }
 
+    // One certificate in, one cycle record out. The client overview renders a
+    // card per certificate and must be able to resolve the window for the exact
+    // certificate it is showing: resolving per client and matching back by
+    // standard let the window describe a DIFFERENT certificate (a superseded
+    // twin of the same scheme family, or one carrying an authorized override),
+    // so the recommended window silently contradicted the stage dots beside it.
+    // Callers may pass a cycleState they already computed, which keeps the dots
+    // and the window on one derivation.
+    function resolveCertificateCycle(input) {
+        const client = input.client || {};
+        const cert = input.certificate || {};
+        const now = date(input.now) || new Date();
+        const cfg = input.policy || policy(input.settings || {});
+        const index = Number.isFinite(input.index) ? input.index : 0;
+        const certificateId = String(cert.id || cert.certificateId || cert.certificateNo || `${client.id || 'client'}-${index}`);
+        const cycleState = input.cycleState || input.cycleStateResolver?.({
+            client, standard: cert.standard, certificate: cert,
+            allReports: input.allReports || [], allPlans: input.allPlans || [], today: now
+        }) || null;
+        const events = input.events || lifecycleEvents(client, certificateId);
+        const derived = auditTypeFromCycleState(cycleState, events);
+        const anchor = date(cert.initialDate || cert.issueDate || cert.currentIssue);
+        const expiry = date(cert.expiryDate) || cycleState?.cycleEnd || (anchor ? new Date(anchor.getFullYear() + 3, anchor.getMonth(), anchor.getDate()) : null);
+        const target = derived.auditType === 'Surveillance 1' ? cycleState?.surv1Due
+            : derived.auditType === 'Surveillance 2' ? cycleState?.surv2Due
+                : cycleState?.recertDue || expiry;
+        const window = planningWindow(derived.auditType, target, expiry, cfg);
+        return {
+            certificateId, cycleRecordIndex: index, certificateNo: cert.certificateNo || '',
+            standard: cert.standard, standardFamily: standardFamily(cert.standard),
+            scope: cert.scope || client.scope || '', siteScopes: cert.siteScopes || {},
+            issueDate: isoDate(anchor), expiryDate: isoDate(expiry), stage: derived.stage,
+            auditType: derived.auditType, targetDate: isoDate(target),
+            recommendedWindowStart: isoDate(window.start), recommendedWindowEnd: isoDate(window.end),
+            closureBufferDays: cfg.ncClosureBufferDays, stageSource: derived.override ? 'authorized-override' : (cycleState?.stageSource || 'lifecycle'),
+            override: derived.override || null, lifecycleEvents: events
+        };
+    }
+
+    // Where "today" sits relative to a recommended window. A window that closed
+    // is planning history, not guidance: saying so is what keeps the card from
+    // offering a past date range next to an amber (missed) milestone.
+    function describeCycleWindow(record, now) {
+        // Window bounds are calendar dates ("2026-06-17"), which Date parses as
+        // UTC midnight while "today" is a local instant. Comparing the two
+        // directly put the first and last day of the window on the wrong side of
+        // the boundary for every user east of UTC, so both are reduced to local
+        // whole days first.
+        const day = 24 * 60 * 60 * 1000;
+        const localDay = (value) => {
+            if (typeof value === 'string') {
+                const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if (parts) return new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+            }
+            const parsed = date(value);
+            return parsed ? new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()) : null;
+        };
+        const today = localDay(now) || localDay(new Date());
+        const start = localDay(record?.recommendedWindowStart);
+        const end = localDay(record?.recommendedWindowEnd);
+        if (!start || !end) return { state: 'unknown', start: null, end: null, days: 0 };
+        if (today > end) return { state: 'closed', start, end, days: Math.round((today - end) / day) };
+        if (today >= start) return { state: 'open', start, end, days: Math.round((end - today) / day) };
+        return { state: 'upcoming', start, end, days: Math.round((start - today) / day) };
+    }
+
     function resolveCycleContext(input) {
         const client = input.client || {};
         const now = date(input.now) || new Date();
@@ -181,31 +247,11 @@
             const previousDate = date(previous?.cert?.currentIssue || previous?.cert?.initialDate || previous?.cert?.issueDate)?.getTime() || -1;
             if (!previous || currentDate >= previousDate) byScheme.set(key, { cert, index });
         });
-        const cycles = [...byScheme.values()].map(({ cert, index }) => {
-            const certificateId = String(cert.id || cert.certificateId || cert.certificateNo || `${client.id || 'client'}-${index}`);
-            const cycleState = input.cycleStateResolver?.({
-                client, standard: cert.standard, certificate: cert,
-                allReports: input.allReports || [], allPlans: input.allPlans || [], today: now
-            }) || null;
-            const events = lifecycleEvents(client, certificateId);
-            const derived = auditTypeFromCycleState(cycleState, events);
-            const anchor = date(cert.initialDate || cert.issueDate || cert.currentIssue);
-            const expiry = date(cert.expiryDate) || cycleState?.cycleEnd || (anchor ? new Date(anchor.getFullYear() + 3, anchor.getMonth(), anchor.getDate()) : null);
-            const target = derived.auditType === 'Surveillance 1' ? cycleState?.surv1Due
-                : derived.auditType === 'Surveillance 2' ? cycleState?.surv2Due
-                    : cycleState?.recertDue || expiry;
-            const window = planningWindow(derived.auditType, target, expiry, cfg);
-            return {
-                certificateId, cycleRecordIndex: index, certificateNo: cert.certificateNo || '',
-                standard: cert.standard, standardFamily: standardFamily(cert.standard),
-                scope: cert.scope || client.scope || '', siteScopes: cert.siteScopes || {},
-                issueDate: isoDate(anchor), expiryDate: isoDate(expiry), stage: derived.stage,
-                auditType: derived.auditType, targetDate: isoDate(target),
-                recommendedWindowStart: isoDate(window.start), recommendedWindowEnd: isoDate(window.end),
-                closureBufferDays: cfg.ncClosureBufferDays, stageSource: derived.override ? 'authorized-override' : (cycleState?.stageSource || 'lifecycle'),
-                override: derived.override || null, lifecycleEvents: events
-            };
-        });
+        const cycles = [...byScheme.values()].map(({ cert, index }) => resolveCertificateCycle({
+            client, certificate: cert, index, now, policy: cfg,
+            cycleStateResolver: input.cycleStateResolver,
+            allReports: input.allReports || [], allPlans: input.allPlans || []
+        }));
         const auditTypes = [...new Set(cycles.map((cycle) => cycle.auditType))];
         const commonStart = cycles.map((cycle) => cycle.recommendedWindowStart).filter(Boolean).sort().at(-1) || '';
         const commonEnd = cycles.map((cycle) => cycle.recommendedWindowEnd).filter(Boolean).sort()[0] || '';
@@ -423,7 +469,8 @@
 
     const api = {
         POLICY_VERSION, PLAN_STATES, DEFAULT_POLICY, DEFAULT_DURATION_VERSION, DEFAULT_DURATION_TABLES, DEFAULT_IMS_RULE, EVENT_TYPES, policy, standardFamily,
-        lifecycleEvents, createLifecycleEvent, resolveCycleContext, resolveDurationMethodology, resolveProvisionalDurationMethodology,
+        lifecycleEvents, createLifecycleEvent, resolveCycleContext, resolveCertificateCycle, describeCycleWindow,
+        resolveDurationMethodology, resolveProvisionalDurationMethodology,
         calculateConfiguredDuration, validateDuration, validateCompetence, buildCoverageMatrix, reconcileAgenda, canTransition, createOverride
     };
     global.AuditPlanningDomain = api;
