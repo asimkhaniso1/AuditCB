@@ -79,13 +79,27 @@ describe('the cycle restarts at a recertification', () => {
         expect(iso(cycleState.anchor)).toBe('2025-05-02');
     });
 
-    it('accepts a recertification issued a little early', () => {
-        // Recert audit run two months before the anniversary — plainly the
-        // boundary, not an annual re-issue.
+    it('starts the cycle on the day the recertified certificate was issued', () => {
+        // Recert issued seven weeks before the anniversary: plainly the
+        // boundary, not an annual re-issue — and the certificate in hand says
+        // the cycle began on 20 August, so the surveillances run from there
+        // rather than from an estimated anniversary.
         const { cycleState } = cycleFor(cert({
             initialDate: '2022-10-07', currentIssue: '2025-08-20', expiryDate: '2026-08-19'
         }));
-        expect(iso(cycleState.anchor)).toBe('2025-10-07');
+        expect(iso(cycleState.anchor)).toBe('2025-08-20');
+        expect(iso(cycleState.surv1Due)).toBe('2026-08-20');
+    });
+
+    it('does not let an annual re-issue mid-cycle move the anchor', () => {
+        // H. A STEEL: first certified July 2021, re-issued July 2026 — five
+        // years on, deep inside the 2024-2027 cycle, so the anchor stays put.
+        const { cycleState } = cycleFor(cert({
+            initialDate: '2021-07-05', currentIssue: '2026-07-05', expiryDate: '2027-07-04'
+        }));
+        expect(iso(cycleState.anchor)).toBe('2024-07-05');
+        expect(iso(cycleState.surv1Due)).toBe('2025-07-05');
+        expect(iso(cycleState.surv2Due)).toBe('2026-07-05');
     });
 
     it('does not call a recertified client "Initial certification"', () => {
@@ -202,6 +216,20 @@ describe('the cycle restarts at a recertification', () => {
         }));
         expect(iso(cycleState.anchor)).toBe('2026-04-02');   // 2011 + five cycles
         expect(iso(cycleState.cycleEnd)).toBe('2029-04-02');
+    });
+
+    it('derives surveillance dates that match the certificate in hand', () => {
+        // H. A STEEL: first certified 14 April 2023, recertified 19 April 2026.
+        // The anniversary would put the cycle five days out from the
+        // certificate, and every surveillance date with it.
+        const { cycleState, record } = cycleFor(cert({
+            initialDate: '2023-04-14', currentIssue: '2026-04-19', expiryDate: '2027-04-18'
+        }));
+
+        expect(iso(cycleState.anchor)).toBe('2026-04-19');
+        expect(iso(cycleState.surv1Due)).toBe('2027-04-19');
+        expect(iso(cycleState.cycleEnd)).toBe('2029-04-19');
+        expect(record.auditType).toBe('Surveillance 1');
     });
 
     it('ignores a certificate carrying a date beyond its own cycle', () => {

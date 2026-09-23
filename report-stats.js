@@ -371,7 +371,8 @@
     // asking for a surveillance in 2028; anchoring on Initial Date forever gave
     // RYMA a four-year cycle and demanded a recertification it had just had.
     const CYCLE_MONTHS = 36;
-    function cycleStartFrom(firstCertified, today) {
+    const REISSUE_SNAP_DAYS = 90;
+    function cycleStartFrom(firstCertified, today, currentIssue) {
         if (!firstCertified) return null;
         const now = today || new Date();
         let start = new Date(firstCertified.getTime());
@@ -379,6 +380,17 @@
             const next = addMonths(start, CYCLE_MONTHS);
             if (next > now) break;
             start = next;
+        }
+        // A cycle that began with a recertification has a real certificate
+        // behind it, and that certificate's issue date is the day the cycle
+        // actually started — the anniversary of first certification is only an
+        // estimate of it. Where the two are close, prefer the real date, so the
+        // surveillance dates the app derives match the certificate in hand.
+        // A re-issue far from the boundary is an ANNUAL one, mid-cycle, and
+        // must not move the anchor.
+        if (currentIssue) {
+            const drift = Math.abs(currentIssue.getTime() - start.getTime());
+            if (drift > 0 && drift <= REISSUE_SNAP_DAYS * 24 * 60 * 60 * 1000 && currentIssue <= now) return new Date(currentIssue.getTime());
         }
         return start;
     }
@@ -637,7 +649,7 @@
 
         const firstCertified = parseDateSafe(cert.initialDate) || parseDateSafe(cert.issueDate) || parseDateSafe(cert.currentIssue);
         if (!firstCertified) return null;
-        const anchor = cycleStartFrom(firstCertified, today);
+        const anchor = cycleStartFrom(firstCertified, today, parseDateSafe(cert.currentIssue));
 
         const rawExpiry = parseDateSafe(cert.expiryDate);
         const cycleEnd = cycleEndFrom(anchor, rawExpiry);
@@ -726,7 +738,7 @@
             if (!c || c === cert || certIdOf(c) === certificateId) return;
             const cAnchor = cycleStartFrom(
                 parseDateSafe(c.initialDate) || parseDateSafe(c.issueDate) || parseDateSafe(c.currentIssue),
-                today);
+                today, parseDateSafe(c.currentIssue));
             const cExpiry = parseDateSafe(c.expiryDate);
             const sameAnchor = !!cAnchor && cAnchor.getTime() === anchor.getTime();
             const sameExpiry = (!cExpiry && !rawExpiry) || (!!cExpiry && !!rawExpiry && cExpiry.getTime() === rawExpiry.getTime());
