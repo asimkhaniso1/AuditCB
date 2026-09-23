@@ -117,6 +117,28 @@ describe('completion evidence within one certification cycle', () => {
         expect(iso27001.completed.s2).toBe(false);
     });
 
+    it('inherits milestones evidenced by the sibling´s FINALIZED AUDIT REPORTS', () => {
+        // Reports carry a standard, not a certificate, so an integrated visit
+        // finalized under "ISO 9001:2015" never reached the 27001 cycle.
+        const client = siliconNetworks({ events: [] });
+        const reports = [
+            { clientId: 'silicon', standard: 'ISO 9001:2015', reportStatus: 'Finalized', auditType: 'Surveillance 1', date: '2023-09-10' },
+            { clientId: 'silicon', standard: 'ISO 9001:2015', reportStatus: 'Finalized', auditType: 'Surveillance 2', date: '2024-09-10' }
+        ];
+        const state = (standard) => ReportStats.cycleState({
+            client, standard, certificate: client.certificates.find((c) => c.standard === standard),
+            allReports: reports, allPlans: [], today: TODAY
+        });
+
+        const iso27001 = state('ISO 27001:2022');
+        expect(iso27001.completed.s1).toBe(true);
+        expect(iso27001.completed.s2).toBe(true);
+        expect(iso27001.sharedEvidence.s1).toBe('22PK9032');
+        expect(iso27001.sharedEvidence.s2).toBe('22PK9032');
+        expect(iso27001.stageSource).toBe('history');
+        expect(iso27001.completed).toEqual(state('ISO 9001:2015').completed);
+    });
+
     it('leaves a certificate that keeps its own record alone, even one milestone behind', () => {
         // Both certificates were surveilled once and recorded separately; only
         // the 9001 system had its second surveillance. They genuinely sit at
