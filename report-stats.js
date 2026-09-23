@@ -609,10 +609,11 @@
         const clientId = client.id;
         const windowStart = new Date(anchor.getTime());
         windowStart.setDate(windowStart.getDate() - 60);
-        const history = allReports.filter((r) => {
+        const reportsInCycle = (forStandard) => allReports.filter((r) => {
             if (!r) return false;
             if (clientId != null && r.clientId != null && String(r.clientId) !== String(clientId)) return false;
-            if (standard && trim(r.standard) && trim(r.standard).toLowerCase() !== standard.toLowerCase()) return false;
+            const want = trim(forStandard);
+            if (want && trim(r.standard) && trim(r.standard).toLowerCase() !== want.toLowerCase()) return false;
             const st = trim(r.reportStatus || r.status).toLowerCase();
             if (st !== 'final' && st !== 'finalized' && st !== 'approved' && st !== 'published') return false;
             const d = parseDateSafe(r.date || r.createdAt);
@@ -623,20 +624,28 @@
         // wins; a generic "Surveillance" is slotted by which due date it sits
         // closest to (mirroring buildProgramme), and a later visit can never
         // regress to an earlier slot than one already completed.
-        let surveillancesDone = 0;
-        let recertDone = false;
-        history.forEach((r) => {
-            const typeStr = trim(r.auditType || r.type);
-            const sid = classifyAuditType(typeStr);
-            if (sid === 'recert') { recertDone = true; return; }
-            if (sid === 's1' || sid === 's2') return; // stage 1 / initial certification audit
-            let slot = sid === 'sv2' ? 2 : (/surveillance\s*1|sv1|1st|first/i.test(typeStr) ? 1 : 0);
-            if (!slot) {
-                const d = parseDateSafe(r.date || r.createdAt);
-                slot = Math.abs(d - surv2Due) < Math.abs(d - surv1Due) ? 2 : 1;
-            }
-            surveillancesDone = Math.min(2, Math.max(surveillancesDone, Math.max(slot, surveillancesDone + 1)));
-        });
+        const tallyVisits = (list) => {
+            let done = 0;
+            let recert = false;
+            list.forEach((r) => {
+                const typeStr = trim(r.auditType || r.type);
+                const sid = classifyAuditType(typeStr);
+                if (sid === 'recert') { recert = true; return; }
+                if (sid === 's1' || sid === 's2') return; // stage 1 / initial certification audit
+                let slot = sid === 'sv2' ? 2 : (/surveillance\s*1|sv1|1st|first/i.test(typeStr) ? 1 : 0);
+                if (!slot) {
+                    const d = parseDateSafe(r.date || r.createdAt);
+                    slot = Math.abs(d - surv2Due) < Math.abs(d - surv1Due) ? 2 : 1;
+                }
+                done = Math.min(2, Math.max(done, Math.max(slot, done + 1)));
+            });
+            return { surveillancesDone: done, recertDone: recert };
+        };
+
+        const history = reportsInCycle(standard);
+        const ownVisits = tallyVisits(history);
+        let surveillancesDone = ownVisits.surveillancesDone;
+        let recertDone = ownVisits.recertDone;
 
         // Append-only certification lifecycle events supplement finalized report
         // history. They never overwrite certificate fields, and authorized stage
@@ -674,23 +683,31 @@
         // caught by the planner and split into separate plans.
         const tracksOwnEvidence = history.length > 0
             || [...lifecycleTypes].some((type) => COMPLETION_TYPES.has(type));
-        const sharedEvents = tracksOwnEvidence ? [] : allEvents.filter((event) => siblings.has(String(event.certificateId || ''))
-            && COMPLETION_TYPES.has(trim(event.type).toLowerCase()));
+        // A sibling's milestones come from EITHER of the two evidence stores:
+        // its finalized audit reports (which carry a standard, not a
+        // certificate) or completion events recorded against it.
+        const siblingProgress = tracksOwnEvidence ? [] : [...siblings.values()].map((sib) => {
+            const visits = tallyVisits(reportsInCycle(sib.standard));
+            const types = new Set(allEvents
+                .filter((event) => String(event.certificateId || '') === certIdOf(sib))
+                .map((event) => trim(event.type).toLowerCase()));
+            return {
+                name: sib.certificateNo || sib.standard || certIdOf(sib),
+                s1: visits.surveillancesDone >= 1 || types.has('surveillance-1-completed'),
+                s2: visits.surveillancesDone >= 2 || types.has('surveillance-2-completed'),
+                recert: visits.recertDone || types.has('recertification-completed') || types.has('certification-renewal')
+            };
+        });
         // Which certificate evidenced each milestone, when it was not this one —
         // the widget names it, so a tick is always traceable to its record.
         const sharedEvidence = { s1: null, s2: null, recert: null };
-        const sharedFrom = (type) => {
-            const event = sharedEvents.find((e) => trim(e.type).toLowerCase() === type);
-            if (!event) return null;
-            const source = siblings.get(String(event.certificateId || ''));
-            return (source && (source.certificateNo || source.standard)) || String(event.certificateId || '');
-        };
+        const sharedFrom = (milestone) => (siblingProgress.find((sib) => sib[milestone]) || {}).name || null;
         if (lifecycleTypes.has('surveillance-1-completed')) surveillancesDone = Math.max(surveillancesDone, 1);
-        else if (surveillancesDone < 1 && (sharedEvidence.s1 = sharedFrom('surveillance-1-completed'))) surveillancesDone = 1;
+        else if (surveillancesDone < 1 && (sharedEvidence.s1 = sharedFrom('s1'))) surveillancesDone = 1;
         if (lifecycleTypes.has('surveillance-2-completed')) surveillancesDone = Math.max(surveillancesDone, 2);
-        else if (surveillancesDone < 2 && (sharedEvidence.s2 = sharedFrom('surveillance-2-completed'))) surveillancesDone = 2;
+        else if (surveillancesDone < 2 && (sharedEvidence.s2 = sharedFrom('s2'))) surveillancesDone = 2;
         if (lifecycleTypes.has('recertification-completed') || lifecycleTypes.has('certification-renewal')) recertDone = true;
-        else if ((sharedEvidence.recert = sharedFrom('recertification-completed') || sharedFrom('certification-renewal'))) recertDone = true;
+        else if ((sharedEvidence.recert = sharedFrom('recert'))) recertDone = true;
         const completed = {
             certification: true,
             s1: surveillancesDone >= 1,
