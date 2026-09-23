@@ -652,9 +652,23 @@
         const clientId = client.id;
         const windowStart = new Date(anchor.getTime());
         windowStart.setDate(windowStart.getDate() - 60);
+
+        // Does this report or plan belong to THIS client? The id check used to
+        // be skipped whenever either side lacked one — and reports in the field
+        // carry no clientId at all, so every finalized audit counted as every
+        // client's history. One client's surveillance was ticking S1 for every
+        // other client holding the same standard. A record that names neither
+        // the id nor the client is attributed to nobody rather than to all.
+        const ourName = trim(client.name).toLowerCase();
+        const belongsToThisClient = (record) => {
+            if (record.clientId != null && clientId != null) return String(record.clientId) === String(clientId);
+            const named = trim(record.client || record.clientName).toLowerCase();
+            if (named && ourName) return named === ourName;
+            return false;
+        };
         const reportsInCycle = (forStandard) => allReports.filter((r) => {
             if (!r) return false;
-            if (clientId != null && r.clientId != null && String(r.clientId) !== String(clientId)) return false;
+            if (!belongsToThisClient(r)) return false;
             const want = trim(forStandard);
             if (want && trim(r.standard) && trim(r.standard).toLowerCase() !== want.toLowerCase()) return false;
             const st = trim(r.reportStatus || r.status).toLowerCase();
@@ -808,7 +822,7 @@
         let nextAudit = dueDate ? { date: dueDate, source: 'calendar', label: stage } : null;
         const scheduled = allPlans.filter((p) => {
             if (!p) return false;
-            if (clientId != null && p.clientId != null && String(p.clientId) !== String(clientId)) return false;
+            if (!belongsToThisClient(p)) return false;
             if (standard && trim(p.standard) && trim(p.standard).toLowerCase() !== standard.toLowerCase()) return false;
             const st = trim(p.status).toLowerCase();
             if (st === 'completed' || st === 'cancelled') return false;
