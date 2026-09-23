@@ -52,12 +52,12 @@ describe('recommended audit window belongs to the certificate on the card', () =
         const { record, windowState, cycleState } = cardFor(client, 'ISO 27001:2022');
 
         expect(record.certificateNo).toBe('22PK9033');
-        expect(record.auditType).toBe('Recertification');
-        expect(record.recommendedWindowStart).toBe('2026-06-17');
-        expect(record.recommendedWindowEnd).toBe('2026-08-16');
-        // Dots and window agree: nothing finalized, recertification missed.
+        expect(record.auditType).toBe('Surveillance 1');
+        expect(record.recommendedWindowStart).toBe('2026-08-17');
+        expect(record.recommendedWindowEnd).toBe('2026-10-16');
+        // Dots and window agree: nothing finalized, the surveillance is due.
         expect(cycleState.completed.recert).toBe(false);
-        expect(windowState.state).toBe('closed');
+        expect(windowState.state).toBe('open');
     });
 
     it('does not let a duplicate certificate record lend its history to the card', () => {
@@ -72,10 +72,10 @@ describe('recommended audit window belongs to the certificate on the card', () =
 
         const { record } = cardFor(client, 'ISO 27001:2022');
 
-        // Before: 'Surveillance 2' targeting 2024-09-16 — the twin's stage.
+        // Before: the twin's stage, resolved from the twin's history.
         expect(record.certificateNo).toBe('22PK9033');
-        expect(record.auditType).toBe('Recertification');
-        expect(record.recommendedWindowStart).toBe('2026-06-17');
+        expect(record.auditType).toBe('Surveillance 1');
+        expect(record.recommendedWindowStart).toBe('2026-08-17');
     });
 
     it('honours an authorized override while the cycle is still running', () => {
@@ -97,7 +97,7 @@ describe('recommended audit window belongs to the certificate on the card', () =
         expect(record.supersededOverride).toBeNull();
     });
 
-    it('supersedes a surveillance override once the certificate has expired', () => {
+    it('supersedes an override recorded in the cycle before this one', () => {
         // The reported card: an Admin pinned the stage to Surveillance 2 while
         // the cycle was live. The certificate has since expired, so that window
         // (17/08/2024 - 16/10/2024) is not an audit anyone can still perform.
@@ -112,18 +112,18 @@ describe('recommended audit window belongs to the certificate on the card', () =
 
         const { record, windowState } = cardFor(client, 'ISO 27001:2022');
 
-        expect(record.auditType).toBe('Recertification');
-        expect(record.recommendedWindowStart).toBe('2026-06-17');
-        expect(record.recommendedWindowEnd).toBe('2026-08-16');
-        expect(record.cycleExpired).toBe(true);
+        expect(record.auditType).toBe('Surveillance 1');
+        expect(record.recommendedWindowStart).toBe('2026-08-17');
+        expect(record.recommendedWindowEnd).toBe('2026-10-16');
+        expect(record.supersededReason).toBe('earlier-cycle');
         // The event is append-only: it still reports, it just stops steering.
         expect(record.override).toBeNull();
         expect(record.stageSource).not.toBe('authorized-override');
         expect(record.supersededOverride.overrideValue).toBe('Surveillance 2');
         expect(record.supersededOverride.user).toBe('Admin');
         expect(record.lifecycleEvents).toHaveLength(1);
-        expect(windowState.state).toBe('closed');
-        expect(windowState.days).toBe(38);
+        expect(windowState.state).toBe('open');
+        expect(windowState.days).toBe(23);   // days left in the surveillance window
     });
 
     it('leaves a recertification override in place on an expired certificate', () => {
@@ -143,22 +143,21 @@ describe('recommended audit window belongs to the certificate on the card', () =
         expect(record.override.user).toBe('Certification Manager');
     });
 
-    it('recommends recertification on an expired certificate that never had a surveillance', () => {
-        // Finalized history exists, but no surveillance was ever completed. The
-        // stage derivation would otherwise ask for Surveillance 1 and point at a
-        // window from 2023.
+    it('recommends recertification once both surveillance windows have closed', () => {
+        // First certified March 2024: Surveillance 1 was due March 2025 and
+        // Surveillance 2 March 2026, so both windows shut months ago and the
+        // cycle ends in March 2027.
         const client = {
-            id: 'silicon', certificates: [certificate()],
-            certificationLifecycleEvents: [{
-                id: 'D1', certificateId: 'CERT-A', type: 'certification-decision',
-                occurredAt: '2022-09-16T00:00:00Z', user: 'CM', role: 'Certification Manager'
-            }]
+            id: 'litho',
+            certificates: [certificate({ id: 'CERT-L', certificateNo: '24PK9035', initialDate: '2024-03-07', currentIssue: '2027-04-19', expiryDate: '2030-04-15' })],
+            certificationLifecycleEvents: []
         };
 
         const { record } = cardFor(client, 'ISO 27001:2022');
 
         expect(record.auditType).toBe('Recertification');
-        expect(record.recommendedWindowStart).toBe('2026-06-17');
+        expect(record.recommendedWindowStart).toBe('2026-12-07');
+        expect(record.recommendedWindowEnd).toBe('2027-02-05');
     });
 
     it('resolves a window for a certificate whose family twin would have shadowed it', () => {
@@ -182,7 +181,7 @@ describe('recommended audit window belongs to the certificate on the card', () =
 
         const { record } = cardFor(client, 'ISO 27001:2022');
         expect(record.certificateNo).toBe('22PK9033');
-        expect(record.recommendedWindowStart).toBe('2026-06-17');
+        expect(record.recommendedWindowStart).toBe('2026-08-17');
     });
 
     it('keeps the per-client context in step with the per-certificate resolver', () => {
@@ -252,15 +251,24 @@ describe('a window can never read backwards', () => {
     });
 
     it('leaves a genuine three-year certificate unchanged', () => {
-        const cert = certificate();   // expiry IS the cycle end
+        // Issued for the full cycle: the recorded expiry lands on the cycle end
+        // (the day before the three-year anniversary), and that precise date is
+        // kept rather than one computed to the day.
+        const cert = certificate({ initialDate: '2024-09-16', currentIssue: '2024-09-16', expiryDate: '2027-09-15' });
         const client = { id: 'silicon', certificates: [cert], certificationLifecycleEvents: [] };
         const cycleState = ReportStats.cycleState({ client, standard: cert.standard, certificate: cert, allReports: [], allPlans: [], today: TODAY });
         const record = Domain.resolveCertificateCycle({
             client, certificate: cert, cycleState, now: TODAY, settings: {},
             allReports: [], allPlans: [], cycleStateResolver: ReportStats.cycleState
         });
-        expect(record.recommendedWindowStart).toBe('2026-06-17');
-        expect(record.recommendedWindowEnd).toBe('2026-08-16');
+
+        expect(cycleState.cycleEnd.toISOString().slice(0, 10)).toBe('2027-09-15');
+        expect(record.expiryDate).toBe('2027-09-15');
+        expect(record.recommendedWindowStart < record.recommendedWindowEnd).toBe(true);
+        // Surveillance 2 falls due this month, and its window is open.
+        expect(record.auditType).toBe('Surveillance 2');
+        expect(record.recommendedWindowStart).toBe('2026-08-17');
+        expect(record.recommendedWindowEnd).toBe('2026-10-16');
     });
 });
 

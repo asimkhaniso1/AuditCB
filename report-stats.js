@@ -357,40 +357,51 @@
         return dt;
     }
 
-    // Where the CURRENT three-year cycle began. A recertification starts a new
-    // cycle but leaves the original certification date on the certificate, so
-    // anchoring on that date forever produced cycles of four years and more —
-    // the calendar then ran past the new cycle's surveillances and reported
-    // recertification overdue for a client who had just been recertified.
-    // The cycle start is the most recent three-year anniversary of first
-    // certification that falls on or before the certificate's current issue
-    // date; an annual re-issue inside a cycle is nowhere near that boundary and
-    // leaves the anchor alone. The tolerance lets a recert issued a little
-    // early still count as the boundary it plainly is.
+    // Where the CURRENT three-year cycle began.
+    //
+    // Initial Date is the first certification and never moves. Current Issue
+    // and Expiry are the certificate ON FILE — re-issued on their own schedule,
+    // often annually — so neither marks a cycle boundary. Certification simply
+    // runs in three-year cycles from first certification: recertify at the end
+    // of one and the next begins. The current cycle is therefore the three-year
+    // period that contains today.
+    //
+    // Deriving it from Current Issue instead put Lithocraft (first certified
+    // March 2024, certificate re-issued to April 2027) in a 2027–2030 cycle
+    // asking for a surveillance in 2028; anchoring on Initial Date forever gave
+    // RYMA a four-year cycle and demanded a recertification it had just had.
     const CYCLE_MONTHS = 36;
-    const EARLY_RECERT_TOLERANCE_DAYS = 90;
-    function cycleStartFrom(firstCertified, currentIssue) {
+    function cycleStartFrom(firstCertified, today) {
         if (!firstCertified) return null;
-        if (!currentIssue || currentIssue <= firstCertified) return firstCertified;
+        const now = today || new Date();
         let start = new Date(firstCertified.getTime());
-        for (let cycles = 0; cycles < 20; cycles++) {
+        for (let cycles = 0; cycles < 40; cycles++) {
             const next = addMonths(start, CYCLE_MONTHS);
-            const reached = new Date(next.getTime());
-            reached.setDate(reached.getDate() - EARLY_RECERT_TOLERANCE_DAYS);
-            if (currentIssue < reached) break;
+            if (next > now) break;
             start = next;
         }
         return start;
     }
 
     // The one cycle-end rule, shared by buildProgramme (report) and cycleState
-    // (dashboard widget). Many certificates on file are ANNUAL re-issues within
-    // a 3-year cycle (expiry = currentIssue + ~364 days, an app convention), so
-    // a recorded expiry is only the true cycle end when it lands at least 30
-    // months after the cycle anchor; otherwise the cycle ends anchor + 36 months.
+    // (dashboard widget). A certification cycle is three years from its start —
+    // the certificate ON FILE expires on its own schedule (often annually, and
+    // occasionally carrying a date years out) and never defines the cycle. Its
+    // expiry is reported separately, as a certificate that has lapsed or is
+    // valid, which is a different fact from where the cycle ends.
     function cycleEndFrom(anchor, expiry) {
-        if (!expiry) return addMonths(anchor, 36);
-        return expiry.getTime() >= addMonths(anchor, 30).getTime() ? expiry : addMonths(anchor, 36);
+        const nominal = addMonths(anchor, CYCLE_MONTHS);
+        // A certificate issued for the full cycle expires the day before the
+        // anniversary, and that recorded date is the precise end of validity —
+        // worth keeping over a date computed to the day. Only a date sitting
+        // right on the nominal end can be that; an annual re-issue (years
+        // early) or a certificate carrying a date beyond the cycle (years late)
+        // is not describing the cycle at all.
+        if (expiry) {
+            const drift = Math.abs(expiry.getTime() - nominal.getTime());
+            if (drift <= 60 * 24 * 60 * 60 * 1000) return expiry;
+        }
+        return nominal;
     }
 
     function buildProgrammeInner(input) {
@@ -475,7 +486,12 @@
         // cycle end only when it is at least 30 months after the cycle anchor
         // (initialDate/issueDate); otherwise the cert is annual-issue and the
         // real cycle end is anchor + 36 months.
-        const recertDate = certExpiry ? cycleEndFrom(certStart || baseDate, certExpiry) : offsetDate(36);
+        // Same cycle arithmetic as the widget: the three-year period containing
+        // the audit, counted from first certification — not from the date the
+        // certificate on file happens to carry.
+        const recertDate = certStart
+            ? cycleEndFrom(cycleStartFrom(certStart, baseDate), certExpiry)
+            : (certExpiry ? cycleEndFrom(baseDate, certExpiry) : offsetDate(36));
         const recertTiming = certExpiry ? ('by ' + fmt(recertDate)) : monthYear(36);
 
         // Match history records to stage slots by their own audit type.
@@ -621,7 +637,7 @@
 
         const firstCertified = parseDateSafe(cert.initialDate) || parseDateSafe(cert.issueDate) || parseDateSafe(cert.currentIssue);
         if (!firstCertified) return null;
-        const anchor = cycleStartFrom(firstCertified, parseDateSafe(cert.currentIssue));
+        const anchor = cycleStartFrom(firstCertified, today);
 
         const rawExpiry = parseDateSafe(cert.expiryDate);
         const cycleEnd = cycleEndFrom(anchor, rawExpiry);
@@ -696,14 +712,22 @@
             if (!c || c === cert || certIdOf(c) === certificateId) return;
             const cAnchor = cycleStartFrom(
                 parseDateSafe(c.initialDate) || parseDateSafe(c.issueDate) || parseDateSafe(c.currentIssue),
-                parseDateSafe(c.currentIssue));
+                today);
             const cExpiry = parseDateSafe(c.expiryDate);
             const sameAnchor = !!cAnchor && cAnchor.getTime() === anchor.getTime();
             const sameExpiry = (!cExpiry && !rawExpiry) || (!!cExpiry && !!rawExpiry && cExpiry.getTime() === rawExpiry.getTime());
             if (sameAnchor && sameExpiry) siblings.set(certIdOf(c), c);
         });
         const COMPLETION_TYPES = new Set(['surveillance-1-completed', 'surveillance-2-completed', 'recertification-completed', 'certification-renewal']);
-        const lifecycleTypes = new Set(lifecycleEvents.map((event) => trim(event.type).toLowerCase()));
+        // Milestones belong to the cycle they happened in. A surveillance
+        // completed under the previous certificate cannot satisfy this cycle's
+        // first surveillance, so completion events are held to the same window
+        // as finalized reports.
+        const inThisCycle = (event) => {
+            const when = parseDateSafe(event.occurredAt || event.createdAt);
+            return !!when && when >= windowStart && when <= today;
+        };
+        const lifecycleTypes = new Set(lifecycleEvents.filter(inThisCycle).map((event) => trim(event.type).toLowerCase()));
 
         // Sharing fills a SILENT record, it never edits one that is being kept.
         // A certificate with a milestone of its own is tracked individually, and
@@ -718,7 +742,7 @@
         const siblingProgress = tracksOwnEvidence ? [] : [...siblings.values()].map((sib) => {
             const visits = tallyVisits(reportsInCycle(sib.standard));
             const types = new Set(allEvents
-                .filter((event) => String(event.certificateId || '') === certIdOf(sib))
+                .filter((event) => String(event.certificateId || '') === certIdOf(sib) && inThisCycle(event))
                 .map((event) => trim(event.type).toLowerCase()));
             return {
                 name: sib.certificateNo || sib.standard || certIdOf(sib),

@@ -11,7 +11,7 @@ const ReportStats = require('../report-stats.js');
 // claimed they never happened — amber nodes and a projected stage beside an
 // identical certificate showing green ticks.
 const TODAY = new Date('2026-09-23T00:00:00');
-const DATES = { initialDate: '2022-09-16', currentIssue: '2022-09-16', expiryDate: '2026-09-15', status: 'Active' };
+const DATES = { initialDate: '2025-09-16', currentIssue: '2025-09-16', expiryDate: '2026-09-15', status: 'Active' };
 
 const completion = (certificateId, type, occurredAt) => ({
     id: `${certificateId}-${type}`, certificateId, type, occurredAt,
@@ -26,8 +26,8 @@ function siliconNetworks(overrides) {
             Object.assign({ id: 'C-9001', certificateNo: '22PK9032', standard: 'ISO 9001:2015' }, DATES)
         ],
         certificationLifecycleEvents: overrides?.events || [
-            completion('C-9001', 'surveillance-1-completed', '2023-09-10T00:00:00Z'),
-            completion('C-9001', 'surveillance-2-completed', '2024-09-10T00:00:00Z')
+            completion('C-9001', 'surveillance-1-completed', '2025-10-10T00:00:00Z'),
+            completion('C-9001', 'surveillance-2-completed', '2026-03-10T00:00:00Z')
         ]
     };
 }
@@ -122,8 +122,8 @@ describe('completion evidence within one certification cycle', () => {
         // finalized under "ISO 9001:2015" never reached the 27001 cycle.
         const client = siliconNetworks({ events: [] });
         const reports = [
-            { clientId: 'silicon', standard: 'ISO 9001:2015', reportStatus: 'Finalized', auditType: 'Surveillance 1', date: '2023-09-10' },
-            { clientId: 'silicon', standard: 'ISO 9001:2015', reportStatus: 'Finalized', auditType: 'Surveillance 2', date: '2024-09-10' }
+            { clientId: 'silicon', standard: 'ISO 9001:2015', reportStatus: 'Finalized', auditType: 'Surveillance 1', date: '2025-10-10' },
+            { clientId: 'silicon', standard: 'ISO 9001:2015', reportStatus: 'Finalized', auditType: 'Surveillance 2', date: '2026-03-10' }
         ];
         const state = (standard) => ReportStats.cycleState({
             client, standard, certificate: client.certificates.find((c) => c.standard === standard),
@@ -146,9 +146,9 @@ describe('completion evidence within one certification cycle', () => {
         // separate plans rather than one integrated visit.
         const client = siliconNetworks({
             events: [
-                completion('C-27001', 'surveillance-1-completed', '2023-09-10T00:00:00Z'),
-                completion('C-9001', 'surveillance-1-completed', '2023-09-10T00:00:00Z'),
-                completion('C-9001', 'surveillance-2-completed', '2024-09-10T00:00:00Z')
+                completion('C-27001', 'surveillance-1-completed', '2025-10-10T00:00:00Z'),
+                completion('C-9001', 'surveillance-1-completed', '2025-10-10T00:00:00Z'),
+                completion('C-9001', 'surveillance-2-completed', '2026-03-10T00:00:00Z')
             ]
         });
         const iso27001 = stateFor(client, 'ISO 27001:2022');
@@ -163,7 +163,7 @@ describe('completion evidence within one certification cycle', () => {
         const client = siliconNetworks();
         const report = {
             clientId: 'silicon', standard: 'ISO 27001:2022', reportStatus: 'Finalized',
-            auditType: 'Stage 2', date: '2022-09-16'
+            auditType: 'Stage 2', date: '2025-09-16'
         };
         const iso27001 = ReportStats.cycleState({
             client, standard: 'ISO 27001:2022', certificate: client.certificates[0],
@@ -177,8 +177,8 @@ describe('completion evidence within one certification cycle', () => {
 
     it('does not share the certificate-issue and decision flags, which are per certificate', () => {
         const client = siliconNetworks({
-            events: [completion('C-9001', 'certification-decision', '2022-09-10T00:00:00Z'),
-            completion('C-9001', 'certificate-issue', '2022-09-16T00:00:00Z')]
+            events: [completion('C-9001', 'certification-decision', '2025-09-20T00:00:00Z'),
+            completion('C-9001', 'certificate-issue', '2025-09-20T00:00:00Z')]
         });
         const iso27001 = stateFor(client, 'ISO 27001:2022');
 

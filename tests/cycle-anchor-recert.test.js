@@ -182,13 +182,43 @@ describe('the cycle restarts at a recertification', () => {
         expect(record.auditType).toBe('Surveillance 2');
     });
 
-    it('still reports a genuinely finished cycle as expired', () => {
-        const { cycleState, record } = cycleFor(cert({
+    it('rolls into the next cycle rather than declaring certification over', () => {
+        // Certification runs in three-year cycles: the one that began in 2022
+        // ended in 2025 and the next is running now. The certificate ON FILE
+        // lapsed in 2025 — a re-issue overdue, reported separately, not the end
+        // of the cycle.
+        const { cycleState } = cycleFor(cert({
             initialDate: '2022-09-16', currentIssue: '2022-09-16', expiryDate: '2025-09-15'
         }));
-        expect(iso(cycleState.anchor)).toBe('2022-09-16');
-        expect(cycleState.expired).toBe(true);
+        expect(iso(cycleState.anchor)).toBe('2025-09-16');
+        expect(iso(cycleState.cycleEnd)).toBe('2028-09-16');
+        expect(cycleState.expired).toBe(false);
         expect(cycleState.certificateExpired).toBe(true);
+    });
+
+    it('counts whole cycles forward however many have passed', () => {
+        const { cycleState } = cycleFor(cert({
+            initialDate: '2011-04-02', currentIssue: '2011-04-02', expiryDate: '2012-04-01'
+        }));
+        expect(iso(cycleState.anchor)).toBe('2026-04-02');   // 2011 + five cycles
+        expect(iso(cycleState.cycleEnd)).toBe('2029-04-02');
+    });
+
+    it('ignores a certificate carrying a date beyond its own cycle', () => {
+        // LITHOCRAFT: first certified March 2024, certificate re-issued with an
+        // April 2027 issue and a 2030 expiry. The cycle is still 2024 to 2027.
+        const { cycleState, record } = cycleFor(cert({
+            initialDate: '2024-03-07', currentIssue: '2027-04-19', expiryDate: '2030-04-15'
+        }));
+
+        expect(iso(cycleState.anchor)).toBe('2024-03-07');
+        expect(iso(cycleState.cycleEnd)).toBe('2027-03-07');
+        expect(iso(cycleState.surv1Due)).toBe('2025-03-07');
+        expect(iso(cycleState.surv2Due)).toBe('2026-03-07');
+        // Both surveillance windows shut months ago, so recertification is next
+        // — and its window sits before the cycle ends, not out at the 2030 date.
         expect(record.auditType).toBe('Recertification');
+        expect(record.recommendedWindowStart).toBe('2026-12-07');
+        expect(record.recommendedWindowEnd).toBe('2027-02-05');
     });
 });
