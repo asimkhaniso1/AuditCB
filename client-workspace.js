@@ -894,6 +894,50 @@ function findRecentFinalizedAudit(clientId, standard) {
 // expected to diverge when audits run early/late or are still in progress;
 // that gap is exactly what should make this widget's "urgent/red" styling
 // meaningful. Do not collapse them into one derived value.
+// Planning window for ONE certificate, derived from the cycleState the caller
+// already computed. Binding both to the same certificate is what stops the
+// recommended window contradicting the stage dots next to it.
+function cycleRecordForCertificate(client, certificate, cycleState, today) {
+    const domain = window.AuditPlanningDomain;
+    if (!certificate || !domain || typeof domain.resolveCertificateCycle !== 'function') return null;
+    try {
+        return domain.resolveCertificateCycle({
+            client, certificate, cycleState: cycleState || null, now: today,
+            settings: (window.state && (window.state.cbSettings || window.state.settings)) || {},
+            allReports: (window.state && window.state.auditReports) || [],
+            allPlans: (window.state && window.state.auditPlans) || [],
+            cycleStateResolver: window.ReportStats && window.ReportStats.cycleState
+        });
+    } catch (err) {
+        if (window.Logger) Logger.warn('Certification cycle window unavailable:', err);
+        return null;
+    }
+}
+
+// Caption under the recommended window. A window that has closed is planning
+// history, so it is labelled overdue rather than offered as guidance — that is
+// what makes it agree with an amber (missed) milestone node. An authorized
+// override is named, because it explains a window the certificate dates alone
+// would not produce.
+function cycleWindowCaption(record, state) {
+    if (!record) return '';
+    const esc = window.UTILS.escapeHtml;
+    const fmt = window.UTILS.formatDate;
+    const lines = [];
+    if (record.stageSource === 'authorized-override' && record.override) {
+        const reason = record.override.reason ? ` — ${esc(record.override.reason)}` : '';
+        lines.push(`<div style="font-size:.7rem;color:#b45309;"><i class="fa-solid fa-user-shield" style="margin-right:3px;"></i>Stage set to ${esc(record.auditType)} by authorized override (${esc(record.override.user || 'unknown user')})${reason}</div>`);
+    }
+    if (state && state.state === 'closed') {
+        lines.push(`<div style="font-size:.7rem;color:#b91c1c;">Window closed ${fmt(state.end)} — ${esc(record.auditType)} overdue by ${state.days} day${state.days === 1 ? '' : 's'}</div>`);
+    } else if (state && state.state === 'open') {
+        lines.push(`<div style="font-size:.7rem;color:#047857;">Window open — closes ${fmt(state.end)} (${state.days} day${state.days === 1 ? '' : 's'} left)</div>`);
+    } else {
+        lines.push(`<div style="font-size:.7rem;color:#64748b;">Planning guidance · includes ${record.closureBufferDays}-day NC closure buffer</div>`);
+    }
+    return lines.join('');
+}
+
 function renderCertificationCycleWidget(client) {
     const certs = client.certificates || [];
     const standards = [...new Set(certs.map(c => c.standard).filter(Boolean))];
@@ -979,14 +1023,19 @@ function renderCertificationCycleWidget(client) {
         // otherwise "Surveillance 2 period" sits beside unticked S1/S2 nodes
         // and reads as a contradiction. cycleState exposes stageSource for this.
         const isProjectedStage = !!(cs && cs.stageSource === 'calendar');
-        const cycleContext = window.getCertificationCycleContext ? window.getCertificationCycleContext(client, today) : null;
-        const cycleRecord = cycleContext?.cycles?.find(c => c.standard === std);
+        // Resolve the window for THIS certificate and from the cycleState the
+        // dots already use. Looking it up by standard in a whole-client context
+        // returned whichever certificate the planning domain preferred for the
+        // scheme family, so the window could describe a superseded twin.
+        const cycleRecord = cycleRecordForCertificate(client, activeCert, cs, today);
+        const windowState = cycleRecord && window.AuditPlanningDomain
+            ? window.AuditPlanningDomain.describeCycleWindow(cycleRecord, today) : null;
         const scheduledPlan = (window.state.auditPlans || [])
             .filter(plan => plan.client === client.name && plan.status === 'Scheduled' && String(plan.standard || '').includes(std))
             .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
         const scheduledEnd = scheduledPlan?.endDate || scheduledPlan?.date;
         const daysFromScheduledEndToExpiry = scheduledEnd ? Math.ceil((cycleEnd - new Date(scheduledEnd)) / (1000 * 60 * 60 * 24)) : null;
-        const expiryWarning = scheduledPlan && daysFromScheduledEndToExpiry <= (cycleContext?.closureBufferDays || 30);
+        const expiryWarning = scheduledPlan && daysFromScheduledEndToExpiry <= (cycleRecord?.closureBufferDays || 30);
 
         return `
             <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, ${expired ? '#fee2e2' : '#f0f9ff'} 0%, ${expired ? '#fecaca' : '#e0f2fe'} 100%); border-left: 4px solid ${expired ? '#dc2626' : '#3b82f6'};">
@@ -1021,7 +1070,7 @@ function renderCertificationCycleWidget(client) {
                                 ${expiryWarning ? `<div style="font-size:.75rem;color:#dc2626;margin-top:.25rem;"><i class="fa-solid fa-triangle-exclamation"></i> Scheduled dates approach certificate expiry and may not preserve the NC closure buffer.</div>` : ''}
                             </div>
                             ` : nextAudit ? `<div><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Next Audit Stage</div><div style="font-size:1.1rem;font-weight:600;color:${isUrgent ? '#dc2626' : '#1e293b'};margin-top:.25rem;">${cycleRecord?.auditType || currentStage}</div></div>` : ''}
-                            ${cycleRecord ? `<div><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Recommended Audit Window</div><div style="font-size:1.1rem;font-weight:600;color:#1e293b;margin-top:.25rem;">${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}</div><div style="font-size:.7rem;color:#64748b;">Planning guidance · includes ${cycleRecord.closureBufferDays}-day NC closure buffer</div></div>` : ''}
+                            ${cycleRecord ? `<div><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Recommended Audit Window</div><div style="font-size:1.1rem;font-weight:600;color:${windowState?.state === 'closed' ? '#b91c1c' : '#1e293b'};margin-top:.25rem;">${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}</div>${cycleWindowCaption(cycleRecord, windowState)}</div>` : ''}
                             <div>
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Certificate Expiry</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: ${expired ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(rawExpiry || cycleEnd)}</div>
@@ -1141,8 +1190,9 @@ function renderAuditCycleTimeline(client) {
         }
     }
 
-    const cycleContext = window.getCertificationCycleContext ? window.getCertificationCycleContext(client, today) : null;
-    const cycleRecord = cycleContext?.cycles?.find(c => c.standard === latestCert.standard);
+    const cycleRecord = cycleRecordForCertificate(client, latestCert, cs, today);
+    const windowState = cycleRecord && window.AuditPlanningDomain
+        ? window.AuditPlanningDomain.describeCycleWindow(cycleRecord, today) : null;
     const scheduledPlan = (window.state.auditPlans || [])
         .filter(plan => plan.client === client.name && plan.status === 'Scheduled' && String(plan.standard || '').includes(latestCert.standard))
         .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
@@ -1174,9 +1224,9 @@ function renderAuditCycleTimeline(client) {
                 </div>
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
                     <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.25rem; font-weight: 700; margin: 0.25rem 0;">${scheduledPlan ? `${window.UTILS.formatDate(scheduledPlan.date)}${scheduledPlan.endDate ? ` – ${window.UTILS.formatDate(scheduledPlan.endDate)}` : ''}` : (cycleRecord ? `${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}` : 'N/A')}</p>
+                    <p style="font-size: 1.25rem; font-weight: 700; margin: 0.25rem 0; color: ${!scheduledPlan && windowState?.state === 'closed' ? '#b91c1c' : 'inherit'};">${scheduledPlan ? `${window.UTILS.formatDate(scheduledPlan.date)}${scheduledPlan.endDate ? ` – ${window.UTILS.formatDate(scheduledPlan.endDate)}` : ''}` : (cycleRecord ? `${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}` : 'N/A')}</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">${scheduledPlan ? 'Scheduled Audit' : 'Recommended Audit Window'}</p>
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${scheduledPlan ? 'Booked dates' : 'Planning guidance, not a compliance deadline'}</p>
+                    ${scheduledPlan ? '<p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Booked dates</p>' : (cycleRecord ? `<div style="margin-top: 0.25rem;">${cycleWindowCaption(cycleRecord, windowState)}</div>` : '<p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Planning guidance, not a compliance deadline</p>')}
                 </div>
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">
                     <i class="fa-solid fa-hourglass-half" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>

@@ -201,14 +201,17 @@ window.recordCertificationStageOverride = async function (clientId, certificateI
         return;
     }
     try {
-        const currentContext = window.AuditPlanningDomain.resolveCycleContext({
+        // Resolve THIS certificate: the per-client context keeps one cycle per
+        // scheme family, so a certificate sharing a family with another left the
+        // lookup empty and the override recorded a null original stage.
+        const record = window.AuditPlanningDomain.resolveCertificateCycle({
             client,
+            certificate,
             settings: window.state.cbSettings || {},
             allReports: window.state.auditReports || [],
             allPlans: window.state.auditPlans || [],
             cycleStateResolver: window.ReportStats?.cycleState
         });
-        const record = currentContext.cycles.find(cycle => String(cycle.certificateId) === String(certificate.id || certificate.certificateNo));
         const override = window.AuditPlanningDomain.createOverride({
             category: 'stage',
             originalValue: record?.auditType || null,
