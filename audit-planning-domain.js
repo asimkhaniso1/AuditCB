@@ -127,6 +127,21 @@
 
     function auditTypeFromCycleState(cycleState, events) {
         const override = latestAuthorizedStageOverride(events);
+        // A surveillance cannot be the next audit on a certificate whose cycle
+        // has already ended: there is no certificate left to maintain, only one
+        // to re-establish. Whatever stage the cycle stalled at — and whatever
+        // stage an override named while the cycle was still running — the next
+        // audit is Recertification. Without this, an expired certificate kept
+        // recommending the surveillance window it missed, years in the past,
+        // beside milestone nodes that all read "missed".
+        const expired = !!cycleState?.expired && !cycleState?.recertDone;
+        if (expired) {
+            const stale = override && !/recert/i.test(String(override.overrideValue || '')) ? override : null;
+            return {
+                auditType: 'Recertification', stage: cycleState.stage || 'Certificate expired',
+                expired: true, override: stale ? null : override, supersededOverride: stale
+            };
+        }
         if (override) return { auditType: override.overrideValue, stage: override.overrideValue, override };
         // With no finalized lifecycle history ReportStats deliberately exposes a
         // calendar projection. Its `completed` flags remain false because those
@@ -203,7 +218,11 @@
             auditType: derived.auditType, targetDate: isoDate(target),
             recommendedWindowStart: isoDate(window.start), recommendedWindowEnd: isoDate(window.end),
             closureBufferDays: cfg.ncClosureBufferDays, stageSource: derived.override ? 'authorized-override' : (cycleState?.stageSource || 'lifecycle'),
-            override: derived.override || null, lifecycleEvents: events
+            override: derived.override || null,
+            // Kept for display and for the record: the event is append-only and
+            // is never deleted, it simply stops steering planning.
+            supersededOverride: derived.supersededOverride || null,
+            cycleExpired: !!derived.expired, lifecycleEvents: events
         };
     }
 

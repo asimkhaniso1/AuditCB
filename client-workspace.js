@@ -927,6 +927,9 @@ function cycleWindowCaption(record, state) {
     if (record.stageSource === 'authorized-override' && record.override) {
         const reason = record.override.reason ? ` — ${esc(record.override.reason)}` : '';
         lines.push(`<div style="font-size:.7rem;color:#b45309;"><i class="fa-solid fa-user-shield" style="margin-right:3px;"></i>Stage set to ${esc(record.auditType)} by authorized override (${esc(record.override.user || 'unknown user')})${reason}</div>`);
+    } else if (record.supersededOverride) {
+        const ov = record.supersededOverride;
+        lines.push(`<div style="font-size:.7rem;color:#b45309;"><i class="fa-solid fa-user-shield" style="margin-right:3px;"></i>${esc(ov.overrideValue)} override by ${esc(ov.user || 'unknown user')} superseded — the certificate expired, so recertification is the only remaining audit</div>`);
     }
     if (state && state.state === 'closed') {
         lines.push(`<div style="font-size:.7rem;color:#b91c1c;">Window closed ${fmt(state.end)} — ${esc(record.auditType)} overdue by ${state.days} day${state.days === 1 ? '' : 's'}</div>`);
