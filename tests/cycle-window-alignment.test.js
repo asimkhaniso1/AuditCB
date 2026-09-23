@@ -78,26 +78,87 @@ describe('recommended audit window belongs to the certificate on the card', () =
         expect(record.recommendedWindowStart).toBe('2026-06-17');
     });
 
-    it('still honours an authorized override recorded against that same certificate', () => {
+    it('honours an authorized override while the cycle is still running', () => {
+        const client = {
+            id: 'silicon',
+            certificates: [certificate({ initialDate: '2025-01-10', currentIssue: '2025-01-10', expiryDate: '2028-01-09' })],
+            certificationLifecycleEvents: [{
+                id: 'OV1', certificateId: 'CERT-A', type: 'authorized-override', overrideValue: 'Surveillance 1',
+                metadata: { category: 'stage' }, reason: 'Client requested deferral',
+                user: 'Admin', role: 'Admin', occurredAt: '2026-06-01T00:00:00Z'
+            }]
+        };
+
+        const { record } = cardFor(client, 'ISO 27001:2022');
+
+        expect(record.auditType).toBe('Surveillance 1');
+        expect(record.stageSource).toBe('authorized-override');
+        expect(record.override.user).toBe('Admin');
+        expect(record.supersededOverride).toBeNull();
+    });
+
+    it('supersedes a surveillance override once the certificate has expired', () => {
+        // The reported card: an Admin pinned the stage to Surveillance 2 while
+        // the cycle was live. The certificate has since expired, so that window
+        // (17/08/2024 - 16/10/2024) is not an audit anyone can still perform.
         const client = {
             id: 'silicon', certificates: [certificate()],
             certificationLifecycleEvents: [{
                 id: 'OV1', certificateId: 'CERT-A', type: 'authorized-override', overrideValue: 'Surveillance 2',
-                metadata: { category: 'stage' }, reason: 'Client requested deferral',
+                metadata: { category: 'stage' }, reason: 'ok',
                 user: 'Admin', role: 'Admin', occurredAt: '2024-06-01T00:00:00Z'
             }]
         };
 
         const { record, windowState } = cardFor(client, 'ISO 27001:2022');
 
-        expect(record.auditType).toBe('Surveillance 2');
-        expect(record.stageSource).toBe('authorized-override');
-        expect(record.override.user).toBe('Admin');
-        expect(record.recommendedWindowStart).toBe('2024-08-17');
-        expect(record.recommendedWindowEnd).toBe('2024-10-16');
-        // The card can now say WHY the window is two years old, and that it lapsed.
+        expect(record.auditType).toBe('Recertification');
+        expect(record.recommendedWindowStart).toBe('2026-06-17');
+        expect(record.recommendedWindowEnd).toBe('2026-08-16');
+        expect(record.cycleExpired).toBe(true);
+        // The event is append-only: it still reports, it just stops steering.
+        expect(record.override).toBeNull();
+        expect(record.stageSource).not.toBe('authorized-override');
+        expect(record.supersededOverride.overrideValue).toBe('Surveillance 2');
+        expect(record.supersededOverride.user).toBe('Admin');
+        expect(record.lifecycleEvents).toHaveLength(1);
         expect(windowState.state).toBe('closed');
-        expect(windowState.days).toBeGreaterThan(700);
+        expect(windowState.days).toBe(38);
+    });
+
+    it('leaves a recertification override in place on an expired certificate', () => {
+        const client = {
+            id: 'silicon', certificates: [certificate()],
+            certificationLifecycleEvents: [{
+                id: 'OV1', certificateId: 'CERT-A', type: 'authorized-override', overrideValue: 'Recertification',
+                metadata: { category: 'stage' }, reason: 'Recert scheduled late',
+                user: 'Certification Manager', role: 'Certification Manager', occurredAt: '2026-08-01T00:00:00Z'
+            }]
+        };
+
+        const { record } = cardFor(client, 'ISO 27001:2022');
+
+        expect(record.auditType).toBe('Recertification');
+        expect(record.supersededOverride).toBeNull();
+        expect(record.override.user).toBe('Certification Manager');
+    });
+
+    it('recommends recertification on an expired certificate that never had a surveillance', () => {
+        // Finalized history exists, but no surveillance was ever completed. The
+        // stage derivation would otherwise ask for Surveillance 1 and point at a
+        // window from 2023.
+        const client = {
+            id: 'silicon', certificates: [certificate()],
+            certificationLifecycleEvents: [{
+                id: 'D1', certificateId: 'CERT-A', type: 'certification-decision',
+                occurredAt: '2022-09-16T00:00:00Z', user: 'CM', role: 'Certification Manager'
+            }]
+        };
+
+        const { record } = cardFor(client, 'ISO 27001:2022');
+
+        expect(record.auditType).toBe('Recertification');
+        expect(record.recommendedWindowStart).toBe('2026-06-17');
     });
 
     it('resolves a window for a certificate whose family twin would have shadowed it', () => {
