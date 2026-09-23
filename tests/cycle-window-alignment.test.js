@@ -15,7 +15,7 @@ const TODAY = new Date('2026-09-23T00:00:00');
 
 const certificate = (over) => Object.assign({
     id: 'CERT-A', certificateNo: '22PK9033', standard: 'ISO 27001:2022', status: 'Active',
-    initialDate: '2022-09-16', currentIssue: '2025-09-16', expiryDate: '2026-09-15'
+    initialDate: '2022-09-16', currentIssue: '2022-09-16', expiryDate: '2026-09-15'
 }, over || {});
 
 // What the card does: pick the certificate, derive cycleState, resolve the

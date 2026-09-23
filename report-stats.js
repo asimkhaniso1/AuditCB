@@ -357,6 +357,32 @@
         return dt;
     }
 
+    // Where the CURRENT three-year cycle began. A recertification starts a new
+    // cycle but leaves the original certification date on the certificate, so
+    // anchoring on that date forever produced cycles of four years and more —
+    // the calendar then ran past the new cycle's surveillances and reported
+    // recertification overdue for a client who had just been recertified.
+    // The cycle start is the most recent three-year anniversary of first
+    // certification that falls on or before the certificate's current issue
+    // date; an annual re-issue inside a cycle is nowhere near that boundary and
+    // leaves the anchor alone. The tolerance lets a recert issued a little
+    // early still count as the boundary it plainly is.
+    const CYCLE_MONTHS = 36;
+    const EARLY_RECERT_TOLERANCE_DAYS = 90;
+    function cycleStartFrom(firstCertified, currentIssue) {
+        if (!firstCertified) return null;
+        if (!currentIssue || currentIssue <= firstCertified) return firstCertified;
+        let start = new Date(firstCertified.getTime());
+        for (let cycles = 0; cycles < 20; cycles++) {
+            const next = addMonths(start, CYCLE_MONTHS);
+            const reached = new Date(next.getTime());
+            reached.setDate(reached.getDate() - EARLY_RECERT_TOLERANCE_DAYS);
+            if (currentIssue < reached) break;
+            start = next;
+        }
+        return start;
+    }
+
     // The one cycle-end rule, shared by buildProgramme (report) and cycleState
     // (dashboard widget). Many certificates on file are ANNUAL re-issues within
     // a 3-year cycle (expiry = currentIssue + ~364 days, an app convention), so
@@ -593,8 +619,9 @@
             || certs[0] || null;
         if (!cert) return null;
 
-        const anchor = parseDateSafe(cert.initialDate) || parseDateSafe(cert.issueDate) || parseDateSafe(cert.currentIssue);
-        if (!anchor) return null;
+        const firstCertified = parseDateSafe(cert.initialDate) || parseDateSafe(cert.issueDate) || parseDateSafe(cert.currentIssue);
+        if (!firstCertified) return null;
+        const anchor = cycleStartFrom(firstCertified, parseDateSafe(cert.currentIssue));
 
         const rawExpiry = parseDateSafe(cert.expiryDate);
         const cycleEnd = cycleEndFrom(anchor, rawExpiry);
@@ -667,7 +694,9 @@
         const siblings = new Map();
         certs.forEach((c) => {
             if (!c || c === cert || certIdOf(c) === certificateId) return;
-            const cAnchor = parseDateSafe(c.initialDate) || parseDateSafe(c.issueDate) || parseDateSafe(c.currentIssue);
+            const cAnchor = cycleStartFrom(
+                parseDateSafe(c.initialDate) || parseDateSafe(c.issueDate) || parseDateSafe(c.currentIssue),
+                parseDateSafe(c.currentIssue));
             const cExpiry = parseDateSafe(c.expiryDate);
             const sameAnchor = !!cAnchor && cAnchor.getTime() === anchor.getTime();
             const sameExpiry = (!cExpiry && !rawExpiry) || (!!cExpiry && !!rawExpiry && cExpiry.getTime() === rawExpiry.getTime());
@@ -738,7 +767,13 @@
             // long-standing "stage = last milestone passed, next = the one
             // after it" reading of this widget.
             stageSource = 'calendar';
-            stage = 'Initial certification'; dueDate = surv1Due; progress = 0;
+            // "Initial certification" would misdescribe a client certified years
+            // ago whose cycle restarted at a recertification. Avoid the word
+            // "recertification" in the label itself: the planning domain reads
+            // this string to pick the next audit type, and that word would send
+            // it back to recertification instead of the surveillance now due.
+            stage = anchor > firstCertified ? 'New cycle started' : 'Initial certification';
+            dueDate = surv1Due; progress = 0;
             if (today > surv1Due) { stage = 'Surveillance 1 period'; dueDate = surv2Due; progress = 33; }
             if (today > surv2Due) { stage = 'Surveillance 2 period'; dueDate = recertDue; progress = 66; }
             if (today > recertDue) { stage = 'Recertification due'; dueDate = cycleEnd; progress = 90; }
@@ -765,7 +800,11 @@
         }
 
         return {
-            anchor, cycleEnd, rawExpiry, surv1Due, surv2Due, recertDue,
+            anchor, firstCertified, cycleEnd, rawExpiry, surv1Due, surv2Due, recertDue,
+            // The certificate ON FILE can lapse long before the cycle does when
+            // it is re-issued annually: that is a re-issue overdue, not the end
+            // of certification, and the two must not be conflated.
+            certificateExpired: !!rawExpiry && today > rawExpiry,
             completed, surveillancesDone, recertDone, hasHistory, sharedEvidence,
             stage, stageSource, progress, nextAudit,
             expired: !recertDone && today > cycleEnd,

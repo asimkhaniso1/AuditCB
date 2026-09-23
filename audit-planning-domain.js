@@ -125,8 +125,16 @@
             && event.metadata?.category === 'stage' && event.overrideValue && event.reason && event.user && event.role).at(-1) || null;
     }
 
-    function auditTypeFromCycleState(cycleState, events) {
-        const override = latestAuthorizedStageOverride(events);
+    function auditTypeFromCycleState(cycleState, events, resolvedPolicy, now) {
+        const rawOverride = latestAuthorizedStageOverride(events);
+        // An override names a stage WITHIN a cycle. A recertification starts a
+        // new one, so an override recorded before the current cycle began
+        // belongs to a cycle that no longer exists and must not steer this one —
+        // it was still pinning a client to "Surveillance 2" from two cycles ago.
+        const cycleStart = date(cycleState?.anchor);
+        const recordedAt = rawOverride ? date(rawOverride.occurredAt || rawOverride.createdAt) : null;
+        const fromEarlierCycle = !!(rawOverride && cycleStart && recordedAt && recordedAt < cycleStart);
+
         // A surveillance cannot be the next audit on a certificate whose cycle
         // has already ended: there is no certificate left to maintain, only one
         // to re-establish. Whatever stage the cycle stalled at — and whatever
@@ -136,13 +144,21 @@
         // beside milestone nodes that all read "missed".
         const expired = !!cycleState?.expired && !cycleState?.recertDone;
         if (expired) {
-            const stale = override && !/recert/i.test(String(override.overrideValue || '')) ? override : null;
+            const stale = rawOverride && (fromEarlierCycle || !/recert/i.test(String(rawOverride.overrideValue || ''))) ? rawOverride : null;
             return {
                 auditType: 'Recertification', stage: cycleState.stage || 'Certificate expired',
-                expired: true, override: stale ? null : override, supersededOverride: stale
+                expired: true, override: stale ? null : rawOverride, supersededOverride: stale,
+                supersededReason: stale ? (fromEarlierCycle ? 'earlier-cycle' : 'cycle-expired') : null
             };
         }
-        if (override) return { auditType: override.overrideValue, stage: override.overrideValue, override };
+        if (rawOverride && !fromEarlierCycle) {
+            return { auditType: rawOverride.overrideValue, stage: rawOverride.overrideValue, override: rawOverride };
+        }
+        const supersededOverride = fromEarlierCycle ? rawOverride : null;
+        const supersededReason = fromEarlierCycle ? 'earlier-cycle' : null;
+        // Every branch below reports the override it did NOT apply, so the
+        // card can say why a stage someone authorised is not in force.
+        const withSuperseded = (result) => Object.assign({ supersededOverride, supersededReason }, result);
         // With no finalized lifecycle history ReportStats deliberately exposes a
         // calendar projection. Its `completed` flags remain false because those
         // milestones were not evidenced by reports, so using the flags here
@@ -151,25 +167,40 @@
         if (cycleState?.stageSource === 'calendar') {
             const projectedStage = String(cycleState.stage || '').toLowerCase();
             if (projectedStage.includes('recertification') || projectedStage.includes('certificate expired')) {
-                return { auditType: 'Recertification', stage: cycleState.stage, projected: true };
+                return withSuperseded({ auditType: 'Recertification', stage: cycleState.stage, projected: true });
             }
-            if (projectedStage.includes('surveillance 2')) {
-                return { auditType: 'Recertification', stage: cycleState.stage, projected: true };
+            // Reading the stage as "the last period that started, so do the NEXT
+            // one" assumed the passed milestone had been performed — in
+            // projection mode nothing has been evidenced, which is why it is a
+            // projection. A surveillance whose due date has just passed is the
+            // audit that is OWED, not one to step over: that is what showed
+            // Surveillance 2 for a client whose first surveillance was due.
+            // Only once a milestone's window has fully closed does it stop
+            // being schedulable and the cycle move on.
+            const cfg = resolvedPolicy || DEFAULT_POLICY;
+            const reference = date(now) || new Date();
+            const stillSchedulable = (due) => {
+                const dueDate = date(due);
+                if (!dueDate) return false;
+                return addDays(dueDate, cfg.surveillanceWindowAfterDays) >= reference;
+            };
+            if (stillSchedulable(cycleState.surv1Due)) {
+                return withSuperseded({ auditType: 'Surveillance 1', stage: cycleState.stage || 'Initial certification', projected: true });
             }
-            if (projectedStage.includes('surveillance 1')) {
-                return { auditType: 'Surveillance 2', stage: cycleState.stage, projected: true };
+            if (stillSchedulable(cycleState.surv2Due)) {
+                return withSuperseded({ auditType: 'Surveillance 2', stage: cycleState.stage, projected: true });
             }
-            return { auditType: 'Surveillance 1', stage: cycleState.stage || 'Initial certification', projected: true };
+            return withSuperseded({ auditType: 'Recertification', stage: cycleState.stage, projected: true });
         }
         const completedTypes = new Set(safeArray(events).map((event) => event.type));
         const completed = cycleState?.completed || {};
         const s1 = completed.s1 || completedTypes.has('surveillance-1-completed');
         const s2 = completed.s2 || completedTypes.has('surveillance-2-completed');
         const recert = completed.recert || completedTypes.has('recertification-completed');
-        if (recert) return { auditType: 'Recertification', stage: 'Recertification completed', complete: true };
-        if (!s1) return { auditType: 'Surveillance 1', stage: cycleState?.stage || 'Surveillance 1 due' };
-        if (!s2) return { auditType: 'Surveillance 2', stage: cycleState?.stage || 'Surveillance 2 due' };
-        return { auditType: 'Recertification', stage: cycleState?.stage || 'Recertification due' };
+        if (recert) return withSuperseded({ auditType: 'Recertification', stage: 'Recertification completed', complete: true });
+        if (!s1) return withSuperseded({ auditType: 'Surveillance 1', stage: cycleState?.stage || 'Surveillance 1 due' });
+        if (!s2) return withSuperseded({ auditType: 'Surveillance 2', stage: cycleState?.stage || 'Surveillance 2 due' });
+        return withSuperseded({ auditType: 'Recertification', stage: cycleState?.stage || 'Recertification due' });
     }
 
     function planningWindow(auditType, target, expiry, resolvedPolicy) {
@@ -212,7 +243,7 @@
             allReports: input.allReports || [], allPlans: input.allPlans || [], today: now
         }) || null;
         const events = input.events || lifecycleEvents(client, certificateId);
-        const derived = auditTypeFromCycleState(cycleState, events);
+        const derived = auditTypeFromCycleState(cycleState, events, cfg, now);
         const anchor = date(cert.initialDate || cert.issueDate || cert.currentIssue);
         const expiry = date(cert.expiryDate) || cycleState?.cycleEnd || (anchor ? new Date(anchor.getFullYear() + 3, anchor.getMonth(), anchor.getDate()) : null);
         // Many certificates on file are ANNUAL re-issues inside a three-year
@@ -238,6 +269,7 @@
             // Kept for display and for the record: the event is append-only and
             // is never deleted, it simply stops steering planning.
             supersededOverride: derived.supersededOverride || null,
+            supersededReason: derived.supersededReason || null,
             cycleExpired: !!derived.expired, lifecycleEvents: events
         };
     }

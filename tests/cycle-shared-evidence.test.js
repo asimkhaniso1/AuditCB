@@ -11,7 +11,7 @@ const ReportStats = require('../report-stats.js');
 // claimed they never happened — amber nodes and a projected stage beside an
 // identical certificate showing green ticks.
 const TODAY = new Date('2026-09-23T00:00:00');
-const DATES = { initialDate: '2022-09-16', currentIssue: '2025-09-16', expiryDate: '2026-09-15', status: 'Active' };
+const DATES = { initialDate: '2022-09-16', currentIssue: '2022-09-16', expiryDate: '2026-09-15', status: 'Active' };
 
 const completion = (certificateId, type, occurredAt) => ({
     id: `${certificateId}-${type}`, certificateId, type, occurredAt,

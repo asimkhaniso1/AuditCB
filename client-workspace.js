@@ -929,7 +929,10 @@ function cycleWindowCaption(record, state) {
         lines.push(`<div style="font-size:.7rem;color:#b45309;"><i class="fa-solid fa-user-shield" style="margin-right:3px;"></i>Stage set to ${esc(record.auditType)} by authorized override (${esc(record.override.user || 'unknown user')})${reason}</div>`);
     } else if (record.supersededOverride) {
         const ov = record.supersededOverride;
-        lines.push(`<div style="font-size:.7rem;color:#b45309;"><i class="fa-solid fa-user-shield" style="margin-right:3px;"></i>${esc(ov.overrideValue)} override by ${esc(ov.user || 'unknown user')} superseded — the certificate expired, so recertification is the only remaining audit</div>`);
+        const why = record.supersededReason === 'earlier-cycle'
+            ? 'it was recorded in an earlier certification cycle'
+            : 'the certificate expired, so recertification is the only remaining audit';
+        lines.push(`<div style="font-size:.7rem;color:#b45309;"><i class="fa-solid fa-user-shield" style="margin-right:3px;"></i>${esc(ov.overrideValue)} override by ${esc(ov.user || 'unknown user')} superseded — ${why}</div>`);
     }
     if (state && state.state === 'closed') {
         lines.push(`<div style="font-size:.7rem;color:#b91c1c;">Window closed ${fmt(state.end)} — ${esc(record.auditType)} overdue by ${state.days} day${state.days === 1 ? '' : 's'}</div>`);
@@ -1078,8 +1081,9 @@ function renderCertificationCycleWidget(client) {
                             ${cycleRecord ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Recommended Audit Window</div><div style="font-size:1.1rem;font-weight:600;color:${windowState?.state === 'closed' ? '#b91c1c' : '#1e293b'};margin-top:.25rem;">${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}</div>${cycleWindowCaption(cycleRecord, windowState)}</div>` : '<div></div>'}
                             <div style="min-width: 0;">
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Certificate Expiry</div>
-                                <div style="font-size: 1.1rem; font-weight: 600; color: ${expired ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(rawExpiry || cycleEnd)}</div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: ${expired || cs?.certificateExpired ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(rawExpiry || cycleEnd)}</div>
                                 ${rawExpiry && rawExpiry.getTime() !== cycleEnd.getTime() ? `<div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem;">Certification cycle ends ${window.UTILS.formatDate(cycleEnd)}</div>` : ''}
+                                ${cs?.certificateExpired && !expired ? '<div style="font-size: 0.7rem; color: #b91c1c; margin-top: 0.15rem;">Certificate on file has lapsed — re-issue overdue</div>' : ''}
                             </div>
                         </div>
                     </div>
