@@ -34,7 +34,10 @@ function pcConnectionFixture() {
 }
 
 describe('certification-cycle-driven audit planning domain', () => {
-    it('derives the PC CONNECTION integrated Surveillance 2 plan from three independent cycle histories', () => {
+    // Initial Date 16/12/2023 → Year 3 of the first cycle on 18/09/2026. The
+    // stage is the calendar's; a milestone missed once its window closed never
+    // holds planning back.
+    it('plans the PC CONNECTION integrated Recertification in Year 3 — S1 on file, S2 missed and its window long closed', () => {
         const client = pcConnectionFixture();
         const context = Domain.resolveCycleContext({
             client,
@@ -44,15 +47,16 @@ describe('certification-cycle-driven audit planning domain', () => {
         });
 
         expect(context.valid).toBe(true);
-        expect(context.auditType).toBe('Surveillance 2');
+        expect(context.stage).toBe('Recertification');
+        expect(context.auditType).toBe('Recertification');
         expect(context.standards).toEqual(['ISO/IEC 27001:2022', 'ISO 22301:2019', 'ISO/IEC 20000-1:2018']);
         expect(context.certificateIds).toEqual(['PC-CERT-1', 'PC-CERT-2', 'PC-CERT-3']);
         expect(context.certificateExpiry).toBe('2026-12-15');
         expect(context.policy.version).toBe('CB-PLAN-2026-01');
-        expect(context.cycles.every((cycle) => cycle.stageSource === 'history')).toBe(true);
+        expect(context.cycles.every((cycle) => cycle.stageSource === 'calendar')).toBe(true);
     });
 
-    it('uses the projected next milestone when PC CONNECTION has no finalized audit history', () => {
+    it('reads the same stage from the calendar when PC CONNECTION has no finalized audit history', () => {
         const client = pcConnectionFixture();
         client.certificationLifecycleEvents = [];
         const context = Domain.resolveCycleContext({
@@ -63,19 +67,21 @@ describe('certification-cycle-driven audit planning domain', () => {
         });
 
         expect(context.valid).toBe(true);
-        expect(context.stage).toBe('Surveillance 2 period');
+        expect(context.stage).toBe('Recertification');
         expect(context.auditType).toBe('Recertification');
         expect(context.certificateExpiry).toBe('2026-12-15');
         expect(context.cycles.every((cycle) => cycle.stageSource === 'calendar')).toBe(true);
     });
 
     it('requires separate plans when stages differ or planning windows do not intersect', () => {
+        // Year 2, S2 window open (due 16/12/2025): one certificate already had
+        // its S2, so it owes Recertification while the other two still owe S2.
         const client = pcConnectionFixture();
         client.certificationLifecycleEvents.push({
             id: 'PC-S2-3', certificateId: 'PC-CERT-3', type: 'surveillance-2-completed',
-            occurredAt: '2025-12-10T12:00:00Z', user: 'Certification Manager', role: 'Certification Manager'
+            occurredAt: '2025-11-20T12:00:00Z', user: 'Certification Manager', role: 'Certification Manager'
         });
-        const context = Domain.resolveCycleContext({ client, now: '2026-09-18', settings: {}, cycleStateResolver: ReportStats.cycleState });
+        const context = Domain.resolveCycleContext({ client, now: '2025-12-01', settings: {}, cycleStateResolver: ReportStats.cycleState });
         expect(context.valid).toBe(false);
         expect(context.conflict).toContain('separate plans');
     });

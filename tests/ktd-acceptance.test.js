@@ -290,7 +290,7 @@ describe('KTD surveillance acceptance', () => {
             expect(cs.hasHistory).toBe(false);
         });
 
-        it('publishing the surveillance report ticks S1 and S2 and moves the stage on', () => {
+        it('publishing the surveillance report ticks S1 and S2 and moves the next audit on', () => {
             const cs = window.ReportStats.cycleState(args([sv2Report('final')]));
             // Dated a year after SV1 was due, so it slots as the SECOND
             // surveillance — matching how buildProgramme slots the same record.
@@ -298,7 +298,9 @@ describe('KTD surveillance acceptance', () => {
             expect(cs.completed.s1).toBe(true);
             expect(cs.completed.s2).toBe(true);
             expect(cs.completed.recert).toBe(false);
-            expect(cs.stage).toBe('Surveillance 2 completed');
+            // The stage is the calendar's (Year 2 on 17/08/2026); the report
+            // ticks milestones and moves the NEXT audit on to recertification.
+            expect(cs.stage).toBe('Surveillance 2');
             // Annual cert expiry (Aug 2026) is NOT the cycle end — recert is
             // driven by the true 3-year cycle end (Aug 2027).
             expect(cs.cycleEnd.getFullYear()).toBe(2027);
@@ -316,7 +318,8 @@ describe('KTD surveillance acceptance', () => {
 
             const after = window.ReportStats.cycleState(Object.assign({}, base, { today: '2027-06-20' }));
             expect(after.completed.recert).toBe(true);
-            expect(after.stage).toBe('Recertification completed');
+            expect(after.stage).toBe('Recertification');
+            expect(after.nextAudit).toBeNull();
         });
 
         it('a scheduled plan outranks the computed due date for the next audit', () => {
@@ -342,19 +345,30 @@ describe('KTD surveillance acceptance', () => {
             expect(window.ReportStats.cycleState({ client: { id: 'x', name: 'No Cert' }, standard: 'ISO 9001:2015', allReports: [] })).toBe(null);
         });
 
-        // The widget must be able to tell an EARNED stage from a PROJECTED one:
-        // with no finalized audit on file the stage label is a calendar
-        // projection ("Surveillance N period") that sits beside unticked stage
-        // nodes, so the UI annotates it — stageSource is that discriminator.
-        it('flags a calendar-projected stage (no finalized history) as stageSource "calendar"', () => {
+        // The stage is the calendar's — the year of the cycle anchored on the
+        // Initial Date — whether or not any audit is on file. Finalized audits
+        // tick milestones; they never change the stage.
+        it('reads the stage from the calendar with no finalized audit on file', () => {
             const cs = window.ReportStats.cycleState(args([sv2Report('draft')]));
             expect(cs.stageSource).toBe('calendar');
-            expect(cs.stage).toMatch(/period|Initial certification|Recertification due/);
+            expect(cs.stage).toBe('Surveillance 2');
+            expect(cs.cycleLabel).toBe('Cycle 1 · Year 2');
         });
 
-        it('flags an audit-earned stage as stageSource "history"', () => {
-            const cs = window.ReportStats.cycleState(args([sv2Report('final')]));
-            expect(cs.stageSource).toBe('history');
+        it('keeps the same calendar stage once an audit is finalized', () => {
+            const without = window.ReportStats.cycleState(args([sv2Report('draft')]));
+            const withAudit = window.ReportStats.cycleState(args([sv2Report('final')]));
+            expect(withAudit.stageSource).toBe('calendar');
+            expect(withAudit.stage).toBe(without.stage);
+            expect(withAudit.completed.s2).toBe(true);
+        });
+
+        it('reports the current annual period as the Current Issue / Expiry', () => {
+            const cs = window.ReportStats.cycleState(args([]));
+            const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            expect(iso(cs.periodStart)).toBe('2025-08-21');
+            expect(iso(cs.periodEnd)).toBe('2026-08-20');
+            expect(iso(cs.cycleLastDay)).toBe('2027-08-20');
         });
     });
 
