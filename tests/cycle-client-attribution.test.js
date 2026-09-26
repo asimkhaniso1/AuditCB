@@ -37,7 +37,7 @@ describe('a cycle counts only its own client´s records', () => {
         expect(state.hasHistory).toBe(false);
         expect(state.completed.s1).toBe(false);
         expect(state.surveillancesDone).toBe(0);
-        expect(state.stage).toBe('Initial certification');
+        expect(state.stage).toBe('Surveillance 1');   // Year 1 of the first cycle
         expect(state.stageSource).toBe('calendar');
     });
 

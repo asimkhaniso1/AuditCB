@@ -172,24 +172,20 @@
         // Every branch below reports the override it did NOT apply, so the
         // card can say why a stage someone authorised is not in force.
         const withSuperseded = (result) => Object.assign({ supersededOverride, supersededReason }, result);
-        // With no finalized lifecycle history ReportStats deliberately exposes a
-        // calendar projection. Its `completed` flags remain false because those
-        // milestones were not evidenced by reports, so using the flags here
-        // would always regress planning to Surveillance 1. In projection mode,
-        // the displayed period/due date is the authoritative next milestone.
-        if (cycleState?.stageSource === 'calendar') {
-            const projectedStage = String(cycleState.stage || '').toLowerCase();
-            if (projectedStage.includes('recertification') || projectedStage.includes('certificate expired')) {
+        // The calendar decides. ReportStats places today in a year of the
+        // cycle anchored on the Initial Date; the audit owed is the first
+        // milestone of THIS cycle not yet performed whose window has not
+        // closed. A surveillance just past its due date is still owed while its
+        // window runs (that is what the recommended window promises); once the
+        // window shuts it is missed and the cycle moves on — a missed audit
+        // never holds planning back. A performed one is never planned twice.
+        // Completion comes only from cycleState, whose evidence is scoped to
+        // this cycle: the raw lifecycle events span every cycle, and a
+        // surveillance done in the last one must not satisfy this one.
+        if (cycleState?.surv1Due) {
+            if (/certificate expired/i.test(String(cycleState.stage || ''))) {
                 return withSuperseded({ auditType: 'Recertification', stage: cycleState.stage, projected: true });
             }
-            // Reading the stage as "the last period that started, so do the NEXT
-            // one" assumed the passed milestone had been performed — in
-            // projection mode nothing has been evidenced, which is why it is a
-            // projection. A surveillance whose due date has just passed is the
-            // audit that is OWED, not one to step over: that is what showed
-            // Surveillance 2 for a client whose first surveillance was due.
-            // Only once a milestone's window has fully closed does it stop
-            // being schedulable and the cycle move on.
             const cfg = resolvedPolicy || DEFAULT_POLICY;
             const reference = date(now) || new Date();
             const stillSchedulable = (due) => {
@@ -197,10 +193,12 @@
                 if (!dueDate) return false;
                 return addDays(dueDate, cfg.surveillanceWindowAfterDays) >= reference;
             };
-            if (stillSchedulable(cycleState.surv1Due)) {
-                return withSuperseded({ auditType: 'Surveillance 1', stage: cycleState.stage || 'Initial certification', projected: true });
+            const done = cycleState.completed || {};
+            if (done.recert) return withSuperseded({ auditType: 'Recertification', stage: cycleState.stage, complete: true, projected: true });
+            if (!done.s1 && stillSchedulable(cycleState.surv1Due)) {
+                return withSuperseded({ auditType: 'Surveillance 1', stage: cycleState.stage, projected: true });
             }
-            if (stillSchedulable(cycleState.surv2Due)) {
+            if (!done.s2 && stillSchedulable(cycleState.surv2Due)) {
                 return withSuperseded({ auditType: 'Surveillance 2', stage: cycleState.stage, projected: true });
             }
             return withSuperseded({ auditType: 'Recertification', stage: cycleState.stage, projected: true });
@@ -253,7 +251,8 @@
         const certificateId = String(cert.id || cert.certificateId || cert.certificateNo || `${client.id || 'client'}-${index}`);
         const cycleState = input.cycleState || input.cycleStateResolver?.({
             client, standard: cert.standard, certificate: cert,
-            allReports: input.allReports || [], allPlans: input.allPlans || [], today: now
+            allReports: input.allReports || [], allPlans: input.allPlans || [], today: now,
+            graceDays: cfg.surveillanceWindowAfterDays
         }) || null;
         const events = input.events || lifecycleEvents(client, certificateId);
         const derived = auditTypeFromCycleState(cycleState, events, cfg, now);

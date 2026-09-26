@@ -69,7 +69,10 @@ describe('the cycle restarts at a recertification', () => {
             initialDate: '2025-11-07', currentIssue: '2025-11-07', expiryDate: '2026-11-06'
         }));
         expect(iso(cycleState.anchor)).toBe('2025-11-07');
-        expect(cycleState.stage).toBe('Initial certification');
+        // The stage names the audit the current year of the cycle owes.
+        expect(cycleState.stage).toBe('Surveillance 1');
+        expect(cycleState.cycleNumber).toBe(1);
+        expect(cycleState.cycleLabel).toBe('Cycle 1 · Year 1');
     });
 
     it('re-anchors a second recertification too', () => {
@@ -102,12 +105,13 @@ describe('the cycle restarts at a recertification', () => {
         expect(iso(cycleState.surv2Due)).toBe('2026-07-05');
     });
 
-    it('does not call a recertified client "Initial certification"', () => {
+    it('names a recertified client by its cycle and year, not "Initial certification"', () => {
         const { cycleState, record } = cycleFor(cert({
             initialDate: '2022-10-07', currentIssue: '2025-10-07', expiryDate: '2026-10-06'
         }));
-        expect(cycleState.stage).toBe('New cycle started');
-        // The label must not push the planner back to recertification.
+        expect(cycleState.stage).toBe('Surveillance 1');
+        expect(cycleState.cycleNumber).toBe(2);
+        expect(cycleState.cycleLabel).toBe('Cycle 2 · Year 1');
         expect(record.auditType).toBe('Surveillance 1');
     });
 
@@ -186,7 +190,9 @@ describe('the cycle restarts at a recertification', () => {
         const { record, cycleState } = cycleFor(certificate);
 
         expect(iso(cycleState.surv1Due)).toBe('2026-09-16');
-        expect(cycleState.stage).toBe('Surveillance 1 period');
+        // The calendar has entered Year 2, so that is the stage — but S1's
+        // window is still open, so S1 remains the audit owed.
+        expect(cycleState.stage).toBe('Surveillance 2');
         expect(record.auditType).toBe('Surveillance 1');
     });
 

@@ -44,8 +44,22 @@ describe('recording an audit that was performed but never captured', () => {
         const after = resolve([completion('Surveillance 1', '2025-07-10')]);
         expect(after.cycleState.completed.s1).toBe(true);
         expect(after.cycleState.completed.s2).toBe(false);
-        expect(after.cycleState.stageSource).toBe('history');
-        expect(after.record.auditType).toBe('Surveillance 2');
+        // The stage stays the calendar's (Year 3 of the cycle begun 05/07/2024)
+        // — recording an audit ticks its milestone, it does not move the stage.
+        expect(after.cycleState.stageSource).toBe('calendar');
+        expect(after.cycleState.stage).toBe('Recertification');
+        // S2 was due 05/07/2026 and its window closed 04/08/2026 without one:
+        // missed, so it no longer holds planning back.
+        expect(after.record.auditType).toBe('Recertification');
+    });
+
+    it('asks for the surveillance a recorded S1 leaves owed while its window is still open', () => {
+        const client = { id: 'ha', name: 'H. A Steel Chains Pvt Ltd.', certificates: [CERT], certificationLifecycleEvents: [completion('Surveillance 1', '2025-07-10')] };
+        const now = new Date('2026-07-20T00:00:00');   // S2 due 05/07/2026, window open to 04/08/2026
+        const cycleState = ReportStats.cycleState({ client, standard: CERT.standard, certificate: CERT, allReports: [], allPlans: [], today: now });
+        const record = Domain.resolveCertificateCycle({ client, certificate: CERT, cycleState, now, settings: {}, allReports: [], allPlans: [] });
+        expect(cycleState.stage).toBe('Recertification');       // Year 3 on the calendar
+        expect(record.auditType).toBe('Surveillance 2');        // still owed, window open
     });
 
     it('brings a client audited every year back to the audit actually next', () => {
@@ -55,7 +69,7 @@ describe('recording an audit that was performed but never captured', () => {
         ]);
         expect(cycleState.completed.s1).toBe(true);
         expect(cycleState.completed.s2).toBe(true);
-        expect(cycleState.stage).toBe('Surveillance 2 completed');
+        expect(cycleState.stage).toBe('Recertification');
         expect(record.auditType).toBe('Recertification');
     });
 
