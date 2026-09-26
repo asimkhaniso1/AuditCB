@@ -2060,6 +2060,38 @@ window.deleteKnowledgeDoc = async function (type, id) {
 // VIEW KNOWLEDGE BASE ANALYSIS
 // Shows extracted clauses and NCR references
 // ============================================
+// Open the uploaded source file (PDF/DOCX) behind a knowledge-base entry.
+// The storage bucket may be private, so a short-lived signed URL is minted
+// from the stored path; the public URL saved at upload is only a fallback.
+// The tab is opened synchronously and pointed at the URL afterwards — a
+// window.open after an await is treated as a popup and blocked.
+window.openKBFile = async function (docId) {
+    const kb = window.state.knowledgeBase || {};
+    const doc = ['standards', 'sops', 'policies', 'marketing']
+        .map(k => (kb[k] || []).find(d => _idEq(d.id, docId))).find(Boolean);
+    if (!doc || (!doc.cloudPath && !doc.cloudUrl)) {
+        window.showNotification('The original file is not stored for this document. Re-upload it to view it here.', 'warning');
+        return;
+    }
+    const tab = window.open('', '_blank');
+    let url = null;
+    if (doc.cloudPath && window.SupabaseClient?.isInitialized) {
+        try {
+            const { data, error } = await window.SupabaseClient.client.storage.from('documents').createSignedUrl(doc.cloudPath, 600);
+            if (!error && data?.signedUrl) url = data.signedUrl;
+        } catch (err) {
+            console.warn('[KB] Signed URL failed:', err);
+        }
+    }
+    url = url || doc.cloudUrl || null;
+    if (!url) {
+        if (tab) tab.close();
+        window.showNotification('Could not open the file — sign in again or check your connection.', 'error');
+        return;
+    }
+    if (tab) { tab.opener = null; tab.location.href = url; } else { window.location.assign(url); }
+};
+
 window.viewKBAnalysis = function (docId) {
     const kb = window.state.knowledgeBase;
 
@@ -2115,14 +2147,21 @@ window.viewKBAnalysis = function (docId) {
     document.getElementById('modal-body').innerHTML = `
         <div style="margin-bottom: 1rem;">
             <!-- Analysis Status -->
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #f0fdf4; border-radius: 8px; margin-bottom: 1rem;">
-                <div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center; padding: 1rem; background: #f0fdf4; border-radius: 8px; margin-bottom: 1rem;">
+                <div style="flex: 1 1 200px;">
                     <strong style="color: #166534;"><i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i>Analysis Complete</strong>
                     <div style="font-size: 0.85rem; color: #166534; margin-top: 0.25rem;">
                         ${clauses.length} ${docType === 'standard' ? 'clauses' : 'sections'} extracted${doc.checklistCount ? ` • ${doc.checklistCount} checklist questions` : ''} • Uploaded ${doc.uploadDate}
                     </div>
                 </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <div style="display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; align-items: center;">
+                    ${doc.cloudPath || doc.cloudUrl ? `
+                        <button class="btn btn-sm btn-outline-primary" data-action="openKBFile" data-id="${doc.id}" title="Open the uploaded file${doc.fileName ? ` (${window.UTILS.escapeHtml(doc.fileName)})` : ''}" aria-label="View file">
+                            <i class="fa-solid fa-file-pdf" style="margin-right: 0.25rem;"></i>View File
+                        </button>
+                    ` : `
+                        <span style="font-size: 0.75rem; color: #64748b;" title="This entry was saved without its source file"><i class="fa-solid fa-file-circle-xmark" style="margin-right: 0.25rem;"></i>No file stored</span>
+                    `}
                     ${docType === 'standard' && doc.generatedChecklist && doc.generatedChecklist.length > 0 ? `
                         <button class="btn btn-sm btn-primary" data-action="createChecklistFromKB" data-id="${doc.id}" title="Create audit checklist from extracted questions" aria-label="Checklist">
                             <i class="fa-solid fa-list-check" style="margin-right: 0.25rem;"></i>Create Checklist
