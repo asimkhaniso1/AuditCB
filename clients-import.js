@@ -517,6 +517,20 @@
         if (confirm(`Are you sure you want to remove the certification scope for ${cert.standard}?\n\nThis will delete all associated scope data and revision history.`)) {
             client.certificates.splice(certIndex, 1);
             window.saveData();
+            // The certificate lives in the CLOUD copy of the client (data.certificates)
+            // and in certification_decisions. Saving only locally left both intact,
+            // so the next load from the cloud brought the deleted record back.
+            if (window.SupabaseClient?.isInitialized && window.DataService) {
+                // syncToCloud resolves false (never throws) on failure.
+                Promise.all([
+                    window.DataService.syncClient(client, { saveLocal: false, silent: true }),
+                    cert.id ? window.DataService.deleteCertificate(cert.id, { silent: true }) : true
+                ]).then(([clientSaved]) => {
+                    if (!clientSaved) {
+                        window.showNotification('Removed here, but the cloud copy could not be updated — it may reappear after refresh. Try again when online.', 'warning');
+                    }
+                });
+            }
             window.showNotification('Certification scope removed', 'success');
             renderClientDetail(clientId);
             setTimeout(() => {
