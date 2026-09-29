@@ -2616,6 +2616,7 @@ window.handleIndustryChange = function (select) {
         client.compliance.applicationStatus = newStatus;
 
         window.saveData();
+        window.DataService?.syncClient(client, { saveLocal: false });
         window.showNotification(`Application status updated to: ${newStatus}`, 'success');
         renderClientDetail(clientId);
 
@@ -2669,6 +2670,7 @@ window.handleIndustryChange = function (select) {
             };
 
             window.saveData();
+            window.DataService?.syncClient(client, { saveLocal: false });
             window.closeModal();
             window.showNotification('Contract details updated', 'success');
             renderClientDetail(clientId);
@@ -2723,6 +2725,7 @@ window.handleIndustryChange = function (select) {
             };
 
             window.saveData();
+            window.DataService?.syncClient(client, { saveLocal: false });
             window.closeModal();
             window.showNotification('NDA details updated', 'success');
             renderClientDetail(clientId);
@@ -2794,6 +2797,7 @@ window.handleIndustryChange = function (select) {
             });
 
             window.saveData();
+            window.DataService?.syncClient(client, { saveLocal: false });
             window.closeModal();
             window.showNotification('Client change logged', 'success');
             renderClientDetail(clientId);

@@ -34,6 +34,22 @@ const SupabaseClient = {
      *   - a certificate the user deleted (client.deletedCertificateIds) is
      *     never brought back.
      */
+    // Client fields with no column of their own, carried in clients.data.
+    // compliance holds the application status, contract, NDA and the ISO
+    // 17021-1 9.6.2 changes log — it was saved to this browser only, so it
+    // never reached another device. cciCompanyId is what the registry import
+    // matches on. profileDocument is metadata only; the uploaded file's base64
+    // and text are transient AI input and stay local.
+    CLIENT_EXTENDED_FIELDS: ['compliance', 'groupName', 'cciCompanyId', 'cciSyncedAt', 'source', 'profileDocument'],
+
+    _clientExtendedFields(client) {
+        const out = {};
+        this.CLIENT_EXTENDED_FIELDS.forEach((key) => {
+            if (client && client[key] !== undefined && client[key] !== null) out[key] = client[key];
+        });
+        return out;
+    },
+
     mergeRegisterCertificates(ownList, registerList, deletedKeys) {
         const own = Array.isArray(ownList) ? ownList : [];
         const reg = Array.isArray(registerList) ? registerList : [];
@@ -1338,6 +1354,7 @@ const SupabaseClient = {
                     // bring back.
                     certificationLifecycleEvents: client.certificationLifecycleEvents || [],
                     deletedCertificateIds: client.deletedCertificateIds || [],
+                    ...this._clientExtendedFields(client),
                     documents: client.documents || [],
                     nextAudit: client.nextAudit || null
                 }
@@ -1407,6 +1424,7 @@ const SupabaseClient = {
                         certificates: client.certificates || [],
                         certificationLifecycleEvents: client.certificationLifecycleEvents || [],
                         deletedCertificateIds: client.deletedCertificateIds || [],
+                        ...this._clientExtendedFields(client),
                         documents: client.documents || [],
                         nextAudit: client.nextAudit || null
                     }
@@ -1519,6 +1537,11 @@ const SupabaseClient = {
                 // [] would drop recorded completions and deletions.
                 if (client.data && Array.isArray(client.data.certificationLifecycleEvents)) mappedClient.certificationLifecycleEvents = client.data.certificationLifecycleEvents;
                 if (client.data && Array.isArray(client.data.deletedCertificateIds)) mappedClient.deletedCertificateIds = client.data.deletedCertificateIds;
+                if (client.data) {
+                    this.CLIENT_EXTENDED_FIELDS.forEach((key) => {
+                        if (client.data[key] !== undefined && client.data[key] !== null) mappedClient[key] = client.data[key];
+                    });
+                }
 
                 const existing = localClients.find(c => String(c.id) === String(client.id));
                 if (existing) {
