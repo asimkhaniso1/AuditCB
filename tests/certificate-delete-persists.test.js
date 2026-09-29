@@ -54,6 +54,8 @@ describe('deleting a certification scope', () => {
         const synced = window.DataService.syncClient.mock.calls[0][0];
         expect(synced.certificates.map(c => c.id)).not.toContain('CERT-PSC');
         expect(window.DataService.deleteCertificate).toHaveBeenCalledWith('CERT-PSC', { silent: true });
+        // Remembered on the client, so the register cannot revive it on load.
+        expect(synced.deletedCertificateIds).toContain('CERT-PSC');
     });
 
     it('takes the standard off the client and its sites, so Sync Standards cannot recreate it', async () => {

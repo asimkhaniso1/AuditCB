@@ -16,6 +16,46 @@ const SupabaseClient = {
      * UI showing a successful analysis that was never saved. Keep the authored
      * analysis and checklist data, but omit recoverable/transient file content.
      */
+    /**
+     * Combine a client's own certificate list (client.data.certificates — what
+     * Settings edits, Sync Standards and deletes write) with the rows the
+     * certificate register (certification_decisions) holds for that client.
+     *
+     * Load used to REPLACE the client's list with the register rows whenever
+     * any existed: a deleted certificate whose register row survived came back
+     * on every refresh, and a record created by Sync Standards (never written
+     * to the register) vanished. Now:
+     *   - the client's own records are kept;
+     *   - a register row matching one (same id, or same standard + certificate
+     *     number) updates its fields, so Certifications-module decisions still
+     *     reach the client;
+     *   - a register row with no match is added (a certificate issued in the
+     *     Certifications module that the client record does not hold yet);
+     *   - a certificate the user deleted (client.deletedCertificateIds) is
+     *     never brought back.
+     */
+    mergeRegisterCertificates(ownList, registerList, deletedKeys) {
+        const own = Array.isArray(ownList) ? ownList : [];
+        const reg = Array.isArray(registerList) ? registerList : [];
+        const canon = (s) => (window.UTILS && window.UTILS.canonicalStandard ? window.UTILS.canonicalStandard(s) : String(s || '').trim());
+        const noKey = (c) => (c && c.certificateNo ? canon(c.standard) + '|' + String(c.certificateNo).trim() : null);
+        const deleted = new Set((Array.isArray(deletedKeys) ? deletedKeys : []).map(String));
+        const isDeleted = (c) => deleted.has(String(c.id)) || (noKey(c) && deleted.has(noKey(c)));
+        const empty = (v) => v == null || v === '' || (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0);
+
+        const out = own.map((c) => Object.assign({}, c));
+        reg.forEach((r) => {
+            if (!r || isDeleted(r)) return;
+            const match = out.find((c) => (r.id != null && String(c.id) === String(r.id)) || (noKey(r) && noKey(c) === noKey(r)));
+            if (match) {
+                Object.keys(r).forEach((k) => { if (!empty(r[k])) match[k] = r[k]; });
+            } else {
+                out.push(Object.assign({}, r));
+            }
+        });
+        return out;
+    },
+
     _buildKnowledgeBaseSnapshot(knowledgeBase) {
         const snapshot = {};
         const source = knowledgeBase || {};
@@ -538,9 +578,10 @@ const SupabaseClient = {
                 window.state.clients.forEach(client => {
                     const byName = certsByKey.get(client.name) || [];
                     const byId = certsByKey.get(String(client.id)) || [];
-                    const merged = [...byName, ...byId.filter(c => !byName.includes(c))];
-                    if (merged.length > 0) {
-                        client.certificates = merged;
+                    const registerRows = [...byName, ...byId.filter(c => !byName.includes(c))];
+                    if (registerRows.length > 0) {
+                        // MERGE, never replace — see mergeRegisterCertificates.
+                        client.certificates = this.mergeRegisterCertificates(client.certificates, registerRows, client.deletedCertificateIds);
                         hydrationCount++;
                     }
                 });
@@ -1291,6 +1332,12 @@ const SupabaseClient = {
                     profileUpdated: client.profileUpdated || null,
                     profileHistory: client.profileHistory || [],
                     certificates: client.certificates || [],
+                    // Without these the save wiped them from the cloud copy:
+                    // recorded completions and stage overrides, and the
+                    // record of deleted certificates the register must not
+                    // bring back.
+                    certificationLifecycleEvents: client.certificationLifecycleEvents || [],
+                    deletedCertificateIds: client.deletedCertificateIds || [],
                     documents: client.documents || [],
                     nextAudit: client.nextAudit || null
                 }
@@ -1359,6 +1406,7 @@ const SupabaseClient = {
                         profileHistory: client.profileHistory || [],
                         certificates: client.certificates || [],
                         certificationLifecycleEvents: client.certificationLifecycleEvents || [],
+                        deletedCertificateIds: client.deletedCertificateIds || [],
                         documents: client.documents || [],
                         nextAudit: client.nextAudit || null
                     }
@@ -1466,6 +1514,11 @@ const SupabaseClient = {
                     documents: (client.data && client.data.documents) || [],
                     nextAudit: (client.data && client.data.nextAudit) || null
                 };
+                // Read back only when the cloud copy carries them: rows saved by
+                // older builds lack the keys, and overwriting the local copy with
+                // [] would drop recorded completions and deletions.
+                if (client.data && Array.isArray(client.data.certificationLifecycleEvents)) mappedClient.certificationLifecycleEvents = client.data.certificationLifecycleEvents;
+                if (client.data && Array.isArray(client.data.deletedCertificateIds)) mappedClient.deletedCertificateIds = client.data.deletedCertificateIds;
 
                 const existing = localClients.find(c => String(c.id) === String(client.id));
                 if (existing) {
