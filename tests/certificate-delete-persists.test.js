@@ -56,6 +56,25 @@ describe('deleting a certification scope', () => {
         expect(window.DataService.deleteCertificate).toHaveBeenCalledWith('CERT-PSC', { silent: true });
     });
 
+    it('takes the standard off the client and its sites, so Sync Standards cannot recreate it', async () => {
+        client.standard = 'ISO 9001:2015, Product Safety Certification';
+        client.sites = [{ name: 'Head Office', standards: 'ISO 9001:2015, Halal, Product Safety Certification, cGMP' }];
+        window.deleteCertificationScope('sg1888', 1);
+        await flush();
+        expect(client.standard).toBe('ISO 9001:2015');
+        expect(client.sites[0].standards).toBe('ISO 9001:2015, Halal, cGMP');
+        const synced = window.DataService.syncClient.mock.calls[0][0];
+        expect(synced.standard).not.toMatch(/Product Safety/);
+    });
+
+    it('keeps the standard listed while another certificate for it remains', async () => {
+        client.certificates.push({ id: 'CERT-PSC-2', standard: 'Product Safety Certification' });
+        client.standard = 'Product Safety Certification';
+        window.deleteCertificationScope('sg1888', 1);
+        await flush();
+        expect(client.standard).toBe('Product Safety Certification');
+    });
+
     it('warns when the cloud copy could not be updated, since the record would come back', async () => {
         window.DataService.syncClient = vi.fn(async () => false);
         window.deleteCertificationScope('sg1888', 1);

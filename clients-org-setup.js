@@ -407,20 +407,32 @@ window.recordCertificationStageOverride = async function (clientId, certificateI
 window.generateCertificatesFromStandards = function (clientId) {
     const client = window.DataService.findClient(clientId);
     if (!client) return;
-    const allStandards = new Set();
-    if (client.standard) client.standard.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
-    if (client.sites) client.sites.forEach(site => { if (site.standards) site.standards.split(',').map(s => s.trim()).forEach(s => allStandards.add(s)); });
+    // Compare by canonical name: "ISO 9001" on a site and an "ISO 9001:2015"
+    // certificate are one standard, and must not produce a second record.
+    const canon = (s) => (window.UTILS && window.UTILS.canonicalStandard ? window.UTILS.canonicalStandard(s) : String(s || '').trim());
+    const wanted = new Map();
+    const collect = (list) => String(list || '').split(',').map(s => s.trim()).filter(Boolean).forEach(s => { const k = canon(s); if (k && !wanted.has(k)) wanted.set(k, k); });
+    collect(client.standard);
+    (client.sites || []).forEach(site => collect(site.standards));
     if (!client.certificates) client.certificates = [];
-    allStandards.forEach(std => {
-        if (!client.certificates.find(c => c.standard === std)) {
+    const held = new Set(client.certificates.map(c => canon(c.standard)));
+    const created = [];
+    wanted.forEach(std => {
+        if (!held.has(std)) {
             client.certificates.push({ id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 10000), standard: std, certificateNo: '', status: 'Active', revision: '00', scope: client.scope || '', siteScopes: {} });
+            held.add(std);
+            created.push(std);
         }
     });
     if (window.saveData) window.saveData();
     window.DataService.syncClient(client, { saveLocal: false });
     if (window.renderClientDetail) renderClientDetail(clientId);
     setTimeout(() => document.querySelector('.tab-btn[data-tab="scopes"]')?.click(), 100);
-    if (window.showNotification) window.showNotification('Certificate records generated');
+    if (window.showNotification) {
+        window.showNotification(created.length
+            ? `Certificate record${created.length === 1 ? '' : 's'} created for: ${created.join(', ')}`
+            : 'Every standard on the client and its sites already has a certificate record', created.length ? 'success' : 'info');
+    }
 };
 window.updateCertField = function (clientId, certIndex, field, value) { const client = window.DataService.findClient(clientId); if (client) client.certificates[certIndex][field] = value; };
 window.updateSiteScope = function (clientId, certIndex, siteName, value) { const client = window.DataService.findClient(clientId); if (client) { if (!client.certificates[certIndex].siteScopes) client.certificates[certIndex].siteScopes = {}; client.certificates[certIndex].siteScopes[siteName] = value; } };

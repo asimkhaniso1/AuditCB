@@ -13,7 +13,10 @@ const STANDARD_EDITIONS = {
 };
 const STANDARD_ALIASES = [
     [/^ce[\s-]*marking/i, 'CE-Marking'],
-    [/^c?gmp\b/i, 'GMP'],
+    // cGMP (current GMP) is a scheme of its own, offered beside GMP — folding it
+    // into GMP ticked both options and made GMP impossible to deselect.
+    [/^cgmp\b/i, 'cGMP'],
+    [/^gmp\b/i, 'GMP'],
     [/^rohs\b/i, 'RoHS'],
     [/^halal\b/i, 'Halal'],
     [/^haccp\b/i, 'HACCP'],
