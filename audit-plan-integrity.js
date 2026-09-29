@@ -558,7 +558,11 @@
             if (b.id === 'cycle-review' && !/recert/i.test(str(c.plan && (c.plan.auditType || c.plan.type)))) {
                 title = 'Surveillance review: changes since the previous audit, continued relevance of the scope, use of certification marks, and progress on objectives';
             }
-            return Object.assign({}, b, { standards: standards, schemes: forSchemes, title: title, processes: !scopeIds.length ? [] : b.processes });
+            // The template names processes one client runs; a session carries
+            // only those THIS client has recorded. Otherwise another client's
+            // agenda listed "Client Onboarding" and the scope check (rightly)
+            // blocked it as a process outside the boundary.
+            return Object.assign({}, b, { standards: standards, schemes: forSchemes, title: title, processes: arr(b.processes).filter(hasProcess) });
         }).filter(function (b) { return b.kind || b.standards.length || b.schemes.length; });
         // One topic session per scheme, placed before internal audit.
         const schemeBlocks = schemes.map(function (name) {

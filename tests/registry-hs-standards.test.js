@@ -104,6 +104,18 @@ describe('agenda for the new registry standards', () => {
         expect(a.rows.some(r => /^Operational planning and control: sampling of the organisation’s core processes/.test(r.item))).toBe(true);
     });
 
+    it('never schedules another client’s processes — no PROCESS_OUTSIDE_BOUNDARY on a 9001 plan', () => {
+        const withProcesses = Object.assign({}, client, { keyProcesses: [{ name: 'Production' }, { name: 'Purchasing' }] });
+        const plan = { id: 'p', client: 'Acme', standard: 'ISO 9001:2015', auditType: 'Surveillance 1', date: '2027-01-11', endDate: '2027-01-11', team: ['Lead'], auditorIds: ['a1'], selectedSites: [{ name: 'HQ' }], durationCalculation: { finalDays: 1 }, manDays: 1 };
+        for (const c of [client, withProcesses]) {
+            const asm = IPI.assemble({ plan: Object.assign({}, plan), client: c, auditors, state: { ncrs: [], auditReports: [], auditPlans: [] }, settings: {} });
+            const scheduled = asm.agenda.rows.flatMap(r => r.processes || []);
+            expect(scheduled.filter(p => /Client Onboarding|Assessment And Design|Continual Improvement and Process/.test(p))).toEqual([]);
+            const scope = IPI.checkScope({ plan: {}, client: c, standards: ['iso9001'], processes: scheduled });
+            expect(scope.issues.map(i => i.code)).not.toContain('PROCESS_OUTSIDE_BOUNDARY');
+        }
+    });
+
     it('builds a short audit (half a day) with tighter sessions instead of refusing', () => {
         const a = build('ISO 9001:2015', 0.5);
         expect(a.errors).toEqual([]);
