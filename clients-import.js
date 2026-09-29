@@ -516,6 +516,15 @@
 
         if (confirm(`Are you sure you want to remove the certification scope for ${cert.standard}?\n\nThis will delete all associated scope data and revision history, and remove ${cert.standard} from the client's and sites' standards.`)) {
             client.certificates.splice(certIndex, 1);
+            // Remember the deletion on the client itself. On load the certificate
+            // register is merged in, and a register row that survived (its delete
+            // can be refused by RLS without an error) must not revive this record.
+            client.deletedCertificateIds = client.deletedCertificateIds || [];
+            if (cert.id) client.deletedCertificateIds.push(String(cert.id));
+            if (cert.certificateNo) {
+                const c = window.UTILS && window.UTILS.canonicalStandard ? window.UTILS.canonicalStandard(cert.standard) : String(cert.standard || '').trim();
+                client.deletedCertificateIds.push(c + '|' + String(cert.certificateNo).trim());
+            }
             // A standard still listed on the client or a site is recreated as a
             // blank certificate by Sync Standards — take it off those lists too,
             // unless another certificate for the same standard remains.
