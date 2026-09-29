@@ -514,8 +514,18 @@
 
         const cert = client.certificates[certIndex];
 
-        if (confirm(`Are you sure you want to remove the certification scope for ${cert.standard}?\n\nThis will delete all associated scope data and revision history.`)) {
+        if (confirm(`Are you sure you want to remove the certification scope for ${cert.standard}?\n\nThis will delete all associated scope data and revision history, and remove ${cert.standard} from the client's and sites' standards.`)) {
             client.certificates.splice(certIndex, 1);
+            // A standard still listed on the client or a site is recreated as a
+            // blank certificate by Sync Standards — take it off those lists too,
+            // unless another certificate for the same standard remains.
+            const canon = (s) => (window.UTILS && window.UTILS.canonicalStandard ? window.UTILS.canonicalStandard(s) : String(s || '').trim());
+            const gone = canon(cert.standard);
+            if (gone && !client.certificates.some(c => canon(c.standard) === gone)) {
+                const without = (list) => String(list || '').split(',').map(s => s.trim()).filter(s => s && canon(s) !== gone).join(', ');
+                if (client.standard) client.standard = without(client.standard);
+                (client.sites || []).forEach(site => { if (site.standards) site.standards = without(site.standards); });
+            }
             window.saveData();
             // The certificate lives in the CLOUD copy of the client (data.certificates)
             // and in certification_decisions. Saving only locally left both intact,
