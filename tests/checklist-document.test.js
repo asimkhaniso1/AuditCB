@@ -80,7 +80,7 @@ describe('validation status is stated once and never contradicts itself', () => 
         expect(text()).not.toMatch(/Coverage could not be assessed/i);
     });
     it('a blocked checklist prints Blocked — and nothing that says validated', () => {
-        const ck = Object.assign({}, s.checklist, { standardIds: [], qaContext: {}, standard: 'Custom', clauses: [] });
+        const ck = Object.assign({}, s.checklist, { standardIds: [], qaContext: {}, standard: '', clauses: [] });
         const cov = CC.assess(ck, CC.buildContext(ck, { client: s.client }));
         const html = CD.build(ck, Object.assign(brandCtx(), { plan: s.plan, client: s.client, qa: s.qa, coverage: cov, combined: CC.combine(s.qa, cov) }));
         const t = DF.renderedText(html);

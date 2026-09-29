@@ -311,7 +311,12 @@
         passed: 'Passed \u2014 coverage validated',
         'passed-with-notes': 'Passed with notes \u2014 coverage validated with identified limitations',
         blocked: 'Blocked \u2014 coverage could not be assessed',
-        failed: 'Failed \u2014 identified coverage gaps'
+        failed: 'Failed \u2014 identified coverage gaps',
+        // A checklist for a scheme the clause registry does not hold (GMP,
+        // Halal, cGMP, ...): there is no requirement set to check it against.
+        // That is a known limit, not an internal error \u2014 it must neither
+        // block nor read as "validated".
+        'not-assessed': 'Not assessed \u2014 no clause registry is held for this scheme; the auditor confirms coverage'
     };
     // Issues that mean the assessment worked from less evidence than it wanted.
     // They are limitations, not gaps: the auditor's judgement is needed, but
@@ -698,6 +703,23 @@
             clauses: [], controls: [], processes: { total: 0, covered: 0, gaps: [] }
         };
 
+        const unresolvedNames = arr(c.standardResolution && c.standardResolution.unresolved);
+        if (Std && !ids.length && unresolvedNames.length) {
+            // Every standard this checklist names is outside the registry: a
+            // scheme checklist (GMP, Halal, cGMP, ...). Nothing is broken — there
+            // is simply no clause set to check it against. It is reported, not
+            // blocked, and it does not claim to be validated.
+            unresolvedNames.forEach(function (name) {
+                issues.push(issue('STANDARD_NOT_IN_REGISTRY', 'warning',
+                    name + ' is not held in the clause registry, so its coverage is not machine-checked; the auditor confirms the checklist covers the scheme requirements.',
+                    { standard: name }));
+            });
+            const result = finish(issues, coverage);
+            result.outcome = 'not-assessed';
+            result.outcomeLabel = OUTCOMES['not-assessed'];
+            result.blocking = false;
+            return result;
+        }
         if (!Std || !ids.length) {
             // An internal error, not a finding: the association between this
             // checklist and its standards is missing. It BLOCKS — filing it as
@@ -977,6 +999,11 @@
         if (!qa) reasons.push('The QA pass did not run; only coverage was checked.');
         const qaCritical = qa && qa.counts && qa.counts.critical > 0;
         if (qaCritical) reasons.push(qa.counts.critical + ' critical QA issue(s).');
+        if (coverage.outcome === 'not-assessed') {
+            reasons.push('No clause registry is held for this scheme; coverage is the auditor’s to confirm.');
+            if (qaCritical) return { outcome: 'failed', label: OUTCOMES.failed, reasons: reasons };
+            return { outcome: 'not-assessed', label: OUTCOMES['not-assessed'], reasons: reasons };
+        }
         if (coverage.outcome === 'failed') reasons.push(coverage.counts.critical + ' coverage gap(s).');
         if (qaCritical || coverage.outcome === 'failed') return { outcome: 'failed', label: OUTCOMES.failed, reasons: reasons };
         const notes = (qa && qa.counts && qa.counts.warning) || coverage.outcome === 'passed-with-notes' || !qa;
