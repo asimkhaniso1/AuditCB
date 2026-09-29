@@ -205,6 +205,11 @@
         });
         // (b) inferred from terminology
         items.forEach(it => {
+            // The document-intelligence note lists the documents on file by name
+            // for awareness; it asks nothing, so a document called "Hazard
+            // Identification" or "Quality Manual" in it is not a requirement of
+            // another standard.
+            if (/^DOCNOTE/i.test(String(it.clause || ''))) return;
             const hay = `${it.title} ${it.requirement}`;
             FOREIGN_TERMS.forEach(([re, concept, requiredBy, origin]) => {
                 if (!re.test(hay)) return;

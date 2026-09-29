@@ -53,8 +53,8 @@
     const NO_VALIDATED_DOCUMENT = 'No validated supporting document mapped';
     const AUDITOR_CONFIRM = ' — auditor to select or confirm the document.';
 
-    const DOMAIN_OF = { iso27001: 'isms', iso22301: 'bcms', iso20000: 'sms' };
-    const STD_LABEL = { iso27001: 'ISO/IEC 27001:2022', iso22301: 'ISO 22301:2019', iso20000: 'ISO/IEC 20000-1:2018' };
+    const DOMAIN_OF = { iso27001: 'isms', iso22301: 'bcms', iso20000: 'sms', iso9001: 'qms', iso14001: 'ems', iso45001: 'ohs' };
+    const STD_LABEL = { iso27001: 'ISO/IEC 27001:2022', iso22301: 'ISO 22301:2019', iso20000: 'ISO/IEC 20000-1:2018', iso9001: 'ISO 9001:2015', iso14001: 'ISO 14001:2015', iso45001: 'ISO 45001:2018' };
 
     function str(v) { return String(v == null ? '' : v).trim(); }
     function lower(v) { return str(v).toLowerCase(); }
@@ -74,7 +74,8 @@
     const T = function (id, label, std, kw, opts) {
         return Object.assign({ id: id, label: label, std: std, kw: kw, expected: false, process: [], related: [], refs: {} }, opts || {});
     };
-    const ALL3 = ['iso27001', 'iso22301', 'iso20000'];
+    // Every registry standard shares the harmonized-structure requirements below.
+    const ALL3 = ['iso27001', 'iso22301', 'iso20000', 'iso9001', 'iso14001', 'iso45001'];
 
     const TOPICS = [
         // ── ISO/IEC 27001 ──
@@ -149,33 +150,81 @@
         T('sms-knowledge', 'Knowledge', ['iso20000'],
             [/knowledge (management|base)/i], { refs: { iso20000: ['7.6'] } }),
 
+        // ── ISO 9001 ──
+        T('qms-customer', 'Customer requirements and customer focus', ['iso9001'],
+            [/customer (requirement|communication|property|focus)|contract review|order review|sales (order|process)/i], { expected: true, process: [/sales|order|customer/i], refs: { iso9001: ['8.2', '5.1.2'] } }),
+        T('qms-design', 'Design and development', ['iso9001'],
+            [/design and development|design control|product development|\bnpd\b/i], { process: [/design|development/i], refs: { iso9001: ['8.3'] } }),
+        T('qms-supplier', 'Control of external providers', ['iso9001'],
+            [/supplier|vendor|purchas|procurement|external provider|outsourc/i], { expected: true, process: [/purchas|procure/i], refs: { iso9001: ['8.4'] } }),
+        T('qms-production', 'Production and service provision', ['iso9001'],
+            [/production|manufactur|process control|work instruction|traceab|preservation/i], { expected: true, process: [/production|manufactur|operation/i], related: ['qms-calibration'], refs: { iso9001: ['8.5'] } }),
+        T('qms-calibration', 'Monitoring and measuring resources', ['iso9001'],
+            [/calibrat|measuring equipment|gauge/i], { expected: true, refs: { iso9001: ['7.1.5'] } }),
+        T('qms-knowledge', 'Organizational knowledge', ['iso9001'],
+            [/knowledge (management|base)|lessons learn/i], { refs: { iso9001: ['7.1.6'] } }),
+        T('qms-release', 'Release of products and services', ['iso9001'],
+            [/release|final inspection|inspection and test|quality control/i], { expected: true, refs: { iso9001: ['8.6'] } }),
+        T('qms-nonconforming', 'Control of nonconforming outputs', ['iso9001'],
+            [/nonconforming (product|output)|non-conforming (product|output)|concession|rework|quarantine/i], { expected: true, refs: { iso9001: ['8.7'] } }),
+        T('qms-satisfaction', 'Customer satisfaction', ['iso9001'],
+            [/customer satisfaction|customer (survey|feedback)|complaint/i], { expected: true, refs: { iso9001: ['9.1.2'] } }),
+
+        // ── ISO 14001 ──
+        T('ems-aspects', 'Environmental aspects and impacts', ['iso14001'],
+            [/aspect|environmental impact/i], { expected: true, refs: { iso14001: ['6.1.2'] } }),
+        T('ems-compliance', 'Compliance obligations and evaluation of compliance', ['iso14001'],
+            [/compliance (obligation|evaluation)|legal (register|requirement)|permit|consent|evaluation of compliance/i], { expected: true, refs: { iso14001: ['6.1.3', '9.1.2'] } }),
+        T('ems-control', 'Environmental operational control', ['iso14001'],
+            [/waste|emission|effluent|chemical|spill|energy|environmental control|operational control/i], { expected: true, refs: { iso14001: ['8.1', '6.1.4'] } }),
+        T('ems-emergency', 'Environmental emergency preparedness and response', ['iso14001'],
+            [/emergency|spill response|fire/i], { expected: true, refs: { iso14001: ['8.2'] } }),
+        T('ems-performance', 'Environmental performance monitoring', ['iso14001'],
+            [/environmental (monitoring|performance)|monitoring and measurement/i], { expected: true, refs: { iso14001: ['9.1'] } }),
+
+        // ── ISO 45001 ──
+        T('ohs-hazards', 'Hazard identification and OH&S risk assessment', ['iso45001'],
+            [/hazard|\bhira\b|risk assessment|job safety|\bjsa\b/i], { expected: true, refs: { iso45001: ['6.1.2', '8.1.2'] } }),
+        T('ohs-participation', 'Consultation and participation of workers', ['iso45001'],
+            [/consultation|participation|safety committee|toolbox/i], { expected: true, refs: { iso45001: ['5.4'] } }),
+        T('ohs-legal', 'Legal and other requirements', ['iso45001'],
+            [/legal (register|requirement)|compliance (evaluation|register)|evaluation of compliance/i], { expected: true, refs: { iso45001: ['6.1.3', '9.1.2'] } }),
+        T('ohs-change', 'Management of change', ['iso45001'],
+            [/management of change|\bmoc\b|change management/i], { expected: true, refs: { iso45001: ['8.1.3'] } }),
+        T('ohs-procurement', 'Procurement, contractors and outsourcing', ['iso45001'],
+            [/contractor|procurement|purchas|permit to work/i], { expected: true, refs: { iso45001: ['8.1.4'] } }),
+        T('ohs-emergency', 'OH&S emergency preparedness and response', ['iso45001'],
+            [/emergency|evacuation|fire|first aid|drill/i], { expected: true, refs: { iso45001: ['8.2'] } }),
+        T('ohs-incident', 'Incident investigation and corrective action', ['iso45001'],
+            [/incident (investigation|report)|accident|near miss/i], { expected: true, refs: { iso45001: ['10.2'] } }),
+
         // ── Shared management-system requirements (Annex SL) ──
         T('ims-context', 'Context of the organization and interested parties', ALL3,
-            [/context of the organi[sz]ation|interested part|needs and expectations/i], { expected: true, refs: { iso27001: ['4.1', '4.2'], iso22301: ['4.1', '4.2'], iso20000: ['4.1', '4.2'] } }),
+            [/context of the organi[sz]ation|interested part|needs and expectations/i], { expected: true, refs: { iso27001: ['4.1', '4.2'], iso22301: ['4.1', '4.2'], iso20000: ['4.1', '4.2'] , iso9001: ['4.1', '4.2'], iso14001: ['4.1', '4.2'], iso45001: ['4.1', '4.2'] } }),
         T('ims-scope', 'Scope of the management system', ALL3,
-            [/\bscope\b/i], { refs: { iso27001: ['4.3'], iso22301: ['4.3'], iso20000: ['4.3'] } }),
+            [/\bscope\b/i], { refs: { iso27001: ['4.3'], iso22301: ['4.3'], iso20000: ['4.3'] , iso9001: ['4.3'], iso14001: ['4.3'], iso45001: ['4.3'] } }),
         T('ims-policy', 'Policy', ALL3,
-            [/\bpolic(y|ies)\b/i], { expected: true, refs: { iso27001: ['5.2'], iso22301: ['5.2'], iso20000: ['5.2'] } }),
+            [/\bpolic(y|ies)\b/i], { expected: true, refs: { iso27001: ['5.2'], iso22301: ['5.2'], iso20000: ['5.2'] , iso9001: ['5.2'], iso14001: ['5.2'], iso45001: ['5.2'] } }),
         T('ims-risk-actions', 'Actions to address risks and opportunities', ALL3,
-            [/risk (assessment|management)|risks? and opportunit/i], { expected: true, refs: { iso27001: ['6.1.1'], iso22301: ['6.1'], iso20000: ['6.1'] } }),
+            [/risk (assessment|management)|risks? and opportunit/i], { expected: true, refs: { iso27001: ['6.1.1'], iso22301: ['6.1'], iso20000: ['6.1'] , iso9001: ['6.1'], iso14001: ['6.1.1'], iso45001: ['6.1.1'] } }),
         T('ims-objectives', 'Objectives', ALL3,
-            [/objective/i], { expected: true, refs: { iso27001: ['6.2'], iso22301: ['6.2'], iso20000: ['6.2'] } }),
+            [/objective/i], { expected: true, refs: { iso27001: ['6.2'], iso22301: ['6.2'], iso20000: ['6.2'] , iso9001: ['6.2'], iso14001: ['6.2'], iso45001: ['6.2'] } }),
         T('ims-competence', 'Competence and training', ALL3,
-            [/competence|training/i], { expected: true, refs: { iso27001: ['7.2'], iso22301: ['7.2'], iso20000: ['7.2'] } }),
+            [/competence|training/i], { expected: true, refs: { iso27001: ['7.2'], iso22301: ['7.2'], iso20000: ['7.2'] , iso9001: ['7.2'], iso14001: ['7.2'], iso45001: ['7.2'] } }),
         T('ims-awareness', 'Awareness', ALL3,
-            [/awareness/i], { expected: true, refs: { iso27001: ['7.3'], iso22301: ['7.3'], iso20000: ['7.3'] } }),
+            [/awareness/i], { expected: true, refs: { iso27001: ['7.3'], iso22301: ['7.3'], iso20000: ['7.3'] , iso9001: ['7.3'], iso14001: ['7.3'], iso45001: ['7.3'] } }),
         T('ims-communication', 'Communication', ALL3,
-            [/communication/i], { expected: true, refs: { iso27001: ['7.4'], iso22301: ['7.4'], iso20000: ['7.4'] } }),
+            [/communication/i], { expected: true, refs: { iso27001: ['7.4'], iso22301: ['7.4'], iso20000: ['7.4'] , iso9001: ['7.4'], iso14001: ['7.4'], iso45001: ['7.4'] } }),
         T('ims-docinfo', 'Control of documented information', ALL3,
-            [/document control|control of documents|documented information|records? control/i], { expected: true, refs: { iso27001: ['7.5'], iso22301: ['7.5'], iso20000: ['7.5'] } }),
+            [/document control|control of documents|documented information|records? control/i], { expected: true, refs: { iso27001: ['7.5'], iso22301: ['7.5'], iso20000: ['7.5'] , iso9001: ['7.5'], iso14001: ['7.5'], iso45001: ['7.5'] } }),
         T('ims-internal-audit', 'Internal audit', ALL3,
-            [/internal audit/i], { expected: true, refs: { iso27001: ['9.2'], iso22301: ['9.2'], iso20000: ['9.2'] } }),
+            [/internal audit/i], { expected: true, refs: { iso27001: ['9.2'], iso22301: ['9.2'], iso20000: ['9.2'] , iso9001: ['9.2'], iso14001: ['9.2'], iso45001: ['9.2'] } }),
         T('ims-mgmt-review', 'Management review', ALL3,
-            [/management review/i], { expected: true, refs: { iso27001: ['9.3'], iso22301: ['9.3'], iso20000: ['9.3'] } }),
+            [/management review/i], { expected: true, refs: { iso27001: ['9.3'], iso22301: ['9.3'], iso20000: ['9.3'] , iso9001: ['9.3'], iso14001: ['9.3'], iso45001: ['9.3'] } }),
         T('ims-nonconformity', 'Nonconformity and corrective action', ALL3,
-            [/nonconformity|non-conformity|corrective action|\bcapa\b/i], { expected: true, refs: { iso27001: ['10.2'], iso22301: ['10.1'], iso20000: ['10.1'] } }),
+            [/nonconformity|non-conformity|corrective action|\bcapa\b/i], { expected: true, refs: { iso27001: ['10.2'], iso22301: ['10.1'], iso20000: ['10.1'] , iso9001: ['10.2'], iso14001: ['10.2'], iso45001: ['10.2'] } }),
         T('ims-improvement', 'Continual improvement', ALL3,
-            [/continual improvement|process optimi[sz]ation/i], { expected: true, process: [/continual improvement/i], refs: { iso27001: ['10.1'], iso22301: ['10.2'], iso20000: ['10.2'] } })
+            [/continual improvement|process optimi[sz]ation/i], { expected: true, process: [/continual improvement/i], refs: { iso27001: ['10.1'], iso22301: ['10.2'], iso20000: ['10.2'] , iso9001: ['10.3'], iso14001: ['10.3'], iso45001: ['10.3'] } })
     ];
 
     const BY_ID = {};
@@ -210,12 +259,16 @@
 
     const NUMBER_PREFIX = [
         [/^ISMS[-\s]/i, 'iso27001'], [/^BCMP?[-\s]/i, 'iso22301'], [/^BCMS[-\s]/i, 'iso22301'],
-        [/^ITSM[-\s]/i, 'iso20000'], [/^SMS[-\s]/i, 'iso20000']
+        [/^ITSM[-\s]/i, 'iso20000'], [/^SMS[-\s]/i, 'iso20000'],
+        [/^QMS?[-\s]/i, 'iso9001'], [/^EMS[-\s]/i, 'iso14001'], [/^OHSM?S?[-\s]/i, 'iso45001']
     ];
     const TITLE_STANDARD = [
         [/(?:for|per|iso(?:\/iec)?)\s*27001|\bisms\b|information security (?:management|policies|policy|manual)/i, 'iso27001'],
         [/(?:for|per|iso)\s*22301|\bbcms\b|business continuity management|business continuity (?:awareness|policy)/i, 'iso22301'],
-        [/(?:for|per|iso(?:\/iec)?)\s*20000|\bitsms\b|\bitsm\b|it service management/i, 'iso20000']
+        [/(?:for|per|iso(?:\/iec)?)\s*20000|\bitsms\b|\bitsm\b|it service management/i, 'iso20000'],
+        [/(?:for|per|iso)\s*9001|\bqms\b|quality (?:management|manual|policy)/i, 'iso9001'],
+        [/(?:for|per|iso)\s*14001|\bems\b|environmental (?:management|manual|policy)/i, 'iso14001'],
+        [/(?:for|per|iso)\s*45001|\bohs\b|oh&s|occupational health|health and safety (?:management|manual|policy)/i, 'iso45001']
     ];
     const TYPE_RULES = [
         ['template', /\btemplate\b|\bblank\b|\bboilerplate\b/i],
@@ -278,6 +331,16 @@
      * @param {Object} doc
      * @param {Object} [client] - its keyProcesses tie an SOP to a process
      */
+    // Registry ids of the standards the client holds (its standards list and
+    // its certificates). Empty when unknown — then nothing is filtered.
+    function clientStandardIds(client) {
+        const CSR = global.ChecklistStandards;
+        if (!client || !CSR || typeof CSR.resolve !== 'function') return [];
+        const names = csv(client.standard).concat(arr(client.certificates).map(function (c) { return str(c && c.standard); }).filter(Boolean));
+        if (!names.length) return [];
+        return CSR.resolve(names).standards.map(function (s) { return s.id; });
+    }
+
     function profile(doc, client) {
         const d = doc || {};
         let std = statedStandards(d);
@@ -289,7 +352,12 @@
         // ("risk assessment", "supplier" and "internal audit" belong to several).
         if (!std.ids.length && topics.ids.length) {
             const domainStds = new Set();
-            topics.ids.forEach(function (id) { BY_ID[id].std.forEach(function (x) { domainStds.add(x); }); });
+            // Only standards this client actually holds can own its documents:
+            // a "Release Management" procedure at a client without ISO 9001 is
+            // not a 9001 release document, and a "Supplier Evaluation
+            // Procedure" at a client holding only ISO 9001 can only be 9001's.
+            const held = clientStandardIds(client);
+            topics.ids.forEach(function (id) { BY_ID[id].std.forEach(function (x) { if (!held.length || held.indexOf(x) !== -1) domainStds.add(x); }); });
             if (domainStds.size === 1) std = { ids: Array.from(domainStds), basis: 'topic-domain' };
         }
         const type = classifyType(d);

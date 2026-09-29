@@ -82,9 +82,9 @@ describe('ChecklistStandards — the scope-gated registry', () => {
     });
 
     it('refuses to resolve a standard it does not hold — it never substitutes another', () => {
-        const r = CS.resolve('ISO 9001:2015');
+        const r = CS.resolve('ISO 50001:2018');
         expect(r.standards).toEqual([]);
-        expect(r.unresolved).toEqual(['ISO 9001:2015']);
+        expect(r.unresolved).toEqual(['ISO 50001:2018']);
     });
 
     it('resolves registry ids as well as display names', () => {
@@ -397,9 +397,9 @@ describe('buildClientChecklist — audit-type scaling', () => {
 
     it('falls back to the document-driven build for a standard outside the registry', () => {
         const cl = B.buildClientChecklist(
-            { id: 'q', name: 'Acme Ltd', standard: 'ISO 9001:2015' },
+            { id: 'q', name: 'Acme Ltd', standard: 'ISO 50001:2018' },
             DOCS,
-            { auditType: 'surveillance', standard: 'ISO 9001:2015' }
+            { auditType: 'surveillance', standard: 'ISO 50001:2018' }
         );
         expect(cl.generator).toBeUndefined();
         expect(cl.clauses.length).toBeGreaterThan(0);

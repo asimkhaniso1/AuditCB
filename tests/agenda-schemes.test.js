@@ -35,10 +35,12 @@ describe('agenda for standards and schemes outside the clause registry', () => {
         expect(asm.agenda.warnings.join(' ')).toMatch(/No clause registry is held for cGMP/);
     });
 
-    it('builds ISO 9001 and Halal together, one topic session each', () => {
-        const items = build('ISO 9001:2015, Halal').agenda.rows.map(r => r.item);
-        expect(items.some(i => /^ISO 9001:2015: customer requirements/.test(i))).toBe(true);
-        expect(items.some(i => /^Halal: Halal assurance system/.test(i))).toBe(true);
+    it('builds ISO 9001 (cited from the registry) and Halal (by topic) together', () => {
+        const rows = build('ISO 9001:2015, Halal').agenda.rows;
+        const prod = rows.find(r => /^Production and service provision/.test(r.item));
+        expect(prod.standards).toEqual([{ stdId: 'iso9001', refs: ['7.1.5', '8.5', '8.6', '8.7'] }]);
+        const halal = rows.find(r => /^Halal: Halal assurance system/.test(r.item));
+        expect(halal.standards).toEqual([]);
     });
 
     it('titles the opening review for a surveillance, not a recertification', () => {
