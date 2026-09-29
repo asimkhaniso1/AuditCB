@@ -131,6 +131,12 @@ describe('reopening a saved plan for editing', () => {
         vi.useRealTimers();
 
         expect(document.getElementById('plan-lead-auditor').value).toBe('Muhammad Asim Khan');
+        // The Standards picker chooses the certificates the plan covers — it
+        // used to be permanently disabled.
+        const std = document.getElementById('plan-standard');
+        expect(std.disabled).toBe(false);
+        expect(Array.from(std.options).length).toBe(3);
+        expect(Array.from(std.selectedOptions).length).toBe(3);
         const rows = Array.from(document.querySelectorAll('#agenda-tbody tr'));
         expect(rows.length).toBeGreaterThan(0);
         rows.forEach(row => {
