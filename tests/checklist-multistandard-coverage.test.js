@@ -100,7 +100,7 @@ describe('the coverage contradiction is gone', () => {
     // this checklist is not tied to a standard". assess() filed the second as
     // 'info', so ok stayed true and summarize() read it as "validated".
     it('a coverage pass that cannot run is Blocked, never "validated"', () => {
-        const ck = { name: 'x', standard: 'Custom', clauses: [], type: 'custom', auditType: 'recertification' };
+        const ck = { name: 'x', standard: '', clauses: [], type: 'custom', auditType: 'recertification' };
         const result = CC.assess(ck, ctxOf(ck));
         expect(result.outcome).toBe('blocked');
         expect(result.blocking).toBe(true);
@@ -113,7 +113,7 @@ describe('the coverage contradiction is gone', () => {
     });
 
     it('the Ready-for-Audit gate refuses it', () => {
-        const ck = { name: 'x', standard: 'Custom', clauses: [], type: 'custom' };
+        const ck = { name: 'x', standard: '', clauses: [], type: 'custom' };
         const coverage = CC.assess(ck, ctxOf(ck));
         const r = CC.readiness(ck, { qa: { issues: [] }, coverage });
         expect(r.ready).toBe(false);
@@ -130,7 +130,7 @@ describe('the coverage contradiction is gone', () => {
     });
 
     it('the combined status never says QA passed and coverage validated while coverage is blocked', () => {
-        const ck = { name: 'x', standard: 'Custom', clauses: [] };
+        const ck = { name: 'x', standard: '', clauses: [] };
         const cov = CC.assess(ck, ctxOf(ck));
         const combined = CC.combine({ ok: true, counts: { critical: 0, warning: 0, info: 0 }, issues: [] }, cov);
         expect(combined.outcome).toBe('blocked');
@@ -138,12 +138,13 @@ describe('the coverage contradiction is gone', () => {
     });
 });
 
-describe('four mutually exclusive outcomes', () => {
+describe('mutually exclusive outcomes', () => {
     const LABELS = {
         passed: 'Passed — coverage validated',
         'passed-with-notes': 'Passed with notes — coverage validated with identified limitations',
         blocked: 'Blocked — coverage could not be assessed',
-        failed: 'Failed — identified coverage gaps'
+        failed: 'Failed — identified coverage gaps',
+        'not-assessed': 'Not assessed — no clause registry is held for this scheme; the auditor confirms coverage'
     };
     it('carries the exact wording', () => { expect(CC.OUTCOMES).toEqual(LABELS); });
 
@@ -158,7 +159,7 @@ describe('four mutually exclusive outcomes', () => {
 
     it('Blocked, Failed, Passed-with-notes and Passed are each reachable and never overlap', () => {
         const seen = new Set();
-        const blocked = CC.assess({ standard: 'Custom', clauses: [] }, ctxOf({ standard: 'Custom', clauses: [] }));
+        const blocked = CC.assess({ standard: '', clauses: [] }, ctxOf({ standard: '', clauses: [] }));
         seen.add(blocked.outcome);
         const ck = build(); ck.clauses = ck.clauses.slice(0, 1);
         seen.add(CC.assess(ck, ctxOf(ck)).outcome);

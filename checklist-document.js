@@ -185,7 +185,7 @@
         }
         const c = cov.coverage || {};
         const outcome = cov.outcome || (cov.blocking ? 'failed' : 'passed');
-        const cls = outcome === 'blocked' || outcome === 'failed' ? 'qa-fail' : (outcome === 'passed-with-notes' ? 'qa-warn' : 'qa-pass');
+        const cls = outcome === 'blocked' || outcome === 'failed' ? 'qa-fail' : (outcome === 'passed-with-notes' || outcome === 'not-assessed' ? 'qa-warn' : 'qa-pass');
         const label = (global.ChecklistCoverage && global.ChecklistCoverage.OUTCOMES && global.ChecklistCoverage.OUTCOMES[outcome]) || outcome;
         const rows = [];
         arr(c.clauses).forEach(function (cl) {
@@ -224,7 +224,7 @@
     /** The single status line for the whole checklist. */
     function validationBanner(combined) {
         if (!combined) return '';
-        const cls = combined.outcome === 'blocked' || combined.outcome === 'failed' ? 'qa-fail' : (combined.outcome === 'passed-with-notes' ? 'qa-warn' : 'qa-pass');
+        const cls = combined.outcome === 'blocked' || combined.outcome === 'failed' ? 'qa-fail' : (combined.outcome === 'passed-with-notes' || combined.outcome === 'not-assessed' ? 'qa-warn' : 'qa-pass');
         return '<div class="qa-panel ' + cls + ' pd-keep"><h2>Checklist validation status</h2><p><strong>' + t(combined.label) + '</strong>'
             + (combined.reasons && combined.reasons.length ? ' ' + t(combined.reasons.join(' ')) : '') + '</p></div>';
     }

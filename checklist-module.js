@@ -113,7 +113,9 @@ function renderChecklistLibrary(clientId) {
         const matchStandard = checklistFilterStandard === 'all' || c.standard === checklistFilterStandard;
         const matchType = checklistFilterType === 'all' || c.type === checklistFilterType;
         const matchScope = checklistFilterScope === 'all' || c.auditScope === checklistFilterScope;
-        const matchAuditType = checklistFilterAuditType === 'all' || (c.auditType || 'initial') === checklistFilterAuditType;
+        const cType = String(c.auditType || '').toLowerCase();
+        // A checklist not tied to an audit type serves every type.
+        const matchAuditType = checklistFilterAuditType === 'all' || !cType || cType === checklistFilterAuditType;
         const matchSearch = checklistSearchTerm === '' ||
             c.name.toLowerCase().includes(checklistSearchTerm.toLowerCase()) ||
             c.standard.toLowerCase().includes(checklistSearchTerm.toLowerCase());
@@ -173,7 +175,8 @@ function renderChecklistLibrary(clientId) {
                     </select>
                     <select id="checklist-filter-audit-type" style="max-width: 150px; margin-bottom: 0;">
                         <option value="all" ${checklistFilterAuditType === 'all' ? 'selected' : ''}>All Audit Types</option>
-                        <option value="initial" ${checklistFilterAuditType === 'initial' ? 'selected' : ''}>Initial / Recert</option>
+                        <option value="initial" ${checklistFilterAuditType === 'initial' ? 'selected' : ''}>Initial</option>
+                        <option value="recertification" ${checklistFilterAuditType === 'recertification' ? 'selected' : ''}>Recertification</option>
                         <option value="surveillance" ${checklistFilterAuditType === 'surveillance' ? 'selected' : ''}>Surveillance</option>
                     </select>
                     <select id="checklist-filter-scope" style="max-width: 140px; margin-bottom: 0;">
@@ -1094,7 +1097,19 @@ function renderChecklistEditor(checklistId) {
                                 If selected, this checklist will appear in that client's audit plan configuration
                             </small>
                         </div>
-                        <!-- Audit Type field removed -->
+                        <!-- Audit type decides how coverage is judged: an initial
+                             audit has no cycle behind it, a surveillance samples
+                             the cycle so far, a recertification must cover it.
+                             The library filter and badge already read it; the
+                             field itself had been removed, so no new checklist
+                             could carry one. -->
+                        <div class="form-group">
+                            <label>Audit Type</label>
+                            <select class="form-control" id="checklist-audit-type">
+                                ${[['', 'Any audit (not type-specific)'], ['initial', 'Initial certification (Stage 1 / Stage 2)'], ['surveillance', 'Surveillance'], ['recertification', 'Recertification']]
+                                    .map(([v, l]) => `<option value="${v}" ${String(checklist?.auditType || '').toLowerCase() === v ? 'selected' : ''}>${l}</option>`).join('')}
+                            </select>
+                        </div>
                         <div class="form-group">
                             <label>Audit Scope</label>
                             <select class="form-control" id="checklist-audit-scope">
@@ -1216,6 +1231,8 @@ function saveChecklistFromEditor(checklistId) {
     const type = document.getElementById('checklist-type').value;
     const clientId = document.getElementById('checklist-client')?.value || null;
     const auditScope = document.getElementById('checklist-audit-scope').value;
+    const auditType = document.getElementById('checklist-audit-type')?.value || '';
+    const clientName = clientId ? ((window.state.clients || []).find(c => String(c.id) === String(clientId)) || {}).name || null : null;
 
     if (!name) {
         window.showNotification('Please enter a checklist name', 'error');
@@ -1300,6 +1317,9 @@ function saveChecklistFromEditor(checklistId) {
                     standard: checklistData.standard,
                     type: checklistData.type,
                     audit_scope: checklistData.auditScope,
+                    audit_type: checklistData.auditType || null,
+                    client_id: checklistData.clientId || null,
+                    client_name: checklistData.clientName || null,
                     clauses: checklistData.clauses,
                     updated_at: new Date().toISOString()
                 });
@@ -1310,6 +1330,9 @@ function saveChecklistFromEditor(checklistId) {
                     standard: checklistData.standard,
                     type: checklistData.type,
                     audit_scope: checklistData.auditScope,
+                    audit_type: checklistData.auditType || null,
+                    client_id: checklistData.clientId || null,
+                    client_name: checklistData.clientName || null,
                     clauses: checklistData.clauses,
                     created_by: checklistData.createdBy,
                     created_at: new Date().toISOString(),
@@ -1331,6 +1354,8 @@ function saveChecklistFromEditor(checklistId) {
             checklist.type = type;
             checklist.clientId = clientId;
             checklist.auditScope = auditScope;
+            checklist.auditType = auditType;
+            checklist.clientName = clientName;
             checklist.clauses = Object.values(clauseGroups);
             delete checklist.items;
             checklist.updatedAt = new Date().toISOString().split('T')[0];
@@ -1345,7 +1370,9 @@ function saveChecklistFromEditor(checklistId) {
             name,
             standard,
             type,
-            // auditType removed
+            auditType,
+            clientId,
+            clientName,
             auditScope,
             clauses: Object.values(clauseGroups),
             createdBy: state.currentUser?.name || 'Current User',
@@ -2051,13 +2078,18 @@ function coverageCardHTML(cov, checklist) {
     if (c.processes && c.processes.total) rows.push(['Critical processes', null, c.processes.covered, c.processes.total, '']);
 
     const drivers = (c.controls || [])[0];
+    // The three-year view belongs to a recertification. A surveillance still
+    // reports the cycle so far; an initial audit has no cycle behind it.
+    const auditType = String((checklist && checklist.auditType) || '').toLowerCase();
+    const heading = /recert/.test(auditType) ? 'Recertification Coverage — this audit and the three-year programme'
+        : /surveil/.test(auditType) ? 'Coverage — this audit and the cycle so far' : 'Coverage — this audit';
     return `
         <div class="card" style="margin-bottom:1.5rem;">
             <h3 style="margin:0 0 0.25rem;">
                 <i class="fa-solid fa-shield-halved" style="margin-right:0.5rem;color:var(--primary-color);"></i>
-                Recertification Coverage — this audit and the three-year programme
+                ${heading}
             </h3>
-            <p style="margin:0 0 0.5rem;font-size:0.88rem;font-weight:600;color:${cov.outcome === 'blocked' || cov.outcome === 'failed' ? '#b91c1c' : cov.outcome === 'passed-with-notes' ? '#a16207' : '#166534'};">${esc(window.ChecklistCoverage ? window.ChecklistCoverage.summarize(cov) : '')}</p>
+            <p style="margin:0 0 0.5rem;font-size:0.88rem;font-weight:600;color:${cov.outcome === 'blocked' || cov.outcome === 'failed' ? '#b91c1c' : (cov.outcome === 'passed-with-notes' || cov.outcome === 'not-assessed') ? '#a16207' : '#166534'};">${esc(window.ChecklistCoverage ? window.ChecklistCoverage.summarize(cov) : '')}</p>
             <p style="margin:0 0 1rem;color:var(--text-secondary);font-size:0.85rem;">
                 Cycle ${esc(cycle.start || '—')} to ${esc(cycle.end || '—')}${cycle.anchored ? ` (anchored on ${esc(cycle.anchored)})` : ''} &middot;
                 ${cycle.priorAudits || 0} prior audit(s), ${cycle.priorChecklists || 0} checklist(s) read for coverage.
