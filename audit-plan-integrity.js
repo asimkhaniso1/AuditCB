@@ -432,6 +432,27 @@
         ['ISO/IEC 20000-1: service reporting and budgeting', ['sms-reporting-budget'], 'iso20000']
     ];
 
+    // Standards and schemes the clause registry does not hold (ISO 9001,
+    // Halal, GMP, cGMP, HACCP, ...). Their sessions name the TOPICS audited —
+    // never a clause number, which would be invented. The universal
+    // management-system blocks (the ones built from `shared` concepts) are
+    // kept for them, uncited.
+    const SCHEME_TOPICS = [
+        [/\b9001\b/, 'customer requirements and communication; design and development, where applicable; control of externally provided processes, products and services; production and service provision; release of products and services; control of nonconforming outputs; customer satisfaction', 'Operations / Quality'],
+        [/\b14001\b/, 'environmental aspects and impacts; compliance obligations and evaluation of compliance; operational control and life-cycle perspective; emergency preparedness and response; environmental performance monitoring', 'Operations / Environment'],
+        [/\b45001\b/, 'hazard identification and OH&S risk assessment; consultation and participation of workers; legal requirements and evaluation of compliance; operational control and the hierarchy of controls; management of change, contractors and procurement; emergency preparedness; incident investigation', 'Operations / OH&S'],
+        [/\b22000\b/, 'prerequisite programmes; hazard analysis and the hazard control plan; traceability; handling of potentially unsafe products, withdrawal and recall; verification activities', 'Food safety team'],
+        [/^c?gmp$/i, 'premises and equipment; personnel and hygiene; production and process controls; raw material and packaging control; quality control, batch records and release; complaints and recalls', 'Production / Quality'],
+        [/^halal$/i, 'Halal assurance system and Halal committee; raw materials and supplier Halal status; segregation, traceability and prevention of contamination; production, cleaning and sanitation; labelling and use of the Halal mark', 'Production / Halal committee'],
+        [/^haccp$/i, 'prerequisite programmes; hazard analysis; critical control points, critical limits and monitoring; corrective actions; verification, validation and records', 'Food safety team'],
+        [/^kosher$/i, 'ingredient and supplier approval; production and equipment status; supervision arrangements and records', 'Production / Quality'],
+        [/^ce-?marking$/i, 'technical documentation; conformity assessment route and harmonised standards; factory production control; declaration of conformity and marking', 'Engineering / Quality']
+    ];
+    function schemeTopics(name) {
+        const hit = SCHEME_TOPICS.find(function (t) { return t[0].test(str(name)); });
+        return hit ? { topics: hit[1], auditee: hit[2] } : { topics: 'scheme-specific requirements, controls and records', auditee: 'Process owners' };
+    }
+
     const CORE_PROCESSES = ['Client Onboarding', 'Assessment And Design Tools', 'Service Desk Operations', 'Incident Management', 'Problem Management',
         'Change Management', 'Cloud Services Operations', 'Patch & Vulnerability Management', 'Backup & Recovery Operations',
         'Performance Monitoring & Reporting', 'Continual Improvement and Process Optimization'];
@@ -472,9 +493,10 @@
         const errors = [];
         const warnings = [];
         const scopeIds = arr(c.standards).filter(function (id) { return CS().byId(id); });
-        const unknown = arr(c.standards).filter(function (id) { return !CS().byId(id); });
-        unknown.forEach(function (u) { errors.push('No controlled agenda template exists for "' + u + '"; it is not in the clause registry and no clauses will be invented for it.'); });
-        if (!scopeIds.length) return { rows: [], sessions: [], traceability: null, findingMap: [], errors: errors.concat(['No standard in scope.']), warnings: warnings };
+        // Everything else in scope is a scheme: planned by topic, uncited.
+        const schemes = uniq(arr(c.schemes).map(str).filter(Boolean).concat(arr(c.standards).filter(function (id) { return !CS().byId(id); })));
+        if (!scopeIds.length && !schemes.length) return { rows: [], sessions: [], traceability: null, findingMap: [], errors: errors.concat(['No standard in scope.']), warnings: warnings };
+        if (schemes.length) warnings.push('No clause registry is held for ' + schemes.join(', ') + '; its sessions name the topics audited, without clause numbers.');
 
         const hoursPerDay = Number(c.hoursPerDay) || 8;
         const finalDays = Number(c.finalDays) || 0;
@@ -487,10 +509,31 @@
             .flatMap(function (q) { return q.refs.filter(function (r) { return r.stdId === 'iso27001'; }).map(function (r) { return r.ref; }); }));
 
         // 1. Resolve every block against the registry; drop blocks with nothing in scope.
+        // A universal block (built from shared management-system concepts) also
+        // serves the schemes in scope; its title stays the same, uncited for them.
+        const universal = function (b) { return arr(b.shared).length > 0; };
         let blocks = BLOCKS.map(function (b) {
             const standards = b.kind ? [] : resolveBlockRefs(b, scopeIds, annexRefs);
-            return Object.assign({}, b, { standards: standards });
-        }).filter(function (b) { return b.kind || b.standards.length; });
+            const forSchemes = !b.kind && schemes.length && universal(b) ? schemes.slice() : [];
+            // The operations block's title names one client's processes; for a
+            // scheme-only scope it describes the sampling generically.
+            let title = !scopeIds.length && b.id === 'core-onboarding-design' ? 'Operational planning and control: sampling of the organisation’s core processes' : b.title;
+            // The review opening every audit is a RECERTIFICATION review only on a
+            // recertification; a surveillance plan used to carry that title too.
+            if (b.id === 'cycle-review' && !/recert/i.test(str(c.plan && (c.plan.auditType || c.plan.type)))) {
+                title = 'Surveillance review: changes since the previous audit, continued relevance of the scope, use of certification marks, and progress on objectives';
+            }
+            return Object.assign({}, b, { standards: standards, schemes: forSchemes, title: title, processes: !scopeIds.length ? [] : b.processes });
+        }).filter(function (b) { return b.kind || b.standards.length || b.schemes.length; });
+        // One topic session per scheme, placed before internal audit.
+        const schemeBlocks = schemes.map(function (name) {
+            const t = schemeTopics(name);
+            return { id: 'scheme-' + lower(name).replace(/[^a-z0-9]+/g, '-'), title: name + ': ' + t.topics, hours: 2.0, auditee: t.auditee, standards: [], schemes: [name], priorities: ['scheme-requirements'] };
+        });
+        if (schemeBlocks.length) {
+            const at = blocks.findIndex(function (b) { return b.id === 'internal-audit'; });
+            blocks.splice(at === -1 ? blocks.length - 2 : at, 0, ...schemeBlocks);
+        }
 
         // 2. Scale the variable blocks to the approved duration, 15-minute steps.
         const fixed = blocks.filter(function (b) { return b.kind; });
@@ -593,6 +636,7 @@
                 sessionId: 'S' + String(n).padStart(2, '0'), blockId: b.id, kind: b.kind || 'session', title: b.title, subject: b.subject || '',
                 spans: [{ day: p.day, start: p.start, end: p.end }], hours: b.hours,
                 standards: b.standards.map(function (e) { return { stdId: e.stdId, refs: e.refs.slice() }; }),
+                schemes: arr(b.schemes).slice(),
                 processes: arr(b.processes).map(function (name) {
                     return processNames.find(function (pn) { return norm(pn).indexOf(norm(name)) === 0 || norm(name).indexOf(norm(pn)) === 0; }) || name;
                 }),
@@ -625,7 +669,7 @@
                 day: 'Day ' + p.day, date: dayDate(p.day), start: hhmm(p.start), end: hhmm(p.end), time: hhmm(p.start) + ' – ' + hhmm(p.end),
                 item: label(p.day) + s.title + (cont ? ' (continued)' : ''), dept: s.auditee.person ? s.auditee.dept + ' / ' + s.auditee.person : s.auditee.dept,
                 auditor: s.auditor.name, auditorId: s.auditor.id, kind: s.kind, sessionId: s.sessionId,
-                standards: s.standards, findingIds: s.findingIds.slice(), processes: s.processes.slice(), subject: s.subject
+                standards: s.standards, schemes: s.schemes.slice(), findingIds: s.findingIds.slice(), processes: s.processes.slice(), subject: s.subject
             });
         };
         parts.forEach(emit);
@@ -659,6 +703,14 @@
             });
             let via = 'clause';
             let target = hits;
+            if (!target.length && !arr(f.standards).some(function (id) { return CS().byId(id); }) && !/^A\./.test(clause)) {
+                // A finding against a scheme with no clause registry cannot be
+                // matched by clause; it is followed up in the session that covers
+                // previous findings and corrective action.
+                const followUpSession = sessions.find(function (s) { return s.blockId === 'improvement'; });
+                const schemeOnly = sessions.every(function (s) { return !s.standards.length; });
+                if (followUpSession && schemeOnly) { target = [followUpSession]; via = 'scheme-follow-up'; }
+            }
             if (!target.length && clause) {
                 const stdId = /^A\./.test(clause) ? 'iso27001' : (arr(f.standards)[0] || '');
                 const fallback = /^A\./.test(clause) ? sessions.find(function (s) { return s.blockId === 'isms-risk-soa'; })
@@ -862,8 +914,15 @@
         const plan = c.plan || {};
         const client = c.client || {};
         const stdIds = arr(c.standards);
+        // Schemes outside the clause registry are matched by canonical name.
+        const canonName = function (s) { const U = typeof window !== 'undefined' && window.UTILS; return U && U.canonicalStandard ? U.canonicalStandard(s) : lower(s); };
+        const schemeNames = arr(c.schemes).map(canonName);
         const certs = arr(client.certificates).filter(function (x) { return !/withdrawn|expired/i.test(str(x.status)); })
-            .filter(function (x) { const r = CS().resolve(x.standard); return !stdIds.length || r.standards.some(function (s) { return stdIds.indexOf(s.id) !== -1; }); });
+            .filter(function (x) {
+                if (!stdIds.length && !schemeNames.length) return true;
+                const r = CS().resolve(x.standard);
+                return r.standards.some(function (s) { return stdIds.indexOf(s.id) !== -1; }) || schemeNames.indexOf(canonName(x.standard)) !== -1;
+            });
         const texts = uniq(certs.map(function (x) { return squash(x.scope); }).filter(Boolean));
         const issues = [];
         if (!certs.length) issues.push({ code: 'SCOPE_NO_CERTIFICATE', message: 'No active certificate is on file for the standards in scope, so the plan scope cannot be verified.' });
@@ -987,7 +1046,12 @@
         ['objectives', 'criteria', 'methodology'].forEach(function (field) {
             const text = str(p[field] || p['audit' + field.charAt(0).toUpperCase() + field.slice(1)]);
             if (!text) { problems.push({ code: 'NARRATIVE_MISSING', field: field, message: 'The plan has no audit ' + field + '.' }); return; }
+            // Secure communication / document-sharing tools belong to a remote or
+            // hybrid audit. Demanding them of an on-site plan failed every
+            // on-site plan the builder wrote ("interviews are held on-site").
+            const remoteOrHybrid = /remote|hybrid/i.test(str(p.auditMethod)) || /remote audit|hybrid audit/i.test(text);
             NARRATIVE_REQUIRED[field].forEach(function (rule) {
+                if (field === 'methodology' && /secure communication/.test(rule[0]) && !remoteOrHybrid) return;
                 if (rule[1] && !rule[1].test(text)) problems.push({ code: 'NARRATIVE_INCOMPLETE', field: field, message: 'Audit ' + field + ' do not state ' + rule[0] + '.' });
             });
             if (field === 'criteria') {
@@ -1178,7 +1242,7 @@
         if (claimed.length && need.length && claimed.length !== need.length) W('FINDING_COUNT_DIFFERS', 'The traceability record lists ' + claimed.length + ' finding(s) but the register now requires follow-up of ' + need.length + '. Rebuild the agenda.', {});
 
         // ── scope and sites ──────────────────────────────────────────
-        const scope = checkScope({ plan: p, client: c.client, standards: scopeIds, processes: uniq(rows.flatMap(function (r) { return arr(r.processes); })) });
+        const scope = checkScope({ plan: p, client: c.client, standards: scopeIds, schemes: schemesOf(p), processes: uniq(rows.flatMap(function (r) { return arr(r.processes); })) });
         scope.issues.forEach(function (i) {
             if (i.severity === 'warning') W(i.code, i.message, { requiresCertificationReview: !!i.requiresCertificationReview });
             else B(i.code, i.message, { field: 'scope', planScope: i.planScope, certificateScope: i.certificateScope });
@@ -1236,6 +1300,13 @@
         return CS().resolve(text).standards.map(function (x) { return x.id; });
     }
 
+    /** The plan's standards/schemes that the clause registry does not hold. */
+    function schemesOf(plan) {
+        const fromCycle = arr(plan && plan.certificationCycle && plan.certificationCycle.standards);
+        const text = fromCycle.length ? fromCycle.join(', ') : str(plan && plan.standard);
+        return CS().resolve(text).unresolved;
+    }
+
     /**
      * Build everything a plan needs from its structured inputs and return it
      * as a patch to apply to the plan, plus the derived records the gate and
@@ -1251,9 +1322,9 @@
         const team = resolveAuditors(plan, c.auditors);
         const findings = collectPreviousFindings({ state: c.state, client: c.client, plan: plan, standards: ids });
         const dur = plan.durationCalculation || {};
-        const built = buildAgenda({ plan: plan, standards: ids, finalDays: dur.finalDays || plan.manDays, hoursPerDay: c.hoursPerDay || 8, assigned: team.assigned,
+        const built = buildAgenda({ plan: plan, standards: ids, schemes: schemesOf(plan), finalDays: dur.finalDays || plan.manDays, hoursPerDay: c.hoursPerDay || 8, assigned: team.assigned,
             client: c.client, findings: findings, checklist: c.checklist });
-        const scope = checkScope({ plan: plan, client: c.client, standards: ids, processes: uniq(built.rows.flatMap(function (r) { return arr(r.processes); })) });
+        const scope = checkScope({ plan: plan, client: c.client, standards: ids, schemes: schemesOf(plan), processes: uniq(built.rows.flatMap(function (r) { return arr(r.processes); })) });
         const site = arr(c.client && c.client.sites).find(function (s) { return arr(plan.selectedSites)[0] && lower(s.name) === lower(arr(plan.selectedSites)[0].name); });
         const tz = df.resolveTimeZone({ plan: plan, client: c.client, site: site });
         const narratives = buildNarratives({ auditType: plan.auditType || plan.type, standards: ids, scope: scope.certificateScope, sites: arr(plan.selectedSites).map(function (s) { return s.name; }), method: plan.auditMethod });
@@ -1277,7 +1348,7 @@
         buildAgenda, buildTraceability, flattenChecklist,
         buildDurationRecord, reconcileDuration,
         checkScope, buildNarratives, checkNarratives,
-        validate, canTransition, contentHash, assemble, standardIdsOf
+        validate, canTransition, contentHash, assemble, standardIdsOf, schemesOf, SCHEME_TOPICS
     };
     global.AuditPlanIntegrity = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;

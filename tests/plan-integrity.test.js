@@ -245,10 +245,12 @@ describe('clause and control references come from the controlled registry', () =
                 built.rows.forEach(r => (r.standards || []).forEach(e => { expect(e.stdId).toBe(id); e.refs.forEach(ref => expect(CS.isKnownRef(id, ref)).toBe(true)); }));
             });
         });
-        it('refuses to build for a standard the registry does not hold', () => {
+        it('plans a standard the registry does not hold by topic, never inventing a clause for it', () => {
             const built = IPI.buildAgenda({ plan: { date: '2026-11-03', endDate: '2026-11-05' }, standards: ['iso9001'], finalDays: 3, assigned: base.asm.team.assigned, client: base.client, findings: [] });
-            expect(built.rows).toEqual([]);
-            expect(built.errors.join(' ')).toMatch(/no controlled agenda template/i);
+            expect(built.errors).toEqual([]);
+            expect(built.rows.length).toBeGreaterThan(0);
+            expect(built.rows.every(r => !(r.standards || []).length)).toBe(true);
+            expect(built.warnings.join(' ')).toMatch(/No clause registry is held for iso9001/);
         });
     });
 

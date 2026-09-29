@@ -720,7 +720,7 @@ function generatePlanNarratives() {
     // The certificate's scope wording is reproduced exactly (see checkScope):
     // it is never expanded, shortened or reworded here.
     const scope = window.AuditPlanIntegrity
-        ? window.AuditPlanIntegrity.checkScope({ plan: {}, client, standards: window.AuditPlanIntegrity.standardIdsOf({ standard: cycle.standards.join(', ') }) }).certificateScope
+        ? window.AuditPlanIntegrity.checkScope({ plan: {}, client, standards: window.AuditPlanIntegrity.standardIdsOf({ standard: cycle.standards.join(', ') }), schemes: window.AuditPlanIntegrity.schemesOf({ standard: cycle.standards.join(', ') }) }).certificateScope
         : ([...new Set(cycle.cycles.map(c => c.scope).filter(Boolean))][0] || '');
     let n;
     if (window.AuditPlanIntegrity) {
