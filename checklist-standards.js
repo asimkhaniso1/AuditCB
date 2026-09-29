@@ -369,6 +369,115 @@
         ['10.2', 'Continual improvement', SHARED.IMP_CONTINUAL, true]
     ];
 
+    // ── ISO 9001:2015 — Quality Management System ─────────────────────
+    // Improvement is 10.1 General / 10.2 Nonconformity and corrective action /
+    // 10.3 Continual improvement — numbered differently from 27001 and from
+    // 22301/20000-1 again, which is why consolidation keys on `shared`.
+    // 8.3 Design and development may be excluded under 4.3 where it does not
+    // apply, so it is not mandatory.
+    const ISO9001_CLAUSES = [
+        ['4.1', 'Understanding the organization and its context', SHARED.CONTEXT_ISSUES, true],
+        ['4.2', 'Understanding the needs and expectations of interested parties', SHARED.CONTEXT_PARTIES, true],
+        ['4.3', 'Determining the scope of the quality management system', SHARED.CONTEXT_SCOPE, true],
+        ['4.4', 'Quality management system and its processes', SHARED.CONTEXT_SYSTEM, true],
+        ['5.1', 'Leadership and commitment', SHARED.LEAD_COMMITMENT, true],
+        ['5.1.2', 'Customer focus', null, true],
+        ['5.2', 'Policy', SHARED.LEAD_POLICY, true],
+        ['5.3', 'Organizational roles, responsibilities and authorities', SHARED.LEAD_ROLES, true],
+        ['6.1', 'Actions to address risks and opportunities', SHARED.PLAN_RISK_ACTIONS, true],
+        ['6.2', 'Quality objectives and planning to achieve them', SHARED.PLAN_OBJECTIVES, true],
+        ['6.3', 'Planning of changes', SHARED.PLAN_CHANGES, true],
+        ['7.1', 'Resources', SHARED.SUP_RESOURCES, true],
+        ['7.1.5', 'Monitoring and measuring resources', null, true],
+        ['7.1.6', 'Organizational knowledge', null, true],
+        ['7.2', 'Competence', SHARED.SUP_COMPETENCE, true],
+        ['7.3', 'Awareness', SHARED.SUP_AWARENESS, true],
+        ['7.4', 'Communication', SHARED.SUP_COMMUNICATION, true],
+        ['7.5', 'Documented information', SHARED.SUP_DOCINFO, true],
+        ['8.1', 'Operational planning and control', SHARED.OP_PLANNING, true],
+        ['8.2', 'Requirements for products and services', null, true],
+        ['8.3', 'Design and development of products and services', null, false],
+        ['8.4', 'Control of externally provided processes, products and services', null, true],
+        ['8.5', 'Production and service provision', null, true],
+        ['8.6', 'Release of products and services', null, true],
+        ['8.7', 'Control of nonconforming outputs', null, true],
+        ['9.1', 'Monitoring, measurement, analysis and evaluation', SHARED.PERF_MONITORING, true],
+        ['9.1.2', 'Customer satisfaction', null, true],
+        ['9.2', 'Internal audit', SHARED.PERF_INTERNAL_AUDIT, true],
+        ['9.3', 'Management review', SHARED.PERF_MGMT_REVIEW, true],
+        ['10.1', 'Improvement — general', null, true],
+        ['10.2', 'Nonconformity and corrective action', SHARED.IMP_NONCONFORMITY, true],
+        ['10.3', 'Continual improvement', SHARED.IMP_CONTINUAL, true]
+    ];
+
+    // ── ISO 14001:2015 — Environmental Management System ──────────────
+    // No "planning of changes" clause in this edition.
+    const ISO14001_CLAUSES = [
+        ['4.1', 'Understanding the organization and its context', SHARED.CONTEXT_ISSUES, true],
+        ['4.2', 'Understanding the needs and expectations of interested parties', SHARED.CONTEXT_PARTIES, true],
+        ['4.3', 'Determining the scope of the environmental management system', SHARED.CONTEXT_SCOPE, true],
+        ['4.4', 'Environmental management system', SHARED.CONTEXT_SYSTEM, true],
+        ['5.1', 'Leadership and commitment', SHARED.LEAD_COMMITMENT, true],
+        ['5.2', 'Environmental policy', SHARED.LEAD_POLICY, true],
+        ['5.3', 'Organizational roles, responsibilities and authorities', SHARED.LEAD_ROLES, true],
+        ['6.1.1', 'Actions to address risks and opportunities — general', SHARED.PLAN_RISK_ACTIONS, true],
+        ['6.1.2', 'Environmental aspects', null, true],
+        ['6.1.3', 'Compliance obligations', null, true],
+        ['6.1.4', 'Planning action', null, true],
+        ['6.2', 'Environmental objectives and planning to achieve them', SHARED.PLAN_OBJECTIVES, true],
+        ['7.1', 'Resources', SHARED.SUP_RESOURCES, true],
+        ['7.2', 'Competence', SHARED.SUP_COMPETENCE, true],
+        ['7.3', 'Awareness', SHARED.SUP_AWARENESS, true],
+        ['7.4', 'Communication', SHARED.SUP_COMMUNICATION, true],
+        ['7.5', 'Documented information', SHARED.SUP_DOCINFO, true],
+        ['8.1', 'Operational planning and control', SHARED.OP_PLANNING, true],
+        ['8.2', 'Emergency preparedness and response', null, true],
+        ['9.1', 'Monitoring, measurement, analysis and evaluation', SHARED.PERF_MONITORING, true],
+        ['9.1.2', 'Evaluation of compliance', null, true],
+        ['9.2', 'Internal audit', SHARED.PERF_INTERNAL_AUDIT, true],
+        ['9.3', 'Management review', SHARED.PERF_MGMT_REVIEW, true],
+        ['10.1', 'Improvement — general', null, true],
+        ['10.2', 'Nonconformity and corrective action', SHARED.IMP_NONCONFORMITY, true],
+        ['10.3', 'Continual improvement', SHARED.IMP_CONTINUAL, true]
+    ];
+
+    // ── ISO 45001:2018 — Occupational Health and Safety Management System ──
+    // No clause-6 "planning of changes": change is managed operationally in
+    // 8.1.3, a different requirement, so it is not consolidated with 6.3.
+    // 10.2 covers incidents as well as nonconformities.
+    const ISO45001_CLAUSES = [
+        ['4.1', 'Understanding the organization and its context', SHARED.CONTEXT_ISSUES, true],
+        ['4.2', 'Understanding the needs and expectations of workers and other interested parties', SHARED.CONTEXT_PARTIES, true],
+        ['4.3', 'Determining the scope of the OH&S management system', SHARED.CONTEXT_SCOPE, true],
+        ['4.4', 'OH&S management system', SHARED.CONTEXT_SYSTEM, true],
+        ['5.1', 'Leadership and commitment', SHARED.LEAD_COMMITMENT, true],
+        ['5.2', 'OH&S policy', SHARED.LEAD_POLICY, true],
+        ['5.3', 'Organizational roles, responsibilities and authorities', SHARED.LEAD_ROLES, true],
+        ['5.4', 'Consultation and participation of workers', null, true],
+        ['6.1.1', 'Actions to address risks and opportunities — general', SHARED.PLAN_RISK_ACTIONS, true],
+        ['6.1.2', 'Hazard identification and assessment of risks and opportunities', null, true],
+        ['6.1.3', 'Determination of legal requirements and other requirements', null, true],
+        ['6.1.4', 'Planning action', null, true],
+        ['6.2', 'OH&S objectives and planning to achieve them', SHARED.PLAN_OBJECTIVES, true],
+        ['7.1', 'Resources', SHARED.SUP_RESOURCES, true],
+        ['7.2', 'Competence', SHARED.SUP_COMPETENCE, true],
+        ['7.3', 'Awareness', SHARED.SUP_AWARENESS, true],
+        ['7.4', 'Communication', SHARED.SUP_COMMUNICATION, true],
+        ['7.5', 'Documented information', SHARED.SUP_DOCINFO, true],
+        ['8.1', 'Operational planning and control', SHARED.OP_PLANNING, true],
+        ['8.1.2', 'Eliminating hazards and reducing OH&S risks', null, true],
+        ['8.1.3', 'Management of change', null, true],
+        ['8.1.4', 'Procurement', null, true],
+        ['8.2', 'Emergency preparedness and response', null, true],
+        ['9.1', 'Monitoring, measurement, analysis and performance evaluation', SHARED.PERF_MONITORING, true],
+        ['9.1.2', 'Evaluation of compliance', null, true],
+        ['9.2', 'Internal audit', SHARED.PERF_INTERNAL_AUDIT, true],
+        ['9.3', 'Management review', SHARED.PERF_MGMT_REVIEW, true],
+        ['10.1', 'Improvement — general', null, true],
+        ['10.2', 'Incident, nonconformity and corrective action', SHARED.IMP_NONCONFORMITY, true],
+        ['10.3', 'Continual improvement', SHARED.IMP_CONTINUAL, true]
+    ];
+
     // ── Process-based operational themes ──────────────────────────────
     // These are what an auditor actually walks: the operation, not the
     // paperwork. Each theme names the clause(s)/control(s) of ITS OWN standard
@@ -442,6 +551,53 @@
             'Verify service costs are budgeted, tracked against actuals and accounted for at the level defined by the organisation.']
     ];
 
+    const ISO9001_THEMES = [
+        ['qms-customer', 'Customer requirements, communication and customer focus', ['8.2', '5.1.2'],
+            'Sample orders or contracts since the previous audit: verify requirements were determined and reviewed before commitment, changes to requirements were controlled, and customer communication — including complaints and customer property — follows the defined route.'],
+        ['qms-design', 'Design and development, where applicable', ['8.3'],
+            'Where design and development is in scope, trace one project through planning, inputs, controls (reviews, verification, validation), outputs and changes. Where it is excluded, confirm the exclusion is justified in the scope and does not affect conformity of products and services.'],
+        ['qms-supplier', 'Control of externally provided processes, products and services', ['8.4'],
+            'Sample external providers: verify the criteria for evaluation, selection, performance monitoring and re-evaluation are applied, that the information given to providers states the requirements, and that incoming products and outsourced processes are verified.'],
+        ['qms-production', 'Production and service provision; monitoring and measuring resources', ['8.5', '7.1.5'],
+            'Observe production or service delivery: verify controlled conditions, identification and traceability, preservation, post-delivery activities and control of changes. Confirm measuring equipment used for product conformity is calibrated or verified and fit for purpose.'],
+        ['qms-release', 'Release of products and services', ['8.6'],
+            'Verify release happens only after planned arrangements confirm requirements are met, and that the person authorising release is identified in the records.'],
+        ['qms-nonconforming', 'Control of nonconforming outputs', ['8.7'],
+            'Sample nonconforming outputs: verify they were identified and controlled to prevent unintended use or delivery, the action taken (correction, segregation, concession) is recorded, and the authority for the decision is identified.'],
+        ['qms-satisfaction', 'Customer satisfaction and analysis of data', ['9.1.2'],
+            'Verify customer perceptions are monitored by a defined method, the results are analysed alongside other quality data, and the analysis drives action.']
+    ];
+
+    const ISO14001_THEMES = [
+        ['ems-aspects', 'Environmental aspects and impacts', ['6.1.2'],
+            'Walk the aspects register against what you see on site: confirm aspects and impacts are determined for activities, products and services with a life-cycle perspective, significance criteria are applied consistently, and significant aspects drive objectives and operational control.'],
+        ['ems-compliance', 'Compliance obligations and evaluation of compliance', ['6.1.3', '9.1.2'],
+            'Verify compliance obligations (permits, consents, legal and other requirements) are identified and current, compliance is evaluated at the planned frequency, and any non-compliance is acted on. Sample one permit condition through to evidence of compliance.'],
+        ['ems-control', 'Operational control and life-cycle perspective', ['8.1'],
+            'Verify operational controls for significant aspects are in place and followed — waste, emissions, effluent, chemicals, energy — including control of outsourced processes and environmental requirements communicated to suppliers and contractors.'],
+        ['ems-emergency', 'Emergency preparedness and response', ['8.2'],
+            'Verify potential environmental emergencies (spills, fire, releases) are identified, response is planned and resourced, and the response is tested periodically where practicable, with the results reviewed.'],
+        ['ems-performance', 'Environmental performance monitoring', ['9.1'],
+            'Verify what environmental performance is monitored and measured, that monitoring equipment is calibrated or verified, and that the results are evaluated against objectives and compliance obligations.']
+    ];
+
+    const ISO45001_THEMES = [
+        ['ohs-hazards', 'Hazard identification and OH&S risk assessment', ['6.1.2', '8.1.2'],
+            'Walk the workplace against the hazard register: confirm hazards are identified for routine and non-routine activities, risks are assessed by a defined method, and controls follow the hierarchy of controls — elimination first, PPE last.'],
+        ['ohs-participation', 'Consultation and participation of workers', ['5.4'],
+            'Interview non-managerial workers: verify they are consulted on and participate in hazard identification, risk assessment, incident investigation and determining controls, and that barriers to participation are removed.'],
+        ['ohs-legal', 'Legal and other requirements and evaluation of compliance', ['6.1.3', '9.1.2'],
+            'Verify applicable OH&S legal and other requirements are identified and current, compliance is evaluated at planned intervals, and any shortfall is acted on.'],
+        ['ohs-change', 'Management of change', ['8.1.3'],
+            'Sample changes since the previous audit — new equipment, processes, work locations, organisation or legal requirements: verify OH&S risks were assessed before the change was made.'],
+        ['ohs-procurement', 'Procurement, contractors and outsourcing', ['8.1.4'],
+            'Verify OH&S requirements are applied when purchasing goods and services, contractors are selected and coordinated against OH&S criteria, and outsourced functions are controlled.'],
+        ['ohs-emergency', 'Emergency preparedness and response', ['8.2'],
+            'Verify emergency situations are identified, response plans exist and are communicated, drills are performed and evaluated, and first aid and emergency equipment are available.'],
+        ['ohs-incident', 'Incident investigation and corrective action', ['10.2'],
+            'Sample incidents and near misses since the previous audit: verify timely reporting, investigation with worker participation, root cause determined, and corrective actions implemented and reviewed for effectiveness.']
+    ];
+
     // ── Recertification / surveillance priorities ─────────────────────
     // ISO/IEC 17021-1 puts these at the front of a recertification: they are
     // where the evidence of a working system lives. `shared` names the concept
@@ -480,7 +636,7 @@
         ['incidents', 'Incidents, disruptions and complaints over the cycle',
             null,
             'Review incidents, disruptions, security events and complaints across the certification cycle. Verify handling against the organisation’s own procedure, trend analysis, and whether the resulting actions reduced recurrence.',
-            { iso27001: ['A.5.26', 'A.5.27'], iso22301: ['8.4'], iso20000: ['8.6.1', '8.6.3'] }],
+            { iso27001: ['A.5.26', 'A.5.27'], iso22301: ['8.4'], iso20000: ['8.6.1', '8.6.3'], iso9001: ['8.2'], iso14001: ['8.2'], iso45001: ['10.2'] }],
         ['internal-audit', 'Internal audit programme across the cycle',
             SHARED.PERF_INTERNAL_AUDIT,
             'Verify the internal audit programme covered every requirement of every certified standard, every site and every process over the certification cycle, that auditors were competent and impartial, and that findings were closed. Sample two internal audit reports for depth of evidence.',
@@ -565,6 +721,46 @@
             themes: expandThemes('iso20000', ISO20000_THEMES),
             hasSoA: false,
             orgRefs: { scope: '4.3', site: '4.3', process: '8.1', outsourced: '8.3.4' }
+        },
+        {
+            id: 'iso9001',
+            label: 'ISO 9001:2015',
+            systemLabel: 'QMS',
+            systemNoun: 'quality management system',
+            match: /\b9001\b/,
+            family: 'annex-sl',
+            clauses: expandClauses('iso9001', ISO9001_CLAUSES),
+            controls: [],
+            themes: expandThemes('iso9001', ISO9001_THEMES),
+            hasSoA: false,
+            orgRefs: { scope: '4.3', site: '4.3', process: '4.4', outsourced: '8.4' }
+        },
+        {
+            id: 'iso14001',
+            label: 'ISO 14001:2015',
+            systemLabel: 'EMS',
+            systemNoun: 'environmental management system',
+            match: /\b14001\b/,
+            family: 'annex-sl',
+            clauses: expandClauses('iso14001', ISO14001_CLAUSES),
+            controls: [],
+            themes: expandThemes('iso14001', ISO14001_THEMES),
+            hasSoA: false,
+            // Outsourced processes are controlled within 8.1 in this edition.
+            orgRefs: { scope: '4.3', site: '4.3', process: '4.4', outsourced: '8.1' }
+        },
+        {
+            id: 'iso45001',
+            label: 'ISO 45001:2018',
+            systemLabel: 'OH&SMS',
+            systemNoun: 'occupational health and safety management system',
+            match: /\b45001\b/,
+            family: 'annex-sl',
+            clauses: expandClauses('iso45001', ISO45001_CLAUSES),
+            controls: [],
+            themes: expandThemes('iso45001', ISO45001_THEMES),
+            hasSoA: false,
+            orgRefs: { scope: '4.3', site: '4.3', process: '4.4', outsourced: '8.1.4' }
         }
     ];
 

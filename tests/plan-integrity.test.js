@@ -246,11 +246,11 @@ describe('clause and control references come from the controlled registry', () =
             });
         });
         it('plans a standard the registry does not hold by topic, never inventing a clause for it', () => {
-            const built = IPI.buildAgenda({ plan: { date: '2026-11-03', endDate: '2026-11-05' }, standards: ['iso9001'], finalDays: 3, assigned: base.asm.team.assigned, client: base.client, findings: [] });
+            const built = IPI.buildAgenda({ plan: { date: '2026-11-03', endDate: '2026-11-05' }, standards: ['iso50001'], finalDays: 3, assigned: base.asm.team.assigned, client: base.client, findings: [] });
             expect(built.errors).toEqual([]);
             expect(built.rows.length).toBeGreaterThan(0);
             expect(built.rows.every(r => !(r.standards || []).length)).toBe(true);
-            expect(built.warnings.join(' ')).toMatch(/No clause registry is held for iso9001/);
+            expect(built.warnings.join(' ')).toMatch(/No clause registry is held for iso50001/);
         });
     });
 

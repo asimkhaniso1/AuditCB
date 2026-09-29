@@ -64,7 +64,7 @@
     // ═════════════════════════════════════════════════════════════════
     // Short forms are part of the controlled registry: a fixed key printed on
     // the agenda, never free text.
-    const STD_SHORT = { iso27001: '27001', iso22301: '22301', iso20000: '20000-1' };
+    const STD_SHORT = { iso27001: '27001', iso22301: '22301', iso20000: '20000-1', iso9001: '9001', iso14001: '14001', iso45001: '45001' };
 
     function stdLabel(stdId) { const s = CS().byId(stdId); return s ? s.label : ''; }
     function shortLabel(stdId) { return STD_SHORT[stdId] || stdId; }
@@ -155,7 +155,7 @@
     function scanFreeText(text, scopeIds) {
         const s = str(text);
         const problems = [];
-        const ids = arr(scopeIds).length ? scopeIds : ['iso27001', 'iso22301', 'iso20000'];
+        const ids = arr(scopeIds).length ? scopeIds : CS().all().map(function (x) { return x.id; });
         // "<ref> <Title...> (<standard hint>)" — ref at the start of the text.
         const m = s.match(/^\s*(A\.\d+\.\d+|\d{1,2}(?:\.\d{1,2}){0,2})\s+([^()\n]+?)\s*(?:\(([^)]*)\))?\s*$/);
         if (!m) return problems;
@@ -164,6 +164,9 @@
         if (/27001/.test(hint)) stdIds = ['iso27001'];
         else if (/22301/.test(hint)) stdIds = ['iso22301'];
         else if (/20000/.test(hint)) stdIds = ['iso20000'];
+        else if (/9001/.test(hint)) stdIds = ['iso9001'];
+        else if (/14001/.test(hint)) stdIds = ['iso14001'];
+        else if (/45001/.test(hint)) stdIds = ['iso45001'];
         const known = stdIds.filter(function (id) { return CS().isKnownRef(id, ref); });
         if (!known.length) {
             problems.push({ text: s, ref: ref, stdId: stdIds[0], code: 'INVALID_CLAUSE',
@@ -344,7 +347,9 @@
     };
 
     const SM = { top: 'Top management', risk: 'Risk owner', support: 'Support functions', isms: 'Information security management',
-        bcm: 'Business continuity management', sms: 'Service management', ops: 'Service operations', ci: 'Continual improvement' };
+        bcm: 'Business continuity management', sms: 'Service management', ops: 'Service operations', ci: 'Continual improvement',
+        sales: 'Sales / Purchasing', production: 'Production / Quality control', quality: 'Quality management',
+        env: 'Environmental management', ohs: 'OH&S management', workers: 'Workers and worker representatives' };
 
     // hours: productive auditor time. Sum = 24 h = 3 auditor-days at 8 h/day
     // for a three-standard recertification; the builder rescales for other
@@ -357,11 +362,11 @@
         { id: 'cycle-review', title: 'Recertification review: changes since the previous audit, continued relevance of the scope, and objectives and performance over the certification cycle', hours: 1.0, auditee: SM.top,
           shared: [S.SCOPE, S.CHANGES, S.MON], priorities: ['changes', 'scope', 'objectives-performance'] },
         { id: 'context-leadership', title: 'Context and interested parties; leadership, policy, roles and responsibilities', hours: 1.5, auditee: SM.top,
-          shared: [S.ISSUES, S.PARTIES, S.SYSTEM, S.COMMIT, S.POLICY, S.ROLES], priorities: ['context', 'scope-and-interaction', 'leadership'] },
+          shared: [S.ISSUES, S.PARTIES, S.SYSTEM, S.COMMIT, S.POLICY, S.ROLES], std: { iso9001: ['5.1.2'] }, priorities: ['context', 'scope-and-interaction', 'leadership'] },
         { id: 'planning', title: 'Risks, opportunities and objectives', hours: 1.0, auditee: SM.risk,
           shared: [S.RISK, S.OBJ], priorities: ['risks-objectives'] },
         { id: 'support', title: 'Resources, competence, awareness, communication and documented information', hours: 1.0, auditee: SM.support,
-          shared: [S.RES, S.COMP, S.AWARE, S.COMM, S.DOC], std: { iso20000: ['7.6'] }, priorities: ['support'] },
+          shared: [S.RES, S.COMP, S.AWARE, S.COMM, S.DOC], std: { iso20000: ['7.6'], iso9001: ['7.1.6'] }, priorities: ['support'] },
         { id: 'isms-risk-soa', title: 'Information security risk assessment and treatment; Statement of Applicability; risk-based Annex A sampling', hours: 1.25, auditee: SM.isms,
           std: { iso27001: ['6.1.2', '6.1.3', '8.2', '8.3'], iso20000: ['8.7.3'] }, annexA: true, priorities: ['isms-risk', 'soa', 'annex-a'] },
         { id: 'access-supplier-cloud', title: 'Access lifecycle; supplier and cloud-service security', hours: 1.0, auditee: SM.isms,
@@ -394,10 +399,30 @@
           std: { iso20000: ['8.5.1', '8.5.3', '8.5.2', '8.2.5', '8.2.6'] }, processes: ['Change Management', 'Configuration and Change Management'], priorities: ['change', 'release', 'config-asset'] },
         { id: 'sms-reporting-budget', title: 'Service reporting; performance monitoring and reporting; service budgeting and accounting, where applicable', hours: 1.0, auditee: SM.sms,
           std: { iso20000: ['9.4', '8.4.1'] }, processes: ['Performance Monitoring & Reporting'], priorities: ['service-reporting', 'budgeting'] },
+        // ── ISO 9001 ──
+        { id: 'qms-customer-design-supply', title: 'Customer requirements; design and development, where applicable; control of externally provided processes, products and services', hours: 1.25, auditee: SM.sales,
+          std: { iso9001: ['8.2', '8.3', '8.4'] }, priorities: ['customer-requirements', 'design', 'external-providers'] },
+        { id: 'qms-production-release', title: 'Production and service provision; monitoring and measuring resources; release of products and services; control of nonconforming outputs', hours: 1.5, auditee: SM.production,
+          std: { iso9001: ['8.5', '7.1.5', '8.6', '8.7'] }, priorities: ['production', 'calibration', 'release', 'nonconforming-outputs'] },
+        { id: 'qms-satisfaction', title: 'Customer satisfaction; analysis and evaluation of quality data', hours: 0.5, auditee: SM.quality,
+          std: { iso9001: ['9.1.2'] }, priorities: ['customer-satisfaction'] },
+        // ── ISO 14001 ──
+        { id: 'ems-aspects-compliance', title: 'Environmental aspects; compliance obligations; planning action; evaluation of compliance', hours: 1.25, auditee: SM.env,
+          std: { iso14001: ['6.1.2', '6.1.3', '6.1.4', '9.1.2'] }, priorities: ['aspects', 'compliance-obligations'] },
+        // ── ISO 45001 ──
+        { id: 'ohs-hazards-legal', title: 'Hazard identification and assessment of OH&S risks and opportunities; legal and other requirements; planning action; evaluation of compliance', hours: 1.25, auditee: SM.ohs,
+          std: { iso45001: ['6.1.2', '6.1.3', '6.1.4', '9.1.2'] }, priorities: ['hazards', 'legal-requirements'] },
+        { id: 'ohs-participation', title: 'Consultation and participation of workers', hours: 0.5, auditee: SM.workers,
+          std: { iso45001: ['5.4'] }, priorities: ['worker-participation'] },
+        { id: 'ohs-operations', title: 'Eliminating hazards and reducing OH&S risks; management of change; procurement, contractors and outsourcing', hours: 1.25, auditee: SM.ohs,
+          std: { iso45001: ['8.1.2', '8.1.3', '8.1.4'] }, priorities: ['hierarchy-of-controls', 'management-of-change', 'contractors'] },
+        // ISO 14001 and ISO 45001 share the requirement; one session covers both.
+        { id: 'emergency', title: 'Emergency preparedness and response', hours: 0.75, auditee: SM.ohs,
+          std: { iso14001: ['8.2'], iso45001: ['8.2'] }, priorities: ['emergency'] },
         { id: 'internal-audit', title: 'Internal audit programme', hours: 0.75, auditee: SM.risk, shared: [S.IA], priorities: ['internal-audit'] },
         { id: 'management-review', title: 'Management review', hours: 0.75, auditee: SM.top, shared: [S.MR], priorities: ['management-review'] },
         { id: 'improvement', title: 'Nonconformity and corrective action, including effectiveness of corrective action; continual improvement; overall effectiveness of the integrated management system', hours: 1.0, auditee: SM.ci,
-          shared: [S.NC, S.CI], processes: ['Continual Improvement and Process Optimization'], priorities: ['nc-effectiveness', 'continual-improvement', 'ims-effectiveness'] },
+          shared: [S.NC, S.CI], std: { iso9001: ['10.1'], iso14001: ['10.1'], iso45001: ['10.1'] }, processes: ['Continual Improvement and Process Optimization'], priorities: ['nc-effectiveness', 'continual-improvement', 'ims-effectiveness'] },
         { id: 'consolidation', kind: 'consolidation', title: 'Auditor consolidation: review of objective evidence, finalization of findings, preparation of audit conclusions and closing-meeting preparation', hours: 0.75, fixed: 'end-1', auditee: 'Audit team only — no auditee interviews',
           subject: 'Audit team only; no auditee interviews.' },
         { id: 'closing', kind: 'closing', title: 'Closing meeting', hours: 0.75, fixed: 'end', auditee: SM.top,
@@ -429,7 +454,16 @@
         ['ISO/IEC 20000-1: supplier management', ['sms-supplier-cloud'], 'iso20000'],
         ['ISO/IEC 20000-1: demand, capacity, availability and service continuity', ['sms-continuity-capacity'], 'iso20000'],
         ['ISO/IEC 20000-1: change, release and deployment; configuration and asset management', ['sms-change-release-config'], 'iso20000'],
-        ['ISO/IEC 20000-1: service reporting and budgeting', ['sms-reporting-budget'], 'iso20000']
+        ['ISO/IEC 20000-1: service reporting and budgeting', ['sms-reporting-budget'], 'iso20000'],
+        ['ISO 9001: customer requirements, design and development, external providers', ['qms-customer-design-supply'], 'iso9001'],
+        ['ISO 9001: production and service provision, release, nonconforming outputs', ['qms-production-release'], 'iso9001'],
+        ['ISO 9001: customer satisfaction', ['qms-satisfaction'], 'iso9001'],
+        ['ISO 14001: environmental aspects, compliance obligations and evaluation of compliance', ['ems-aspects-compliance'], 'iso14001'],
+        ['ISO 14001: emergency preparedness and response', ['emergency'], 'iso14001'],
+        ['ISO 45001: hazard identification, legal requirements and evaluation of compliance', ['ohs-hazards-legal'], 'iso45001'],
+        ['ISO 45001: consultation and participation of workers', ['ohs-participation'], 'iso45001'],
+        ['ISO 45001: hierarchy of controls, management of change, contractors', ['ohs-operations'], 'iso45001'],
+        ['ISO 45001: emergency preparedness and response', ['emergency'], 'iso45001']
     ];
 
     // Standards and schemes the clause registry does not hold (ISO 9001,
@@ -438,9 +472,7 @@
     // management-system blocks (the ones built from `shared` concepts) are
     // kept for them, uncited.
     const SCHEME_TOPICS = [
-        [/\b9001\b/, 'customer requirements and communication; design and development, where applicable; control of externally provided processes, products and services; production and service provision; release of products and services; control of nonconforming outputs; customer satisfaction', 'Operations / Quality'],
-        [/\b14001\b/, 'environmental aspects and impacts; compliance obligations and evaluation of compliance; operational control and life-cycle perspective; emergency preparedness and response; environmental performance monitoring', 'Operations / Environment'],
-        [/\b45001\b/, 'hazard identification and OH&S risk assessment; consultation and participation of workers; legal requirements and evaluation of compliance; operational control and the hierarchy of controls; management of change, contractors and procurement; emergency preparedness; incident investigation', 'Operations / OH&S'],
+        // ISO 9001/14001/45001 are in the clause registry and get cited sessions.
         [/\b22000\b/, 'prerequisite programmes; hazard analysis and the hazard control plan; traceability; handling of potentially unsafe products, withdrawal and recall; verification activities', 'Food safety team'],
         [/^c?gmp$/i, 'premises and equipment; personnel and hygiene; production and process controls; raw material and packaging control; quality control, batch records and release; complaints and recalls', 'Production / Quality'],
         [/^halal$/i, 'Halal assurance system and Halal committee; raw materials and supplier Halal status; segregation, traceability and prevention of contamination; production, cleaning and sanitation; labelling and use of the Halal mark', 'Production / Halal committee'],
@@ -512,12 +544,15 @@
         // A universal block (built from shared management-system concepts) also
         // serves the schemes in scope; its title stays the same, uncited for them.
         const universal = function (b) { return arr(b.shared).length > 0; };
+        const clientProcesses = arr(c.client && c.client.keyProcesses).map(function (p) { return norm(typeof p === 'string' ? p : p && p.name); }).filter(Boolean);
+        const hasProcess = function (name) { const n = norm(name); return clientProcesses.some(function (pn) { return pn.indexOf(n) === 0 || n.indexOf(pn) === 0; }); };
         let blocks = BLOCKS.map(function (b) {
             const standards = b.kind ? [] : resolveBlockRefs(b, scopeIds, annexRefs);
             const forSchemes = !b.kind && schemes.length && universal(b) ? schemes.slice() : [];
-            // The operations block's title names one client's processes; for a
-            // scheme-only scope it describes the sampling generically.
-            let title = !scopeIds.length && b.id === 'core-onboarding-design' ? 'Operational planning and control: sampling of the organisation’s core processes' : b.title;
+            // The operations block's title names specific processes; unless the
+            // client actually runs them it describes the sampling generically.
+            let title = b.id === 'core-onboarding-design' && (!scopeIds.length || !arr(b.processes).some(hasProcess))
+                ? 'Operational planning and control: sampling of the organisation’s core processes' : b.title;
             // The review opening every audit is a RECERTIFICATION review only on a
             // recertification; a surveillance plan used to carry that title too.
             if (b.id === 'cycle-review' && !/recert/i.test(str(c.plan && (c.plan.auditType || c.plan.type)))) {
@@ -538,18 +573,25 @@
         // 2. Scale the variable blocks to the approved duration, 15-minute steps.
         const fixed = blocks.filter(function (b) { return b.kind; });
         const variable = blocks.filter(function (b) { return !b.kind; });
+        // A short audit (half a day, or a day at a short working day) keeps
+        // the mandatory meetings but tightens them, and lets sessions drop to
+        // 15 minutes, rather than refusing to build at all.
+        if (total <= 4) fixed.forEach(function (b) { b.hours = b.fixed === 'start' ? 0.25 : 0.5; });
         const fixedHours = fixed.reduce(function (t, b) { return t + b.hours; }, 0);
         const baseVar = variable.reduce(function (t, b) { return t + b.hours; }, 0);
         const avail = total - fixedHours;
-        if (avail < 1) return { rows: [], sessions: [], traceability: null, findingMap: [], errors: errors.concat(['The approved duration is too short to hold the mandatory opening, consolidation and closing activities.']), warnings: warnings };
+        const minBlock = avail >= variable.length * 0.5 ? 0.5 : 0.25;
+        if (avail < variable.length * minBlock) {
+            return { rows: [], sessions: [], traceability: null, findingMap: [], errors: errors.concat(['The approved duration (' + total + ' h) is too short for this scope: it needs ' + variable.length + ' sessions of at least 15 minutes plus the opening, consolidation and closing meetings (' + (fixedHours + variable.length * 0.25) + ' h). Increase the duration, or split the standards into separate plans.']), warnings: warnings };
+        }
         const scale = avail / baseVar;
-        variable.forEach(function (b) { b.hours = Math.max(0.5, Math.round(b.hours * scale * 4) / 4); });
+        variable.forEach(function (b) { b.hours = Math.max(minBlock, Math.round(b.hours * scale * 4) / 4); });
         let drift = Math.round((avail - variable.reduce(function (t, b) { return t + b.hours; }, 0)) * 4) / 4;
         const order = variable.slice().sort(function (a, b) { return b.hours - a.hours; });
         for (let i = 0; drift !== 0 && i < 400; i++) {
             const b = order[i % order.length];
             const step = drift > 0 ? 0.25 : -0.25;
-            if (b.hours + step >= 0.5) { b.hours += step; drift = Math.round((drift - step) * 4) / 4; }
+            if (b.hours + step >= minBlock) { b.hours += step; drift = Math.round((drift - step) * 4) / 4; }
         }
         blocks = [fixed.find(function (b) { return b.fixed === 'start'; })]
             .concat(variable)
