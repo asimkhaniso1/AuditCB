@@ -17,11 +17,19 @@ function normalizeStandardFamily(standard) {
     return match ? match[1] : String(standard || '').toUpperCase().replace(/:\d{4}.*/, '').trim();
 }
 
+// Which of the client's certificates the plan being edited covers. Set from the
+// Standards picker (or restored from a saved plan); empty means all of them.
+function planCertificateSelection(client) {
+    const sel = window._planCertificateSelection;
+    return sel && client && sel.client === client.name && Array.isArray(sel.ids) && sel.ids.length ? sel.ids : null;
+}
+
 function getCertificationCycleContext(client, now = new Date()) {
     if (window.AuditPlanningDomain) {
         return window.AuditPlanningDomain.resolveCycleContext({
             client,
             now,
+            certificateIds: planCertificateSelection(client),
             settings: window.state?.cbSettings || window.state?.settings || {},
             allReports: window.state?.auditReports || [],
             allPlans: window.state?.auditPlans || [],
@@ -316,6 +324,7 @@ window.planAuditMethodChanged = function (el) {
 
 function renderCreateAuditPlanForm(preSelectedClientName = null) {
     window.editingPlanId = null; // Reset edit mode
+    window._planCertificateSelection = null; // a new plan starts from all certificates
 
     const html = `
         <div class="fade-in">
@@ -358,7 +367,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 </div>
                                 <div class="form-group" style="grid-column: 1 / -1; margin: 0;">
                                     <label>Standards & Current Editions <span style="color: var(--danger-color);">*</span></label>
-                                    <select class="form-control" id="plan-standard" multiple style="height: 100px; font-size: 0.9rem; background: #f1f5f9;" disabled>
+                                    <select class="form-control" id="plan-standard" multiple style="height: 100px; font-size: 0.9rem;" disabled>
                                         <option value="">-- Select Client First --</option>
                                     </select>
                                     <small id="standards-hint" style="color: var(--text-secondary); display: block; margin-top: 4px;">Pulled directly from the active certification-cycle record; confirmation is required, re-entry is not.</small>
@@ -809,19 +818,19 @@ function editAuditPlan(id) {
         if (document.getElementById('plan-duration-justification')) document.getElementById('plan-duration-justification').value = duration.justification || '';
         if (document.getElementById('plan-duration-basis')) document.getElementById('plan-duration-basis').value = duration.basis || '';
 
+        // Reopen with the certificates this plan was made for, not every
+        // certificate the client holds today.
+        const savedIds = plan.certificationCycle && Array.isArray(plan.certificationCycle.certificateIds) ? plan.certificationCycle.certificateIds.map(String) : [];
+        window._planCertificateSelection = savedIds.length ? { client: plan.client, ids: savedIds } : null;
+
         // Trigger client details load
         updateClientDetails(plan.client);
 
         // Pre-fill rest after delay
         setTimeout(() => {
-            // Restore standards
-            const currentStandards = (plan.standard || '').split(', ').map(s => s.trim());
-            const stdSelect = document.getElementById('plan-standard');
-            if (stdSelect) {
-                Array.from(stdSelect.options).forEach(opt => {
-                    opt.selected = currentStandards.includes(opt.value);
-                });
-            }
+            // Standards: the picker was built by updateClientDetails from the
+            // plan's saved certificate selection (options are certificate ids),
+            // so there is nothing to re-tick here by name.
 
             // Restore site selection
             if (plan.selectedSites && plan.selectedSites.length > 0) {
@@ -906,12 +915,24 @@ function updateClientDetails(clientName) {
         const stdSelect = document.getElementById('plan-standard');
         const stdHint = document.getElementById('standards-hint');
         const cyclePanel = document.getElementById('cycle-source-panel');
+        // A different client's certificate choice does not carry over.
+        if (window._planCertificateSelection && window._planCertificateSelection.client !== client.name) window._planCertificateSelection = null;
         const cycle = getCertificationCycleContext(client);
+        const esc = window.UTILS.escapeHtml;
         if (stdSelect) {
-            if (cycle.cycles.length > 0) {
-                stdSelect.disabled = true;
-                stdSelect.innerHTML = cycle.standards.map(std => `<option value="${std}" selected>${std}</option>`).join('');
-                if (stdHint) stdHint.textContent = 'Locked to the current certification-cycle record. Confirm below; do not re-enter.';
+            if ((cycle.available || []).length > 0) {
+                // The picker chooses which CERTIFICATES this plan covers (their
+                // standards and editions still come from the certificates, never
+                // re-entered). Certificates on different cycles need separate
+                // plans, and without a choice here that was impossible.
+                stdSelect.disabled = false;
+                stdSelect.innerHTML = cycle.available.map(a => `<option value="${esc(a.certificateId)}" ${a.selected ? 'selected' : ''}>${esc(a.standard)} — ${esc(a.auditType)}</option>`).join('');
+                stdSelect.onchange = () => {
+                    const ids = Array.from(stdSelect.selectedOptions).map(o => o.value);
+                    window._planCertificateSelection = { client: client.name, ids };
+                    updateClientDetails(client.name);
+                };
+                if (stdHint) stdHint.textContent = 'Choose the certificates this plan covers (Ctrl/Cmd to select several). Standards and editions come from the certificates.';
                 const typeInput = document.getElementById('plan-audit-type');
                 if (typeInput) typeInput.value = cycle.auditType;
             } else {
@@ -924,7 +945,9 @@ function updateClientDetails(clientName) {
             cyclePanel.style.display = 'block';
             cyclePanel.innerHTML = cycle.cycles.length ? `
                 <div style="font-weight:700;margin-bottom:.5rem;">Certification-cycle source of truth</div>
-                ${cycle.conflict ? `<div style="color:#b91c1c;margin-bottom:.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> ${cycle.conflict}</div>` : ''}
+                ${cycle.conflict ? `<div style="color:#b91c1c;margin-bottom:.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(cycle.conflict)}</div>` : ''}
+                <div style="font-size:.8rem;margin-bottom:.5rem;">${(cycle.available || []).map(a => `<div style="color:${a.selected ? '#1e293b' : '#94a3b8'};">${a.selected ? '<i class="fa-solid fa-check" style="color:#16a34a;margin-right:4px;"></i>' : '<i class="fa-regular fa-circle" style="margin-right:4px;"></i>'}<strong>${esc(a.standard)}</strong>${a.certificateNo ? ` (${esc(a.certificateNo)})` : ''} — ${esc(a.auditType)}, window ${esc(a.recommendedWindowStart || '-')} to ${esc(a.recommendedWindowEnd || '-')}</div>`).join('')}</div>
+                ${(cycle.undated || []).length ? `<div style="color:#b45309;font-size:.8rem;margin-bottom:.5rem;"><i class="fa-solid fa-circle-info"></i> Not plannable until its certificate dates are entered in Settings: ${esc(cycle.undated.join(', '))}</div>` : ''}
                 <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;font-size:.85rem;">
                     <div><strong>Current stage:</strong> ${cycle.stage || 'Unresolved'}</div>
                     <div><strong>Required audit type:</strong> ${cycle.auditType || 'Resolve cycle conflict'}</div>

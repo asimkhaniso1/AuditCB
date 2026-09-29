@@ -318,7 +318,18 @@
         const client = input.client || {};
         const now = date(input.now) || new Date();
         const cfg = policy(input.settings || {});
-        const active = safeArray(client.certificates).filter((cert) => cert.standard && !['withdrawn', 'expired'].includes(String(cert.status || '').toLowerCase()));
+        const live = safeArray(client.certificates).filter((cert) => cert.standard && !['withdrawn', 'expired'].includes(String(cert.status || '').toLowerCase()));
+        // A certificate with no dates has no cycle to plan against — it would
+        // project a window from nothing. It is named, not silently planned.
+        const hasDates = (cert) => !!date(cert.initialDate || cert.currentIssue || cert.issueDate);
+        const undated = live.filter((cert) => !hasDates(cert)).map((cert) => cert.standard);
+        const certKey = (cert, index) => String(cert.id || cert.certificateId || cert.certificateNo || `${client.id || 'client'}-${index}`);
+        // The plan covers the certificates the planner selected (all by
+        // default). Certificates on different cycles cannot share one plan, and
+        // without a selection there was no way to make the separate plans the
+        // conflict message asked for.
+        const selected = Array.isArray(input.certificateIds) && input.certificateIds.length ? new Set(input.certificateIds.map(String)) : null;
+        const active = live.filter((cert, index) => hasDates(cert) && (!selected || selected.has(certKey(cert, index))));
         const byScheme = new Map();
         active.forEach((cert, index) => {
             const key = standardFamily(cert.standard);
@@ -336,15 +347,33 @@
         const commonStart = cycles.map((cycle) => cycle.recommendedWindowStart).filter(Boolean).sort().at(-1) || '';
         const commonEnd = cycles.map((cycle) => cycle.recommendedWindowEnd).filter(Boolean).sort()[0] || '';
         const incompatible = auditTypes.length > 1 || (commonStart && commonEnd && commonStart > commonEnd);
+        // Every dated live certificate with the audit it owes, so the planner
+        // can choose which ones this plan covers.
+        const available = live.map((cert, index) => ({ cert, index })).filter(({ cert }) => hasDates(cert)).map(({ cert, index }) => {
+            const record = resolveCertificateCycle({
+                client, certificate: cert, index, now, policy: cfg, cycleStateResolver: input.cycleStateResolver,
+                allReports: input.allReports || [], allPlans: input.allPlans || []
+            });
+            return {
+                certificateId: record.certificateId, standard: cert.standard, certificateNo: cert.certificateNo || '',
+                auditType: record.auditType, recommendedWindowStart: record.recommendedWindowStart, recommendedWindowEnd: record.recommendedWindowEnd,
+                selected: !selected || selected.has(certKey(cert, index))
+            };
+        });
+        const describe = (cycle) => `${cycle.standard} — ${cycle.auditType}${cycle.recommendedWindowStart ? `, window ${cycle.recommendedWindowStart} to ${cycle.recommendedWindowEnd}` : ''}`;
+        const conflict = incompatible
+            ? `These certificates cannot share one plan: ${cycles.map(describe).join('; ')}. Create separate plans — untick the ones that belong in another plan — or record an authorized lifecycle override.`
+            : '';
         return {
             valid: cycles.length > 0 && !incompatible,
+            available, undated,
             cycles, certificateIds: cycles.map((cycle) => cycle.certificateId),
             standards: cycles.map((cycle) => cycle.standard), auditType: auditTypes.length === 1 ? auditTypes[0] : '',
             stage: [...new Set(cycles.map((cycle) => cycle.stage))].join(' / '),
             recommendedWindowStart: commonStart, recommendedWindowEnd: commonEnd,
             certificateExpiry: cycles.map((cycle) => cycle.expiryDate).filter(Boolean).sort()[0] || '',
             closureBufferDays: cfg.ncClosureBufferDays, policy: cfg,
-            conflict: incompatible ? 'Selected certification cycles do not have a compatible stage and planning-window intersection; create separate plans or record an authorized lifecycle override.' : ''
+            conflict
         };
     }
 
