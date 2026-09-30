@@ -553,47 +553,108 @@ window.uploadKnowledgeDoc = function (type) {
     window.openModal();
 };
 // --- KB Analysis Mode Picker ---
-window.showAnalysisModeModal = function (docId, isReanalyze = false) {
+// One screen for every way a standard is turned into questions: analysing it
+// in the Knowledge Base, re-analysing it, and creating an audit checklist
+// (from the Checklists page or from a standard's analysis view). `purpose` is
+// 'analyze' | 'reanalyze' | 'checklist'; the old boolean isReanalyze is still
+// accepted. For a checklist the standard is picked here when no docId is
+// given, and opts.clientId preselects the client.
+const _ANALYSIS_TYPE_HINTS = {
+    initial: 'Full scope audit — covers all clauses comprehensively',
+    surveillance: 'Focused audit — fewer questions on continued conformity, changes, and correction effectiveness',
+    recertification: 'Full scope audit over the whole cycle — covers all clauses comprehensively'
+};
+
+function _analysisPurpose(purpose) {
+    if (purpose === true || purpose === 'true' || purpose === 'reanalyze') return 'reanalyze';
+    if (purpose === 'checklist') return 'checklist';
+    return 'analyze';
+}
+
+window.showAnalysisModeModal = function (docId, purpose, opts) {
     const modalContent = document.getElementById('modal-body');
     if (!modalContent) return;
+    const esc = window.UTILS.escapeHtml;
+    const mode = _analysisPurpose(purpose);
+    const options = opts || {};
+    const presetClient = options.clientId != null ? String(options.clientId) : '';
 
     // Build client options for context selector — all clients, sorted by name
     const clients = (window.state.clients || []).slice().sort((a, b) =>
         (a.name || '').localeCompare(b.name || '')
     );
     const clientOptions = clients.map(c =>
-        `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)}${c.industry ? ' (' + window.UTILS.escapeHtml(c.industry) + ')' : ''}</option>`
+        `<option value="${esc(c.id)}" ${String(c.id) === presetClient ? 'selected' : ''}>${esc(c.name)}${c.industry ? ' (' + esc(c.industry) + ')' : ''}</option>`
     ).join('');
+
+    // Standard picker — only when a checklist is being created without a
+    // standard already chosen (the Checklists page).
+    const standards = ((window.state.knowledgeBase || {}).standards || []).slice()
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    const pickStandard = mode === 'checklist' && !docId;
+    if (pickStandard && !standards.length) {
+        modalContent.innerHTML = `
+            <div style="text-align:center;padding:1rem 0.5rem;">
+                <div style="font-size:1.5rem;margin-bottom:0.5rem;">📚</div>
+                <p style="margin:0 0 1rem;color:#475569;">No standards are in the Knowledge Base yet. Upload the standard there first, or build the checklist by hand.</p>
+                <button class="btn btn-secondary" data-action="_buildChecklistManually">Build manually</button>
+            </div>`;
+        document.getElementById('modal-title').textContent = 'New Checklist';
+        const saveBtn0 = document.getElementById('modal-save');
+        if (saveBtn0) saveBtn0.style.display = 'none';
+        window.openModal();
+        return;
+    }
+    const doc = docId ? standards.find(d => _idEq(d.id, docId)) : null;
+    const standardOptions = standards.map(s =>
+        `<option value="${esc(s.id)}">${esc(s.name)}${s.status === 'ready' ? '' : ' (not analysed yet)'}</option>`
+    ).join('');
+
+    const segment = (id, label, active) => `
+                <div id="at-${id}" data-action="_setAuditType" data-id="${id}"
+                     style="flex:1;padding:0.6rem;text-align:center;cursor:pointer;background:${active ? '#3b82f6' : '#fff'};color:${active ? 'white' : '#64748b'};font-weight:600;font-size:0.85rem;transition:all 0.2s;">
+                    ${label}
+                </div>`;
+
+    const heading = mode === 'checklist' ? 'Create Audit Checklist' : 'Configure Analysis';
+    const subheading = mode === 'checklist'
+        ? 'Choose the standard, audit type, client and depth — the questions are generated from the standard'
+        : 'Choose audit type, depth, and optional client context';
 
     modalContent.innerHTML = `
         <div style="text-align:center;margin-bottom:1.25rem;">
-            <div style="font-size:1.5rem;margin-bottom:0.25rem;">🔍</div>
-            <h3 style="margin:0;font-size:1.2rem;color:#1e293b;">Configure Analysis</h3>
-            <p style="margin:0.25rem 0 0;font-size:0.85rem;color:#64748b;">Choose audit type, depth, and optional client context</p>
+            <div style="font-size:1.5rem;margin-bottom:0.25rem;">${mode === 'checklist' ? '📝' : '🔍'}</div>
+            <h3 style="margin:0;font-size:1.2rem;color:#1e293b;">${heading}</h3>
+            <p style="margin:0.25rem 0 0;font-size:0.85rem;color:#64748b;">${subheading}</p>
+            ${doc && mode === 'checklist' ? `<p style="margin:0.35rem 0 0;font-size:0.85rem;color:#1e293b;font-weight:600;">${esc(doc.name)}</p>` : ''}
         </div>
+
+        ${pickStandard ? `
+        <div style="margin-bottom:1rem;">
+            <label for="analysis-standard-select" style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">Standard</label>
+            <select id="analysis-standard-select" style="width:100%;padding:0.5rem 0.75rem;border:2px solid #e2e8f0;border-radius:8px;font-size:0.85rem;color:#334155;background:#fff;">
+                <option value="">— Select a Knowledge Base standard —</option>
+                ${standardOptions}
+            </select>
+        </div>` : ''}
 
         <!-- Audit Type Toggle -->
         <div style="margin-bottom:1rem;">
             <label style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">Audit Type</label>
             <div id="audit-type-toggle" style="display:flex;gap:0;border:2px solid #e2e8f0;border-radius:8px;overflow:hidden;">
-                <div id="at-initial" data-action="_setAuditType" data-id="initial" 
-                     style="flex:1;padding:0.6rem;text-align:center;cursor:pointer;background:#3b82f6;color:white;font-weight:600;font-size:0.85rem;transition:all 0.2s;">
-                    🏁 Initial / Recertification
-                </div>
-                <div id="at-surveillance" data-action="_setAuditType" data-id="surveillance"
-                     style="flex:1;padding:0.6rem;text-align:center;cursor:pointer;background:#fff;color:#64748b;font-weight:600;font-size:0.85rem;transition:all 0.2s;">
-                    🔄 Surveillance
-                </div>
+                ${segment('initial', '🏁 Initial', true)}
+                ${segment('surveillance', '🔄 Surveillance', false)}
+                ${segment('recertification', '♻️ Recertification', false)}
             </div>
             <div id="audit-type-hint" style="font-size:0.75rem;color:#64748b;margin-top:0.35rem;padding:0 0.25rem;">
-                Full scope audit — covers all clauses comprehensively
+                ${_ANALYSIS_TYPE_HINTS.initial}
             </div>
         </div>
 
         <!-- Client Context (Optional) -->
         <div style="margin-bottom:1rem;">
-            <label style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">
-                Client Context <span style="font-weight:400;text-transform:none;color:#94a3b8;">(optional — tailors questions)</span>
+            <label for="analysis-client-select" style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">
+                ${mode === 'checklist' ? 'Client' : 'Client Context'} <span style="font-weight:400;text-transform:none;color:#94a3b8;">(optional — ${mode === 'checklist' ? 'leave generic for a global checklist' : 'tailors questions'})</span>
             </label>
             <select id="analysis-client-select" style="width:100%;padding:0.5rem 0.75rem;border:2px solid #e2e8f0;border-radius:8px;font-size:0.85rem;color:#334155;background:#fff;">
                 <option value="">— Generic (no client context) —</option>
@@ -604,7 +665,7 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
         <!-- Analysis Depth Cards -->
         <label style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">Analysis Depth</label>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
-            <div data-action="_startAnalysis" data-arg1="${docId}" data-arg2="short" data-arg3="${isReanalyze}" 
+            <div data-action="_startAnalysis" data-arg1="${docId ? esc(docId) : ''}" data-arg2="short" data-arg3="${mode}" 
                  style="cursor:pointer;border:2px solid #e2e8f0;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#fff;">
                 <div style="font-size:1.5rem;margin-bottom:0.5rem;">⚡</div>
                 <div style="font-weight:700;font-size:0.95rem;color:#1e293b;margin-bottom:0.5rem;">Short</div>
@@ -614,7 +675,7 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
                     <div style="color:#f59e0b;font-weight:600;">~10 seconds</div>
                 </div>
             </div>
-            <div data-action="_startAnalysis" data-arg1="${docId}" data-arg2="standard" data-arg3="${isReanalyze}" 
+            <div data-action="_startAnalysis" data-arg1="${docId ? esc(docId) : ''}" data-arg2="standard" data-arg3="${mode}" 
                  style="cursor:pointer;border:2px solid #3b82f6;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#eff6ff;position:relative;">
                 <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:#3b82f6;color:white;font-size:0.65rem;padding:2px 8px;border-radius:4px;font-weight:600;">RECOMMENDED</div>
                 <div style="font-size:1.5rem;margin-bottom:0.5rem;">📋</div>
@@ -625,7 +686,7 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
                     <div style="color:#3b82f6;font-weight:600;">~35 seconds</div>
                 </div>
             </div>
-            <div data-action="_startAnalysis" data-arg1="${docId}" data-arg2="comprehensive" data-arg3="${isReanalyze}" 
+            <div data-action="_startAnalysis" data-arg1="${docId ? esc(docId) : ''}" data-arg2="comprehensive" data-arg3="${mode}" 
                  style="cursor:pointer;border:2px solid #e2e8f0;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#fff;">
                 <div style="font-size:1.5rem;margin-bottom:0.5rem;">🔬</div>
                 <div style="font-weight:700;font-size:0.95rem;color:#1e293b;margin-bottom:0.5rem;">Comprehensive</div>
@@ -636,8 +697,14 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
                 </div>
             </div>
         </div>
+        ${mode === 'checklist' ? `
+        <div style="text-align:center;font-size:0.8rem;color:#64748b;">
+            Prefer to type the questions yourself?
+            <button type="button" data-action="_buildChecklistManually" style="background:none;border:none;padding:0;color:#2563eb;font-weight:600;cursor:pointer;font-size:inherit;">Build manually</button>
+        </div>` : ''}
     `;
-    document.getElementById('modal-title').textContent = isReanalyze ? 'Re-analyze Standard' : 'Analyze Standard';
+    document.getElementById('modal-title').textContent = mode === 'checklist' ? 'New Checklist'
+        : mode === 'reanalyze' ? 'Re-analyze Standard' : 'Analyze Standard';
 
     // Hide default footer buttons since we have custom actions
     const saveBtn = document.getElementById('modal-save');
@@ -651,40 +718,111 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
 
 // Toggle audit type in the modal
 window._setAuditType = function (type) {
-    window._analysisAuditType = type;
-    const initEl = document.getElementById('at-initial');
-    const survEl = document.getElementById('at-surveillance');
+    const selected = _ANALYSIS_TYPE_HINTS[type] ? type : 'initial';
+    window._analysisAuditType = selected;
     const hintEl = document.getElementById('audit-type-hint');
-    if (!initEl || !survEl) return;
-
-    if (type === 'surveillance') {
-        survEl.style.background = '#f59e0b';
-        survEl.style.color = 'white';
-        initEl.style.background = '#fff';
-        initEl.style.color = '#64748b';
-        if (hintEl) hintEl.textContent = 'Focused audit — fewer questions on continued conformity, changes, and correction effectiveness';
-    } else {
-        initEl.style.background = '#3b82f6';
-        initEl.style.color = 'white';
-        survEl.style.background = '#fff';
-        survEl.style.color = '#64748b';
-        if (hintEl) hintEl.textContent = 'Full scope audit — covers all clauses comprehensively';
-    }
+    const colours = { initial: '#3b82f6', surveillance: '#f59e0b', recertification: '#10b981' };
+    Object.keys(_ANALYSIS_TYPE_HINTS).forEach(id => {
+        const el = document.getElementById('at-' + id);
+        if (!el) return;
+        el.style.background = id === selected ? colours[id] : '#fff';
+        el.style.color = id === selected ? 'white' : '#64748b';
+    });
+    if (hintEl) hintEl.textContent = _ANALYSIS_TYPE_HINTS[selected];
 };
 
 // Internal: Start analysis with selected mode, audit type, and client context
-window._startAnalysis = async function (docId, mode, isReanalyze) {
+window._startAnalysis = async function (docId, mode, purpose) {
     const auditType = window._analysisAuditType || 'initial';
     const clientSelect = document.getElementById('analysis-client-select');
     const clientId = clientSelect ? clientSelect.value : '';
+    const kind = _analysisPurpose(purpose);
 
+    if (kind === 'checklist') {
+        const standardSelect = document.getElementById('analysis-standard-select');
+        const standardId = docId || (standardSelect ? standardSelect.value : '');
+        if (!standardId) {
+            window.showNotification('Select the standard to build the checklist from.', 'warning');
+            if (standardSelect) standardSelect.focus();
+            return;
+        }
+        window.closeModal();
+        return window.generateChecklistFromStandard(standardId, mode, auditType, clientId);
+    }
+
+    // The analysis prompt knows two shapes: full scope and surveillance.
+    const analysisType = auditType === 'surveillance' ? 'surveillance' : 'initial';
     window.closeModal();
 
-    if (isReanalyze) {
-        window.reanalyzeStandard(docId, mode, auditType, clientId);
+    if (kind === 'reanalyze') {
+        window.reanalyzeStandard(docId, mode, analysisType, clientId);
     } else {
-        window.analyzeStandard(docId, mode, auditType, clientId);
+        window.analyzeStandard(docId, mode, analysisType, clientId);
     }
+};
+
+// "Build manually" on the New Checklist screen: the blank editor.
+window._buildChecklistManually = function () {
+    window.closeModal();
+    if (typeof window.renderChecklistEditor === 'function') window.renderChecklistEditor(null);
+};
+
+// Redraw whichever screen the person is on after a checklist is generated.
+function _refreshAfterChecklist() {
+    if (document.getElementById('btn-new-checklist') && typeof window.renderChecklistLibrary === 'function') {
+        window.renderChecklistLibrary(); // keeps the library's client scope
+    } else if (document.getElementById('settings-subtabs') && typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    }
+}
+
+/**
+ * Create an audit checklist from a Knowledge Base standard with the audit
+ * type, client and depth chosen on the analysis screen. The standard is
+ * analysed with those settings unless its last analysis already used them;
+ * no checklist is created when the analysis could not produce questions
+ * (the offline fallback yields clauses only), rather than silently reusing
+ * questions from an earlier run with different settings.
+ */
+window.generateChecklistFromStandard = async function (docId, mode, auditType, clientId) {
+    const kb = window.state.knowledgeBase || {};
+    const doc = (kb.standards || []).find(d => _idEq(d.id, docId));
+    if (!doc) {
+        window.showNotification('Standard not found in the Knowledge Base', 'error');
+        return null;
+    }
+    const type = _ANALYSIS_TYPE_HINTS[auditType] ? auditType : 'initial';
+    const analysisType = type === 'surveillance' ? 'surveillance' : 'initial';
+    const client = String(clientId || '');
+
+    const reusable = doc.status === 'ready'
+        && Array.isArray(doc.generatedChecklist) && doc.generatedChecklist.length > 0
+        && (doc.lastAnalysisMode || 'standard') === mode
+        && (doc.lastAuditType || 'initial') === analysisType
+        && String(doc.lastClientId || '') === client;
+
+    if (!reusable) {
+        doc.status = 'processing';
+        window.saveData();
+        window._kbProgress.show(`Preparing ${analysisType === 'surveillance' ? 'surveillance ' : ''}${mode} analysis...`, 5);
+        let ok = false;
+        try {
+            ok = await extractStandardClauses(doc, doc.name, mode, analysisType, client);
+        } catch (e) {
+            console.error('[KB] Checklist analysis failed:', e);
+        }
+        window._kbProgress.hide();
+        await window.DataService.syncSettings({ saveLocal: false, silent: true });
+        if (!ok) {
+            _refreshAfterChecklist();
+            window.showNotification(`No questions could be generated for ${doc.name}, so no checklist was created. Check the AI connection and try again.`, 'error');
+            return null;
+        }
+    }
+
+    const checklist = await window.createChecklistFromKB(doc.id, { auditType: type, clientId: client });
+    _refreshAfterChecklist();
+    return checklist;
 };
 
 // Analyze standard function (triggered by "Analyze Now" button)
@@ -1208,7 +1346,7 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
                 doc.lastClientId = '';
             }
             window.saveData();
-            return;
+            return true;
         } else {
             console.warn(`[KB Analysis] Both batches failed`);
         }
@@ -1229,6 +1367,7 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
         window.showNotification(`No built-in clause set for ${standardName}. Upload the standard and analyse it before using it in a checklist.`, 'warning');
     }
     window.saveData();
+    return false;
 }
 
 // Built-in clause database for common standards (fallback) - COMPREHENSIVE with sub-clauses and bullet points
@@ -1848,22 +1987,38 @@ window.handleReanalyze = function (docId, docType) {
 };
 
 // Build descriptive checklist title from doc metadata
-function _buildChecklistTitle(doc) {
+const _CHECKLIST_TYPE_LABELS = { initial: 'Initial', surveillance: 'Surveillance', recertification: 'Recertification' };
+function _buildChecklistTitle(doc, auditType, clientName) {
     const parts = [doc.name];
-    if (doc.lastClientName) parts.push(doc.lastClientName);
-    const typeLabel = doc.lastAuditType === 'surveillance' ? 'Surveillance' : 'Initial';
+    const client = clientName !== undefined ? clientName : doc.lastClientName;
+    if (client) parts.push(client);
+    const typeLabel = _CHECKLIST_TYPE_LABELS[auditType || doc.lastAuditType] || 'Initial';
     parts.push(`${typeLabel} Audit Checklist`);
     return parts.join(' - ');
 }
 
-// Create a checklist from KB extracted questions
-window.createChecklistFromKB = async function (docId) {
+// "Create Checklist" in a standard's analysis view: ask for the audit type,
+// client and depth first, on the same screen the analysis uses.
+window.openCreateChecklistFromKB = function (docId) {
+    const doc = ((window.state.knowledgeBase || {}).standards || []).find(d => _idEq(d.id, docId));
+    window.showAnalysisModeModal(docId, 'checklist', { clientId: doc && doc.lastClientId ? doc.lastClientId : '' });
+};
+
+// Create a checklist from KB extracted questions. opts.auditType and
+// opts.clientId (from the analysis screen) take precedence over the settings
+// the standard was last analysed with.
+window.createChecklistFromKB = async function (docId, opts) {
     const kb = window.state.knowledgeBase;
     const doc = kb.standards.find(d => _idEq(d.id, docId));
     if (!doc || !doc.generatedChecklist || doc.generatedChecklist.length === 0) {
         window.showNotification('No checklist questions found. Re-analyze the standard first.', 'error');
-        return;
+        return null;
     }
+    const options = opts || {};
+    const auditType = _CHECKLIST_TYPE_LABELS[options.auditType] ? options.auditType : (doc.lastAuditType || 'initial');
+    const clientId = options.clientId !== undefined ? String(options.clientId || '') : String(doc.lastClientId || '');
+    const clientRecord = clientId ? (window.state.clients || []).find(c => String(c.id) === clientId) : null;
+    const clientName = clientRecord ? clientRecord.name : '';
 
     // Build hierarchical checklist structure: mainClause -> subClause -> items
     // Supports 2-4 level hierarchy (e.g., 4 -> 4.1 -> 4.1.1 -> items)
@@ -1954,11 +2109,12 @@ window.createChecklistFromKB = async function (docId) {
 
     const newChecklist = {
         id: Date.now(),
-        name: _buildChecklistTitle(doc),
+        name: _buildChecklistTitle(doc, auditType, clientName),
         standard: doc.name,
-        type: doc.lastClientName ? 'custom' : 'global',
-        auditType: doc.lastAuditType || 'initial',
-        clientName: doc.lastClientName || '',
+        type: clientId ? 'custom' : 'global',
+        auditType: auditType,
+        clientId: clientId || null,
+        clientName: clientName || '',
         clauses: clauseArray,
         createdBy: window.state.currentUser?.name || 'Admin',
         createdAt: new Date().toISOString().split('T')[0],
@@ -1980,6 +2136,9 @@ window.createChecklistFromKB = async function (docId) {
                     name: newChecklist.name,
                     standard: newChecklist.standard,
                     type: newChecklist.type,
+                    audit_type: newChecklist.auditType || null,
+                    client_id: newChecklist.clientId || null,
+                    client_name: newChecklist.clientName || null,
                     clauses: newChecklist.clauses,
                     created_by: newChecklist.createdBy,
                     created_at: new Date().toISOString(),
@@ -1992,6 +2151,7 @@ window.createChecklistFromKB = async function (docId) {
 
     window.closeModal();
     window.showNotification(`Created checklist "${newChecklist.name}" with ${auditableItems.length} questions (clauses 4-10)!`, 'success');
+    return newChecklist;
 };
 
 // Delete Knowledge Document
@@ -2163,7 +2323,7 @@ window.viewKBAnalysis = function (docId) {
                         <span style="font-size: 0.75rem; color: #64748b;" title="This entry was saved without its source file"><i class="fa-solid fa-file-circle-xmark" style="margin-right: 0.25rem;"></i>No file stored</span>
                     `}
                     ${docType === 'standard' && doc.generatedChecklist && doc.generatedChecklist.length > 0 ? `
-                        <button class="btn btn-sm btn-primary" data-action="createChecklistFromKB" data-id="${doc.id}" title="Create audit checklist from extracted questions" aria-label="Checklist">
+                        <button class="btn btn-sm btn-primary" data-action="openCreateChecklistFromKB" data-id="${doc.id}" title="Create audit checklist from extracted questions" aria-label="Checklist">
                             <i class="fa-solid fa-list-check" style="margin-right: 0.25rem;"></i>Create Checklist
                         </button>
                     ` : ''}

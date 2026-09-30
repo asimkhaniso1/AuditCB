@@ -13,11 +13,13 @@ function loadModule(file) {
     eval(src);
 }
 
+let realRenderLibrary;
 beforeAll(() => {
     window.Logger = { debug() { }, info() { }, warn() { }, error() { } };
     loadModule('./utils.js');
     loadModule('./validation.js');
     loadModule('./checklist-module.js');
+    realRenderLibrary = window.renderChecklistLibrary;
 });
 
 function mount() {
@@ -63,6 +65,15 @@ describe('Create Checklist: audit type and client are kept', () => {
         expect(ck.clientId).toBe('sg');
         expect(ck.clientName).toBe('SG 1888 (PVT.) LTD.');
         expect(saved[0]).toMatchObject({ audit_type: 'surveillance', client_id: 'sg', client_name: 'SG 1888 (PVT.) LTD.' });
+    });
+
+    it('New Checklist opens the analysis screen, scoped to the client being viewed', () => {
+        const calls = [];
+        window.showAnalysisModeModal = (...args) => calls.push(args);
+        realRenderLibrary('sg');
+        document.getElementById('btn-new-checklist').click();
+        expect(calls).toEqual([[null, 'checklist', { clientId: 'sg' }]]);
+        delete window.showAnalysisModeModal;
     });
 
     it('shows the saved audit type when the checklist is reopened', () => {
