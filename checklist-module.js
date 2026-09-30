@@ -14,6 +14,22 @@ let checklistSearchTerm = '';
 // re-render calls keep the scope the user is actually looking at.
 let _checklistScopeClientId = null;
 
+// The standards a pick-list may offer. Inside a client's workspace that is the
+// client's own Applicable Standards (record, certificates, sites) — not the
+// CB's whole list — plus `keep`, a value already on the record being edited.
+// Outside a client scope, or for a client with no standards recorded, the
+// full list is returned unchanged.
+function standardsInScope(all, keep) {
+    const client = _checklistScopeClientId == null ? null
+        : (window.state.clients || []).find(c => String(c.id) === String(_checklistScopeClientId));
+    const held = client && window.UTILS && typeof window.UTILS.clientStandards === 'function'
+        ? window.UTILS.clientStandards(client) : [];
+    if (!held.length) return all;
+    const out = held.slice();
+    if (keep && out.indexOf(keep) === -1) out.push(keep);
+    return out;
+}
+
 // Format ISO/UTC date to local readable date
 function _fmtDate(raw) {
     if (!raw) return '—';
@@ -131,7 +147,7 @@ function renderChecklistLibrary(clientId) {
     const customChecklists = filtered.filter(c => c.type === 'custom' && !c.archived);
     const archivedChecklists = filtered.filter(c => c.archived);
 
-    const standards = window.state.cbSettings?.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
+    const standards = standardsInScope(window.state.cbSettings?.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018']);
     const _auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
     const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
 
@@ -661,6 +677,7 @@ function openImportChecklistModal() {
         standards = [...new Set([...kbStds, ...clStds])];
     }
     if (!standards.length) standards = ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
+    standards = standardsInScope(standards);
     const userRole = state.currentUser?.role;
     const isAdmin = state.settings?.isAdmin || false;
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
@@ -1035,7 +1052,7 @@ function renderChecklistEditor(checklistId) {
     const isEdit = !!checklistId;
     const checklist = isEdit ? state.checklists?.find(c => String(c.id) === String(checklistId)) : null;
 
-    const standards = window.state.cbSettings?.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
+    const standards = standardsInScope(window.state.cbSettings?.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'], checklist?.standard);
     const userRole = (state.currentUser?.role || '').toLowerCase();
     const isAdmin = userRole === 'admin' || state.settings?.isAdmin || false;
     const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
