@@ -390,7 +390,10 @@ function renderChecklistLibrary(clientId) {
     window.contentArea.innerHTML = html;
 
     // Event Listeners
-    document.getElementById('btn-new-checklist')?.addEventListener('click', openAddChecklistModal);
+    // New Checklist opens the same screen the Knowledge Base analysis uses —
+    // standard, audit type, client and depth — and generates the questions.
+    // "Build manually" on that screen still reaches the blank editor.
+    document.getElementById('btn-new-checklist')?.addEventListener('click', () => openNewChecklistScreen(scopeId));
     document.getElementById('btn-import-checklist')?.addEventListener('click', openImportChecklistModal);
     // Build from the client's own uploaded documents. Previously reachable only
     // via Plans & Audits -> a plan -> Configure Checklists, which meant a plan
@@ -1015,6 +1018,14 @@ function setupCSVUpload() {
 function openAddChecklistModal() {
     // Full-page editor instead of modal
     renderChecklistEditor(null);
+}
+
+function openNewChecklistScreen(clientId) {
+    if (typeof window.showAnalysisModeModal === 'function') {
+        window.showAnalysisModeModal(null, 'checklist', { clientId: clientId || '' });
+    } else {
+        renderChecklistEditor(null);
+    }
 }
 
 function renderChecklistEditor(checklistId) {

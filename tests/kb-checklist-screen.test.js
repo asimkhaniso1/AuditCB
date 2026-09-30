@@ -1,0 +1,142 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Creating a checklist — from the Checklists page or from a standard's
+// analysis view — goes through the same Configure Analysis screen as the
+// Knowledge Base analysis: standard, audit type (Initial / Surveillance /
+// Recertification), client and depth. The checklist keeps the audit type and
+// client chosen there.
+globalThis.window = globalThis.window || globalThis;
+window.state = window.state || {};
+window.state.knowledgeBase = { standards: [], sops: [], policies: [], marketing: [] };
+window.switchSettingsSubTab = () => {};
+
+const fs = await import('fs');
+const path = await import('path');
+const utils = await import('../utils.js');
+window.UTILS = window.UTILS || utils.default || utils;
+new Function(fs.readFileSync(path.resolve('./settings-kb.js'), 'utf8'))();
+
+const GMP = {
+    id: 9001, name: 'GMP Guidelines Pakistan', fileName: 'GMP.pdf', uploadDate: '2026-09-29', status: 'ready',
+    clauses: [{ clause: '4.1', title: 'Organisation' }],
+    generatedChecklist: [
+        { clause: '4.1', requirement: 'Is there an organizational chart that defines responsibilities?' },
+        { clause: '4.2', requirement: 'Are specific duties of personnel recorded in writing?' }
+    ],
+    lastAuditType: 'initial', lastAnalysisMode: 'standard', lastClientId: '', lastClientName: ''
+};
+
+function mount() {
+    document.body.innerHTML = '<h3 id="modal-title"></h3><div id="modal-body"></div><div id="modal-save"></div>';
+}
+
+describe('Checklist creation uses the analysis screen', () => {
+    let notes, upserts;
+    beforeEach(() => {
+        notes = [];
+        upserts = [];
+        window.showNotification = (msg, type) => notes.push({ msg, type });
+        window.openModal = () => {};
+        window.closeModal = () => {};
+        window.saveData = () => {};
+        window.DataService = { syncSettings: vi.fn(async () => true) };
+        window.state.checklists = [];
+        window.state.currentUser = { name: 'Admin' };
+        window.state.clients = [{ id: 'sg', name: 'SG 1888 (PVT.) LTD.' }];
+        window.state.knowledgeBase = { standards: [JSON.parse(JSON.stringify(GMP))], sops: [], policies: [], marketing: [] };
+        window.SupabaseClient = {
+            isInitialized: true,
+            client: { from: () => ({ upsert: async (row) => { upserts.push(row); return {}; } }) }
+        };
+        window.AI_SERVICE = undefined;
+        mount();
+    });
+
+    it('New Checklist shows the standard picker, three audit types, client and the depth cards', () => {
+        window.showAnalysisModeModal(null, 'checklist', { clientId: 'sg' });
+        const body = document.getElementById('modal-body');
+        const std = Array.from(body.querySelectorAll('#analysis-standard-select option')).map(o => o.value);
+        expect(std).toEqual(['', '9001']);
+        expect(['at-initial', 'at-surveillance', 'at-recertification'].every(id => document.getElementById(id))).toBe(true);
+        expect(document.getElementById('analysis-client-select').value).toBe('sg');
+        const depths = Array.from(body.querySelectorAll('[data-action="_startAnalysis"]')).map(d => [d.dataset.arg2, d.dataset.arg3, d.dataset.arg1]);
+        expect(depths).toEqual([['short', 'checklist', ''], ['standard', 'checklist', ''], ['comprehensive', 'checklist', '']]);
+        expect(body.querySelector('[data-action="_buildChecklistManually"]')).toBeTruthy();
+        expect(document.getElementById('modal-title').textContent).toBe('New Checklist');
+    });
+
+    it('asks for the standard before generating', async () => {
+        window.showAnalysisModeModal(null, 'checklist');
+        await window._startAnalysis('', 'standard', 'checklist');
+        expect(window.state.checklists).toHaveLength(0);
+        expect(notes.pop().msg).toMatch(/Select the standard/);
+    });
+
+    it('creates a recertification checklist for the chosen client, locally and in the database', async () => {
+        window.showAnalysisModeModal(null, 'checklist');
+        document.getElementById('analysis-standard-select').value = '9001';
+        document.getElementById('analysis-client-select').value = 'sg';
+        window._setAuditType('recertification');
+        window.AI_SERVICE = { callProxyAPI: vi.fn(async () => JSON.stringify([
+            { clause: '4.1', title: 'Organisation', requirement: 'x', checklistQuestions: ['Is the organisation chart current?'] },
+            { clause: '5.1', title: 'Personnel', requirement: 'y', checklistQuestions: ['Are duties defined?'] }
+        ])) };
+        await window._startAnalysis('', 'short', 'checklist');
+
+        const ck = window.state.checklists[0];
+        expect(ck).toBeTruthy();
+        expect(ck.auditType).toBe('recertification');
+        expect(ck.clientId).toBe('sg');
+        expect(ck.clientName).toBe('SG 1888 (PVT.) LTD.');
+        expect(ck.type).toBe('custom');
+        expect(ck.name).toBe('GMP Guidelines Pakistan - SG 1888 (PVT.) LTD. - Recertification Audit Checklist');
+        expect(upserts[0]).toMatchObject({ audit_type: 'recertification', client_id: 'sg', client_name: 'SG 1888 (PVT.) LTD.' });
+        // Recertification is analysed as a full-scope audit and re-analysed for the client.
+        expect(window.AI_SERVICE.callProxyAPI).toHaveBeenCalled();
+        const doc = window.state.knowledgeBase.standards[0];
+        expect(doc.lastAuditType).toBe('initial');
+        expect(doc.lastClientId).toBe('sg');
+    });
+
+    it('reuses the last analysis when it already matches the chosen settings', async () => {
+        window.AI_SERVICE = { callProxyAPI: vi.fn() };
+        const ck = await window.generateChecklistFromStandard(9001, 'standard', 'initial', '');
+        expect(window.AI_SERVICE.callProxyAPI).not.toHaveBeenCalled();
+        expect(ck.auditType).toBe('initial');
+        expect(ck.type).toBe('global');
+        expect(ck.clauses.flatMap(c => c.subClauses)).toHaveLength(2);
+    });
+
+    it('creates no checklist when the analysis yields no questions, instead of reusing an older run', async () => {
+        window.AI_SERVICE = { callProxyAPI: vi.fn(async () => 'not json') };
+        const ck = await window.generateChecklistFromStandard(9001, 'standard', 'surveillance', '');
+        expect(ck).toBeNull();
+        expect(window.state.checklists).toHaveLength(0);
+        expect(notes.some(n => n.type === 'error' && /no checklist was created/.test(n.msg))).toBe(true);
+    });
+
+    it("the analysis view's Create Checklist opens the screen for that standard", () => {
+        window.state.auditReports = [];
+        window.viewKBAnalysis(9001);
+        const btn = document.querySelector('#modal-body [data-action="openCreateChecklistFromKB"]');
+        expect(btn).toBeTruthy();
+        window.openCreateChecklistFromKB(9001);
+        expect(document.getElementById('analysis-standard-select')).toBeNull();
+        const card = document.querySelector('[data-action="_startAnalysis"]');
+        expect(card.dataset.arg1).toBe('9001');
+        expect(card.dataset.arg3).toBe('checklist');
+        expect(document.getElementById('modal-body').textContent).toMatch(/GMP Guidelines Pakistan/);
+    });
+
+    it('Analyze Now no longer runs as a re-analysis (the "false" attribute was truthy)', async () => {
+        window.analyzeStandard = vi.fn();
+        window.reanalyzeStandard = vi.fn();
+        window.showAnalysisModeModal(9001, false);
+        const card = document.querySelector('[data-action="_startAnalysis"]');
+        expect(card.dataset.arg3).toBe('analyze');
+        window._setAuditType('recertification');
+        await window._startAnalysis('9001', 'short', card.dataset.arg3);
+        expect(window.reanalyzeStandard).not.toHaveBeenCalled();
+        expect(window.analyzeStandard).toHaveBeenCalledWith('9001', 'short', 'initial', '');
+    });
+});
