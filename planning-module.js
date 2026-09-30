@@ -1918,6 +1918,9 @@ window.renderConfigureChecklist = async function (planId) {
     const checklists = state.checklists || [];
     console.info('[ConfigChecklist] state.checklists count:', checklists.length, '| plan.selectedChecklists:', selectedIds);
 
+    // A checklist is for this audit when EVERY standard it names is one the
+    // audit covers (an integrated checklist needs all of its standards in
+    // scope, not just one).
     // Offer the checklists for the standards this audit covers — the plan's
     // own standards, or failing that every standard the client holds (record,
     // certificates, sites). Matching used to take every 4-5 digit number in
@@ -1930,7 +1933,7 @@ window.renderConfigureChecklist = async function (planId) {
     const auditStandards = planStandards.length ? planStandards : window.UTILS.clientStandards(client);
     const isAssigned = (c) => selectedIds.some(id => String(id) === String(c.id));
     const forThisAudit = (c) => isAssigned(c) || !auditStandards.length
-        || window.UTILS.standardsOverlap(c.standard || '', auditStandards);
+        || window.UTILS.standardsWithin(c.standard || '', auditStandards);
     // A client-specific checklist that names ANOTHER client is that client's.
     const clientNameLower = String(plan.client || '').trim().toLowerCase();
     const otherClientNames = (state.clients || []).map(c => String(c.name || '').trim().toLowerCase())
@@ -1968,7 +1971,7 @@ window.renderConfigureChecklist = async function (planId) {
     // limit to apply, so everything stays reachable.)
     const clientScope = window.UTILS.clientStandards(client);
     const withinClientScope = (c) => !clientScope.length
-        || (window.UTILS.standardsOverlap(c.standard || '', clientScope) && !ownedByAnotherClient(c));
+        || (window.UTILS.standardsWithin(c.standard || '', clientScope) && !ownedByAnotherClient(c));
     const notOffered = checklists.filter(c => !matchingChecklists.includes(c));
     const hiddenChecklists = notOffered.filter(withinClientScope);
     const outOfScopeCount = notOffered.length - hiddenChecklists.length;

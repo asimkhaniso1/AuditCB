@@ -381,9 +381,16 @@ describe('renderChecklistLibrary — globals are filtered to the client\'s stand
         expect(html()).not.toContain('ISO 50001 Initial');
     });
 
-    it('an integrated global matches when ANY of its standards is held', () => {
+    it('an integrated global matches when the client holds ALL of its standards', () => {
         window.renderChecklistLibrary('pcc');
         expect(html()).toContain('IMS Recovered');
+    });
+
+    it('an integrated global is not offered to a client holding only one of its standards', () => {
+        // Language Services UK holds ISO 27001 but neither ISO 22301 nor ISO 20000-1.
+        window.state.clients.push({ id: 'ls', name: 'Language Services UK Limited', standard: 'ISO 9001:2015, ISO 27001:2022' });
+        window.renderChecklistLibrary('ls');
+        expect(html()).not.toContain('IMS Recovered');
     });
 
     it('ISO/IEC vs ISO spelling does not hide a relevant checklist', () => {

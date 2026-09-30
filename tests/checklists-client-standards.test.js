@@ -49,6 +49,13 @@ describe('UTILS.clientStandards / standardsOverlap', () => {
         expect(M.UTILS.standardsOverlap('ISO 9001', held)).toBe(true);
         expect(M.UTILS.standardsOverlap('ISO 9001:2015, ISO 14001:2015', held)).toBe(true);
     });
+    it('standardsWithin needs every named standard to be held', () => {
+        const held = ['ISO 9001:2015', 'ISO 27001:2022'];
+        expect(M.UTILS.standardsWithin('ISO 27001:2022', held)).toBe(true);
+        expect(M.UTILS.standardsWithin('ISO/IEC 27001:2022, ISO 9001', held)).toBe(true);
+        expect(M.UTILS.standardsWithin('ISO 27001:2022, ISO 22301:2019, ISO 20000-1:2018', held)).toBe(false);
+        expect(M.UTILS.standardsWithin('', held)).toBe(false);
+    });
 });
 
 describe('Configure Checklists on an SG 1888 plan', () => {
@@ -170,6 +177,33 @@ describe('Configure Checklists on an SG 1888 plan', () => {
         const main = document.querySelector('.checklist-select-cb[data-id="5"]');
         main.checked = true; main.dispatchEvent(new Event('change'));
         expect(items.map(i => i.checked)).toEqual([true, false]);
+    });
+
+    it('an integrated checklist needs every one of its standards in scope', async () => {
+        const IMS = { id: 20, name: 'ISO 27001:2022, ISO 22301:2019, ISO 20000-1:2018 Checklist (Recovered)', standard: 'ISO 27001:2022, ISO 22301:2019, ISO 20000-1:2018', type: 'global', clauses: [] };
+        const ISMS = { id: 21, name: 'ISO 27001:2022 - Initial Audit Checklist', standard: 'ISO 27001:2022', type: 'global', clauses: [] };
+        const onPage = () => Array.from(document.querySelectorAll('.checklist-select-cb')).map(cb => cb.getAttribute('data-id'));
+
+        // Holds ISO 27001 only: the single-standard checklist, never the integrated one.
+        window.state = { clients: [{ id: 'ls', name: 'Language Services UK Limited', standard: 'ISO 9001:2015, ISO 27001:2022' }],
+            checklists: [IMS, ISMS], auditPlans: [{ id: 'q1', client: 'Language Services UK Limited', standard: 'ISO 27001:2022', selectedChecklists: [] }] };
+        await window.renderConfigureChecklist('q1');
+        expect(onPage()).toEqual(['21']);
+
+        // Holds all three, on an integrated plan: both.
+        const pcc = { id: 'pcc', name: 'PC CONNECTION, INC.', standard: 'ISO/IEC 27001:2022, ISO 22301:2019, ISO/IEC 20000-1:2018' };
+        window.state = { clients: [pcc], checklists: [IMS, ISMS],
+            auditPlans: [{ id: 'q2', client: 'PC CONNECTION, INC.', standard: 'ISO/IEC 27001:2022, ISO 22301:2019, ISO/IEC 20000-1:2018', selectedChecklists: [] }] };
+        await window.renderConfigureChecklist('q2');
+        expect(visibleCards().sort()).toEqual(['20', '21']);
+
+        // Holds all three, but this plan is ISO 27001 only: the integrated one waits behind "Show".
+        window.state = { clients: [pcc], checklists: [IMS, ISMS],
+            auditPlans: [{ id: 'q3', client: 'PC CONNECTION, INC.', standard: 'ISO/IEC 27001:2022', selectedChecklists: [] }] };
+        await window.renderConfigureChecklist('q3');
+        expect(visibleCards()).toEqual(['21']);
+        const behind = Array.from(document.querySelectorAll('#config-hidden-checklists .checklist-select-cb')).map(cb => cb.getAttribute('data-id'));
+        expect(behind).toEqual(['20']);
     });
 
     it('always shows a checklist already assigned to the plan', async () => {
