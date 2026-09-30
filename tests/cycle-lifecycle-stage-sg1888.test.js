@@ -133,9 +133,16 @@ describe('SG 1888 overview card', () => {
         expect(card.textContent).toMatch(/For Surveillance 2/);
         expect(byLabel['CURRENT ISSUE / EXPIRY']).toBe('14/09/2026 – 13/09/2027');
         expect(card.textContent).toMatch(/Cycle 1 · Year 3/);
-        expect(dots).toContain('Surveillance 1 audit finalized');
+        expect(dots).toContain('Surveillance 1 performed 10/09/2025 — recorded completion');
         expect(dots.some(t => /^Surveillance 2 period passed/.test(t))).toBe(true);   // due, window open
         expect(dots).toContain('Recertification not yet due');
+    });
+
+    it('a recorded completion names its date, source, organization and evidence on the dot', () => {
+        const c = client();
+        c.certificationLifecycleEvents[0].metadata = { category: 'completion', source: 'third-party', auditor: 'Previous CB & Co', evidence: [{ name: 'S1.pdf', path: 'p/S1.pdf' }] };
+        const { dots } = cardFor(render(c), 'Halal');
+        expect(dots).toContain('Surveillance 1 performed 10/09/2025 by Previous CB & Co (third-party audit) · 1 evidence file');
     });
 
     it('ISO 9001 and cGMP show Surveillance 1 then Surveillance 2', () => {
