@@ -914,6 +914,54 @@ function lifecycleStages(cycleState, record, fallback) {
     return { current, next };
 }
 
+// One lifecycle state for everything on a cycle card — the progress bar, the
+// Cert / S1 / S2 / Re dots, Current and Next Stage and the window. The
+// current milestone is the one outstanding now; only IT carries a status
+// colour (not yet due = neutral blue, window open = amber, overdue = red).
+// Completed milestones are green, earlier ones missed outright are red, and
+// later ones are grey — the Next Audit Stage is a future stage and is never
+// coloured as if it were due. The bar runs to the current milestone: green
+// over what is done, then the current status colour.
+const LIFECYCLE_COLOURS = { completed: '#10b981', upcoming: '#3b82f6', open: '#f59e0b', overdue: '#dc2626', missed: '#dc2626', future: '#cbd5e1' };
+const LIFECYCLE_MILESTONES = [['s1', 'Surveillance 1', 'S1', '1'], ['s2', 'Surveillance 2', 'S2', '2'], ['recert', 'Recertification', 'Re', '↻']];
+function cycleLifecycleView({ current, done, expired, dues, windowState, today }) {
+    const completed = done || {};
+    let currentIndex;
+    if (completed.recert) currentIndex = 4;
+    else if (expired) currentIndex = 3;
+    else {
+        const named = LIFECYCLE_STAGES.indexOf(current);
+        currentIndex = named >= 0 ? named + 1
+            : (LIFECYCLE_MILESTONES.findIndex(([key]) => !completed[key]) + 1) || 3;
+    }
+    const currentKey = currentIndex <= 3 ? LIFECYCLE_MILESTONES[currentIndex - 1][0] : null;
+    let status;
+    if (currentIndex === 4) status = 'completed';
+    else if (expired) status = 'overdue';
+    else if (windowState && ['upcoming', 'open', 'closed'].includes(windowState.state)) status = windowState.state === 'closed' ? 'overdue' : windowState.state;
+    else {
+        const due = dues && dues[currentKey];
+        status = due && today > due ? 'open' : 'upcoming';
+    }
+    const milestones = LIFECYCLE_MILESTONES.map(([key, name, label, sym], i) => {
+        const index = i + 1;
+        const state = completed[key] ? 'completed'
+            : index === currentIndex ? status
+                : index < currentIndex ? 'missed' : 'future';
+        return { key, name, label, sym, index, state, current: index === currentIndex, due: dues ? dues[key] : null };
+    });
+    const lastDone = milestones.reduce((max, m) => (m.state === 'completed' && m.index < Math.min(currentIndex, 4) ? Math.max(max, m.index) : max), 0);
+    const pct = (index) => Math.round(Math.min(index, 3) / 3 * 1000) / 10;
+    return {
+        currentIndex, currentKey, status, milestones,
+        progress: {
+            completedPct: currentIndex === 4 ? 100 : pct(lastDone),
+            currentPct: pct(currentIndex),
+            colour: LIFECYCLE_COLOURS[status]
+        }
+    };
+}
+
 function cycleRecordForCertificate(client, certificate, cycleState, today) {
     const domain = window.AuditPlanningDomain;
     if (!certificate || !domain || typeof domain.resolveCertificateCycle !== 'function') return null;
@@ -1013,11 +1061,11 @@ function renderCertificationCycleWidget(client) {
             })
             : null;
 
-        let cycleEnd, surv1, surv2, recertAudit, currentStage, nextAudit, progress;
+        let cycleEnd, surv1, surv2, recertAudit, currentStage, nextAudit;
         let s1Done, s2Done, recertDone, expired;
         if (cs) {
             cycleEnd = cs.cycleEnd; surv1 = cs.surv1Due; surv2 = cs.surv2Due; recertAudit = cs.recertDue;
-            currentStage = cs.stage; progress = cs.progress;
+            currentStage = cs.stage;
             nextAudit = cs.nextAudit ? cs.nextAudit.date : null;
             s1Done = cs.completed.s1; s2Done = cs.completed.s2; recertDone = cs.completed.recert;
             expired = cs.expired;
@@ -1026,22 +1074,20 @@ function renderCertificationCycleWidget(client) {
             surv1 = new Date(issueDate); surv1.setFullYear(surv1.getFullYear() + 1);
             surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
             recertAudit = new Date(cycleEnd); recertAudit.setDate(recertAudit.getDate() - 60);
-            currentStage = "Initial Certification"; nextAudit = surv1; progress = 0;
-            if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; progress = 33; }
-            if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; progress = 66; }
-            if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = cycleEnd; progress = 90; }
-            if (today > cycleEnd) { currentStage = "Expired"; nextAudit = null; progress = 100; }
+            currentStage = "Initial Certification"; nextAudit = surv1;
+            if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; }
+            if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; }
+            if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = cycleEnd; }
+            if (today > cycleEnd) { currentStage = "Expired"; nextAudit = null; }
             const recentAudit = findRecentFinalizedAudit(client.id, std);
             if (recentAudit && currentStage === "Recertification Due"
                 && !/re-?cert/.test(String(recentAudit.auditType || recentAudit.type || '').toLowerCase())) {
-                currentStage = "Surveillance 2"; nextAudit = recertAudit; progress = 66;
+                currentStage = "Surveillance 2"; nextAudit = recertAudit;
             }
             s1Done = today > surv1; s2Done = today > surv2; recertDone = false;
             expired = today > cycleEnd;
         }
 
-        const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
-        const isUrgent = daysToNext > 0 && daysToNext <= 60;
         // The stage is the calendar's (year of the cycle from the Initial Date);
         // the dots carry what was actually performed. Current Issue / Expiry are
         // the current annual period the cycle implies, not the certificate on
@@ -1059,6 +1105,10 @@ function renderCertificationCycleWidget(client) {
         currentStage = stages.current;
         const windowState = cycleRecord && window.AuditPlanningDomain
             ? window.AuditPlanningDomain.describeCycleWindow(cycleRecord, today) : null;
+        const view = cycleLifecycleView({
+            current: currentStage, done: { s1: s1Done, s2: s2Done, recert: recertDone }, expired,
+            dues: { s1: surv1, s2: surv2, recert: recertAudit }, windowState, today
+        });
         const scheduledPlan = (window.state.auditPlans || [])
             .filter(plan => plan.client === client.name && plan.status === 'Scheduled' && String(plan.standard || '').includes(std))
             .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
@@ -1079,8 +1129,9 @@ function renderCertificationCycleWidget(client) {
                         </div>
                         
                         <!-- Progress Bar -->
-                        <div style="background: rgba(255,255,255,0.6); border-radius: 8px; height: 8px; overflow: hidden; margin-bottom: 0.75rem;">
-                            <div style="background: ${expired ? '#dc2626' : progress >= 66 ? '#f59e0b' : '#3b82f6'}; height: 100%; width: ${progress}%; transition: width 0.3s ease;"></div>
+                        <div class="cycle-progress" data-current="${view.currentKey || 'complete'}" data-status="${view.status}" style="position: relative; background: rgba(255,255,255,0.6); border-radius: 8px; height: 8px; overflow: hidden; margin-bottom: 0.75rem;">
+                            <div class="cycle-progress-current" style="position: absolute; left: 0; top: 0; background: ${view.progress.colour}; height: 100%; width: ${view.progress.currentPct}%; transition: width 0.3s ease;"></div>
+                            <div class="cycle-progress-done" style="position: absolute; left: 0; top: 0; background: ${LIFECYCLE_COLOURS.completed}; height: 100%; width: ${view.progress.completedPct}%; transition: width 0.3s ease;"></div>
                         </div>
 
                         <!-- Current Stage Info -->
@@ -1100,8 +1151,8 @@ function renderCertificationCycleWidget(client) {
                                 </div>
                                 ${expiryWarning ? `<div style="font-size:.75rem;color:#dc2626;margin-top:.25rem;"><i class="fa-solid fa-triangle-exclamation"></i> Scheduled dates approach certificate expiry and may not preserve the NC closure buffer.</div>` : ''}
                             </div>
-                            ` : nextAudit ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Next Audit Stage</div><div style="font-size:1.1rem;font-weight:600;color:${isUrgent ? '#dc2626' : '#1e293b'};margin-top:.25rem;">${stages.next || currentStage}</div></div>` : '<div></div>'}
-                            ${cycleRecord ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Recommended Audit Window</div><div style="font-size:1.1rem;font-weight:600;color:${windowState?.state === 'closed' ? '#b91c1c' : '#1e293b'};margin-top:.25rem;">${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}</div>${LIFECYCLE_STAGES.includes(cycleRecord.auditType) ? `<div style="font-size:.7rem;color:#64748b;margin-top:.15rem;">For ${cycleRecord.auditType}</div>` : ''}${cycleWindowCaption(cycleRecord, windowState)}</div>` : '<div></div>'}
+                            ` : nextAudit ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Next Audit Stage</div><div style="font-size:1.1rem;font-weight:600;color:#1e293b;margin-top:.25rem;">${stages.next || currentStage}</div></div>` : '<div></div>'}
+                            ${cycleRecord ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Recommended Audit Window</div><div style="font-size:1.1rem;font-weight:600;color:${view.status === 'overdue' ? '#b91c1c' : view.status === 'open' ? '#b45309' : '#1e293b'};margin-top:.25rem;">${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}</div>${LIFECYCLE_STAGES.includes(cycleRecord.auditType) ? `<div style="font-size:.7rem;color:#64748b;margin-top:.15rem;">For ${cycleRecord.auditType}</div>` : ''}${cycleWindowCaption(cycleRecord, windowState)}</div>` : '<div></div>'}
                             <div style="min-width: 0;">
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Current Issue / Expiry</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: ${expired ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(periodStart)} – ${window.UTILS.formatDate(periodEnd)}</div>
@@ -1113,46 +1164,54 @@ function renderCertificationCycleWidget(client) {
                     
                     <!-- Mini Timeline -->
                     ${(() => {
-        // Node states: green ✓ = the audit is FINALIZED in Audit360 (never
-        // shown from the calendar alone); amber ! = that stage's period has
-        // already passed on the calendar but no finalized audit is on file —
-        // the milestone is DUE/MISSED, not blank. Grey = genuinely upcoming.
-        const node = (done, dueDate, sym, label, name, sharedFrom, recorded) => {
-            const overdue = !done && dueDate && today > dueDate;
+        // Dots follow the same lifecycle view as the bar: green ✓ completed
+        // (from a finalized report or a recorded audit — never the calendar
+        // alone); the CURRENT milestone ringed in its status colour (blue not
+        // yet due, amber window open, red overdue); red ! for an earlier
+        // milestone missed outright; grey for every future milestone.
+        const sources = {
+            s1: [cs && cs.sharedEvidence && cs.sharedEvidence.s1, cs && cs.completionRecords && cs.completionRecords.s1],
+            s2: [cs && cs.sharedEvidence && cs.sharedEvidence.s2, cs && cs.completionRecords && cs.completionRecords.s2],
+            recert: [cs && cs.sharedEvidence && cs.sharedEvidence.recert, cs && cs.completionRecords && cs.completionRecords.recert]
+        };
+        const windowText = cycleRecord
+            ? `${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}` : '';
+        const node = (m) => {
+            const [sharedFrom, recorded] = sources[m.key];
+            const colour = LIFECYCLE_COLOURS[m.state];
             // A milestone recorded through Record Completed Audit names when it
             // was performed and by whom (CCI or the third party).
             const recordedTitle = recorded && recorded.performedAt
-                ? `${name} performed ${window.UTILS.formatDate(recorded.performedAt)}`
+                ? `${m.name} performed ${window.UTILS.formatDate(recorded.performedAt)}`
                     + (recorded.source === 'third-party' ? ` by ${recorded.auditor || 'a third party'} (third-party audit)`
                         : recorded.source === 'cci' ? ` by CCI${recorded.auditor ? ' — ' + recorded.auditor : ''}` : ' — recorded completion')
                     + (recorded.evidence && recorded.evidence.length ? ` · ${recorded.evidence.length} evidence file${recorded.evidence.length === 1 ? '' : 's'}` : '')
                 : null;
-            const bg = done ? '#10b981' : overdue ? '#f59e0b' : '#cbd5e1';
             // A tick earned on a sibling certificate of the same cycle names that
             // certificate, so the evidence behind it stays traceable.
-            const title = done
+            const title = m.state === 'completed'
                 ? (recordedTitle ? window.UTILS.escapeHtml(recordedTitle) : null) || (sharedFrom
-                    ? `${name} recorded on certificate ${sharedFrom} — same certification cycle`
-                    : `${name} audit finalized`)
-                : overdue ? `${name} period passed (${window.UTILS.formatDate(dueDate)}) — no finalized audit on file`
-                    : `${name} not yet due`;
-            return `<div style="text-align: center;" title="${title}">
-                            <div style="width: 32px; height: 32px; background: ${bg}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">${done ? '✓' : overdue ? '!' : sym}</div>
-                            <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">${label}</div>
+                    ? `${m.name} recorded on certificate ${sharedFrom} — same certification cycle`
+                    : `${m.name} audit finalized`)
+                : m.state === 'upcoming' ? `${m.name} — current stage, not yet due${windowText ? ' (window ' + windowText + ')' : ''}`
+                    : m.state === 'open' ? `${m.name} — current stage, audit window open${windowText ? ' (' + windowText + ')' : ''}`
+                        : m.state === 'overdue' ? `${m.name} — current stage, overdue${windowText ? ' (window ' + windowText + ' has closed)' : ''}`
+                            : m.state === 'missed' ? `${m.name} missed — period passed${m.due ? ' (' + window.UTILS.formatDate(m.due) + ')' : ''} with no audit on file`
+                                : `${m.name} — future stage`;
+            const glyph = m.state === 'completed' ? '✓' : (m.state === 'overdue' || m.state === 'missed') ? '!' : m.sym;
+            const ring = m.current ? `box-shadow: 0 0 0 3px ${colour}40;` : '';
+            return `<div class="cycle-node" data-milestone="${m.key}" data-state="${m.state}" style="text-align: center;" title="${title}">
+                            <div style="width: 32px; height: 32px; background: ${colour}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem; ${ring}">${glyph}</div>
+                            <div style="font-size: 0.65rem; color: ${m.current ? colour : '#64748b'}; font-weight: ${m.current ? '700' : '400'}; margin-top: 0.25rem;">${m.label}</div>
                         </div>`;
         };
-        const link = (reached) => `<div style="width: 20px; height: 2px; background: ${reached ? '#10b981' : '#cbd5e1'};"></div>`;
+        const link = (m) => `<div style="width: 20px; height: 2px; background: ${m.state === 'completed' ? LIFECYCLE_COLOURS.completed : m.current ? LIFECYCLE_COLOURS[m.state] : LIFECYCLE_COLOURS.future};"></div>`;
         return `<div style="display: flex; gap: 0.5rem; align-items: center;">
-                        <div style="text-align: center;">
-                            <div style="width: 32px; height: 32px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">✓</div>
+                        <div class="cycle-node" data-milestone="cert" data-state="completed" style="text-align: center;" title="Certification">
+                            <div style="width: 32px; height: 32px; background: ${LIFECYCLE_COLOURS.completed}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;">✓</div>
                             <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">Cert</div>
                         </div>
-                        ${link(s1Done)}
-                        ${node(s1Done, surv1, '1', 'S1', 'Surveillance 1', cs && cs.sharedEvidence && cs.sharedEvidence.s1, cs && cs.completionRecords && cs.completionRecords.s1)}
-                        ${link(s2Done)}
-                        ${node(s2Done, surv2, '2', 'S2', 'Surveillance 2', cs && cs.sharedEvidence && cs.sharedEvidence.s2, cs && cs.completionRecords && cs.completionRecords.s2)}
-                        ${link(recertDone)}
-                        ${node(recertDone, recertAudit, '↻', 'Re', 'Recertification', cs && cs.sharedEvidence && cs.sharedEvidence.recert, cs && cs.completionRecords && cs.completionRecords.recert)}
+                        ${view.milestones.map(m => link(m) + node(m)).join('')}
                     </div>`;
     })()}
                 </div>
@@ -1258,6 +1317,22 @@ function renderAuditCycleTimeline(client) {
     const s2Done = cs ? cs.completed.s2 : today > surv2;
     const recertDone = cs ? cs.completed.recert : today > recertAudit;
     const cycleExpired = cs ? cs.expired : today > cycleEnd;
+    // The same lifecycle view as the overview card: the line runs to the
+    // current milestone, which alone carries a status colour.
+    const view = cycleLifecycleView({
+        current: currentStage, done: { s1: s1Done, s2: s2Done, recert: recertDone }, expired: cycleExpired,
+        dues: { s1: tl.surv1, s2: tl.surv2, recert: tl.recert }, windowState, today
+    });
+    const stateOf = (key) => view.milestones.find(m => m.key === key);
+    const doneAt = view.currentIndex === 4 ? 75 : Math.round(view.progress.completedPct * 0.75);
+    const currentAt = Math.min(view.currentIndex, 3) * 25;
+    const lineGradient = `linear-gradient(90deg, ${LIFECYCLE_COLOURS.completed} 0%, ${LIFECYCLE_COLOURS.completed} ${doneAt}%, `
+        + `${view.progress.colour} ${doneAt}%, ${view.progress.colour} ${currentAt}%, ${LIFECYCLE_COLOURS.future} ${currentAt}%, ${LIFECYCLE_COLOURS.future} 100%)`;
+    const bigNode = (key, icon) => {
+        const m = stateOf(key);
+        const ring = m.current ? `box-shadow: 0 0 0 4px ${LIFECYCLE_COLOURS[m.state]}40;` : '';
+        return `<div class="cycle-node" data-milestone="${key}" data-state="${m.state}" style="width: 40px; height: 40px; background: ${LIFECYCLE_COLOURS[m.state]}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white; ${ring}"><i class="fa-solid ${m.state === 'completed' ? 'fa-check' : (m.state === 'overdue' || m.state === 'missed') ? 'fa-exclamation' : icon}"></i></div>`;
+    };
 
     return `
         <div class="fade-in">
@@ -1302,7 +1377,7 @@ function renderAuditCycleTimeline(client) {
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; position: relative; padding: 2rem 0;">
-                    <div style="position: absolute; top: 50%; left: 5%; right: 5%; height: 4px; background: linear-gradient(90deg, #10b981 0%, #10b981 25%, #3b82f6 25%, #3b82f6 50%, #3b82f6 50%, #3b82f6 75%, #f59e0b 75%, #f59e0b 90%, #dc2626 90%); border-radius: 2px;"></div>
+                    <div class="cycle-progress" data-current="${view.currentKey || 'complete'}" data-status="${view.status}" style="position: absolute; top: 50%; left: 5%; right: 5%; height: 4px; background: ${lineGradient}; border-radius: 2px;"></div>
                     
                     <div style="text-align: center; z-index: 1;">
                         <div style="width: 40px; height: 40px; background: #10b981; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-check"></i></div>
@@ -1311,28 +1386,28 @@ function renderAuditCycleTimeline(client) {
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
-                        <div style="width: 40px; height: 40px; background: ${s1Done ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
+                        ${bigNode('s1', 'fa-eye')}
                         <div style="font-weight: 500; font-size: 0.9rem;">Surv 1</div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(tl.surv1)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">Year 1</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
-                        <div style="width: 40px; height: 40px; background: ${s2Done ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
+                        ${bigNode('s2', 'fa-eye')}
                         <div style="font-weight: 500; font-size: 0.9rem;">Surv 2</div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(tl.surv2)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">Year 2</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
-                        <div style="width: 40px; height: 40px; background: ${recertDone ? '#10b981' : '#f59e0b'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-sync"></i></div>
+                        ${bigNode('recert', 'fa-sync')}
                         <div style="font-weight: 500; font-size: 0.9rem;">Recert Audit</div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(tl.recert)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">60 days before</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
-                        <div style="width: 40px; height: 40px; background: ${cycleExpired ? '#dc2626' : '#94a3b8'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-hourglass-end"></i></div>
+                        <div style="width: 40px; height: 40px; background: ${cycleExpired ? LIFECYCLE_COLOURS.overdue : LIFECYCLE_COLOURS.future}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-hourglass-end"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Expiry</div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(tl.end)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">Year 3</div>
