@@ -85,6 +85,17 @@ const UTILS = {
         return UTILS.parseStandards(stored).some(function (s) { return want.indexOf(s) !== -1; });
     },
 
+    // Is EVERY standard a stored string names one of `held`? The rule for
+    // offering a checklist to a client or a plan: an integrated ISO 27001 +
+    // ISO 22301 + ISO 20000-1 checklist is for a client that holds all three,
+    // not for one that holds ISO 27001 alone. A string naming no standard is
+    // within nothing.
+    standardsWithin: function (stored, held) {
+        const want = (held || []).map(function (s) { return UTILS.canonicalStandard(s); });
+        const named = UTILS.parseStandards(stored);
+        return named.length > 0 && named.every(function (s) { return want.indexOf(s) !== -1; });
+    },
+
     // Should this picker option show as selected? Compares canonically, so a
     // client carrying a raw registry label still ticks the matching chip.
     isStandardSelected: function (stored, option) {

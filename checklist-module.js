@@ -90,11 +90,13 @@ function renderChecklistLibrary(clientId) {
     // shown ISO 9001:2026. (The old substring match on normalised keys did
     // both, since "cgmp" contains "gmp".)
     const clientStandards = scopedClient ? window.UTILS.clientStandards(scopedClient) : [];
-    // A checklist can name several standards (an integrated-system checklist),
-    // so it is relevant when ANY of its standards is one the client holds.
+    // A checklist can name several standards (an integrated-system checklist).
+    // It is relevant only when the client holds EVERY one of them: a combined
+    // ISO 27001 / 22301 / 20000-1 checklist is not offered to a client that
+    // holds ISO 27001 alone.
     const targetsClientStandard = (c) => {
         if (!clientStandards.length) return true; // client has none recorded — don't hide everything
-        return window.UTILS.standardsOverlap(c.standard || '', clientStandards);
+        return window.UTILS.standardsWithin(c.standard || '', clientStandards);
     };
 
     // Does this checklist belong to the scoped client?
