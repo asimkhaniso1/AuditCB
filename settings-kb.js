@@ -2054,6 +2054,10 @@ function _resolveChecklistStandard(doc, client) {
     return near || canon;
 }
 
+// Build Checklist (client-docs-bulk.js) uses the same mapping to find the
+// Knowledge Base document behind a scheme.
+window._resolveChecklistStandard = _resolveChecklistStandard;
+
 // "Create Checklist" in a standard's analysis view: ask for the audit type,
 // client and depth first, on the same screen the analysis uses.
 window.openCreateChecklistFromKB = function (docId) {

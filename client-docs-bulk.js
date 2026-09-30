@@ -2128,8 +2128,29 @@
         };
     }
 
+    /**
+     * The analysed Knowledge Base document that stands for a scheme on this
+     * client — "GMP Guidelines Pakistan" for a cGMP holder. Its title is not
+     * the scheme's name, so it is matched the way a checklist built from it is
+     * labelled (settings-kb.js _resolveChecklistStandard).
+     */
+    function schemeKnowledgeDoc(schemeName, client) {
+        const kb = (window.state && window.state.knowledgeBase) || {};
+        const resolve = window._resolveChecklistStandard;
+        const canon = window.UTILS && window.UTILS.canonicalStandard;
+        if (!Array.isArray(kb.standards) || typeof resolve !== 'function' || typeof canon !== 'function') return null;
+        const wanted = canon(schemeName);
+        return kb.standards.find(s => s && s.status === 'ready' && Array.isArray(s.clauses) && s.clauses.length
+            && canon(resolve(s, client)) === wanted) || null;
+    }
+
+    function schemeSourceNote(schemeName, client) {
+        const doc = schemeKnowledgeDoc(schemeName, client);
+        return doc ? ` and the Knowledge Base (${esc(doc.name)})` : '';
+    }
+
     /** Clause list for a standard: analysed KB first, built-in list otherwise. */
-    function clausesForStandard(standardName) {
+    function clausesForStandard(standardName, client) {
         const kb = (window.state && window.state.knowledgeBase) || {};
         const normalize = window.KB_HELPERS && window.KB_HELPERS.normalizeStdName;
         if (Array.isArray(kb.standards) && normalize) {
@@ -2140,6 +2161,8 @@
             );
             if (doc) return { clauses: doc.clauses, source: `Knowledge Base — ${doc.name}` };
         }
+        const schemeDoc = client ? schemeKnowledgeDoc(standardName, client) : null;
+        if (schemeDoc) return { clauses: schemeDoc.clauses, source: `Knowledge Base — ${schemeDoc.name}` };
         // The scope-gated registry answers for the standards it holds, without
         // needing settings-kb.js to have been loaded and without the ISO 9001
         // default that used to stand in for every unrecognised standard.
@@ -3444,6 +3467,19 @@
         const registry = (clientStandards.length || presetStandard)
             ? fullRegistry.filter(s => preselected.has(s.id))
             : fullRegistry;
+        // Schemes the client holds that have no clause set in the registry
+        // (Halal, cGMP, HACCP…). They are selectable too: their checklist is
+        // built by the document-driven builder, with the scheme's analysed
+        // Knowledge Base document supplying the clauses where there is one.
+        const schemes = scopeResolved.unresolved.slice();
+        // Ticked when the screen opens: what the PLAN is for, when it names a
+        // standard — a cGMP plan opens on cGMP, not on the client's ISO 9001.
+        // From the client's Checklists page (no plan standard) the client's
+        // registry standards are ticked, as before.
+        const presetResolved = presetStandard && window.ChecklistStandards
+            ? window.ChecklistStandards.resolve(presetStandard) : null;
+        const tickedIds = presetResolved ? new Set(presetResolved.standards.map(s => s.id)) : preselected;
+        const tickedSchemes = new Set(presetResolved ? presetResolved.unresolved : []);
         const audit = normalizeAuditType(presetAuditType || 'surveillance');
         const mappedCount = docs.filter(d => d.linkedClauses).length;
         const context = [
@@ -3475,18 +3511,21 @@
             </div>
             <div class="form-group">
                 <label>Audit scope — standards</label>
-                ${registry.length ? `<div style="display:flex;flex-direction:column;gap:0.35rem;padding:0.5rem 0.1rem;">
+                ${(registry.length || schemes.length) ? `<div style="display:flex;flex-direction:column;gap:0.35rem;padding:0.5rem 0.1rem;">
                     ${registry.map(s => `<label style="display:flex;gap:0.5rem;align-items:center;cursor:pointer;">
-                        <input type="checkbox" class="cldoc-std" value="${esc(s.id)}" ${preselected.has(s.id) ? 'checked' : ''}>
+                        <input type="checkbox" class="cldoc-std" value="${esc(s.id)}" ${tickedIds.has(s.id) ? 'checked' : ''}>
                         <span>${esc(s.label)} <span style="color:var(--text-secondary);font-size:0.82rem;">— ${esc(s.systemNoun)}${s.hasSoA ? ', incl. Annex A / SoA sampling' : ''}</span></span>
+                    </label>`).join('')}
+                    ${schemes.map(name => `<label style="display:flex;gap:0.5rem;align-items:center;cursor:pointer;">
+                        <input type="checkbox" class="cldoc-scheme" value="${esc(name)}" ${tickedSchemes.has(name) ? 'checked' : ''}>
+                        <span>${esc(name)} <span style="color:var(--text-secondary);font-size:0.82rem;">— scheme, built from the client's documents${schemeSourceNote(name, client)}</span></span>
                     </label>`).join('')}
                 </div>
                 <small style="color: var(--text-secondary);">Only the standards ticked here can generate clauses, controls or questions. Nothing is inferred from another standard.</small>` : ''}
-                ${scopeResolved.unresolved.length ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;border-radius:0 6px 6px 0;padding:0.55rem 0.85rem;margin-top:0.6rem;font-size:0.83rem;">
-                    <strong>${esc(scopeResolved.unresolved.join(', '))}</strong> ${scopeResolved.unresolved.length > 1 ? 'have' : 'has'} no validated clause set in the registry.
-                    ${standards.length ? 'The document-driven builder will be used for it and the checklist will flag it for auditor review.' : ''}
+                ${schemes.length ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;border-radius:0 6px 6px 0;padding:0.55rem 0.85rem;margin-top:0.6rem;font-size:0.83rem;">
+                    <strong>${esc(schemes.join(', '))}</strong> ${schemes.length > 1 ? 'have' : 'has'} no clause set in the registry, so ${schemes.length > 1 ? 'their' : 'its'} coverage is confirmed by the auditor rather than machine-checked. Build a scheme checklist separately from the ISO standards.
                 </div>` : ''}
-                <select class="form-control" id="cldoc-standard" style="${registry.length ? 'display:none;' : ''}margin-top:0.5rem;">
+                <select class="form-control" id="cldoc-standard" style="${(registry.length || schemes.length) ? 'display:none;' : ''}margin-top:0.5rem;">
                     ${standards.length ? standards.map(s => `<option ${s === presetStandard ? 'selected' : ''}>${esc(s)}</option>`).join('') : '<option value="">(not set on client)</option>'}
                 </select>
             </div>
@@ -3517,8 +3556,20 @@
             </label>
         </div>`, () => {
             const auditType = document.getElementById('cldoc-audit-type').value;
-            const standard = document.getElementById('cldoc-standard').value;
             const standardIds = Array.from(document.querySelectorAll('.cldoc-std:checked')).map(el => el.value);
+            const schemeNames = Array.from(document.querySelectorAll('.cldoc-scheme:checked')).map(el => el.value);
+            // A registry standard is built from its clause set, a scheme from
+            // the client's documents: one checklist cannot be both, and each
+            // certificate is audited on its own plan anyway.
+            if (standardIds.length && schemeNames.length) {
+                notify('Build the ' + schemeNames.join(' / ') + ' checklist separately from the ISO standards — untick one group.', 'error');
+                return;
+            }
+            if (!standardIds.length && !schemeNames.length && document.querySelector('.cldoc-std, .cldoc-scheme')) {
+                notify('Tick the standard this checklist is for.', 'error');
+                return;
+            }
+            const standard = schemeNames.length ? schemeNames.join(', ') : document.getElementById('cldoc-standard').value;
             const includeMandatory = document.getElementById('cldoc-mandatory').checked;
             const includeOrgContext = document.getElementById('cldoc-org').checked;
             const soaField = document.getElementById('cldoc-soa');
@@ -3527,7 +3578,7 @@
                 : [];
             const standardClauses = normalizeAuditType(auditType) === 'surveillance'
                 ? null
-                : clausesForStandard(standard).clauses;
+                : clausesForStandard(standard, client).clauses;
             const plan = planId ? window.DataService.findAuditPlan(planId) : null;
             const focusPoints = (plan && plan.preAudit && plan.preAudit.focusPoints) || [];
             const lengthValue = document.getElementById('cldoc-length').value;
