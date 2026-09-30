@@ -172,8 +172,8 @@
         // Every branch below reports the override it did NOT apply, so the
         // card can say why a stage someone authorised is not in force.
         const withSuperseded = (result) => Object.assign({ supersededOverride, supersededReason }, result);
-        // The calendar decides. ReportStats places today in a year of the
-        // cycle anchored on the Initial Date; the audit owed is the first
+        // The lifecycle decides, on the cycle the Initial Date anchors: the
+        // audit owed — and so the stage — is the first
         // milestone of THIS cycle not yet performed whose window has not
         // closed. A surveillance just past its due date is still owed while its
         // window runs (that is what the recommended window promises); once the
@@ -196,12 +196,12 @@
             const done = cycleState.completed || {};
             if (done.recert) return withSuperseded({ auditType: 'Recertification', stage: cycleState.stage, complete: true, projected: true });
             if (!done.s1 && stillSchedulable(cycleState.surv1Due)) {
-                return withSuperseded({ auditType: 'Surveillance 1', stage: cycleState.stage, projected: true });
+                return withSuperseded({ auditType: 'Surveillance 1', stage: 'Surveillance 1', projected: true });
             }
             if (!done.s2 && stillSchedulable(cycleState.surv2Due)) {
-                return withSuperseded({ auditType: 'Surveillance 2', stage: cycleState.stage, projected: true });
+                return withSuperseded({ auditType: 'Surveillance 2', stage: 'Surveillance 2', projected: true });
             }
-            return withSuperseded({ auditType: 'Recertification', stage: cycleState.stage, projected: true });
+            return withSuperseded({ auditType: 'Recertification', stage: 'Recertification', projected: true });
         }
         const completedTypes = new Set(safeArray(events).map((event) => event.type));
         const completed = cycleState?.completed || {};
@@ -283,7 +283,7 @@
             // is never deleted, it simply stops steering planning.
             supersededOverride: derived.supersededOverride || null,
             supersededReason: derived.supersededReason || null,
-            cycleExpired: !!derived.expired, lifecycleEvents: events
+            cycleExpired: !!derived.expired, complete: !!derived.complete, lifecycleEvents: events
         };
     }
 

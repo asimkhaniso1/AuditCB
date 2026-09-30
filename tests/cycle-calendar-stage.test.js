@@ -5,9 +5,10 @@ const ReportStats = require('../report-stats.js');
 const Domain = require('../audit-planning-domain.js');
 
 // The certification cycle starts from the Initial Date and rolls every three
-// years. The stage is the year of the cycle today falls in — Year 1
-// Surveillance 1, Year 2 Surveillance 2, Year 3 Recertification — whether or
-// not any audit was performed; a performed audit only ticks its milestone.
+// years; the cycle number, year and annual period follow the calendar. The
+// stage follows the lifecycle — Surveillance 1, Surveillance 2,
+// Recertification — and is the audit owed: the first not performed whose
+// window is still open. A milestone missed outright lets the stage move on.
 // Current Issue / Expiry shown are the current annual period of that cycle,
 // whatever certificate happens to be on file.
 const iso = (d) => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null);
@@ -38,7 +39,7 @@ describe('PC CONNECTION on 26/09/2026 — Initial Date 16/12/2022', () => {
 
     it('names the stage by the year — Surveillance 1 — not "New cycle started"', () => {
         expect(cycleState.stage).toBe('Surveillance 1');
-        expect(cycleState.stageSource).toBe('calendar');
+        expect(cycleState.stageSource).toBe('lifecycle');
     });
 
     it('shows the current annual period as Current Issue 16/12/2025 and Expiry 15/12/2026', () => {
@@ -53,14 +54,16 @@ describe('PC CONNECTION on 26/09/2026 — Initial Date 16/12/2022', () => {
     });
 });
 
-describe('the stage does not depend on whether an audit was performed', () => {
-    it('reads the same stage with a finalized Surveillance 1 on file as without', () => {
+describe('the stage follows the audits performed, on the calendar cycle', () => {
+    it('moves from Surveillance 1 to Surveillance 2 once Surveillance 1 is finalized', () => {
         const without = resolve({ certificate: pcCert(), today: '2026-11-30' });
         const withS1 = resolve({
             certificate: pcCert(), today: '2026-11-30',
             reports: [{ client: 'PC CONNECTION, INC.', standard: 'ISO/IEC 27001:2022', auditType: 'Surveillance 1', reportStatus: 'final', date: '2026-11-20' }]
         });
-        expect(withS1.cycleState.stage).toBe(without.cycleState.stage);
+        expect(without.cycleState.stage).toBe('Surveillance 1');
+        expect(withS1.cycleState.stage).toBe('Surveillance 2');
+        expect(withS1.cycleState.cycleLabel).toBe(without.cycleState.cycleLabel);
         expect(withS1.cycleState.completed.s1).toBe(true);
         expect(without.cycleState.completed.s1).toBe(false);
         // A performed audit is never asked for twice: the next one is S2.
@@ -68,9 +71,9 @@ describe('the stage does not depend on whether an audit was performed', () => {
         expect(without.record.auditType).toBe('Surveillance 1');
     });
 
-    it('moves to Year 2 on the anniversary even with Surveillance 1 never done, and stops asking for it once its window closes', () => {
+    it('moves to Year 2 on the anniversary with Surveillance 1 still owed, and moves the stage on once its window closes', () => {
         const inWindow = resolve({ certificate: pcCert(), today: '2027-01-05' });   // S1 window open to 15/01/2027
-        expect(inWindow.cycleState.stage).toBe('Surveillance 2');
+        expect(inWindow.cycleState.stage).toBe('Surveillance 1');
         expect(inWindow.cycleState.cycleLabel).toBe('Cycle 2 · Year 2');
         expect(iso(inWindow.cycleState.periodStart)).toBe('2026-12-16');
         expect(iso(inWindow.cycleState.periodEnd)).toBe('2027-12-15');

@@ -38,7 +38,7 @@ describe('a cycle counts only its own client´s records', () => {
         expect(state.completed.s1).toBe(false);
         expect(state.surveillancesDone).toBe(0);
         expect(state.stage).toBe('Surveillance 1');   // Year 1 of the first cycle
-        expect(state.stageSource).toBe('calendar');
+        expect(state.stageSource).toBe('lifecycle');
     });
 
     it('still counts the client´s own audit when it is matched by name alone', () => {

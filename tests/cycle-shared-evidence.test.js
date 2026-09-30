@@ -47,7 +47,7 @@ describe('completion evidence within one certification cycle', () => {
         expect(iso27001.sharedEvidence.s1).toBe('22PK9032');
         expect(iso27001.sharedEvidence.s2).toBe('22PK9032');
         // Evidence ticks milestones; the stage itself stays the calendar's.
-        expect(iso27001.stageSource).toBe('calendar');
+        expect(iso27001.stageSource).toBe('lifecycle');
     });
 
     it('leaves both cards of the cycle reading the same', () => {
@@ -81,7 +81,7 @@ describe('completion evidence within one certification cycle', () => {
         expect(iso27001.completed.s1).toBe(false);
         expect(iso27001.completed.s2).toBe(false);
         expect(iso27001.sharedEvidence.s1).toBeNull();
-        expect(iso27001.stageSource).toBe('calendar');
+        expect(iso27001.stageSource).toBe('lifecycle');
     });
 
     it('will not lend evidence when only the expiry differs', () => {
@@ -135,7 +135,7 @@ describe('completion evidence within one certification cycle', () => {
         expect(iso27001.completed.s2).toBe(true);
         expect(iso27001.sharedEvidence.s1).toBe('22PK9032');
         expect(iso27001.sharedEvidence.s2).toBe('22PK9032');
-        expect(iso27001.stageSource).toBe('calendar');
+        expect(iso27001.stageSource).toBe('lifecycle');
         expect(iso27001.completed).toEqual(state('ISO 9001:2015').completed);
     });
 

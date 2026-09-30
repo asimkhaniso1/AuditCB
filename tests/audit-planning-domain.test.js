@@ -53,7 +53,7 @@ describe('certification-cycle-driven audit planning domain', () => {
         expect(context.certificateIds).toEqual(['PC-CERT-1', 'PC-CERT-2', 'PC-CERT-3']);
         expect(context.certificateExpiry).toBe('2026-12-15');
         expect(context.policy.version).toBe('CB-PLAN-2026-01');
-        expect(context.cycles.every((cycle) => cycle.stageSource === 'calendar')).toBe(true);
+        expect(context.cycles.every((cycle) => cycle.stageSource === 'lifecycle')).toBe(true);
     });
 
     it('reads the same stage from the calendar when PC CONNECTION has no finalized audit history', () => {
@@ -70,7 +70,7 @@ describe('certification-cycle-driven audit planning domain', () => {
         expect(context.stage).toBe('Recertification');
         expect(context.auditType).toBe('Recertification');
         expect(context.certificateExpiry).toBe('2026-12-15');
-        expect(context.cycles.every((cycle) => cycle.stageSource === 'calendar')).toBe(true);
+        expect(context.cycles.every((cycle) => cycle.stageSource === 'lifecycle')).toBe(true);
     });
 
     it('requires separate plans when stages differ or planning windows do not intersect', () => {

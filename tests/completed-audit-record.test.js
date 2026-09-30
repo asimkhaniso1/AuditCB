@@ -46,7 +46,7 @@ describe('recording an audit that was performed but never captured', () => {
         expect(after.cycleState.completed.s2).toBe(false);
         // The stage stays the calendar's (Year 3 of the cycle begun 05/07/2024)
         // — recording an audit ticks its milestone, it does not move the stage.
-        expect(after.cycleState.stageSource).toBe('calendar');
+        expect(after.cycleState.stageSource).toBe('lifecycle');
         expect(after.cycleState.stage).toBe('Recertification');
         // S2 was due 05/07/2026 and its window closed 04/08/2026 without one:
         // missed, so it no longer holds planning back.
@@ -58,7 +58,11 @@ describe('recording an audit that was performed but never captured', () => {
         const now = new Date('2026-07-20T00:00:00');   // S2 due 05/07/2026, window open to 04/08/2026
         const cycleState = ReportStats.cycleState({ client, standard: CERT.standard, certificate: CERT, allReports: [], allPlans: [], today: now });
         const record = Domain.resolveCertificateCycle({ client, certificate: CERT, cycleState, now, settings: {}, allReports: [], allPlans: [] });
-        expect(cycleState.stage).toBe('Recertification');       // Year 3 on the calendar
+        // Year 3 on the calendar, but S1 is done and S2 is still in its window:
+        // the stage is Surveillance 2 and Recertification follows.
+        expect(cycleState.cycleLabel).toMatch(/Year 3$/);
+        expect(cycleState.stage).toBe('Surveillance 2');
+        expect(cycleState.nextStage).toBe('Recertification');
         expect(record.auditType).toBe('Surveillance 2');        // still owed, window open
     });
 
