@@ -1943,19 +1943,25 @@ window.renderConfigureChecklist = async function (planId) {
         return otherClientNames.some(n => title.includes(n)) && !(clientNameLower && title.includes(clientNameLower));
     };
 
-    const matchingChecklists = checklists.filter(c => forThisAudit(c) && (isAssigned(c) || !ownedByAnotherClient(c)));
-    const hiddenChecklists = checklists.filter(c => !matchingChecklists.includes(c));
-
-    const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
     const clientName = plan.client || '';
-    const clientChecklists = matchingChecklists.filter(c => {
+    const belongsToThisClient = (c) => {
         const cType = (c.type || '').toLowerCase();
         if (cType === 'global') return false;
         if (c.clientName === clientName) return true;
         if (client && String(c.clientId) === String(client.id)) return true;
         if (clientName && c.name && c.name.toLowerCase().includes(clientName.toLowerCase())) return true;
         return false;
-    });
+    };
+    // The client's own checklists are always offered, at the top, whatever
+    // standard they are labelled with — a checklist built for this client is
+    // the first thing to reach for, and a mislabelled standard must not bury
+    // it among the hidden ones.
+    const matchingChecklists = checklists.filter(c => isAssigned(c) || belongsToThisClient(c)
+        || (forThisAudit(c) && !ownedByAnotherClient(c)));
+    const hiddenChecklists = checklists.filter(c => !matchingChecklists.includes(c));
+
+    const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
+    const clientChecklists = matchingChecklists.filter(belongsToThisClient);
     // Catch-all: non-global checklists not matched to this client (e.g. imported CSVs)
     const clientClIds = new Set(clientChecklists.map(c => c.id));
     const otherChecklists = matchingChecklists.filter(c => {
@@ -2173,6 +2179,26 @@ window.renderConfigureChecklist = async function (planId) {
             // Also toggle the main checklist checkbox
             const mainCb = document.querySelector(`.checklist-select-cb[data-id="${clId}"]`);
             if (mainCb && isChecked) mainCb.checked = true;
+        });
+    });
+
+    // Ticking a checklist puts its questions in scope. The box used to tick
+    // only itself: a newly chosen checklist had no question selected, so
+    // Review & Merge reported "No items selected" and Save stored the
+    // checklist with an empty scope. Ticking selects every question unless
+    // some are already picked; unticking clears them.
+    document.querySelectorAll('.checklist-select-cb').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const clId = cb.getAttribute('data-id');
+            const itemCbs = Array.from(document.querySelectorAll(`.item-select-cb[data-checklist-id="${clId}"]`));
+            if (cb.checked) {
+                if (!itemCbs.some(i => i.checked)) itemCbs.forEach(i => { i.checked = true; });
+            } else {
+                itemCbs.forEach(i => { i.checked = false; });
+            }
+            const all = document.querySelector(`.select-all-items-cb[data-checklist-id="${clId}"]`);
+            if (all) all.checked = itemCbs.length > 0 && itemCbs.every(i => i.checked);
+            window.configItemSelectionChanged(clId);
         });
     });
 };

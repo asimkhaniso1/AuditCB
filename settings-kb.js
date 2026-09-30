@@ -1997,6 +1997,26 @@ function _buildChecklistTitle(doc, auditType, clientName) {
     return parts.join(' - ');
 }
 
+// The standard a checklist built from a Knowledge Base document is for. The
+// document's TITLE is not a standard: "GMP Guidelines Pakistan" produced
+// checklists labelled with that title, which no plan or client standard
+// matches. An ISO title is already the standard; otherwise the client's own
+// held standard the title points at wins (a cGMP client's GMP guideline is
+// their cGMP checklist), then the scheme the title starts with (GMP, Halal…).
+function _resolveChecklistStandard(doc, client) {
+    const U = window.UTILS;
+    const name = String((doc && doc.name) || '').trim();
+    const canon = U.canonicalStandard(name);
+    if (/^ISO\b/i.test(name)) return canon;
+    const nameL = name.toLowerCase();
+    const lead = (nameL.match(/[a-z0-9]{3,}/) || [''])[0];
+    const held = client ? U.clientStandards(client) : [];
+    const exact = held.find(h => h.toLowerCase() === canon.toLowerCase() || nameL.includes(h.toLowerCase()));
+    if (exact) return exact;
+    const near = lead ? held.find(h => !/^ISO\b/i.test(h) &&h.toLowerCase().includes(lead)) : null;
+    return near || canon;
+}
+
 // "Create Checklist" in a standard's analysis view: ask for the audit type,
 // client and depth first, on the same screen the analysis uses.
 window.openCreateChecklistFromKB = function (docId) {
@@ -2110,7 +2130,7 @@ window.createChecklistFromKB = async function (docId, opts) {
     const newChecklist = {
         id: Date.now(),
         name: _buildChecklistTitle(doc, auditType, clientName),
-        standard: doc.name,
+        standard: _resolveChecklistStandard(doc, clientRecord),
         type: clientId ? 'custom' : 'global',
         auditType: auditType,
         clientId: clientId || null,
