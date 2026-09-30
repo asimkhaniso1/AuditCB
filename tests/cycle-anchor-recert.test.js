@@ -190,9 +190,9 @@ describe('the cycle restarts at a recertification', () => {
         const { record, cycleState } = cycleFor(certificate);
 
         expect(iso(cycleState.surv1Due)).toBe('2026-09-16');
-        // The calendar has entered Year 2, so that is the stage — but S1's
-        // window is still open, so S1 remains the audit owed.
-        expect(cycleState.stage).toBe('Surveillance 2');
+        // The calendar has entered Year 2, but S1's window is still open, so S1
+        // remains the audit owed — and the stage.
+        expect(cycleState.stage).toBe('Surveillance 1');
         expect(record.auditType).toBe('Surveillance 1');
     });
 

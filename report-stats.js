@@ -798,16 +798,13 @@
         };
         const hasHistory = history.length > 0;
 
-        // The stage is the CALENDAR's. Certification runs in three-year cycles
-        // from the Initial Date, and the year of the cycle today falls in names
-        // the audit that year owes: Year 1 Surveillance 1, Year 2 Surveillance
-        // 2, Year 3 Recertification. Whether an audit was performed neither
-        // holds the stage back nor moves it on — a finalized audit or recorded
-        // completion only ticks its milestone, and a milestone whose period
-        // passed without one shows as missed. (The stage used to be earned from
-        // finalized audits, so a client whose audits were never captured here
-        // sat at "New cycle started" for the whole cycle.)
-        const stageSource = 'calendar';
+        // The CYCLE is the calendar's: three-year cycles from the Initial Date,
+        // and the year and annual period follow the date alone. The STAGE is
+        // the lifecycle's — Certification, Surveillance 1, Surveillance 2,
+        // Recertification, in that order — and is the audit the cycle owes now
+        // (set below, with the due date). The Current Issue / Expiry on file
+        // never moves either.
+        const stageSource = 'lifecycle';
         const cycleYear = today < surv1Due ? 1 : (today < surv2Due ? 2 : 3);
         const monthsFromFirst = (anchor.getFullYear() - firstCertified.getFullYear()) * 12 + (anchor.getMonth() - firstCertified.getMonth());
         const cycleNumber = Math.max(1, Math.round(monthsFromFirst / CYCLE_MONTHS) + 1);
@@ -820,7 +817,6 @@
         const periodStart = addMonths(anchor, (cycleYear - 1) * 12);
         const periodEnd = cycleYear === 3 ? cycleLastDay : dayBefore(addMonths(anchor, cycleYear * 12));
         const cycleLabel = 'Cycle ' + cycleNumber + ' · Year ' + cycleYear;
-        let stage = ['Surveillance 1', 'Surveillance 2', 'Recertification'][cycleYear - 1];
         let progress = Math.max(0, Math.min(100, Math.round((today - anchor) / (cycleEnd - anchor) * 100)));
 
         // The audit owed next: the first milestone of this cycle not yet
@@ -829,13 +825,26 @@
         // it is missed and the cycle moves on. A performed audit is never asked
         // for twice. The planning domain applies the same rule with the CB's
         // configured window (graceDays mirrors surveillanceWindowAfterDays).
+        //
+        // That audit is also the Current Stage, and the one after it the Next
+        // Stage: with Surveillance 1 performed and Surveillance 2 still in its
+        // window, the stage is Surveillance 2 and Recertification follows — even
+        // in the third calendar year. The calendar used to name the stage
+        // (Year 3 = Recertification), which skipped a surveillance that was
+        // still owed. A milestone whose window closed unperformed is missed
+        // (its node shows it) and the stage moves on, so a client whose audits
+        // were never captured here still progresses through the cycle.
         const graceDays = Number.isFinite(Number(input.graceDays)) ? Number(input.graceDays) : 30;
         const stillOpen = (due) => { const end = new Date(due.getTime()); end.setDate(end.getDate() + graceDays); return end >= today; };
-        let dueDate = recertDone ? null
-            : (!completed.s1 && stillOpen(surv1Due)) ? surv1Due
-                : (!completed.s2 && stillOpen(surv2Due)) ? surv2Due
-                    : recertDue;
-        if (!recertDone && today > cycleEnd) { stage = 'Certificate expired'; dueDate = null; progress = 100; }
+        const MILESTONES = ['Surveillance 1', 'Surveillance 2', 'Recertification'];
+        const owed = recertDone ? 3
+            : (!completed.s1 && !completed.s2 && stillOpen(surv1Due)) ? 0
+                : (!completed.s2 && stillOpen(surv2Due)) ? 1
+                    : 2;
+        let stage = owed === 3 ? 'Recertification completed' : MILESTONES[owed];
+        let nextStage = owed >= 2 ? 'Surveillance 1 (next cycle)' : MILESTONES[owed + 1];
+        let dueDate = [surv1Due, surv2Due, recertDue][owed] || null;
+        if (!recertDone && today > cycleEnd) { stage = 'Certificate expired'; nextStage = 'Recertification'; dueDate = null; progress = 100; }
 
         // A real scheduled plan always beats a computed due date.
         let nextAudit = dueDate ? { date: dueDate, source: 'calendar', label: stage } : null;
@@ -863,7 +872,7 @@
             // of certification, and the two must not be conflated.
             certificateExpired: !!rawExpiry && today > rawExpiry,
             completed, surveillancesDone, recertDone, hasHistory, sharedEvidence,
-            stage, stageSource, progress, nextAudit,
+            stage, nextStage, stageSource, progress, nextAudit,
             cycleNumber, cycleYear, cycleLabel, periodStart, periodEnd, cycleLastDay,
             expired: !recertDone && today > cycleEnd,
             lifecycleEvents
