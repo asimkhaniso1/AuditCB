@@ -1,4 +1,5 @@
 // Checklist authoring clause-validation tests.
+const REAL_UTILS = (m => m.default || m)(await import('../utils.js'));
 //
 // Root cause under test: findings inherit `clause` from the checklist item
 // that raised them, and the Report Integrity validator blocks finalization
@@ -164,7 +165,7 @@ describe('checklist-module.js validateChecklistRows (window.validateChecklistRow
 describe('checklist-module.js clause datalist sourcing (window.AuditFrameworks integration)', () => {
     beforeEach(() => {
         window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
-        window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s) };
+        window.UTILS = Object.assign({}, REAL_UTILS, { escapeHtml: (s) => String(s == null ? '' : s) });
         loadModule('./validation.js');
         loadModule('./audit-frameworks.js');
         loadModule('./checklist-module.js');
@@ -217,7 +218,7 @@ describe('checklist-module.js clause datalist sourcing (window.AuditFrameworks i
 describe('renderChecklistLibrary — client scoping', () => {
     beforeEach(() => {
         window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
-        window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s) };
+        window.UTILS = Object.assign({}, REAL_UTILS, { escapeHtml: (s) => String(s == null ? '' : s) });
         window.CONSTANTS = { AUDIT_TYPES: [], AUDIT_SCOPES: [], ROLES: { CERTIFICATION_MANAGER: 'Certification Manager' } };
         // renderChecklistLibrary writes to window.contentArea (script.js caches
         // the element there), not via getElementById.
@@ -295,7 +296,7 @@ describe('renderChecklistLibrary — client scoping', () => {
 describe('renderChecklistLibrary — tolerates an incomplete CONSTANTS.ROLES', () => {
     beforeEach(() => {
         window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
-        window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s) };
+        window.UTILS = Object.assign({}, REAL_UTILS, { escapeHtml: (s) => String(s == null ? '' : s) });
         document.body.innerHTML = '<div id="content-area"></div>';
         window.contentArea = document.getElementById('content-area');
         window.state = {
@@ -336,7 +337,7 @@ describe('renderChecklistLibrary — tolerates an incomplete CONSTANTS.ROLES', (
 describe('renderChecklistLibrary — globals are filtered to the client\'s standards', () => {
     beforeEach(() => {
         window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
-        window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s) };
+        window.UTILS = Object.assign({}, REAL_UTILS, { escapeHtml: (s) => String(s == null ? '' : s) });
         window.CONSTANTS = { AUDIT_TYPES: [], AUDIT_SCOPES: [], ROLES: { CERTIFICATION_MANAGER: 'Certification Manager' } };
         document.body.innerHTML = '<div id="content-area"></div>';
         window.contentArea = document.getElementById('content-area');
@@ -417,7 +418,7 @@ describe('renderChecklistLibrary — globals are filtered to the client\'s stand
 describe('renderChecklistLibrary — Build from Client Documents action', () => {
     beforeEach(() => {
         window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
-        window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s) };
+        window.UTILS = Object.assign({}, REAL_UTILS, { escapeHtml: (s) => String(s == null ? '' : s) });
         window.CONSTANTS = { AUDIT_TYPES: [], AUDIT_SCOPES: [], ROLES: { CERTIFICATION_MANAGER: 'Certification Manager' } };
         document.body.innerHTML = '<div id="content-area"></div>';
         window.contentArea = document.getElementById('content-area');

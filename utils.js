@@ -54,6 +54,37 @@ const UTILS = {
             .filter(Boolean);
     },
 
+    // Every standard a client holds, canonical and de-duplicated: the client
+    // record's own list, each certificate on file (a withdrawn one no longer
+    // counts) and each site's Applicable Standards. The record's list alone
+    // is often stale — SG 1888's says "ISO 9001:2015" while its certificates
+    // and site also carry Halal and cGMP.
+    clientStandards: function (client) {
+        const out = [];
+        if (!client) return out;
+        const add = function (label) {
+            const c = UTILS.canonicalStandard(label);
+            if (c && out.indexOf(c) === -1) out.push(c);
+        };
+        UTILS.parseStandards(client.standard).forEach(add);
+        (client.certificates || []).forEach(function (cert) {
+            if (cert && !/withdrawn/i.test(String(cert.status || ''))) add(cert.standard);
+        });
+        (client.sites || []).forEach(function (site) {
+            const st = site && site.standards;
+            (Array.isArray(st) ? st : String(st || '').split(',')).forEach(add);
+        });
+        return out;
+    },
+
+    // Does a stored standards string (one standard, or an integrated list)
+    // name any of `held`? Canonical, edition-exact: ISO 9001:2026 is not
+    // ISO 9001:2015, and GMP is not cGMP.
+    standardsOverlap: function (stored, held) {
+        const want = (held || []).map(function (s) { return UTILS.canonicalStandard(s); });
+        return UTILS.parseStandards(stored).some(function (s) { return want.indexOf(s) !== -1; });
+    },
+
     // Should this picker option show as selected? Compares canonically, so a
     // client carrying a raw registry label still ticks the matching chip.
     isStandardSelected: function (stored, option) {

@@ -1882,6 +1882,17 @@ window.closeAuditPlan = async function (planId) {
     }
 };
 
+// Reveal (or hide again) the checklists Configure Checklists filters out.
+// Toggled in place rather than re-rendered, so ticks already made are kept.
+window.toggleHiddenPlanChecklists = function (btn) {
+    const box = document.getElementById('config-hidden-checklists');
+    if (!box) return;
+    const show = box.style.display === 'none';
+    box.style.display = show ? '' : 'none';
+    const button = btn && btn.nodeType === 1 ? btn : document.querySelector('[data-action="toggleHiddenPlanChecklists"]');
+    if (button) button.textContent = show ? 'Hide' : 'Show all';
+};
+
 // Checklist Selection Modal for Audit Plan
 // FULL-FORM CHECKLIST CONFIGURATION (Local Overrides for Audit Plans)
 window.renderConfigureChecklist = async function (planId) {
@@ -1904,28 +1915,38 @@ window.renderConfigureChecklist = async function (planId) {
     const savedOverrides = plan.selectedChecklistOverrides || {};
     const selectedIds = plan.selectedChecklists || [];
 
-    // Get all checklists - don't filter by standard match
-    // Users should see all available checklists when configuring an audit plan
     const checklists = state.checklists || [];
     console.info('[ConfigChecklist] state.checklists count:', checklists.length, '| plan.selectedChecklists:', selectedIds);
 
-    // For sorting/highlighting: extract plan standards for reference
+    // Offer the checklists for the standards this audit covers — the plan's
+    // own standards, or failing that every standard the client holds (record,
+    // certificates, sites). Matching used to take every 4-5 digit number in
+    // the names, so the "2015" of ISO 9001:2015 matched ISO 14001:2015 and
+    // ISO 17100:2015, and every other client's checklist was listed under
+    // "Other / Imported". Those stay reachable behind "Show all", and a
+    // checklist already assigned to the plan is always shown.
     const client = state.clients.find(c => c.name === plan.client);
-    const clientStandards = (client?.standard || '').split(', ').map(s => s.trim()).filter(s => s);
-    const planStandardsList = (plan.standard || '').split(', ').map(s => s.trim()).filter(s => s);
-    const allStandards = [...new Set([...planStandardsList, ...clientStandards])].map(s => s.toLowerCase());
+    const planStandards = window.UTILS.parseStandards(plan.standard);
+    const auditStandards = planStandards.length ? planStandards : window.UTILS.clientStandards(client);
+    const isAssigned = (c) => selectedIds.some(id => String(id) === String(c.id));
+    const forThisAudit = (c) => isAssigned(c) || !auditStandards.length
+        || window.UTILS.standardsOverlap(c.standard || '', auditStandards);
+    // A client-specific checklist that names ANOTHER client is that client's.
+    const clientNameLower = String(plan.client || '').trim().toLowerCase();
+    const otherClientNames = (state.clients || []).map(c => String(c.name || '').trim().toLowerCase())
+        .filter(n => n && n !== clientNameLower);
+    const ownedByAnotherClient = (c) => {
+        if (client && c.clientId != null && c.clientId !== '' && String(c.clientId) !== String(client.id)) return true;
+        const named = String(c.clientName || '').trim().toLowerCase();
+        if (named && named !== clientNameLower) return true;
+        const title = String(c.name || '').toLowerCase();
+        return otherClientNames.some(n => title.includes(n)) && !(clientNameLower && title.includes(clientNameLower));
+    };
 
-    const extractISONumbers = (str) => (str.match(/\d{4,5}/g) || []);
-    const planISONumbers = allStandards.flatMap(s => extractISONumbers(s));
+    const matchingChecklists = checklists.filter(c => forThisAudit(c) && (isAssigned(c) || !ownedByAnotherClient(c)));
+    const hiddenChecklists = checklists.filter(c => !matchingChecklists.includes(c));
 
-    const matchingChecklists = checklists; // Show ALL checklists
-
-    const globalChecklists = matchingChecklists.filter(c => {
-        if (c.type !== 'global') return false;
-        if (planISONumbers.length === 0) return true; // No standards set — show all
-        const clISO = extractISONumbers(c.standard || c.name || '');
-        return clISO.some(n => planISONumbers.includes(n));
-    });
+    const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
     const clientName = plan.client || '';
     const clientChecklists = matchingChecklists.filter(c => {
         const cType = (c.type || '').toLowerCase();
@@ -2121,6 +2142,14 @@ window.renderConfigureChecklist = async function (planId) {
                 `}
                 ${renderGroup('Global Checklists', globalChecklists, 'fa-solid fa-globe', '#0369a1')}
                 ${otherChecklists.length > 0 ? renderGroup('Other / Imported Checklists', otherChecklists, 'fa-solid fa-file-import', '#7c3aed') : ''}
+                ${hiddenChecklists.length ? `
+                <div style="margin: 0 0 1rem; padding: 0.75rem 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: #475569;">
+                    <span>Showing checklists for <strong>${window.UTILS.escapeHtml(auditStandards.join(', ') || 'all standards')}</strong>. ${hiddenChecklists.length} checklist${hiddenChecklists.length === 1 ? '' : 's'} for other standards or other clients ${hiddenChecklists.length === 1 ? 'is' : 'are'} hidden.</span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="toggleHiddenPlanChecklists" aria-controls="config-hidden-checklists">Show all</button>
+                </div>
+                <div id="config-hidden-checklists" style="display: none;">
+                    ${renderGroup('Other standards and clients', hiddenChecklists, 'fa-solid fa-eye-slash', '#64748b')}
+                </div>` : ''}
             </div>
             
             <div style="margin-top: 3rem; padding: 2rem; border-top: 1px solid #e2e8f0; text-align: center;">
