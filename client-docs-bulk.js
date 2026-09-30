@@ -3415,7 +3415,13 @@
             return;
         }
 
-        const clientStandards = String(client.standard || '').split(',').map(s => s.trim()).filter(Boolean);
+        // Everything the client holds — the record's list, its certificates and
+        // its sites' Applicable Standards. The record's list alone is often
+        // stale (SG 1888's says only ISO 9001:2015; Halal and cGMP sit on the
+        // certificates).
+        const clientStandards = (window.UTILS && typeof window.UTILS.clientStandards === 'function')
+            ? window.UTILS.clientStandards(client)
+            : String(client.standard || '').split(',').map(s => s.trim()).filter(Boolean);
         const standards = presetStandard && !clientStandards.includes(presetStandard)
             ? [presetStandard].concat(clientStandards)
             : clientStandards;
@@ -3428,8 +3434,16 @@
         const scopeResolved = window.ChecklistStandards
             ? window.ChecklistStandards.resolve(scopeSource)
             : { standards: [], unresolved: [] };
-        const registry = window.ChecklistStandards ? window.ChecklistStandards.all() : [];
         const preselected = new Set(scopeResolved.standards.map(s => s.id));
+        // The audit scope offers only the standards this client holds (plus the
+        // one the plan names). It used to list the whole clause registry — ISO
+        // 27001, 22301, 20000-1, 14001, 45001 — for a client certified to none
+        // of them. A client with no standards recorded has nothing to gate by
+        // and still sees the registry.
+        const fullRegistry = window.ChecklistStandards ? window.ChecklistStandards.all() : [];
+        const registry = (clientStandards.length || presetStandard)
+            ? fullRegistry.filter(s => preselected.has(s.id))
+            : fullRegistry;
         const audit = normalizeAuditType(presetAuditType || 'surveillance');
         const mappedCount = docs.filter(d => d.linkedClauses).length;
         const context = [
