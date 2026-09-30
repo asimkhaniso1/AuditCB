@@ -1197,6 +1197,14 @@
             ? scope.ids.reduce((acc, id) =>
                 acc.concat(plan.themes.filter(t => t.stdId === id).slice(0, budget.themesPerStandard)), [])
             : plan.themes;
+        // Controls a theme question on THIS checklist walks. plan.themeCovered
+        // counts every theme of the scope, including those a budgeted
+        // surveillance leaves out — so a control named by a previous finding
+        // (A.8.13, A.8.16) was dropped from the Annex A sample as "covered by
+        // a theme" that was never asked, and coverage then blocked the
+        // checklist for not sampling it.
+        const emittedThemeCovered = new Set();
+        selectedThemes.forEach(t => t.refs.forEach(r => emittedThemeCovered.add(`${t.stdId}::${r}`)));
         const clauses = [];
         const review = [];
 
@@ -1384,7 +1392,7 @@
                     required = CC.riskDrivenControls(std, ctx).required.map(r => r.ref);
                 } catch (_e) { required = []; }
             }
-            const { sample, poolSize, soaDriven } = sampleAnnexAControls(std, plan, budget, o.soaApplicable, required);
+            const { sample, poolSize, soaDriven } = sampleAnnexAControls(std, { themeCovered: emittedThemeCovered }, budget, o.soaApplicable, required);
             if (!sample.length) return;
             // Grouped by control theme rather than one question per control.
             // Controls of the same theme are sampled in one conversation with

@@ -133,6 +133,21 @@
         return out;
     }
 
+    /**
+     * An ISO/IEC 17021-1 §9.6.2 mandatory surveillance element ("9.6.2 (c)
+     * Treatment of complaints"). Its criterion is known — it is the
+     * certification body's surveillance programme, not a clause of the
+     * client's standard — so "9.6.2 (c)" is never checked against ISO 9001 or
+     * ISO/IEC 27001, and the element is not an unmapped hand-off either.
+     */
+    function isSurveillanceElement(it) {
+        const raw = (it && it.raw) || {};
+        const src = String(raw.criterionSource || raw.source || '');
+        return src === 'surveillance-mandatory' || src === 'surveillance-programme'
+            || String((it && it.section) || '').toUpperCase() === 'SURV'
+            || /^9\.6\.2\s*\([a-z]\)$/i.test(String((it && it.clause) || '').trim());
+    }
+
     /** A ref the generator uses as a section tag rather than a standard citation. */
     const PSEUDO_REFS = new Set(['ORG', 'DOC', 'DOCNOTE', 'IMS', 'RECERT', 'REVIEW', 'FOCUS', 'SURV', 'THEME', 'SOA', '']);
     function isPseudoRef(ref) {
@@ -224,7 +239,7 @@
         items.forEach(it => {
             const refs = it.refs && it.refs.length
                 ? it.refs
-                : (isPseudoRef(it.clause) ? [] : ids.map(id => ({ stdId: id, ref: it.clause })));
+                : (isPseudoRef(it.clause) || isSurveillanceElement(it) ? [] : ids.map(id => ({ stdId: id, ref: it.clause })));
             if (!refs.length) return;
             if (!Std) return;
             // A citation is valid when at least one selected standard genuinely
@@ -390,7 +405,7 @@
         // documents its management system does not require — so it is reported
         // separately, as intelligence about the document set.
         const docNotes = items.filter(it => it.documentNote);
-        const handoffs = items.filter(it => it.auditorReview && !it.documentNote);
+        const handoffs = items.filter(it => it.auditorReview && !it.documentNote && !isSurveillanceElement(it));
         if (handoffs.length) {
             issues.push(issue('AUDITOR_REVIEW', 'info',
                 `${handoffs.length} item(s) carry no clause citation and are marked for auditor review — a reliable mapping could not be established, so none was invented.`,
