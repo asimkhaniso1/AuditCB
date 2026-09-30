@@ -79,13 +79,13 @@ describe('Configure Checklists on an SG 1888 plan', () => {
         await window.renderConfigureChecklist(plan.id);
     }
 
-    it('a cGMP plan offers only the cGMP checklists, and hides the rest behind Show all', async () => {
+    it('a cGMP plan offers the cGMP checklists and the client’s own, and hides the rest behind Show all', async () => {
         await render({ id: 'p1', client: 'SG 1888 (PVT.) LTD.', standard: 'cGMP', selectedChecklists: [] });
         const visible = new Set(visibleCards());
-        expect([...visible].sort()).toEqual(['11', '5']);
+        expect([...visible].sort()).toEqual(['10', '11', '5']);
         const hidden = document.getElementById('config-hidden-checklists');
         expect(hidden.style.display).toBe('none');
-        expect(document.body.textContent).toMatch(/9 checklists for other standards or other clients are hidden/);
+        expect(document.body.textContent).toMatch(/8 checklists for other standards or other clients are hidden/);
         window.toggleHiddenPlanChecklists();
         expect(hidden.style.display).toBe('');
     });
@@ -95,6 +95,52 @@ describe('Configure Checklists on an SG 1888 plan', () => {
         const visible = new Set(visibleCards());
         expect([...visible].sort()).toEqual(['10', '11', '3', '5']);
         ['1', '2', '4', '6', '7', '8', '9'].forEach(id => expect(visible.has(id)).toBe(false));
+    });
+
+    it('lists the client’s own checklist at the top even when its standard label matches nothing', async () => {
+        window.state = { clients: [SG(), ...OTHERS], auditPlans: [{ id: 'p4', client: 'SG 1888 (PVT.) LTD.', standard: 'cGMP', selectedChecklists: [] }],
+            checklists: CHECKLISTS().concat([{ id: 12, name: 'GMP Guidelines Pakistan - SG 1888 (PVT.) LTD. - Surveillance Audit Checklist', standard: 'GMP Guidelines Pakistan', type: 'custom', clientId: 'sg',
+                clauses: [{ mainClause: '4', subClauses: [{ clause: '4.1', requirement: 'Is there an organisation chart?' }, { clause: '4.2', requirement: 'Are duties written down?' }] }] }]) };
+        await window.renderConfigureChecklist('p4');
+        expect(visibleCards()).toContain('12');
+        const firstHeading = document.querySelector('#content-area .fade-in h3');
+        expect(firstHeading.textContent).toMatch(/SG 1888 \(PVT\.\) LTD\. Checklists/);
+        const inClientGroup = Array.from(firstHeading.parentElement.querySelectorAll('.checklist-select-cb')).map(cb => cb.getAttribute('data-id'));
+        expect(inClientGroup).toContain('12');
+    });
+
+    it('ticking a checklist selects its questions, so Review & Merge and Save have something to work with', async () => {
+        const notes = [];
+        window.showNotification = (msg, type) => notes.push({ msg, type });
+        window.state = { clients: [SG(), ...OTHERS], auditPlans: [{ id: 'p5', client: 'SG 1888 (PVT.) LTD.', standard: 'cGMP', selectedChecklists: [] }],
+            checklists: [{ id: 5, name: 'GMP Guidelines Pakistan - Initial Audit Checklist', standard: 'cGMP', type: 'global',
+                clauses: [{ mainClause: '4', subClauses: [{ clause: '4.1', requirement: 'Is there an organisation chart?' }, { clause: '4.2', requirement: 'Are duties written down?' }] }] }] };
+        await window.renderConfigureChecklist('p5');
+        const main = document.querySelector('.checklist-select-cb[data-id="5"]');
+        const items = () => Array.from(document.querySelectorAll('.item-select-cb[data-checklist-id="5"]'));
+        expect(items().some(i => i.checked)).toBe(false);
+
+        main.checked = true; main.dispatchEvent(new Event('change'));
+        expect(items().every(i => i.checked)).toBe(true);
+
+        document.body.insertAdjacentHTML('beforeend', '<h3 id="modal-title"></h3><div id="modal-body"></div><button id="modal-save"></button>');
+        window.openModal = () => { };
+        window.reviewMergedQuestions('p5');
+        expect(notes.some(n => /No items selected/.test(n.msg))).toBe(false);
+
+        main.checked = false; main.dispatchEvent(new Event('change'));
+        expect(items().some(i => i.checked)).toBe(false);
+    });
+
+    it('keeps a partial selection when the checklist box is re-ticked', async () => {
+        window.state = { clients: [SG()], auditPlans: [{ id: 'p6', client: 'SG 1888 (PVT.) LTD.', standard: 'cGMP', selectedChecklists: [] }],
+            checklists: [{ id: 5, name: 'x', standard: 'cGMP', type: 'global', clauses: [{ mainClause: '4', subClauses: [{ clause: '4.1', requirement: 'a?' }, { clause: '4.2', requirement: 'b?' }] }] }] };
+        await window.renderConfigureChecklist('p6');
+        const items = Array.from(document.querySelectorAll('.item-select-cb[data-checklist-id="5"]'));
+        items[0].checked = true;
+        const main = document.querySelector('.checklist-select-cb[data-id="5"]');
+        main.checked = true; main.dispatchEvent(new Event('change'));
+        expect(items.map(i => i.checked)).toEqual([true, false]);
     });
 
     it('always shows a checklist already assigned to the plan', async () => {

@@ -98,6 +98,27 @@ describe('Checklist creation uses the analysis screen', () => {
         expect(doc.lastClientId).toBe('sg');
     });
 
+    it('labels the checklist with the standard, not the Knowledge Base document title', async () => {
+        // A cGMP client: the GMP guideline is their cGMP checklist.
+        window.state.clients = [{ id: 'sg', name: 'SG 1888 (PVT.) LTD.', standard: 'ISO 9001:2015', certificates: [{ standard: 'Halal' }, { standard: 'cGMP' }] }];
+        window.state.knowledgeBase.standards[0].lastClientId = 'sg';
+        const forClient = await window.generateChecklistFromStandard(9001, 'standard', 'initial', 'sg');
+        expect(forClient.standard).toBe('cGMP');
+        // No client: the scheme the title names.
+        window.state.knowledgeBase.standards[0].lastClientId = '';
+        const generic = await window.generateChecklistFromStandard(9001, 'standard', 'initial', '');
+        expect(generic.standard).toBe('GMP');
+        // An ISO document is already a standard.
+        window.state.knowledgeBase.standards.push(Object.assign({}, GMP, { id: 7, name: 'ISO 14001:2026' }));
+        const iso = await window.generateChecklistFromStandard(7, 'standard', 'initial', '');
+        expect(iso.standard).toBe('ISO 14001:2026');
+        // ...and is never swapped for another edition the client happens to hold.
+        window.state.clients = [{ id: 'e', name: 'EMS Client', standard: 'ISO 14001:2015' }];
+        window.state.knowledgeBase.standards[1].lastClientId = 'e';
+        const held2015 = await window.generateChecklistFromStandard(7, 'standard', 'initial', 'e');
+        expect(held2015.standard).toBe('ISO 14001:2026');
+    });
+
     it('reuses the last analysis when it already matches the chosen settings', async () => {
         window.AI_SERVICE = { callProxyAPI: vi.fn() };
         const ck = await window.generateChecklistFromStandard(9001, 'standard', 'initial', '');
