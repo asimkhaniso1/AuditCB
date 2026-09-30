@@ -606,9 +606,26 @@ window.showAnalysisModeModal = function (docId, purpose, opts) {
         return;
     }
     const doc = docId ? standards.find(d => _idEq(d.id, docId)) : null;
-    const standardOptions = standards.map(s =>
-        `<option value="${esc(s.id)}">${esc(s.name)}${s.status === 'ready' ? '' : ' (not analysed yet)'}</option>`
-    ).join('');
+    // With a client chosen, only the Knowledge Base standards that client
+    // holds are offered — the client's Applicable Standards gate checklist
+    // creation the same way they gate Configure Checklists. A client with no
+    // standards recorded, or no client at all, sees the whole Knowledge Base.
+    const standardsFor = (clientId) => {
+        const client = clientId ? clients.find(c => String(c.id) === String(clientId)) : null;
+        const held = client ? window.UTILS.clientStandards(client) : [];
+        if (!held.length) return { list: standards, held, client };
+        return { list: standards.filter(s => window.UTILS.standardsOverlap(_resolveChecklistStandard(s, client), held)), held, client };
+    };
+    const standardOptionsFor = (clientId) => {
+        const scoped = standardsFor(clientId);
+        if (!scoped.list.length) {
+            return `<option value="">— No Knowledge Base standard for ${esc(scoped.client.name)} (${esc(scoped.held.join(', '))}) —</option>`;
+        }
+        return '<option value="">— Select a Knowledge Base standard —</option>' + scoped.list.map(s =>
+            `<option value="${esc(s.id)}">${esc(s.name)}${s.status === 'ready' ? '' : ' (not analysed yet)'}</option>`
+        ).join('');
+    };
+    const standardOptions = standardOptionsFor(presetClient);
 
     const segment = (id, label, active) => `
                 <div id="at-${id}" data-action="_setAuditType" data-id="${id}"
@@ -633,9 +650,9 @@ window.showAnalysisModeModal = function (docId, purpose, opts) {
         <div style="margin-bottom:1rem;">
             <label for="analysis-standard-select" style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">Standard</label>
             <select id="analysis-standard-select" style="width:100%;padding:0.5rem 0.75rem;border:2px solid #e2e8f0;border-radius:8px;font-size:0.85rem;color:#334155;background:#fff;">
-                <option value="">— Select a Knowledge Base standard —</option>
                 ${standardOptions}
             </select>
+            <div id="analysis-standard-hint" style="font-size:0.75rem;color:#64748b;margin-top:0.35rem;padding:0 0.25rem;"></div>
         </div>` : ''}
 
         <!-- Audit Type Toggle -->
@@ -712,6 +729,26 @@ window.showAnalysisModeModal = function (docId, purpose, opts) {
 
     // Store audit type state
     window._analysisAuditType = 'initial';
+
+    // Choosing a client narrows the standard list to what that client holds.
+    const standardSel = document.getElementById('analysis-standard-select');
+    const clientSel = document.getElementById('analysis-client-select');
+    if (pickStandard && standardSel && clientSel) {
+        const hint = document.getElementById('analysis-standard-hint');
+        const refresh = () => {
+            const keep = standardSel.value;
+            standardSel.innerHTML = standardOptionsFor(clientSel.value);
+            if (keep && Array.from(standardSel.options).some(o => o.value === keep)) standardSel.value = keep;
+            const scoped = standardsFor(clientSel.value);
+            if (hint) {
+                hint.textContent = scoped.held.length
+                    ? `Limited to ${scoped.client.name}'s Applicable Standards: ${scoped.held.join(', ')}.`
+                    : '';
+            }
+        };
+        clientSel.addEventListener('change', refresh);
+        refresh();
+    }
 
     window.openModal();
 };
