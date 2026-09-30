@@ -897,6 +897,23 @@ function findRecentFinalizedAudit(clientId, standard) {
 // Planning window for ONE certificate, derived from the cycleState the caller
 // already computed. Binding both to the same certificate is what stops the
 // recommended window contradicting the stage dots next to it.
+// Current and next stage of the certification lifecycle — Surveillance 1,
+// Surveillance 2, Recertification, then the next cycle. The current stage is
+// the audit the cycle owes now; the planning record decides it where it can,
+// because it also applies an authorized override and the CB's surveillance
+// window, so the card names the same audit the planner will offer.
+const LIFECYCLE_STAGES = ['Surveillance 1', 'Surveillance 2', 'Recertification'];
+function lifecycleStages(cycleState, record, fallback) {
+    let current = cycleState ? cycleState.stage : fallback;
+    let next = cycleState ? cycleState.nextStage || null : null;
+    if (record && !record.cycleExpired && !record.complete && LIFECYCLE_STAGES.includes(record.auditType)) {
+        current = record.auditType;
+        const i = LIFECYCLE_STAGES.indexOf(current);
+        next = i >= LIFECYCLE_STAGES.length - 1 ? 'Surveillance 1 (next cycle)' : LIFECYCLE_STAGES[i + 1];
+    }
+    return { current, next };
+}
+
 function cycleRecordForCertificate(client, certificate, cycleState, today) {
     const domain = window.AuditPlanningDomain;
     if (!certificate || !domain || typeof domain.resolveCertificateCycle !== 'function') return null;
@@ -1038,6 +1055,8 @@ function renderCertificationCycleWidget(client) {
         // returned whichever certificate the planning domain preferred for the
         // scheme family, so the window could describe a superseded twin.
         const cycleRecord = cycleRecordForCertificate(client, activeCert, cs, today);
+        const stages = lifecycleStages(cs, cycleRecord, currentStage);
+        currentStage = stages.current;
         const windowState = cycleRecord && window.AuditPlanningDomain
             ? window.AuditPlanningDomain.describeCycleWindow(cycleRecord, today) : null;
         const scheduledPlan = (window.state.auditPlans || [])
@@ -1081,8 +1100,8 @@ function renderCertificationCycleWidget(client) {
                                 </div>
                                 ${expiryWarning ? `<div style="font-size:.75rem;color:#dc2626;margin-top:.25rem;"><i class="fa-solid fa-triangle-exclamation"></i> Scheduled dates approach certificate expiry and may not preserve the NC closure buffer.</div>` : ''}
                             </div>
-                            ` : nextAudit ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Next Audit Stage</div><div style="font-size:1.1rem;font-weight:600;color:${isUrgent ? '#dc2626' : '#1e293b'};margin-top:.25rem;">${cycleRecord?.auditType || currentStage}</div></div>` : '<div></div>'}
-                            ${cycleRecord ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Recommended Audit Window</div><div style="font-size:1.1rem;font-weight:600;color:${windowState?.state === 'closed' ? '#b91c1c' : '#1e293b'};margin-top:.25rem;">${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}</div>${cycleWindowCaption(cycleRecord, windowState)}</div>` : '<div></div>'}
+                            ` : nextAudit ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Next Audit Stage</div><div style="font-size:1.1rem;font-weight:600;color:${isUrgent ? '#dc2626' : '#1e293b'};margin-top:.25rem;">${stages.next || currentStage}</div></div>` : '<div></div>'}
+                            ${cycleRecord ? `<div style="min-width:0;"><div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Recommended Audit Window</div><div style="font-size:1.1rem;font-weight:600;color:${windowState?.state === 'closed' ? '#b91c1c' : '#1e293b'};margin-top:.25rem;">${window.UTILS.formatDate(cycleRecord.recommendedWindowStart)} – ${window.UTILS.formatDate(cycleRecord.recommendedWindowEnd)}</div>${LIFECYCLE_STAGES.includes(cycleRecord.auditType) ? `<div style="font-size:.7rem;color:#64748b;margin-top:.15rem;">For ${cycleRecord.auditType}</div>` : ''}${cycleWindowCaption(cycleRecord, windowState)}</div>` : '<div></div>'}
                             <div style="min-width: 0;">
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Current Issue / Expiry</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: ${expired ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(periodStart)} – ${window.UTILS.formatDate(periodEnd)}</div>
@@ -1218,6 +1237,7 @@ function renderAuditCycleTimeline(client) {
     }
 
     const cycleRecord = cycleRecordForCertificate(client, latestCert, cs, today);
+    currentStage = lifecycleStages(cs, cycleRecord, currentStage).current;
     const windowState = cycleRecord && window.AuditPlanningDomain
         ? window.AuditPlanningDomain.describeCycleWindow(cycleRecord, today) : null;
     const scheduledPlan = (window.state.auditPlans || [])
