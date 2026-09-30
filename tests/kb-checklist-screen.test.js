@@ -65,6 +65,45 @@ describe('Checklist creation uses the analysis screen', () => {
         expect(document.getElementById('modal-title').textContent).toBe('New Checklist');
     });
 
+    it('limits the standard list to what the chosen client holds', () => {
+        const kb = window.state.knowledgeBase.standards;
+        kb.push(Object.assign({}, GMP, { id: 1, name: 'ISO 9001:2015' }), Object.assign({}, GMP, { id: 2, name: 'ISO 14001:2015' }),
+            Object.assign({}, GMP, { id: 3, name: 'ISO 13485:2016' }));
+        window.state.clients = [
+            { id: 'sg', name: 'SG 1888 (PVT.) LTD.', standard: 'ISO 9001:2015', certificates: [{ standard: 'Halal' }, { standard: 'cGMP' }] },
+            { id: 'ems', name: 'EMS Client', standard: 'ISO 14001:2015' },
+            { id: 'new', name: 'New Client' }
+        ];
+        const options = () => Array.from(document.querySelectorAll('#analysis-standard-select option')).map(o => o.textContent.trim());
+        const pick = (id) => { const sel = document.getElementById('analysis-client-select'); sel.value = id; sel.dispatchEvent(new Event('change')); };
+
+        // Opened from SG 1888's page: the GMP guideline (their cGMP) and ISO 9001 only.
+        window.showAnalysisModeModal(null, 'checklist', { clientId: 'sg' });
+        expect(options()).toEqual(['— Select a Knowledge Base standard —', 'GMP Guidelines Pakistan', 'ISO 9001:2015']);
+        expect(document.getElementById('analysis-standard-hint').textContent).toMatch(/Limited to SG 1888 \(PVT\.\) LTD\.'s Applicable Standards: ISO 9001:2015, Halal, cGMP/);
+
+        // Switching client re-filters; a selection that is still valid is kept.
+        document.getElementById('analysis-standard-select').value = '1';
+        pick('ems');
+        expect(options()).toEqual(['— Select a Knowledge Base standard —', 'ISO 14001:2015']);
+        expect(document.getElementById('analysis-standard-select').value).toBe('');
+
+        // No client, or a client with no standards recorded: the whole Knowledge Base.
+        pick('');
+        expect(options()).toHaveLength(5);
+        expect(document.getElementById('analysis-standard-hint').textContent).toBe('');
+        pick('new');
+        expect(options()).toHaveLength(5);
+    });
+
+    it('says so when the Knowledge Base has nothing for the client’s standards', () => {
+        window.state.clients = [{ id: 'h', name: 'Halal Only', standard: 'Halal' }];
+        window.showAnalysisModeModal(null, 'checklist', { clientId: 'h' });
+        const opts = Array.from(document.querySelectorAll('#analysis-standard-select option'));
+        expect(opts).toHaveLength(1);
+        expect(opts[0].textContent).toMatch(/No Knowledge Base standard for Halal Only \(Halal\)/);
+    });
+
     it('asks for the standard before generating', async () => {
         window.showAnalysisModeModal(null, 'checklist');
         await window._startAnalysis('', 'standard', 'checklist');
