@@ -1162,6 +1162,45 @@
      * @param {Object} [opts] - { auditType, standard, standardIds, includeMandatory,
      *   standardClauses, includeOrgContext, focusPoints, maxItems, manDays, soaApplicable }
      */
+    /**
+     * Sections for standards the client holds that are analysed in the
+     * Knowledge Base but not carried by the clause registry (ISO 17100,
+     * ISO 18841, ISO 18587…). Each becomes its own section, named for the
+     * standard, whose questions come from that standard's own analysed clause
+     * set — so an integrated audit gets ONE checklist across the registry
+     * standards and these. A surveillance samples them evenly; an initial or
+     * recertification audit takes every clause.
+     */
+    const KB_SURVEILLANCE_SAMPLE = 6;
+    function knowledgeBaseSections(kbStandards, auditType) {
+        return (kbStandards || []).map(k => {
+            const all = (k.clauses || []).filter(c => c && c.clause && (c.requirement || c.title));
+            let list = all;
+            if (auditType === 'surveillance' && all.length > KB_SURVEILLANCE_SAMPLE) {
+                const step = all.length / KB_SURVEILLANCE_SAMPLE;
+                list = Array.from({ length: KB_SURVEILLANCE_SAMPLE }, (_, i) => all[Math.floor(i * step)]);
+            }
+            if (!list.length) return null;
+            return {
+                mainClause: k.name,
+                title: `${k.name} — requirements from the Knowledge Base (${k.docName})`
+                    + (list.length < all.length ? ` — ${list.length} of ${all.length} clauses sampled` : ''),
+                subClauses: list.map(c => {
+                    const asked = Array.isArray(c.checklistQuestions) && c.checklistQuestions[0];
+                    const text = asked || `${c.title ? c.title + ' — ' : ''}verify how the organisation meets this requirement and obtain evidence that it operates as described: ${c.requirement || c.title}`;
+                    const ref = String(c.clause);
+                    return {
+                        clause: ref, title: c.title || '', requirement: text,
+                        // The criterion is a clause of THIS standard, held in the
+                        // Knowledge Base — not of a registry standard in scope.
+                        criterionRef: ref, criterionSource: 'knowledge-base', criterionStandard: k.name,
+                        items: [{ clause: ref, requirement: text }]
+                    };
+                })
+            };
+        }).filter(Boolean);
+    }
+
     function buildClientChecklist(client, docs, opts) {
         const scope = resolveScope(opts || {}, client);
         if (scope.ids.length) return buildScopedChecklist(client, docs, opts || {}, scope);
@@ -1462,16 +1501,27 @@
             });
         }
 
+        // Knowledge Base standards audited in the same visit, ahead of the
+        // auditor-review and document-note sections.
+        const kbSections = knowledgeBaseSections(o.kbStandards, auditType);
+        if (kbSections.length) {
+            const tail = clauses.findIndex(c => c.mainClause === 'REVIEW' || c.mainClause === 'DOCNOTE');
+            clauses.splice(tail === -1 ? clauses.length : tail, 0, ...kbSections);
+        }
+        const kbItems = kbSections.reduce((t, c) => t + c.subClauses.length, 0);
+        const kbNames = kbSections.map(c => c.mainClause);
+
         const itemCount = clauses.reduce((t, c) => t + c.subClauses.length, 0);
-        const ceiling = questionCeiling(scope.ids, budget, focus.length);
+        const ceiling = questionCeiling(scope.ids, budget, focus.length) + kbItems;
         const typeLabel = auditType === 'surveillance' ? 'Surveillance'
             : auditType === 'recertification' ? 'Recertification' : 'Initial';
 
         const checklist = {
             id: Date.now(),
             name: `${client.name} - ${typeLabel} Audit Checklist (Client-Specific)`,
-            standard: scope.labels.join(', ') || o.standard || client.standard || '',
+            standard: scope.labels.concat(kbNames).join(', ') || o.standard || client.standard || '',
             standardIds: scope.ids,
+            knowledgeBaseStandards: kbNames,
             type: 'custom',
             auditType,
             clientName: client.name,
@@ -2146,7 +2196,7 @@
 
     function schemeSourceNote(schemeName, client) {
         const doc = schemeKnowledgeDoc(schemeName, client);
-        return doc ? ` and the Knowledge Base (${esc(doc.name)})` : '';
+        return doc ? `Knowledge Base clause set (${esc(doc.name)})` : "scheme, built from the client's documents";
     }
 
     /** Clause list for a standard: analysed KB first, built-in list otherwise. */
@@ -3472,6 +3522,11 @@
         // built by the document-driven builder, with the scheme's analysed
         // Knowledge Base document supplying the clauses where there is one.
         const schemes = scopeResolved.unresolved.slice();
+        // A scheme with an analysed Knowledge Base document is "grounded": it
+        // has a clause set of its own and can share a checklist with registry
+        // standards. One without (Halal, with nothing uploaded) cannot.
+        const grounded = schemes.filter(name => schemeKnowledgeDoc(name, client));
+        const ungrounded = schemes.filter(name => !grounded.includes(name));
         // Ticked when the screen opens: what the PLAN is for, when it names a
         // standard — a cGMP plan opens on cGMP, not on the client's ISO 9001.
         // From the client's Checklists page (no plan standard) the client's
@@ -3518,12 +3573,15 @@
                     </label>`).join('')}
                     ${schemes.map(name => `<label style="display:flex;gap:0.5rem;align-items:center;cursor:pointer;">
                         <input type="checkbox" class="cldoc-scheme" value="${esc(name)}" ${tickedSchemes.has(name) ? 'checked' : ''}>
-                        <span>${esc(name)} <span style="color:var(--text-secondary);font-size:0.82rem;">— scheme, built from the client's documents${schemeSourceNote(name, client)}</span></span>
+                        <span>${esc(name)} <span style="color:var(--text-secondary);font-size:0.82rem;">— ${schemeSourceNote(name, client)}</span></span>
                     </label>`).join('')}
                 </div>
                 <small style="color: var(--text-secondary);">Only the standards ticked here can generate clauses, controls or questions. Nothing is inferred from another standard.</small>` : ''}
-                ${schemes.length ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;border-radius:0 6px 6px 0;padding:0.55rem 0.85rem;margin-top:0.6rem;font-size:0.83rem;">
-                    <strong>${esc(schemes.join(', '))}</strong> ${schemes.length > 1 ? 'have' : 'has'} no clause set in the registry, so ${schemes.length > 1 ? 'their' : 'its'} coverage is confirmed by the auditor rather than machine-checked. Build a scheme checklist separately from the ISO standards.
+                ${grounded.length ? `<div style="background:#f0f9ff;border-left:3px solid #0ea5e9;border-radius:0 6px 6px 0;padding:0.55rem 0.85rem;margin-top:0.6rem;font-size:0.83rem;">
+                    <strong>${esc(grounded.join(', '))}</strong> ${grounded.length > 1 ? 'are' : 'is'} built from ${grounded.length > 1 ? 'their' : 'its'} analysed Knowledge Base clause set and can be combined with the standards above in one checklist. ${grounded.length > 1 ? 'Their' : 'Its'} coverage is confirmed by the auditor rather than machine-checked.
+                </div>` : ''}
+                ${ungrounded.length ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;border-radius:0 6px 6px 0;padding:0.55rem 0.85rem;margin-top:0.6rem;font-size:0.83rem;">
+                    <strong>${esc(ungrounded.join(', '))}</strong> ${ungrounded.length > 1 ? 'have' : 'has'} no clause set in the registry, so ${ungrounded.length > 1 ? 'their' : 'its'} coverage is confirmed by the auditor rather than machine-checked. Build a scheme checklist separately from the ISO standards.
                 </div>` : ''}
                 <select class="form-control" id="cldoc-standard" style="${(registry.length || schemes.length) ? 'display:none;' : ''}margin-top:0.5rem;">
                     ${standards.length ? standards.map(s => `<option ${s === presetStandard ? 'selected' : ''}>${esc(s)}</option>`).join('') : '<option value="">(not set on client)</option>'}
@@ -3561,10 +3619,18 @@
             // A registry standard is built from its clause set, a scheme from
             // the client's documents: one checklist cannot be both, and each
             // certificate is audited on its own plan anyway.
-            if (standardIds.length && schemeNames.length) {
-                notify('Build the ' + schemeNames.join(' / ') + ' checklist separately from the ISO standards — untick one group.', 'error');
+            const loose = schemeNames.filter(name => !schemeKnowledgeDoc(name, client));
+            if (standardIds.length && loose.length) {
+                notify(loose.join(' / ') + ' has no clause set in the registry or the Knowledge Base, so it cannot share a checklist with the other standards — build it separately, or upload and analyse it in the Knowledge Base.', 'error');
                 return;
             }
+            // Registry standards plus Knowledge Base standards: one checklist.
+            const kbStandards = standardIds.length
+                ? schemeNames.map(name => {
+                    const doc = schemeKnowledgeDoc(name, client);
+                    return { name, docName: doc.name, clauses: doc.clauses };
+                })
+                : [];
             if (!standardIds.length && !schemeNames.length && document.querySelector('.cldoc-std, .cldoc-scheme')) {
                 notify('Tick the standard this checklist is for.', 'error');
                 return;
@@ -3578,7 +3644,9 @@
                 : [];
             const standardClauses = normalizeAuditType(auditType) === 'surveillance'
                 ? null
-                : clausesForStandard(standard, client).clauses;
+                : (schemeNames.length
+                    ? schemeNames.reduce((all, name) => all.concat(clausesForStandard(name, client).clauses), [])
+                    : clausesForStandard(standard, client).clauses);
             const plan = planId ? window.DataService.findAuditPlan(planId) : null;
             const focusPoints = (plan && plan.preAudit && plan.preAudit.focusPoints) || [];
             const lengthValue = document.getElementById('cldoc-length').value;
@@ -3586,7 +3654,7 @@
                 ? parseInt(lengthValue, 10)
                 : null;
             createChecklist(client, docs, {
-                auditType, standard, standardIds, includeMandatory, includeOrgContext,
+                auditType, standard, standardIds, kbStandards, includeMandatory, includeOrgContext,
                 standardClauses, focusPoints, maxItems, soaApplicable,
                 manDays: (plan && (plan.manDays || plan.man_days)) || manDays || ''
             }, planId);

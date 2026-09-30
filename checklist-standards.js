@@ -72,7 +72,11 @@
         PERF_INTERNAL_AUDIT: 'performance.internal-audit',
         PERF_MGMT_REVIEW: 'performance.management-review',
         IMP_NONCONFORMITY: 'improvement.nonconformity-corrective-action',
-        IMP_CONTINUAL: 'improvement.continual'
+        IMP_CONTINUAL: 'improvement.continual',
+        // ISO 9001, 14001 and 45001 open clause 10 with the same general
+        // requirement. Left unshared, an integrated checklist asked it once per
+        // standard in identical words, which QA rightly blocks as a duplicate.
+        IMP_GENERAL: 'improvement.general'
     };
 
     // Human-readable label for each consolidated group, used as the question
@@ -98,7 +102,8 @@
         'performance.internal-audit': 'Internal audit',
         'performance.management-review': 'Management review',
         'improvement.nonconformity-corrective-action': 'Nonconformity and corrective action',
-        'improvement.continual': 'Continual improvement'
+        'improvement.continual': 'Continual improvement',
+        'improvement.general': 'Improvement — general'
     };
 
     // The auditor's question for each shared concept, used when two or more
@@ -127,7 +132,8 @@
         'performance.internal-audit': 'Verify the internal audit programme covers every requirement of each of {systems}, at planned intervals, by competent and impartial auditors. Sample audit reports for depth of evidence and confirm findings were reported to management and closed.',
         'performance.management-review': 'Verify management review is conducted at planned intervals with every required input for each of {systems}, and that the outputs include decisions on improvement, change and resources. Trace one decision through to implementation.',
         'improvement.nonconformity-corrective-action': 'Sample nonconformities raised across {systems}: reaction and correction, evaluation of the need to eliminate the cause, root cause analysis, action taken, review of effectiveness, and any change to the system. Confirm records are retained.',
-        'improvement.continual': 'Establish how the organisation continually improves the suitability, adequacy and effectiveness of {systems}, and evidence improvements actually delivered since the previous audit.'
+        'improvement.continual': 'Establish how the organisation continually improves the suitability, adequacy and effectiveness of {systems}, and evidence improvements actually delivered since the previous audit.',
+        'improvement.general': 'Establish how the organisation determines and selects opportunities for improvement across {systems} and implements the actions needed to achieve the intended outcomes. Trace one opportunity from identification to result.'
     };
 
     // ── ISO/IEC 27001:2022 — Information Security Management System ───
@@ -405,7 +411,7 @@
         ['9.1.2', 'Customer satisfaction', null, true],
         ['9.2', 'Internal audit', SHARED.PERF_INTERNAL_AUDIT, true],
         ['9.3', 'Management review', SHARED.PERF_MGMT_REVIEW, true],
-        ['10.1', 'Improvement — general', null, true],
+        ['10.1', 'Improvement — general', SHARED.IMP_GENERAL, true],
         ['10.2', 'Nonconformity and corrective action', SHARED.IMP_NONCONFORMITY, true],
         ['10.3', 'Continual improvement', SHARED.IMP_CONTINUAL, true]
     ];
@@ -436,7 +442,7 @@
         ['9.1.2', 'Evaluation of compliance', null, true],
         ['9.2', 'Internal audit', SHARED.PERF_INTERNAL_AUDIT, true],
         ['9.3', 'Management review', SHARED.PERF_MGMT_REVIEW, true],
-        ['10.1', 'Improvement — general', null, true],
+        ['10.1', 'Improvement — general', SHARED.IMP_GENERAL, true],
         ['10.2', 'Nonconformity and corrective action', SHARED.IMP_NONCONFORMITY, true],
         ['10.3', 'Continual improvement', SHARED.IMP_CONTINUAL, true]
     ];
@@ -473,7 +479,7 @@
         ['9.1.2', 'Evaluation of compliance', null, true],
         ['9.2', 'Internal audit', SHARED.PERF_INTERNAL_AUDIT, true],
         ['9.3', 'Management review', SHARED.PERF_MGMT_REVIEW, true],
-        ['10.1', 'Improvement — general', null, true],
+        ['10.1', 'Improvement — general', SHARED.IMP_GENERAL, true],
         ['10.2', 'Incident, nonconformity and corrective action', SHARED.IMP_NONCONFORMITY, true],
         ['10.3', 'Continual improvement', SHARED.IMP_CONTINUAL, true]
     ];

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-import { M } from '../tools/pcc-scenario.mjs';
+import { M, B } from '../tools/pcc-scenario.mjs';
 
 // Build Checklist (from client documents) listed the whole clause registry
 // under "Audit scope — standards": ISO/IEC 27001, ISO 22301, ISO/IEC 20000-1,
@@ -102,7 +102,7 @@ describe('Build Checklist — schemes (Halal, cGMP) are selectable', () => {
         tick('cldoc-std', 'iso9001', true); tick('cldoc-scheme', 'Halal', true);
         await save();
         expect(window.state.checklists || []).toHaveLength(0);
-        expect(notes.pop().msg).toMatch(/Build the Halal checklist separately from the ISO standards/);
+        expect(notes.pop().msg).toMatch(/Halal has no clause set in the registry or the Knowledge Base, so it cannot share a checklist/);
 
         tick('cldoc-std', 'iso9001', false); tick('cldoc-scheme', 'cGMP', true);
         await save();
@@ -133,6 +133,99 @@ describe('Build Checklist — schemes (Halal, cGMP) are selectable', () => {
         const text = JSON.stringify(window.state.checklists[0].clauses);
         expect(text).toMatch(/Organisation and personnel|organisation chart shall define GMP/);
         delete window._resolveChecklistStandard;
+    });
+});
+
+describe('Build Checklist — Knowledge Base standards join the registry ones in one checklist', () => {
+    // Language Services UK: ISO 9001, 14001 and 27001 are in the clause
+    // registry; ISO 17100 and ISO 18841 are analysed in the Knowledge Base.
+    // They were labelled "schemes" and refused alongside the ISO standards.
+    const kbClauses = (tag, n) => Array.from({ length: n }, (_, i) => ({
+        clause: `${4 + Math.floor(i / 3)}.${(i % 3) + 1}`, title: `${tag} requirement ${i + 1}`,
+        requirement: `The provider shall control ${tag} item ${i + 1}.`, checklistQuestions: [`How is ${tag} item ${i + 1} controlled?`]
+    }));
+    const LS = () => ({
+        id: 'ls', name: 'Language Services UK Limited', documents: DOC,
+        standard: 'ISO 9001:2015, ISO 14001:2015, ISO 27001:2022, ISO 17100:2015, ISO 18841:2018, ISO 18587:2017',
+        keyProcesses: [{ name: 'Translation' }], sites: [{ name: 'HQ', employees: 10 }]
+    });
+    const KB = () => ({ standards: [
+        { id: 1, name: 'ISO 17100:2015', status: 'ready', clauses: kbClauses('translation', 12) },
+        { id: 2, name: 'ISO 18841:2018', status: 'ready', clauses: kbClauses('interpreting', 4) }
+    ] });
+    const flush = () => new Promise(r => setTimeout(r, 0));
+    function openLS(auditType) {
+        window._resolveChecklistStandard = (doc) => M.UTILS.canonicalStandard(doc.name);
+        const client = LS();
+        html = '';
+        window.UTILS = M.UTILS;
+        window.state = { clients: [client], auditPlans: [], knowledgeBase: KB() };
+        window.DataService = { findClient: () => client, findAuditPlan: () => null,
+            openFormModal: (_t, body, onSave) => { html = body; document.body.innerHTML = body; save = onSave; } };
+        window.saveData = () => { }; window.closeModal = () => { }; window.SupabaseClient = undefined;
+        notes = []; window.showNotification = (msg, type) => notes.push({ msg, type });
+        window.buildChecklistFromClientDocs('ls', auditType);
+    }
+    const tickRegistry = () => document.querySelectorAll('.cldoc-std').forEach(cb => { cb.checked = true; });
+    const tickScheme = (name) => { document.querySelector(`.cldoc-scheme[value="${name}"]`).checked = true; };
+    const releaseBlockers = (ck) => {
+        const qa = M.QA.validate(ck, ck.qaContext);
+        const coverage = M.CC.assess(ck, M.CC.buildContext(ck, { client: LS() }));
+        return { qa, blockers: M.CC.readiness(ck, { qa, coverage }).blockers.map(b => b.code) };
+    };
+
+    it('labels them as Knowledge Base clause sets, and only the un-analysed one as a scheme', () => {
+        openLS('surveillance');
+        expect(offered().sort()).toEqual(['iso14001', 'iso27001', 'iso9001']);
+        expect(schemes()).toEqual(['ISO 17100:2015', 'ISO 18841:2018', 'ISO 18587:2017']);
+        expect(html).toMatch(/ISO 17100:2015 <span[^>]*>— Knowledge Base clause set \(ISO 17100:2015\)/);
+        expect(html).toMatch(/ISO 18587:2017 <span[^>]*>— scheme, built from the client/);
+        expect(html).toMatch(/ISO 17100:2015, ISO 18841:2018<\/strong> are built from their analysed Knowledge Base clause set and can be combined/);
+        expect(html).toMatch(/ISO 18587:2017<\/strong> has no clause set in the registry/);
+    });
+
+    it('builds one surveillance checklist across all five, sampled, and it can be released', async () => {
+        openLS('surveillance');
+        tickRegistry(); tickScheme('ISO 17100:2015'); tickScheme('ISO 18841:2018');
+        await save(); await flush();
+        const ck = window.state.checklists[0];
+        expect(ck.standard).toBe('ISO/IEC 27001:2022, ISO 9001:2015, ISO 14001:2015, ISO 17100:2015, ISO 18841:2018');
+        expect(ck.knowledgeBaseStandards).toEqual(['ISO 17100:2015', 'ISO 18841:2018']);
+        const section = (name) => ck.clauses.find(c => c.mainClause === name);
+        expect(section('ISO 17100:2015').subClauses).toHaveLength(6);          // 12 clauses, sampled
+        expect(section('ISO 17100:2015').title).toMatch(/6 of 12 clauses sampled/);
+        expect(section('ISO 18841:2018').subClauses).toHaveLength(4);
+        expect(section('ISO 17100:2015').subClauses[0]).toMatchObject({ criterionSource: 'knowledge-base', criterionStandard: 'ISO 17100:2015', requirement: 'How is translation item 1 controlled?' });
+        expect(ck.clauses.some(c => c.mainClause === 'SURV')).toBe(true);
+
+        const { qa, blockers } = releaseBlockers(ck);
+        expect(qa.issues.filter(i => i.severity === 'critical')).toEqual([]);
+        expect(blockers).toEqual([]);
+    });
+
+    it('an initial audit takes every Knowledge Base clause and is releasable too', async () => {
+        openLS('initial');
+        tickRegistry(); tickScheme('ISO 17100:2015');
+        await save(); await flush();
+        const ck = window.state.checklists[0];
+        expect(ck.clauses.find(c => c.mainClause === 'ISO 17100:2015').subClauses).toHaveLength(12);
+        expect(releaseBlockers(ck).blockers).toEqual([]);
+    });
+
+    it('still refuses to mix in a standard with no clause set anywhere, and names it', async () => {
+        openLS('surveillance');
+        tickRegistry(); tickScheme('ISO 17100:2015'); tickScheme('ISO 18587:2017');
+        await save();
+        expect(window.state.checklists || []).toHaveLength(0);
+        expect(notes.pop().msg).toMatch(/^ISO 18587:2017 has no clause set in the registry or the Knowledge Base/);
+    });
+
+    it('ISO 9001 + ISO 14001 ask the general improvement clause once, not twice', () => {
+        const ck = B.buildClientChecklist(LS(), DOC, { auditType: 'initial', standardIds: ['iso9001', 'iso14001'], manDays: 2 });
+        const tens = ck.clauses.flatMap(c => (c.subClauses || []).map(i => i)).filter(i => i.clause === '10.1');
+        expect(tens).toHaveLength(1);
+        expect(tens[0].refs.map(r => r.stdId).sort()).toEqual(['iso14001', 'iso9001']);
+        expect(M.QA.validate(ck, ck.qaContext).issues.some(i => i.code === 'DUPLICATE_QUESTION')).toBe(false);
     });
 });
 

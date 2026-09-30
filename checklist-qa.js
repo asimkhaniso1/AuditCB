@@ -148,6 +148,17 @@
             || /^9\.6\.2\s*\([a-z]\)$/i.test(String((it && it.clause) || '').trim());
     }
 
+    /**
+     * An item whose criterion is a clause of a standard held in the Knowledge
+     * Base, not in the clause registry (ISO 17100 "4.2" on a checklist that
+     * also covers ISO 9001). Its reference is not checked against the registry
+     * standards in scope — it does not belong to them.
+     */
+    function isKnowledgeBaseItem(it) {
+        const raw = (it && it.raw) || {};
+        return String(raw.criterionSource || '') === 'knowledge-base';
+    }
+
     /** A ref the generator uses as a section tag rather than a standard citation. */
     const PSEUDO_REFS = new Set(['ORG', 'DOC', 'DOCNOTE', 'IMS', 'RECERT', 'REVIEW', 'FOCUS', 'SURV', 'THEME', 'SOA', '']);
     function isPseudoRef(ref) {
@@ -173,6 +184,11 @@
      * already does.
      */
     function citeDifferentRequirements(a, b) {
+        // A Knowledge Base item is a clause of its own standard: the same
+        // wording under ISO 17100 4.2 and ISO 18841 4.2 tests two requirements.
+        const kbKey = it => (isKnowledgeBaseItem(it) ? `${it.raw.criterionStandard || ''}::${it.clause}` : null);
+        const ka = kbKey(a), kb = kbKey(b);
+        if (ka || kb) return ka !== kb;
         const key = it => new Set((it.refs || []).map(r => String(r.ref).trim()));
         const A = key(a), B = key(b);
         if (!A.size || !B.size) return false;
@@ -239,7 +255,7 @@
         items.forEach(it => {
             const refs = it.refs && it.refs.length
                 ? it.refs
-                : (isPseudoRef(it.clause) || isSurveillanceElement(it) ? [] : ids.map(id => ({ stdId: id, ref: it.clause })));
+                : (isPseudoRef(it.clause) || isSurveillanceElement(it) || isKnowledgeBaseItem(it) ? [] : ids.map(id => ({ stdId: id, ref: it.clause })));
             if (!refs.length) return;
             if (!Std) return;
             // A citation is valid when at least one selected standard genuinely
@@ -311,6 +327,8 @@
             const byRef = new Map();
             items.forEach(it => {
                 if (isPseudoRef(it.clause)) return;
+                // A Knowledge Base item already says which standard it means.
+                if (isKnowledgeBaseItem(it)) return;
                 if (!byRef.has(it.clause)) byRef.set(it.clause, []);
                 byRef.get(it.clause).push(it);
             });
