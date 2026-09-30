@@ -1036,6 +1036,15 @@
         STANDARD_NOT_LINKED: 'Checklist not linked to every standard in the audit scope'
     };
 
+    // Cycle gaps are judged over the whole certification cycle. assess() rates
+    // them critical only at the audit that closes the cycle (recertification);
+    // at a surveillance they are informational — the requirement can still be
+    // audited at a later visit — and the gate treats them the way coverage
+    // does, as notes, instead of refusing to release every surveillance
+    // checklist. RISK_CONTROL_GAP is not here: risk drivers name controls THIS
+    // audit must sample, whatever the audit type.
+    const CYCLE_GAP_CODES = { CYCLE_REQUIREMENT_GAP: true, CYCLE_CONTROL_GAP: true, CYCLE_PROCESS_GAP: true };
+
     /**
      * Decide whether a checklist may be marked Ready for Audit.
      *
@@ -1079,6 +1088,7 @@
         list.forEach(function (i) {
             const label = BLOCKING_CODES[i.code];
             if (!label) { notes.push(i); return; }
+            if (CYCLE_GAP_CODES[i.code] && i.severity === 'info') { notes.push(i); return; }
             // An issue an auditor has explicitly dispositioned — item removed,
             // clause assigned, or a recorded justification — stops blocking.
             const key = i.code + '|' + (i.itemRef || '') + '|' + (i.nearRef || '');
