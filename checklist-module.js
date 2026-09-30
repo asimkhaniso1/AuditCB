@@ -67,16 +67,18 @@ function renderChecklistLibrary(clientId) {
     // put ISO 14001, 27001, 50001 and 20000-1 checklists in front of a client
     // certified to ISO 9001 alone, which is noise at best and an invitation to
     // audit against an unsubscribed standard at worst.
-    const clientStandards = String((scopedClient && scopedClient.standard) || '')
-        .split(',').map(s => s.trim()).filter(Boolean);
-    const normStd = (s) => String(s || '').toLowerCase().replace(/iso\/iec/g, 'iso').replace(/[\s:_-]/g, '');
-    const clientStandardKeys = clientStandards.map(normStd);
+    // Held = the client record's list, its certificates and its sites'
+    // Applicable Standards (UTILS.clientStandards) — the record's list alone
+    // missed Halal and cGMP on SG 1888. Matching is canonical and
+    // edition-exact, so a cGMP holder is not shown GMP, nor ISO 9001:2015 one
+    // shown ISO 9001:2026. (The old substring match on normalised keys did
+    // both, since "cgmp" contains "gmp".)
+    const clientStandards = scopedClient ? window.UTILS.clientStandards(scopedClient) : [];
     // A checklist can name several standards (an integrated-system checklist),
     // so it is relevant when ANY of its standards is one the client holds.
     const targetsClientStandard = (c) => {
-        if (!clientStandardKeys.length) return true; // client has none recorded — don't hide everything
-        return String(c.standard || '').split(',').map(s => normStd(s)).filter(Boolean)
-            .some(k => clientStandardKeys.some(ck => k === ck || k.includes(ck) || ck.includes(k)));
+        if (!clientStandards.length) return true; // client has none recorded — don't hide everything
+        return window.UTILS.standardsOverlap(c.standard || '', clientStandards);
     };
 
     // Does this checklist belong to the scoped client?
