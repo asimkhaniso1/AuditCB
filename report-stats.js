@@ -754,6 +754,27 @@
             return !!when && when >= windowStart && when <= today;
         };
         const lifecycleTypes = new Set(lifecycleEvents.filter(inThisCycle).map((event) => trim(event.type).toLowerCase()));
+        // What was recorded against each milestone of this cycle — when it was
+        // performed, by whom (CCI or a named third party) and the evidence
+        // filed with it — so a tick carries its record, not just a colour.
+        const COMPLETION_KEY = { 'surveillance-1-completed': 's1', 'surveillance-2-completed': 's2', 'recertification-completed': 'recert', 'certification-renewal': 'recert' };
+        const completionRecords = { s1: null, s2: null, recert: null };
+        lifecycleEvents.filter(inThisCycle).forEach((event) => {
+            const key = COMPLETION_KEY[trim(event.type).toLowerCase()];
+            if (!key) return;
+            const meta = event.metadata || {};
+            const record = {
+                eventId: event.id || null,
+                performedAt: parseDateSafe(event.occurredAt || event.createdAt),
+                source: meta.source === 'third-party' ? 'third-party' : (meta.source === 'cci' ? 'cci' : null),
+                auditor: trim(meta.auditor) || null,
+                evidence: safeArr(meta.evidence),
+                note: trim(event.reason) || null,
+                recordedBy: event.user || null
+            };
+            const prior = completionRecords[key];
+            if (!prior || (record.performedAt && prior.performedAt && record.performedAt > prior.performedAt)) completionRecords[key] = record;
+        });
 
         // Sharing fills a SILENT record, it never edits one that is being kept.
         // A certificate with a milestone of its own is tracked individually, and
@@ -871,7 +892,7 @@
             // it is re-issued annually: that is a re-issue overdue, not the end
             // of certification, and the two must not be conflated.
             certificateExpired: !!rawExpiry && today > rawExpiry,
-            completed, surveillancesDone, recertDone, hasHistory, sharedEvidence,
+            completed, completionRecords, surveillancesDone, recertDone, hasHistory, sharedEvidence,
             stage, nextStage, stageSource, progress, nextAudit,
             cycleNumber, cycleYear, cycleLabel, periodStart, periodEnd, cycleLastDay,
             expired: !recertDone && today > cycleEnd,

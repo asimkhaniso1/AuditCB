@@ -1117,13 +1117,21 @@ function renderCertificationCycleWidget(client) {
         // shown from the calendar alone); amber ! = that stage's period has
         // already passed on the calendar but no finalized audit is on file —
         // the milestone is DUE/MISSED, not blank. Grey = genuinely upcoming.
-        const node = (done, dueDate, sym, label, name, sharedFrom) => {
+        const node = (done, dueDate, sym, label, name, sharedFrom, recorded) => {
             const overdue = !done && dueDate && today > dueDate;
+            // A milestone recorded through Record Completed Audit names when it
+            // was performed and by whom (CCI or the third party).
+            const recordedTitle = recorded && recorded.performedAt
+                ? `${name} performed ${window.UTILS.formatDate(recorded.performedAt)}`
+                    + (recorded.source === 'third-party' ? ` by ${recorded.auditor || 'a third party'} (third-party audit)`
+                        : recorded.source === 'cci' ? ` by CCI${recorded.auditor ? ' — ' + recorded.auditor : ''}` : ' — recorded completion')
+                    + (recorded.evidence && recorded.evidence.length ? ` · ${recorded.evidence.length} evidence file${recorded.evidence.length === 1 ? '' : 's'}` : '')
+                : null;
             const bg = done ? '#10b981' : overdue ? '#f59e0b' : '#cbd5e1';
             // A tick earned on a sibling certificate of the same cycle names that
             // certificate, so the evidence behind it stays traceable.
             const title = done
-                ? (sharedFrom
+                ? (recordedTitle ? window.UTILS.escapeHtml(recordedTitle) : null) || (sharedFrom
                     ? `${name} recorded on certificate ${sharedFrom} — same certification cycle`
                     : `${name} audit finalized`)
                 : overdue ? `${name} period passed (${window.UTILS.formatDate(dueDate)}) — no finalized audit on file`
@@ -1140,11 +1148,11 @@ function renderCertificationCycleWidget(client) {
                             <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">Cert</div>
                         </div>
                         ${link(s1Done)}
-                        ${node(s1Done, surv1, '1', 'S1', 'Surveillance 1', cs && cs.sharedEvidence && cs.sharedEvidence.s1)}
+                        ${node(s1Done, surv1, '1', 'S1', 'Surveillance 1', cs && cs.sharedEvidence && cs.sharedEvidence.s1, cs && cs.completionRecords && cs.completionRecords.s1)}
                         ${link(s2Done)}
-                        ${node(s2Done, surv2, '2', 'S2', 'Surveillance 2', cs && cs.sharedEvidence && cs.sharedEvidence.s2)}
+                        ${node(s2Done, surv2, '2', 'S2', 'Surveillance 2', cs && cs.sharedEvidence && cs.sharedEvidence.s2, cs && cs.completionRecords && cs.completionRecords.s2)}
                         ${link(recertDone)}
-                        ${node(recertDone, recertAudit, '↻', 'Re', 'Recertification', cs && cs.sharedEvidence && cs.sharedEvidence.recert)}
+                        ${node(recertDone, recertAudit, '↻', 'Re', 'Recertification', cs && cs.sharedEvidence && cs.sharedEvidence.recert, cs && cs.completionRecords && cs.completionRecords.recert)}
                     </div>`;
     })()}
                 </div>

@@ -229,45 +229,164 @@ function certificateCompletionsHTML(client, certificate, index) {
     return `<div style="margin-top:.6rem;border-top:1px dashed #e2e8f0;padding-top:.5rem;">
         <div style="font-size:.75rem;color:#475569;font-weight:600;">Audits performed</div>
         ${recorded.length
-            ? `<ul style="margin:.25rem 0 0;padding-left:1rem;font-size:.75rem;color:#15803d;">${recorded.map(event => `<li>${esc(byType[event.type])} — ${window.UTILS.formatDate(event.occurredAt)}${event.user ? ' (' + esc(event.user) + ')' : ''}</li>`).join('')}</ul>`
+            ? `<ul style="margin:.25rem 0 0;padding-left:1rem;font-size:.75rem;color:#15803d;">${recorded.map(event => {
+                const meta = event.metadata || {};
+                const by = meta.source === 'third-party' ? ` · Third-party: ${esc(meta.auditor || '')}`
+                    : meta.source === 'cci' ? ` · CCI${meta.auditor ? ': ' + esc(meta.auditor) : ''}` : '';
+                const files = (meta.evidence || []).map((file, i) => `<button type="button" class="btn btn-link" style="padding:0 .25rem;font-size:.72rem;" data-action="openCompletionEvidence" data-arg1="${esc(client.id)}" data-arg2="${esc(event.id)}" data-arg3="${i}" title="Open ${esc(file.name)}"><i class="fa-solid fa-paperclip"></i> ${esc(file.name)}</button>`).join('');
+                return `<li>${esc(byType[event.type])} — ${window.UTILS.formatDate(event.occurredAt)}${by}${event.user ? ' (' + esc(event.user) + ')' : ''}${event.reason ? `<div style="color:#475569;">${esc(event.reason)}</div>` : ''}${files ? `<div>${files}</div>` : ''}</li>`;
+            }).join('')}</ul>`
             : '<div style="font-size:.72rem;color:#64748b;margin-top:.15rem;">None recorded. Milestones tick only from a finalized report or a recorded audit.</div>'}
         <button type="button" class="btn btn-sm btn-outline-secondary" style="margin-top:.4rem;" data-action="recordCompletedCertificationAudit" data-arg1="${client.id}" data-arg2="${index}">Record Completed Audit</button>
     </div>`;
 }
 
-window.recordCompletedCertificationAudit = async function (clientId, certificateIndex) {
+// Record Completed Audit — a form in the app's modal, not a chain of browser
+// prompts. The saved record is an append-only lifecycle event on the
+// certificate; ReportStats.cycleState reads it to tick the milestone and move
+// the stage on, and carries its source, auditor and evidence to the card.
+const COMPLETION_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
+
+function completionFormState(client, certificate) {
+    const cycleState = window.ReportStats?.cycleState?.({
+        client, standard: certificate.standard, certificate,
+        allReports: window.state.auditReports || [], allPlans: window.state.auditPlans || []
+    }) || null;
+    const done = cycleState?.completed || {};
+    const suggested = !done.s1 && !done.s2 ? 'Surveillance 1' : !done.s2 ? 'Surveillance 2' : 'Recertification';
+    return { cycleState, suggested };
+}
+
+window.recordCompletedCertificationAudit = function (clientId, certificateIndex) {
     const client = window.state.clients.find(item => String(item.id) === String(clientId));
     const certificate = client?.certificates?.[Number(certificateIndex)];
     if (!client || !certificate || !window.AuditPlanningDomain) {
         window.showNotification('Certification lifecycle service is unavailable.', 'error');
         return;
     }
-    const milestone = window.prompt('Which audit was performed? Enter Surveillance 1, Surveillance 2, or Recertification.');
-    if (!milestone) return;
-    const performedAt = window.prompt('Date the audit was performed (YYYY-MM-DD):');
-    if (!performedAt) return;
-    const note = window.prompt('Reference or note for the record (optional):') || '';
+    const esc = window.UTILS.escapeHtml;
+    const { cycleState, suggested } = completionFormState(client, certificate);
+    const today = new Date();
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const auditors = (window.state.auditors || []).map(a => a && a.name).filter(Boolean);
+    const stages = [['Surveillance 1', 'S1 — Surveillance 1'], ['Surveillance 2', 'S2 — Surveillance 2'], ['Recertification', 'Recert — Recertification']];
 
+    document.getElementById('modal-title').textContent = 'Record Completed Audit';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="completion-form" novalidate>
+            <div style="padding:.6rem .8rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;margin-bottom:1rem;font-size:.85rem;color:#0c4a6e;">
+                <strong>${esc(certificate.standard || 'Certificate')}</strong>${certificate.certificateNo ? ` · Cert # ${esc(certificate.certificateNo)}` : ''}
+                ${cycleState ? `<div style="font-size:.78rem;margin-top:.2rem;">${esc(cycleState.cycleLabel || '')} · cycle began ${window.UTILS.formatDate(cycleState.anchor)} · current stage ${esc(cycleState.stage || '')}</div>` : ''}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                <div class="form-group">
+                    <label for="completion-stage">Audit Stage <span style="color:#dc2626;">*</span></label>
+                    <select id="completion-stage" class="form-control">
+                        ${stages.map(([value, label]) => `<option value="${value}" ${value === suggested ? 'selected' : ''}>${label}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="completion-date">Audit Date <span style="color:#dc2626;">*</span></label>
+                    <input type="date" id="completion-date" class="form-control" max="${todayIso}">
+                </div>
+                <div class="form-group">
+                    <label for="completion-source">Audit Source <span style="color:#dc2626;">*</span></label>
+                    <select id="completion-source" class="form-control">
+                        <option value="cci">CCI</option>
+                        <option value="third-party">Third-Party</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="completion-auditor" id="completion-auditor-label">Auditor</label>
+                    <input type="text" id="completion-auditor" class="form-control" list="completion-auditor-options" placeholder="Lead auditor who performed it">
+                    <datalist id="completion-auditor-options">${auditors.map(name => `<option value="${esc(name)}"></option>`).join('')}</datalist>
+                </div>
+            </div>
+            <div id="completion-cycle-note" style="display:none;padding:.5rem .75rem;background:#fef3c7;border-radius:6px;font-size:.8rem;color:#92400e;margin-bottom:.75rem;"></div>
+            <div class="form-group">
+                <label for="completion-evidence">Evidence <span style="font-weight:400;color:#64748b;">(audit report, certificate or other record — PDF, image or Word, up to 10 MB each)</span></label>
+                <input type="file" id="completion-evidence" class="form-control" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/*">
+            </div>
+            <div class="form-group">
+                <label for="completion-notes">Notes</label>
+                <textarea id="completion-notes" class="form-control" rows="3" placeholder="Report reference, scope covered, findings raised…"></textarea>
+            </div>
+        </form>`;
+
+    const sourceSel = document.getElementById('completion-source');
+    const auditorLabel = document.getElementById('completion-auditor-label');
+    const auditorInput = document.getElementById('completion-auditor');
+    sourceSel.addEventListener('change', () => {
+        const third = sourceSel.value === 'third-party';
+        auditorLabel.innerHTML = third ? 'Organization <span style="color:#dc2626;">*</span>' : 'Auditor';
+        auditorInput.placeholder = third ? 'Certification body or organization that performed it' : 'Lead auditor who performed it';
+        auditorInput.setAttribute('list', third ? '' : 'completion-auditor-options');
+    });
+    // Say up front when the date will be filed without ticking this cycle.
+    const dateInput = document.getElementById('completion-date');
+    const cycleNote = document.getElementById('completion-cycle-note');
+    dateInput.addEventListener('change', () => {
+        const outside = cycleState && dateInput.value
+            && !window.AuditPlanningDomain.completionFallsInCycle(cycleState, dateInput.value);
+        cycleNote.style.display = outside ? '' : 'none';
+        cycleNote.textContent = outside
+            ? `This date falls before the current cycle, which began ${window.UTILS.formatDate(cycleState.anchor)}. It will be kept on the record but will not tick this cycle's milestone.`
+            : '';
+    });
+
+    const saveBtn = document.getElementById('modal-save');
+    saveBtn.style.display = '';
+    saveBtn.textContent = 'Save';
+    saveBtn.onclick = () => saveCompletedAudit(client, certificate, saveBtn);
+    window.openModal();
+};
+
+async function uploadCompletionEvidence(client, files) {
+    if (!files.length) return [];
+    const supa = window.SupabaseClient;
+    if (!supa || !supa.isInitialized || !supa.client) throw new Error('evidence can only be uploaded while connected to the cloud');
+    const uploaded = [];
+    for (const file of files) {
+        const safeName = String(file.name || 'evidence').replace(/[^a-zA-Z0-9.-]/g, '_');
+        const path = `lifecycle-evidence/${client.id}/${Date.now()}_${safeName}`;
+        const { data, error } = await supa.client.storage.from('documents').upload(path, file, { cacheControl: '3600', upsert: false });
+        if (error) throw new Error(`${file.name}: ${error.message || 'upload failed'}`);
+        uploaded.push({ name: file.name, path: data?.path || path, size: file.size, type: file.type || null });
+    }
+    return uploaded;
+}
+
+async function saveCompletedAudit(client, certificate, saveBtn) {
+    const milestone = document.getElementById('completion-stage').value;
+    const performedAt = document.getElementById('completion-date').value;
+    const source = document.getElementById('completion-source').value;
+    const auditor = document.getElementById('completion-auditor').value.trim();
+    const note = document.getElementById('completion-notes').value.trim();
+    const files = Array.from(document.getElementById('completion-evidence').files || []);
+
+    if (!performedAt) { window.showNotification('Enter the date the audit was performed.', 'error'); return; }
+    const tooBig = files.find(file => file.size > COMPLETION_EVIDENCE_MAX_BYTES);
+    if (tooBig) { window.showNotification(`${tooBig.name} is larger than 10 MB.`, 'error'); return; }
+
+    let record;
     try {
-        const record = window.AuditPlanningDomain.createCompletionRecord({
-            milestone, performedAt, note,
+        // Validate everything (role, date, third-party organization) before
+        // any file is uploaded.
+        record = window.AuditPlanningDomain.createCompletionRecord({
+            milestone, performedAt, note, source, auditor,
             user: window.state.currentUser?.name || 'Unknown user',
             role: window.state.currentUser?.role || 'Unknown role',
             settings: window.state.cbSettings || {}
         });
+    } catch (error) {
+        window.showNotification(`Audit not recorded: ${error.message}`, 'error');
+        return;
+    }
 
-        // A date outside the current cycle is filed but ticks nothing, so say
-        // so before writing it rather than leaving the node stubbornly amber.
-        const cycleState = window.ReportStats?.cycleState?.({
-            client, standard: certificate.standard, certificate,
-            allReports: window.state.auditReports || [], allPlans: window.state.auditPlans || []
-        });
-        if (cycleState && !window.AuditPlanningDomain.completionFallsInCycle(cycleState, record.performedAt)) {
-            const cycleStart = window.UTILS.formatDate(cycleState.anchor);
-            const proceed = window.confirm(`That date falls before the current cycle, which began ${cycleStart}. It will be kept on the record but will not tick this cycle's milestone. Record it anyway?`);
-            if (!proceed) return;
-        }
-
+    saveBtn.disabled = true;
+    saveBtn.textContent = files.length ? 'Uploading evidence…' : 'Saving…';
+    try {
+        const evidence = await uploadCompletionEvidence(client, files);
         const event = window.AuditPlanningDomain.createLifecycleEvent({
             certificateId: certificate.id || certificate.certificateNo,
             type: record.type,
@@ -276,17 +395,48 @@ window.recordCompletedCertificationAudit = async function (clientId, certificate
             user: record.user,
             role: record.role,
             reason: record.note,
-            metadata: { category: 'completion', recordedAt: record.createdAt }
+            metadata: { category: 'completion', recordedAt: record.createdAt, source: record.source, auditor: record.auditor, evidence }
         });
         client.certificationLifecycleEvents = client.certificationLifecycleEvents || [];
         client.certificationLifecycleEvents.push(event);
         window.saveData();
         await window.SupabaseClient?.syncClientsToSupabase?.([client]);
-        window.showNotification(`${record.milestone} recorded as performed on ${window.UTILS.formatDate(record.performedAt)}.`, 'success');
-        if (typeof window.renderClientOrgSetup === 'function') window.renderClientOrgSetup(clientId);
+        window.closeModal();
+        window.showNotification(`${record.milestone} recorded as performed on ${window.UTILS.formatDate(record.performedAt)}${record.source === 'third-party' ? ` by ${record.auditor}` : ''}.`, 'success');
+        if (typeof window.renderClientOrgSetup === 'function') window.renderClientOrgSetup(client.id);
     } catch (error) {
         window.showNotification(`Audit not recorded: ${error.message}`, 'error');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
     }
+}
+
+// Open an evidence file filed with a recorded audit. The bucket may be
+// private, so a short-lived signed URL is minted from the stored path; the tab
+// is opened before the await so it is not treated as a blocked popup.
+window.openCompletionEvidence = async function (clientId, eventId, fileIndex) {
+    const client = window.state.clients.find(item => String(item.id) === String(clientId));
+    const event = (client?.certificationLifecycleEvents || []).find(e => String(e.id) === String(eventId));
+    const file = event?.metadata?.evidence?.[Number(fileIndex)];
+    if (!file || !file.path) {
+        window.showNotification('That evidence file is not stored.', 'warning');
+        return;
+    }
+    const tab = window.open('', '_blank');
+    let url = null;
+    try {
+        const { data, error } = await window.SupabaseClient.client.storage.from('documents').createSignedUrl(file.path, 600);
+        if (!error && data?.signedUrl) url = data.signedUrl;
+    } catch (err) {
+        if (window.Logger) Logger.warn('[Lifecycle] Signed URL failed:', err);
+    }
+    if (!url) {
+        if (tab) tab.close();
+        window.showNotification('Could not open the evidence file — sign in again or check your connection.', 'error');
+        return;
+    }
+    if (tab) { tab.opener = null; tab.location.href = url; } else { window.location.assign(url); }
 };
 
 window.cancelCertificationStageOverride = async function (clientId, certificateIndex) {

@@ -613,10 +613,21 @@
         if (!performedAt) throw new Error('Enter the date the audit was performed (YYYY-MM-DD).');
         const now = date(input.now) || new Date();
         if (performedAt > now) throw new Error('An audit cannot be recorded as performed in the future.');
+        // Who performed it: this CB (CCI) or a third party — typically the
+        // previous certification body on a transferred certificate, whose
+        // audit is accepted as evidence but must be named.
+        const source = /third/i.test(String(input.source || '')) ? 'third-party' : 'cci';
+        const auditor = String(input.auditor || '').trim();
+        if (source === 'third-party' && !auditor) throw new Error('Name the organization that performed the third-party audit.');
+        const evidence = safeArray(input.evidence).filter((file) => file && (file.path || file.url)).map((file) => ({
+            name: String(file.name || file.path || 'Evidence'), path: file.path || null, url: file.url || null,
+            size: Number(file.size) || null, type: file.type || null
+        }));
         return {
             id: global.crypto?.randomUUID?.() || `CMP-${Date.now()}-${Math.random().toString(16).slice(2)}`,
             milestone, type: COMPLETION_MILESTONES[milestone],
             performedAt: isoDate(performedAt),
+            source, auditor, evidence,
             note: String(input.note || '').trim(),
             user: input.user || 'Unknown user', role: input.role,
             createdAt: input.createdAt || new Date().toISOString()
