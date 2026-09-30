@@ -79,15 +79,30 @@ describe('Configure Checklists on an SG 1888 plan', () => {
         await window.renderConfigureChecklist(plan.id);
     }
 
-    it('a cGMP plan offers the cGMP checklists and the client’s own, and hides the rest behind Show all', async () => {
+    it('a cGMP plan offers the cGMP checklists and the client’s own; only the client’s other standards sit behind Show', async () => {
         await render({ id: 'p1', client: 'SG 1888 (PVT.) LTD.', standard: 'cGMP', selectedChecklists: [] });
         const visible = new Set(visibleCards());
         expect([...visible].sort()).toEqual(['10', '11', '5']);
         const hidden = document.getElementById('config-hidden-checklists');
         expect(hidden.style.display).toBe('none');
-        expect(document.body.textContent).toMatch(/8 checklists for other standards or other clients are hidden/);
+        // Behind "Show": the client's ISO 9001:2015 global checklist — nothing else.
+        const behind = Array.from(hidden.querySelectorAll('.checklist-select-cb')).map(cb => cb.getAttribute('data-id'));
+        expect(behind).toEqual(['3']);
+        const note = document.getElementById('config-scope-note').textContent;
+        expect(note).toMatch(/1 checklist for SG 1888 \(PVT\.\) LTD\.'s other standards \(ISO 9001:2015, Halal\) is hidden/);
+        expect(note).toMatch(/outside the client's Applicable Standards, and other clients' checklists, are not offered/);
+        // Standards the client does not hold, and other clients' checklists, are not on the page at all.
+        const onPage = Array.from(document.querySelectorAll('.checklist-select-cb')).map(cb => cb.getAttribute('data-id'));
+        ['1', '2', '4', '6', '7', '8', '9'].forEach(id => expect(onPage).not.toContain(id));
         window.toggleHiddenPlanChecklists();
         expect(hidden.style.display).toBe('');
+    });
+
+    it('a client with no standards recorded is not locked out of every checklist', async () => {
+        window.state = { clients: [{ id: 'n', name: 'New Client' }], checklists: CHECKLISTS(), auditPlans: [{ id: 'p0', client: 'New Client', standard: '', selectedChecklists: [] }] };
+        await window.renderConfigureChecklist('p0');
+        const onPage = Array.from(document.querySelectorAll('.checklist-select-cb')).map(cb => cb.getAttribute('data-id'));
+        expect(onPage).toEqual(expect.arrayContaining(['1', '3', '5']));
     });
 
     it('a plan without standards falls back to what the client holds; other clients’ checklists stay hidden', async () => {
@@ -107,6 +122,20 @@ describe('Configure Checklists on an SG 1888 plan', () => {
         expect(firstHeading.textContent).toMatch(/SG 1888 \(PVT\.\) LTD\. Checklists/);
         const inClientGroup = Array.from(firstHeading.parentElement.querySelectorAll('.checklist-select-cb')).map(cb => cb.getAttribute('data-id'));
         expect(inClientGroup).toContain('12');
+    });
+
+    it('a checklist named for the client shows in the client group even when stored as Global', async () => {
+        window.state = { clients: [SG(), ...OTHERS], auditPlans: [{ id: 'p7', client: 'SG 1888 (PVT.) LTD.', standard: 'cGMP', selectedChecklists: [] }],
+            checklists: CHECKLISTS().concat([{ id: 13, name: 'GMP Guidelines Pakistan - SG 1888 (PVT.) LTD. - Surveillance Audit Checklist', standard: 'GMP Guidelines Pakistan', type: 'global', clauses: [] }]) };
+        await window.renderConfigureChecklist('p7');
+        expect(visibleCards()).toContain('13');
+        const headings = Array.from(document.querySelectorAll('#content-area .fade-in h3'));
+        const clientGroup = headings.find(h => /SG 1888 \(PVT\.\) LTD\. Checklists/.test(h.textContent)).parentElement;
+        const globalGroup = headings.find(h => /Global Checklists/.test(h.textContent)).parentElement;
+        const ids = (g) => Array.from(g.querySelectorAll('.checklist-select-cb')).map(cb => cb.getAttribute('data-id'));
+        expect(ids(clientGroup)).toContain('13');
+        expect(ids(globalGroup)).not.toContain('13');
+        expect(document.body.textContent).not.toMatch(/No Custom Checklists Yet/);
     });
 
     it('ticking a checklist selects its questions, so Review & Merge and Save have something to work with', async () => {

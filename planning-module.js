@@ -1890,7 +1890,7 @@ window.toggleHiddenPlanChecklists = function (btn) {
     const show = box.style.display === 'none';
     box.style.display = show ? '' : 'none';
     const button = btn && btn.nodeType === 1 ? btn : document.querySelector('[data-action="toggleHiddenPlanChecklists"]');
-    if (button) button.textContent = show ? 'Hide' : 'Show all';
+    if (button) button.textContent = show ? 'Hide' : 'Show';
 };
 
 // Checklist Selection Modal for Audit Plan
@@ -1944,12 +1944,14 @@ window.renderConfigureChecklist = async function (planId) {
     };
 
     const clientName = plan.client || '';
+    // Tied to this client by id, by recorded client name, or by carrying the
+    // client's full name in its title — whatever its type says. A checklist
+    // built for SG 1888 but stored as "Global" was treated as nobody's, and
+    // then hidden because its standard label matched nothing.
     const belongsToThisClient = (c) => {
-        const cType = (c.type || '').toLowerCase();
-        if (cType === 'global') return false;
-        if (c.clientName === clientName) return true;
-        if (client && String(c.clientId) === String(client.id)) return true;
-        if (clientName && c.name && c.name.toLowerCase().includes(clientName.toLowerCase())) return true;
+        if (clientName && String(c.clientName || '').trim() === clientName.trim()) return true;
+        if (client && c.clientId != null && c.clientId !== '' && String(c.clientId) === String(client.id)) return true;
+        if (clientName && c.name && c.name.toLowerCase().includes(clientName.trim().toLowerCase())) return true;
         return false;
     };
     // The client's own checklists are always offered, at the top, whatever
@@ -1958,9 +1960,21 @@ window.renderConfigureChecklist = async function (planId) {
     // it among the hidden ones.
     const matchingChecklists = checklists.filter(c => isAssigned(c) || belongsToThisClient(c)
         || (forThisAudit(c) && !ownedByAnotherClient(c)));
-    const hiddenChecklists = checklists.filter(c => !matchingChecklists.includes(c));
+    // The client's Applicable Standards (client setup) are the outer limit,
+    // for global checklists as much as any other: what sits behind "Show" is
+    // only the checklists for the client's OTHER standards. A checklist for a
+    // standard the client does not hold, or one belonging to another client,
+    // is not offered at all. (A client with no standards recorded has no
+    // limit to apply, so everything stays reachable.)
+    const clientScope = window.UTILS.clientStandards(client);
+    const withinClientScope = (c) => !clientScope.length
+        || (window.UTILS.standardsOverlap(c.standard || '', clientScope) && !ownedByAnotherClient(c));
+    const notOffered = checklists.filter(c => !matchingChecklists.includes(c));
+    const hiddenChecklists = notOffered.filter(withinClientScope);
+    const outOfScopeCount = notOffered.length - hiddenChecklists.length;
+    const otherClientStandards = clientScope.filter(st => !auditStandards.includes(st));
 
-    const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
+    const globalChecklists = matchingChecklists.filter(c => c.type === 'global' && !belongsToThisClient(c));
     const clientChecklists = matchingChecklists.filter(belongsToThisClient);
     // Catch-all: non-global checklists not matched to this client (e.g. imported CSVs)
     const clientClIds = new Set(clientChecklists.map(c => c.id));
@@ -2148,14 +2162,14 @@ window.renderConfigureChecklist = async function (planId) {
                 `}
                 ${renderGroup('Global Checklists', globalChecklists, 'fa-solid fa-globe', '#0369a1')}
                 ${otherChecklists.length > 0 ? renderGroup('Other / Imported Checklists', otherChecklists, 'fa-solid fa-file-import', '#7c3aed') : ''}
-                ${hiddenChecklists.length ? `
-                <div style="margin: 0 0 1rem; padding: 0.75rem 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: #475569;">
-                    <span>Showing checklists for <strong>${window.UTILS.escapeHtml(auditStandards.join(', ') || 'all standards')}</strong>. ${hiddenChecklists.length} checklist${hiddenChecklists.length === 1 ? '' : 's'} for other standards or other clients ${hiddenChecklists.length === 1 ? 'is' : 'are'} hidden.</span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="toggleHiddenPlanChecklists" aria-controls="config-hidden-checklists">Show all</button>
+                ${(hiddenChecklists.length || outOfScopeCount) ? `
+                <div id="config-scope-note" style="margin: 0 0 1rem; padding: 0.75rem 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: #475569;">
+                    <span>Showing checklists for <strong>${window.UTILS.escapeHtml(auditStandards.join(', ') || 'all standards')}</strong>.${hiddenChecklists.length ? ` ${hiddenChecklists.length} checklist${hiddenChecklists.length === 1 ? '' : 's'} for ${window.UTILS.escapeHtml(plan.client)}'s other standards${otherClientStandards.length ? ` (${window.UTILS.escapeHtml(otherClientStandards.join(', '))})` : ''} ${hiddenChecklists.length === 1 ? 'is' : 'are'} hidden.` : ''}${outOfScopeCount ? ` Checklists for standards outside the client's Applicable Standards, and other clients' checklists, are not offered.` : ''}</span>
+                    ${hiddenChecklists.length ? '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="toggleHiddenPlanChecklists" aria-controls="config-hidden-checklists">Show</button>' : ''}
                 </div>
-                <div id="config-hidden-checklists" style="display: none;">
-                    ${renderGroup('Other standards and clients', hiddenChecklists, 'fa-solid fa-eye-slash', '#64748b')}
-                </div>` : ''}
+                ${hiddenChecklists.length ? `<div id="config-hidden-checklists" style="display: none;">
+                    ${renderGroup(`${window.UTILS.escapeHtml(plan.client)} — other applicable standards`, hiddenChecklists, 'fa-solid fa-eye-slash', '#64748b')}
+                </div>` : ''}` : ''}
             </div>
             
             <div style="margin-top: 3rem; padding: 2rem; border-top: 1px solid #e2e8f0; text-align: center;">
