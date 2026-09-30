@@ -134,8 +134,8 @@ describe('SG 1888 overview card', () => {
         expect(byLabel['CURRENT ISSUE / EXPIRY']).toBe('14/09/2026 – 13/09/2027');
         expect(card.textContent).toMatch(/Cycle 1 · Year 3/);
         expect(dots).toContain('Surveillance 1 performed 10/09/2025 — recorded completion');
-        expect(dots.some(t => /^Surveillance 2 period passed/.test(t))).toBe(true);   // due, window open
-        expect(dots).toContain('Recertification not yet due');
+        expect(dots).toContain('Surveillance 2 — current stage, audit window open (15/08/2026 – 14/10/2026)');
+        expect(dots).toContain('Recertification — future stage');
     });
 
     it('a recorded completion names its date, source, organization and evidence on the dot', () => {
