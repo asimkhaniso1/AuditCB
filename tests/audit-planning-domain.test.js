@@ -94,8 +94,24 @@ describe('certification-cycle-driven audit planning domain', () => {
         expect(methodology.usesDefaults).toBe(true);
         expect(methodology.version).toBe('Audit360 default v1');
         expect(result.configured).toBe(true);
-        expect(result.baselineDays).toBe(1.5);
+        // Three standards at 1.5 days each, summed for the integrated audit (IAF MD 11).
+        expect(result.results.map(r => r.days)).toEqual([1.5, 1.5, 1.5]);
+        expect(result.baselineDays).toBe(4.5);
+        expect(result.combination).toBe('sum');
         expect(methodology.missingFamilies).toEqual([]);
+    });
+
+    it('sums the standards of an integrated audit — six standards are not half a day', () => {
+        // Language Services UK: Surveillance 1, 10 employees, one site, six standards.
+        const standards = ['ISO 14001:2015', 'ISO 9001:2015', 'ISO 17100:2015', 'ISO 18841:2018', 'ISO 18587:2017', 'ISO/IEC 27001:2022'];
+        const methodology = Domain.resolveDurationMethodology({}, standards);
+        const result = Domain.calculateConfiguredDuration(methodology, { employees: 10, sites: 1, auditType: 'Surveillance 1', riskLevel: 'Medium' });
+        expect(result.results).toHaveLength(6);
+        expect(result.baselineDays).toBe(3);
+        // A single standard is unaffected.
+        const single = Domain.calculateConfiguredDuration(Domain.resolveDurationMethodology({}, ['ISO 9001:2015']), { employees: 10, sites: 1, auditType: 'Surveillance 1' });
+        expect(single.baselineDays).toBe(0.5);
+        expect(single.combination).toBe('single');
     });
 
     it('uses only configured, versioned duration tables and IMS rules', () => {
@@ -107,7 +123,7 @@ describe('certification-cycle-driven audit planning domain', () => {
         const methodology = Domain.resolveDurationMethodology({ durationMethodologies }, standards);
         const result = Domain.calculateConfiguredDuration(methodology, { employees: 250, sites: 1, auditType: 'Surveillance 2', riskLevel: 'Medium' });
         expect(methodology.configured).toBe(true);
-        expect(result.baselineDays).toBe(3);
+        expect(result.baselineDays).toBe(5.5);   // 3 + 2.5
     });
 
     it('falls back to defaults when a legacy configured rule has no applicable stage row', () => {
@@ -150,7 +166,7 @@ describe('certification-cycle-driven audit planning domain', () => {
         expect(methodology.provisional).toBe(true);
         expect(methodology.version).toBe('DRAFT');
         expect(result.configured).toBe(true);
-        expect(result.baselineDays).toBe(2.5);
+        expect(result.baselineDays).toBe(5);     // 2.5 + 2.5
     });
 
     it('validates lead authorization separately from collective scheme and technical coverage', () => {
