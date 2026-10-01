@@ -2222,6 +2222,28 @@ function removeChecklistQuestion(id, itemRef, key) {
 }
 
 /**
+ * Open the app's form modal. `onSave` returns true when it has done its work;
+ * only then is the modal closed, so a validation message leaves the form open
+ * with what was typed. Replaces the browser prompt() dialogs these actions
+ * used.
+ */
+function openChecklistForm(title, bodyHtml, onSave, saveLabel) {
+    const save = () => { if (onSave()) window.closeModal(); };
+    if (window.DataService && typeof window.DataService.openFormModal === 'function') {
+        window.DataService.openFormModal(title, bodyHtml, save);
+    } else {
+        document.getElementById('modal-title').textContent = title;
+        document.getElementById('modal-body').innerHTML = bodyHtml;
+        const btn = document.getElementById('modal-save');
+        btn.style.display = '';
+        btn.onclick = save;
+        window.openModal();
+    }
+    const btn = document.getElementById('modal-save');
+    if (btn) btn.textContent = saveLabel || 'Save';
+}
+
+/**
  * Give an unmapped question a real clause reference.
  *
  * The reference is validated against the same rule the authoring screen uses,
@@ -2236,22 +2258,33 @@ function assignChecklistClause(id, itemRef, key) {
         window.showNotification('That question is no longer in the checklist.', 'warning');
         return;
     }
-    const label = String(target.sub.title || target.sub.requirement || '').slice(0, 220);
-    const entered = prompt(`Clause or control reference this question tests\n\n${label}`, '');
-    if (entered === null) return;
-    const ref = entered.trim();
-    if (!isValidClauseRef(ref)) {
-        window.showNotification(`"${ref}" is not a clause reference. Use the clause number from the standard, e.g. 9.2 or A.8.13.`, 'error');
-        return;
-    }
-    target.sub.clause = ref;
-    target.sub.auditorReview = false;
-    (target.sub.items || []).forEach(it => { it.clause = ref; });
-    recountChecklist(checklist);
-    clearResolution(checklist, key);
-    persistChecklist(checklist);
-    window.showNotification(`Question mapped to ${ref}.`, 'success');
-    viewChecklistDetail(id);
+    const esc = window.UTILS.escapeHtml;
+    const label = String(target.sub.title || target.sub.requirement || '').slice(0, 300);
+    openChecklistForm('Assign Clause', `
+        <div class="form-group">
+            <label>Question</label>
+            <div style="padding:0.6rem 0.8rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:0.88rem;color:#334155;">${esc(label)}</div>
+        </div>
+        <div class="form-group">
+            <label for="assign-clause-ref">Clause or control reference this question tests <span style="color:#dc2626;">*</span></label>
+            <input type="text" id="assign-clause-ref" class="form-control" placeholder="e.g. 9.2 or A.8.13" autocomplete="off">
+            <small style="color:var(--text-secondary);">Use the clause number from the standard, not a section tag.</small>
+        </div>`, () => {
+        const ref = String(document.getElementById('assign-clause-ref').value || '').trim();
+        if (!isValidClauseRef(ref)) {
+            window.showNotification(ref ? `"${ref}" is not a clause reference. Use the clause number from the standard, e.g. 9.2 or A.8.13.` : 'Enter the clause or control reference.', 'error');
+            return false;
+        }
+        target.sub.clause = ref;
+        target.sub.auditorReview = false;
+        (target.sub.items || []).forEach(it => { it.clause = ref; });
+        recountChecklist(checklist);
+        clearResolution(checklist, key);
+        persistChecklist(checklist);
+        window.showNotification(`Question mapped to ${ref}.`, 'success');
+        setTimeout(() => viewChecklistDetail(id), 0);
+        return true;
+    }, 'Assign');
 }
 
 /**
@@ -2264,22 +2297,29 @@ function assignChecklistClause(id, itemRef, key) {
 function justifyChecklistIssue(id, key) {
     const checklist = state.checklists?.find(c => String(c.id) === String(id));
     if (!checklist) return;
-    const note = prompt('Record why this stands as it is. It is stored with the checklist and printed on it.', '');
-    if (note === null) return;
-    if (note.trim().length < 15) {
-        window.showNotification('A justification has to say something an assessor can read — at least a sentence.', 'error');
-        return;
-    }
-    if (!checklist.resolvedIssues) checklist.resolvedIssues = {};
-    checklist.resolvedIssues[key] = {
-        action: 'justified', note: note.trim(),
-        by: (window.state?.currentUser?.name) || 'Admin',
-        at: new Date().toISOString().split('T')[0]
-    };
-    checklist.updatedAt = new Date().toISOString().split('T')[0];
-    persistChecklist(checklist);
-    window.showNotification('Justification recorded.', 'success');
-    viewChecklistDetail(id);
+    openChecklistForm('Record Justification', `
+        <div class="form-group">
+            <label for="justify-note">Why this stands as it is <span style="color:#dc2626;">*</span></label>
+            <textarea id="justify-note" class="form-control" rows="4" placeholder="At least a sentence an assessor can read"></textarea>
+            <small style="color:var(--text-secondary);">Stored with the checklist, with your name and today's date, and printed on it.</small>
+        </div>`, () => {
+        const note = String(document.getElementById('justify-note').value || '').trim();
+        if (note.length < 15) {
+            window.showNotification('A justification has to say something an assessor can read — at least a sentence.', 'error');
+            return false;
+        }
+        if (!checklist.resolvedIssues) checklist.resolvedIssues = {};
+        checklist.resolvedIssues[key] = {
+            action: 'justified', note,
+            by: (window.state?.currentUser?.name) || 'Admin',
+            at: new Date().toISOString().split('T')[0]
+        };
+        checklist.updatedAt = new Date().toISOString().split('T')[0];
+        persistChecklist(checklist);
+        window.showNotification('Justification recorded.', 'success');
+        setTimeout(() => viewChecklistDetail(id), 0);
+        return true;
+    });
 }
 
 /**
@@ -2409,7 +2449,7 @@ function soaTextFromDocument(d) {
 function applyChecklistSoA(checklist, refs, provenance) {
     if (!refs || !refs.length) {
         window.showNotification('No Annex A control references were recognised in that text — expected references like A.5.1 or A.8.13. Nothing was stored, and the applicable set is still shown as assumed.', 'error');
-        return;
+        return false;
     }
     if (!checklist.qaContext) checklist.qaContext = {};
     checklist.qaContext.soaApplicable = refs;
@@ -2428,7 +2468,8 @@ function applyChecklistSoA(checklist, refs, provenance) {
     recountChecklist(checklist);
     persistChecklist(checklist);
     window.showNotification(`Statement of Applicability recorded — ${refs.length} control(s) applicable. Coverage recalculated.`, 'success');
-    viewChecklistDetail(String(checklist.id));
+    setTimeout(() => viewChecklistDetail(String(checklist.id)), 0);
+    return true;
 }
 
 /**
@@ -2466,22 +2507,39 @@ function pickChecklistSoADocument(id, stdId) {
         if (!isNaN(ad) || !isNaN(bd)) return isNaN(ad) ? 1 : -1;
         return 0;
     });
-    const listing = sorted.map((d, i) => `${i + 1}. ${d.name}${d.revision ? ' — Rev ' + d.revision : ''}${d.date ? ' — ' + d.date : ''}`).join('\n');
-    const choice = prompt(`Which document on file is the current Statement of Applicability for ${std.label}?\n\n${listing}\n\nEnter its number.`, '');
-    if (choice === null) return;
-    const idx = parseInt(String(choice).trim(), 10);
-    const doc = idx >= 1 && idx <= sorted.length ? sorted[idx - 1] : null;
-    if (!doc) {
-        window.showNotification(`"${choice}" is not one of the listed documents.`, 'error');
-        return;
-    }
-    let refs = refsFromSoAText(soaTextFromDocument(doc));
-    if (!refs.length) {
-        const entered = prompt(`"${doc.name}" does not carry any recognisable control references on its own record. Paste the references it declares applicable\n\ne.g. A.5.1, A.5.9, A.8.13`, '');
-        if (entered === null) return;
-        refs = refsFromSoAText(entered);
-    }
-    applyChecklistSoA(checklist, refs, { source: 'document', document: doc });
+    const esc = window.UTILS.escapeHtml;
+    // A document named or categorised as the SoA is preselected.
+    const likely = Math.max(0, sorted.findIndex(d => /statement of applicability|\bsoa\b/i.test(`${d.name || ''} ${d.category || ''}`)));
+    openChecklistForm(`Statement of Applicability — ${std.label}`, `
+        <div class="form-group">
+            <label for="soa-doc">Document on file that is the current SoA <span style="color:#dc2626;">*</span></label>
+            <select id="soa-doc" class="form-control">
+                ${sorted.map((d, i) => `<option value="${i}" ${i === likely ? 'selected' : ''}>${esc(d.name)}${d.revision ? ' — Rev ' + esc(d.revision) : ''}${d.date ? ' — ' + esc(d.date) : ''}</option>`).join('')}
+            </select>
+            <small style="color:var(--text-secondary);">Most recent first.</small>
+        </div>
+        <div class="form-group">
+            <label for="soa-doc-refs">Controls it declares applicable <span style="color:#dc2626;">*</span></label>
+            <textarea id="soa-doc-refs" class="form-control" rows="4" placeholder="e.g. A.5.1, A.5.9, A.5.15, A.8.8, A.8.13"></textarea>
+            <small id="soa-doc-hint" style="color:var(--text-secondary);"></small>
+        </div>`, () => {
+        const doc = sorted[Number(document.getElementById('soa-doc').value)];
+        if (!doc) { window.showNotification('Choose the document.', 'error'); return false; }
+        return applyChecklistSoA(checklist, refsFromSoAText(document.getElementById('soa-doc-refs').value), { source: 'document', document: doc });
+    }, 'Record SoA');
+    // Read what the chosen document's own record carries; otherwise ask for it.
+    const select = document.getElementById('soa-doc');
+    const box = document.getElementById('soa-doc-refs');
+    const hint = document.getElementById('soa-doc-hint');
+    const fill = () => {
+        const doc = sorted[Number(select.value)];
+        const refs = doc ? refsFromSoAText(soaTextFromDocument(doc)) : [];
+        box.value = refs.join(', ');
+        hint.textContent = refs.length
+            ? `${refs.length} control reference(s) read from this document's record — check them before recording.`
+            : `"${doc ? doc.name : ''}" does not carry control references on its own record. Paste the references it declares applicable.`;
+    };
+    if (select && box) { select.addEventListener('change', fill); fill(); }
 }
 
 /**
@@ -2499,9 +2557,20 @@ function pasteChecklistSoA(id, stdId) {
         window.showNotification('That standard is not in the clause registry, so the Statement of Applicability cannot be recorded.', 'error');
         return;
     }
-    const entered = prompt(`Control references the Statement of Applicability declares applicable for ${std.label}\n\ne.g. A.5.1, A.5.9, A.5.15, A.8.8, A.8.13`, '');
-    if (entered === null) return;
-    applyChecklistSoA(checklist, refsFromSoAText(entered), { source: 'pasted' });
+    openChecklistForm(`Statement of Applicability — ${std.label}`, `
+        <div class="form-group">
+            <label for="soa-paste">Control references the SoA declares applicable <span style="color:#dc2626;">*</span></label>
+            <textarea id="soa-paste" class="form-control" rows="5" placeholder="e.g. A.5.1, A.5.9, A.5.15, A.8.8, A.8.13"></textarea>
+            <small id="soa-paste-count" style="color:var(--text-secondary);">Paste the list as it appears in the SoA — ranges and other text around the references are fine.</small>
+        </div>`, () => applyChecklistSoA(checklist, refsFromSoAText(document.getElementById('soa-paste').value), { source: 'pasted' }), 'Record SoA');
+    const box = document.getElementById('soa-paste');
+    const count = document.getElementById('soa-paste-count');
+    if (box && count) {
+        box.addEventListener('input', () => {
+            const n = refsFromSoAText(box.value).length;
+            count.textContent = n ? `${n} control reference(s) recognised.` : 'No control references recognised yet — expected references like A.5.1 or A.8.13.';
+        });
+    }
 }
 
 /** Locate a sub-clause by its clause reference, with its parent and position. */
