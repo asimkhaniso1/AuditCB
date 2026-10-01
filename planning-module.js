@@ -1142,7 +1142,7 @@ function autoCalculateDays() {
         document.getElementById('plan-ims-adjustment').value = imsDefault;
         document.getElementById('plan-duration-basis').value = provisional
             ? `PROVISIONAL PLANNING ONLY — ${calculationMethodology.name} · unapproved draft${cycle.standards.length > 1 ? ` · IMS ${draftIMS?.version || 'draft/unapproved'}` : ''}`
-            : `${calculationMethodology.name} · version ${calculationMethodology.version}${defaultDurationUsed ? ' · default guide for auditor review' : ''}${cycle.standards.length > 1 ? ` · IMS ${imsConfig?.version}` : ''}`;
+            : `${calculationMethodology.name} · version ${calculationMethodology.version}${defaultDurationUsed ? ' · default guide for auditor review' : ''}${cycle.standards.length > 1 ? ` · ${calculated.results.length} standards summed (${calculated.results.map(r => r.days).join(' + ')} = ${baseline} days), IMS ${imsConfig?.version}` : ''}`;
         recalculateDurationAllocation();
         window.showNotification(provisional
             ? `Provisional planning duration calculated: ${baseline.toFixed(1)} days. Save as Draft; activate the approved methodology before final validation.`

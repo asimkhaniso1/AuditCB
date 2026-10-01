@@ -849,7 +849,9 @@
                 }
             } catch (_e) { perStandard = []; }
         }
-        const baseline = Number(d.baselineDays) || (perStandard.length ? Math.max.apply(null, perStandard.map(function (x) { return x.baselineDays; })) : 0);
+        // Integrated audit: the sum of the standards' times (IAF MD 11), before
+        // the IMS adjustment — the same rule calculateConfiguredDuration uses.
+        const baseline = Number(d.baselineDays) || perStandard.reduce(function (t, x) { return t + x.baselineDays; }, 0);
         const ims = Number(d.imsAdjustmentPercent) || 0;
         const justified = Number(d.justifiedAdjustment) || 0;
         const adjustments = [];
