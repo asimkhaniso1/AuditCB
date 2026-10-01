@@ -187,13 +187,16 @@ describe('Build Checklist — Knowledge Base standards join the registry ones in
     it('builds one surveillance checklist across all five, sampled, and it can be released', async () => {
         openLS('surveillance');
         tickRegistry(); tickScheme('ISO 17100:2015'); tickScheme('ISO 18841:2018');
+        document.getElementById('cldoc-length').value = '45';      // Two days: Knowledge Base clauses are sampled
         await save(); await flush();
         const ck = window.state.checklists[0];
         expect(ck.standard).toBe('ISO/IEC 27001:2022, ISO 9001:2015, ISO 14001:2015, ISO 17100:2015, ISO 18841:2018');
         expect(ck.knowledgeBaseStandards).toEqual(['ISO 17100:2015', 'ISO 18841:2018']);
         const section = (name) => ck.clauses.find(c => c.mainClause === name);
-        expect(section('ISO 17100:2015').subClauses).toHaveLength(6);          // 12 clauses, sampled
-        expect(section('ISO 17100:2015').title).toMatch(/6 of 12 clauses sampled/);
+        const sampled = section('ISO 17100:2015').subClauses.length;          // 12 clauses, sampled
+        expect(sampled).toBeGreaterThanOrEqual(2);
+        expect(sampled).toBeLessThan(12);
+        expect(section('ISO 17100:2015').title).toMatch(new RegExp(`${sampled} of 12 clauses sampled`));
         expect(section('ISO 18841:2018').subClauses).toHaveLength(4);
         expect(section('ISO 17100:2015').subClauses[0]).toMatchObject({ criterionSource: 'knowledge-base', criterionStandard: 'ISO 17100:2015', requirement: 'How is translation item 1 controlled?' });
         expect(ck.clauses.some(c => c.mainClause === 'SURV')).toBe(true);
@@ -210,6 +213,26 @@ describe('Build Checklist — Knowledge Base standards join the registry ones in
         const ck = window.state.checklists[0];
         expect(ck.clauses.find(c => c.mainClause === 'ISO 17100:2015').subClauses).toHaveLength(12);
         expect(releaseBlockers(ck).blockers).toEqual([]);
+    });
+
+    it('the chosen length sizes the surveillance checklist; mandatory elements are never trimmed', async () => {
+        const sizes = {};
+        for (const length of ['25', '45', '75', '']) {
+            openLS('surveillance');
+            tickRegistry(); tickScheme('ISO 17100:2015'); tickScheme('ISO 18841:2018');
+            document.getElementById('cldoc-length').value = length;
+            await save(); await flush();
+            const ck = window.state.checklists[0];
+            sizes[length || 'none'] = ck.itemCount;
+            expect(ck.clauses.find(c => c.mainClause === 'SURV').subClauses).toHaveLength(8);
+            // Over the target only when even the smallest sample is (the
+            // mandatory structure alone can be): Half day on this scope.
+            if (length && length !== '25') expect(ck.itemCount).toBeLessThanOrEqual(Number(length));
+            expect(releaseBlockers(ck).blockers).toEqual([]);
+        }
+        expect(sizes['25']).toBeLessThan(sizes['45']);
+        expect(sizes['45']).toBeLessThanOrEqual(sizes['75']);
+        expect(sizes['75']).toBeLessThan(sizes.none);
     });
 
     it('still refuses to mix in a standard with no clause set anywhere, and names it', async () => {
