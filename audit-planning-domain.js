@@ -444,7 +444,13 @@
         });
         const failed = results.find((result) => result.error);
         if (failed) return { configured: false, error: failed.error, results };
-        return { configured: true, baselineDays: Math.max(...results.map((result) => result.days)), results };
+        // An integrated audit starts from the SUM of each standard's audit
+        // time (IAF MD 11); the integration reduction is then applied, within
+        // the CB's configured limit, as the IMS adjustment. Taking only the
+        // largest standard gave Language Services UK half a day for six
+        // standards.
+        const baselineDays = results.reduce((total, result) => total + result.days, 0);
+        return { configured: true, baselineDays, combination: results.length > 1 ? 'sum' : 'single', results };
     }
 
     function validateDuration(calculation, methodology, standardCount) {
