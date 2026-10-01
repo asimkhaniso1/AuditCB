@@ -818,7 +818,7 @@
      * Only the elastic sections move: the requirement coverage an initial or
      * recertification audit owes the standard is never sampled away.
      */
-    function riskBasedBudget(auditType, standardIds, manDays, profile, siteCount) {
+    function riskBasedBudget(auditType, standardIds, manDays, profile, siteCount, lengthScale) {
         const type = normalizeAuditType(auditType);
         const n = Math.max(1, (standardIds || []).length);
         const band = (profile && profile.band) || 'unknown';
@@ -839,14 +839,24 @@
             recertification: { annexA: 18, processes: 10, documents: 3, themesPerStandard: null, coverAllClauses: true }
         }[type];
 
+        // The checklist length chosen on Build Checklist (surveillance only).
+        // It scales the SAMPLED sections — themes, Annex A controls, processes,
+        // documents and Knowledge Base clauses. The ISO/IEC 17021-1 mandatory
+        // elements, Stage 1 focus points and the surveillance core are never
+        // trimmed. Infinity means "no limit": every clause of the scope.
+        const ls = type === 'surveillance' && Number(lengthScale) > 0 ? Number(lengthScale) : 1;
+        const unlimited = ls === Infinity;
+        const scaled = (v) => (unlimited ? v * 4 : v * ls);
         return {
             auditType: type,
             scale: Math.round(scale * 100) / 100,
-            annexASample: cap(knobs.annexA),
-            processSample: cap(knobs.processes),
-            documentSample: knobs.documents,
-            themesPerStandard: knobs.themesPerStandard,
-            coverAllClauses: knobs.coverAllClauses,
+            lengthScale: unlimited ? 'unlimited' : ls,
+            annexASample: cap(scaled(knobs.annexA)),
+            processSample: cap(scaled(knobs.processes)),
+            documentSample: Math.max(1, Math.round(scaled(knobs.documents))),
+            themesPerStandard: knobs.themesPerStandard == null || unlimited ? null : Math.max(1, Math.round(knobs.themesPerStandard * ls)),
+            coverAllClauses: knobs.coverAllClauses || unlimited,
+            kbSample: unlimited ? null : Math.max(2, Math.round(KB_SURVEILLANCE_SAMPLE * ls)),
             siteSample: Math.min(siteCount || 0, type === 'surveillance' ? 3 : 10)
         };
     }
@@ -1172,13 +1182,14 @@
      * recertification audit takes every clause.
      */
     const KB_SURVEILLANCE_SAMPLE = 6;
-    function knowledgeBaseSections(kbStandards, auditType) {
+    function knowledgeBaseSections(kbStandards, auditType, sampleSize) {
+        const take = sampleSize === undefined ? KB_SURVEILLANCE_SAMPLE : sampleSize;
         return (kbStandards || []).map(k => {
             const all = (k.clauses || []).filter(c => c && c.clause && (c.requirement || c.title));
             let list = all;
-            if (auditType === 'surveillance' && all.length > KB_SURVEILLANCE_SAMPLE) {
-                const step = all.length / KB_SURVEILLANCE_SAMPLE;
-                list = Array.from({ length: KB_SURVEILLANCE_SAMPLE }, (_, i) => all[Math.floor(i * step)]);
+            if (auditType === 'surveillance' && take != null && all.length > take) {
+                const step = all.length / take;
+                list = Array.from({ length: take }, (_, i) => all[Math.floor(i * step)]);
             }
             if (!list.length) return null;
             return {
@@ -1201,9 +1212,41 @@
         }).filter(Boolean);
     }
 
+    // Length scales tried when fitting a surveillance checklist to the length
+    // chosen on Build Checklist, smallest first.
+    const LENGTH_SCALES = [0.2, 0.35, 0.5, 0.65, 0.8, 1, 1.25, 1.5, 1.8, 2.2, 2.7, 3.3];
+
+    /**
+     * A scoped surveillance checklist sized to `maxItems` questions: the
+     * largest sampling scale whose checklist fits. It used to ignore the
+     * chosen length, so Half day, Two days and Longer all built the same
+     * checklist. If even the smallest sample is over the target (the
+     * mandatory elements alone can be), the smallest is used.
+     */
+    function fitScopedChecklist(client, docs, o, scope) {
+        const target = Number(o.maxItems);
+        let best = null;
+        for (const scale of LENGTH_SCALES) {
+            const trial = buildScopedChecklist(client, docs, Object.assign({}, o, { lengthScale: scale, _trial: true }), scope);
+            if (best && trial.itemCount > target) break;
+            best = { scale, count: trial.itemCount };
+            if (trial.itemCount >= target) break;
+        }
+        const built = buildScopedChecklist(client, docs, Object.assign({}, o, { lengthScale: best.scale }), scope);
+        built.lengthTarget = target;
+        return built;
+    }
+
     function buildClientChecklist(client, docs, opts) {
         const scope = resolveScope(opts || {}, client);
-        if (scope.ids.length) return buildScopedChecklist(client, docs, opts || {}, scope);
+        const o = opts || {};
+        if (scope.ids.length && normalizeAuditType(o.auditType) === 'surveillance') {
+            if (o.lengthScale == null && Number(o.maxItems) > 0) return fitScopedChecklist(client, docs, o, scope);
+            if (o.lengthScale == null && o.maxItems === null && o.lengthUnlimited) {
+                return buildScopedChecklist(client, docs, Object.assign({}, o, { lengthScale: Infinity }), scope);
+            }
+        }
+        if (scope.ids.length) return buildScopedChecklist(client, docs, o, scope);
         return buildLegacyChecklist(client, docs, opts);
     }
 
@@ -1225,7 +1268,7 @@
         const budget = riskBasedBudget(
             auditType, scope.ids, o.manDays,
             typeof orgSizeProfile === 'function' ? orgSizeProfile(client) : null,
-            (client.sites || []).length
+            (client.sites || []).length, o.lengthScale
         );
         const plan = CS.planScope(scope.ids);
         const systems = CS.systemsPhrase(scope.ids);
@@ -1503,7 +1546,7 @@
 
         // Knowledge Base standards audited in the same visit, ahead of the
         // auditor-review and document-note sections.
-        const kbSections = knowledgeBaseSections(o.kbStandards, auditType);
+        const kbSections = knowledgeBaseSections(o.kbStandards, auditType, budget.kbSample);
         if (kbSections.length) {
             const tail = clauses.findIndex(c => c.mainClause === 'REVIEW' || c.mainClause === 'DOCNOTE');
             clauses.splice(tail === -1 ? clauses.length : tail, 0, ...kbSections);
@@ -1559,6 +1602,7 @@
             source: 'client-documents'
         };
 
+        if (o._trial) return checklist;
         if (window.ChecklistQA) {
             checklist.qa = window.ChecklistQA.validate(checklist, checklist.qaContext);
         }
@@ -3464,7 +3508,7 @@
         }
         return (_cldocLength.manDays ? 'Plan is ' + esc(_cldocLength.manDays) + ' man-day(s).' : 'Man-days not set on the plan.')
             + ' Focus points and the ISO 17021-1 mandatory elements are never trimmed.'
-            + (_cldocLength.hasRegistry ? ' For the standards ticked above, length is set by scope and risk — man-days and organisation size move the sampling depth, not the requirement coverage.' : '');
+            + (_cldocLength.hasRegistry ? ' The length sets how many themes, Annex A controls, processes, documents and Knowledge Base clauses are sampled; "No limit" covers every clause of the scope.' : '');
     }
 
     /** Keep the length control honest when the audit type changes. */
@@ -3653,9 +3697,10 @@
             const maxItems = normalizeAuditType(auditType) === 'surveillance' && lengthValue
                 ? parseInt(lengthValue, 10)
                 : null;
+            const lengthUnlimited = normalizeAuditType(auditType) === 'surveillance' && !lengthValue;
             createChecklist(client, docs, {
                 auditType, standard, standardIds, kbStandards, includeMandatory, includeOrgContext,
-                standardClauses, focusPoints, maxItems, soaApplicable,
+                standardClauses, focusPoints, maxItems, lengthUnlimited, soaApplicable,
                 manDays: (plan && (plan.manDays || plan.man_days)) || manDays || ''
             }, planId);
         });
