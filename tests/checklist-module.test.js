@@ -1,5 +1,26 @@
 // Checklist authoring clause-validation tests.
 const REAL_UTILS = (m => m.default || m)(await import('../utils.js'));
+
+// The checklist actions open the app's form modal (no browser prompts). These
+// helpers mount the modal, fill a field and press Save.
+function mountModal() {
+    if (!document.getElementById('modal-body')) {
+        document.body.insertAdjacentHTML('beforeend', '<div id="modal-overlay" class="hidden"><h3 id="modal-title"></h3><div id="modal-body"></div><button id="modal-save">Save</button></div>');
+    }
+    window.openModal = () => { document.getElementById('modal-overlay').classList.remove('hidden'); };
+    window.closeModal = () => { document.getElementById('modal-overlay').classList.add('hidden'); document.getElementById('modal-body').innerHTML = ''; };
+    window.DataService = undefined;
+}
+function fillAndSave(values) {
+    Object.keys(values || {}).forEach(id => {
+        const el = document.getElementById(id);
+        el.value = values[id];
+        el.dispatchEvent(new Event('change'));
+        el.dispatchEvent(new Event('input'));
+    });
+    document.getElementById('modal-save').click();
+}
+const modalOpen = () => !document.getElementById('modal-overlay').classList.contains('hidden');
 //
 // Root cause under test: findings inherit `clause` from the checklist item
 // that raised them, and the Report Integrity validator blocks finalization
@@ -627,10 +648,11 @@ describe('markChecklistReadyForAudit — the release gate', () => {
      * carry a real blocker.
      */
     function clearTheGate(note) {
-        window.prompt = () => note || 'Both questions stand; the wording is tightened on site.';
+        mountModal();
         let r = window.checklistReadiness(window.state.checklists[0]).readiness;
         for (let guard = 0; !r.ready && guard < 10; guard++) {
             window.justifyChecklistIssue('cl-1', r.blockers[0].key);
+            fillAndSave({ 'justify-note': note || 'Both questions stand; the wording is tightened on site.' });
             r = window.checklistReadiness(window.state.checklists[0]).readiness;
         }
         return r;
@@ -684,6 +706,25 @@ describe('markChecklistReadyForAudit — the release gate', () => {
         window.markChecklistReadyForAudit('cl-1');
         expect(cl.readyForAudit).toBeUndefined();
         expect(notes.join(' ')).toMatch(/must be resolved first/i);
+    });
+
+    it('Assign Clause is a form: a bad reference keeps it open, a good one maps the question', () => {
+        const cl = window.state.checklists[0];
+        cl.clauses[0].subClauses.push({ clause: 'REVIEW', title: 'Unmapped question', requirement: 'Is the thing done?', refs: [], auditorReview: true, items: [{ clause: 'REVIEW', requirement: 'Is the thing done?' }] });
+        mountModal();
+        window.assignChecklistClause('cl-1', 'REVIEW', 'AUDITOR_REVIEW||');
+        expect(document.getElementById('modal-title').textContent).toBe('Assign Clause');
+        expect(document.getElementById('modal-body').textContent).toMatch(/Unmapped question/);
+
+        fillAndSave({ 'assign-clause-ref': 'FOCUS.1' });
+        expect(modalOpen()).toBe(true);
+        expect(notes.join(' ')).toMatch(/is not a clause reference/);
+
+        fillAndSave({ 'assign-clause-ref': 'A.8.13' });
+        expect(modalOpen()).toBe(false);
+        const mapped = cl.clauses[0].subClauses.find(x => x.title === 'Unmapped question');
+        expect(mapped.clause).toBe('A.8.13');
+        expect(mapped.auditorReview).toBe(false);
     });
 
     it('withdraws the release as soon as the checklist changes', () => {
@@ -748,8 +789,11 @@ describe('pasteChecklistSoA / pickChecklistSoADocument — supplying an SoA onto
     });
 
     it('lands pasted references in qaContext.soaApplicable and coverage then reports the SoA as supplied', () => {
-        window.prompt = () => 'A.5.1, A.5.9, A.8.13';
+        mountModal();
         window.pasteChecklistSoA('cl-2', 'iso27001');
+        expect(document.getElementById('modal-title').textContent).toMatch(/Statement of Applicability/);
+        fillAndSave({ 'soa-paste': 'A.5.1, A.5.9, A.8.13' });
+        expect(modalOpen()).toBe(false);
 
         const cl = window.state.checklists[0];
         expect(cl.qaContext.soaApplicable).toEqual(['A.5.1', 'A.5.9', 'A.8.13']);
@@ -766,8 +810,10 @@ describe('pasteChecklistSoA / pickChecklistSoADocument — supplying an SoA onto
     });
 
     it('refuses an unparseable reference list, naming the reason, and stores nothing', () => {
-        window.prompt = () => 'The current policy set is under review; nothing final yet.';
+        mountModal();
         window.pasteChecklistSoA('cl-2', 'iso27001');
+        fillAndSave({ 'soa-paste': 'The current policy set is under review; nothing final yet.' });
+        expect(modalOpen()).toBe(true);     // the form stays open with what was typed
 
         const cl = window.state.checklists[0];
         expect(cl.qaContext.soaApplicable).toEqual([]);
@@ -776,8 +822,9 @@ describe('pasteChecklistSoA / pickChecklistSoADocument — supplying an SoA onto
     });
 
     it('refuses an empty paste the same way', () => {
-        window.prompt = () => '';
+        mountModal();
         window.pasteChecklistSoA('cl-2', 'iso27001');
+        fillAndSave({ 'soa-paste': '' });
 
         const cl = window.state.checklists[0];
         expect(cl.qaContext.soaApplicable).toEqual([]);
@@ -788,15 +835,17 @@ describe('pasteChecklistSoA / pickChecklistSoADocument — supplying an SoA onto
         const cl = window.state.checklists[0];
         cl.readyForAudit = { by: 'Lead Auditor', at: '2024-01-01' };
 
-        window.prompt = () => 'A.5.1';
+        mountModal();
         window.pasteChecklistSoA('cl-2', 'iso27001');
+        fillAndSave({ 'soa-paste': 'A.5.1' });
 
         expect(cl.readyForAudit).toBeUndefined();
     });
 
-    it('cancelling the prompt (null) leaves the checklist untouched', () => {
-        window.prompt = () => null;
+    it('cancelling the form leaves the checklist untouched', () => {
+        mountModal();
         window.pasteChecklistSoA('cl-2', 'iso27001');
+        window.closeModal();
 
         const cl = window.state.checklists[0];
         expect(cl.qaContext.soaApplicable).toEqual([]);
@@ -809,8 +858,14 @@ describe('pasteChecklistSoA / pickChecklistSoADocument — supplying an SoA onto
             { id: 'd1', name: 'Statement of Applicability v3', category: 'Policy', revision: '3', date: '2024-01-10', linkedClauses: 'A.5.1, A.5.9, A.8.13' },
             { id: 'd2', name: 'Statement of Applicability v2', category: 'Policy', revision: '2', date: '2022-01-01', linkedClauses: 'A.5.1' }
         ];
-        window.prompt = () => '1';
+        mountModal();
         window.pickChecklistSoADocument('cl-2', 'iso27001');
+        // Most recent first, the SoA preselected, its references read off its record.
+        const options = Array.from(document.querySelectorAll('#soa-doc option')).map(o => o.textContent);
+        expect(options[0]).toMatch(/Statement of Applicability v3/);
+        expect(document.getElementById('soa-doc').value).toBe('0');
+        expect(document.getElementById('soa-doc-refs').value).toBe('A.5.1, A.5.9, A.8.13');
+        fillAndSave({});
 
         const cl = window.state.checklists[0];
         expect(cl.qaContext.soaApplicable).toEqual(['A.5.1', 'A.5.9', 'A.8.13']);
@@ -821,15 +876,12 @@ describe('pasteChecklistSoA / pickChecklistSoADocument — supplying an SoA onto
 
     it('falls back to asking for the reference list when the chosen document carries none on its own record', () => {
         window.state.clients[0].documents = [{ id: 'd3', name: 'Undated Notes', revision: '', date: '' }];
-        let call = 0;
-        window.prompt = () => {
-            call += 1;
-            // 1st prompt: which document (only one is on file).
-            if (call === 1) return '1';
-            // 2nd prompt: it carries no refs, so the auditor is asked to type them.
-            return 'A.8.13';
-        };
+        mountModal();
         window.pickChecklistSoADocument('cl-2', 'iso27001');
+        // It carries no references, so the form says so and asks for them.
+        expect(document.getElementById('soa-doc-refs').value).toBe('');
+        expect(document.getElementById('soa-doc-hint').textContent).toMatch(/does not carry control references/);
+        fillAndSave({ 'soa-doc-refs': 'A.8.13' });
 
         const cl = window.state.checklists[0];
         expect(cl.qaContext.soaApplicable).toEqual(['A.8.13']);

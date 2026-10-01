@@ -111,12 +111,28 @@
         return 'CHK-' + initials + '-' + year + '-' + String(idx + 1).padStart(2, '0');
     }
 
-    /** The checklist's questions in print order, from either data shape. */
+    // Preparation notes the builder appends to a question for the person
+    // building the checklist. They are not part of the question and are not
+    // printed.
+    const PREP_NOTES = [/\s*No validated supporting document mapped — auditor to select or confirm the document\.?/g];
+    function forPrint(text) {
+        let out = text == null ? '' : String(text);
+        PREP_NOTES.forEach(function (re) { out = out.replace(re, ''); });
+        return out.trim();
+    }
+
+    /**
+     * The checklist's questions in print order, from either data shape. The
+     * Document Intelligence section (DOCNOTE) is an awareness note about the
+     * client's document set — "not an audit finding" — and asks nothing, so
+     * it is left out of the printed checklist.
+     */
     function printItems(checklist) {
         const out = [];
         const ck = checklist || {};
         if (arr(ck.clauses).length) {
             ck.clauses.forEach(function (main) {
+                if (String(main.mainClause || '').toUpperCase() === 'DOCNOTE') return;
                 out.push({ clause: main.mainClause || main.clause, requirement: main.title || main.requirement, isHeader: true, level: 1 });
                 arr(main.subClauses).forEach(function (sub) {
                     const nested = function (o) {
@@ -131,15 +147,15 @@
                         // that means different things in different standards.
                         out.push({ clause: sub.clause, requirement: sub.citation ? subTitle + ' — ' + sub.citation : subTitle, isHeader: true, level: 2 });
                         sub.items.forEach(function (item) {
-                            out.push({ clause: item.clause, requirement: item.requirement || item.text || item.title || '' });
+                            out.push({ clause: item.clause, requirement: forPrint(item.requirement || item.text || item.title || '') });
                         });
                     } else {
-                        out.push({ clause: sub.clause, requirement: sub.requirement || sub.title || sub.requirement_text || sub.text || nested(sub) || '' });
+                        out.push({ clause: sub.clause, requirement: forPrint(sub.requirement || sub.title || sub.requirement_text || sub.text || nested(sub) || '') });
                     }
                 });
             });
         } else if (arr(ck.items).length) {
-            return ck.items.map(function (i) { return { clause: i.clause, requirement: i.requirement || i.text || i.title || '' }; });
+            return ck.items.map(function (i) { return { clause: i.clause, requirement: forPrint(i.requirement || i.text || i.title || '') }; });
         }
         return out;
     }
@@ -178,9 +194,16 @@
      * each standard's figures as planned in this audit, inherited from earlier
      * audits in the cycle, and remaining.
      */
+    function coverageHeading(checklist) {
+        const type = String((checklist && checklist.auditType) || '').toLowerCase();
+        if (type.indexOf('recert') !== -1) return 'Recertification coverage validation';
+        if (type.indexOf('surv') !== -1) return 'Coverage validation — this audit and the cycle so far';
+        return 'Coverage validation';
+    }
+
     function coveragePanel(cov, checklist) {
         if (!cov) {
-            return '<div class="qa-panel qa-cov qa-fail"><h2>Recertification coverage validation</h2>'
+            return '<div class="qa-panel qa-cov qa-fail"><h2>' + coverageHeading(checklist) + '</h2>'
                 + '<p><strong>Blocked — coverage could not be assessed.</strong> The coverage pass did not run. This is an internal error; it is not a finding about the audit.</p></div>';
         }
         const c = cov.coverage || {};
@@ -213,7 +236,7 @@
         const cycleText = (cycle.start && cycle.end) ? 'Certification cycle ' + d.formatDateRange(cycle.start, cycle.end) + (cycle.anchored ? ' (anchored on ' + t(cycle.anchored) + ')' : '')
             + ', ' + (cycle.priorAudits || 0) + ' prior audit(s) on file, ' + (cycle.priorChecklists || 0) + ' of their checklists read for coverage.' : '';
         return '<div class="qa-panel qa-cov ' + cls + '">'
-            + '<h2>Recertification coverage validation</h2>'
+            + '<h2>' + coverageHeading(checklist) + '</h2>'
             + '<p><strong>' + t(label) + '.</strong> ' + t(cycleText) + '</p>'
             + (rows.length ? '<table class="cov-table"><thead><tr><th>Coverage by standard</th><th>Planned this audit</th><th>Inherited from cycle</th><th>Remaining</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>' : '')
             + (list ? '<ul>' + list + '</ul>' : '') + disp
@@ -245,7 +268,9 @@
             'table.items th { background: ' + brand.deep + '; color: #f8fafc; padding: 7px 10px; text-align: left; font-size: 8pt; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }',
             'table.items td { padding: 7px 10px; border: 1px solid #e2e8f0; vertical-align: top; font-size: 9pt; overflow-wrap: break-word; }',
             'table.items td.clause { font-weight: 700; background: #f8fafc; color: #334155; font-family: Consolas, "Courier New", monospace; font-size: 8.5pt; }',
-            'tr.section-header td:first-child { white-space: nowrap; }',
+            // A section code can be a standard name ("ISO 18841:2018"); it
+            // wraps inside the clause column rather than running into the title.
+            'tr.section-header td:first-child, tr.sub-header td:first-child { overflow-wrap: anywhere; word-break: break-word; }',
             'table.items tr.item:nth-child(even) td:not(.clause) { background: #fafbfc; }',
             'tr.section-header td { background: ' + brand.primary + '; color: #fff; font-weight: 700; font-size: 9.5pt; border-color: ' + brand.primary + '; padding: 6px 10px; }',
             'tr.sub-header td { background: ' + brand.tint + '; color: ' + brand.text + '; font-weight: 600; font-size: 9pt; border-bottom: 2px solid ' + brand.tintBorder + '; }',
@@ -338,7 +363,9 @@
             + scope
             + '</div>'
             + validationBanner(c.combined)
-            + qaPanel(c.qa)
+            // The QA issue list (duplicate / consistency warnings) is an
+            // internal check on how the checklist was built. It is shown in the
+            // app, not printed; the validation status above summarises it.
             + coveragePanel(c.coverage, ck)
             + '<p class="status-key"><strong>Item status key</strong> (once the audit begins): '
             + ITEM_STATUSES.map(function (s) { return '<span>' + t(s.label) + (s.requiresJustification ? ' (justification required)' : '') + '</span>'; }).join('') + '</p>'
