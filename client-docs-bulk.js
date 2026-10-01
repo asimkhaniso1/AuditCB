@@ -1184,8 +1184,23 @@
     const KB_SURVEILLANCE_SAMPLE = 6;
     function knowledgeBaseSections(kbStandards, auditType, sampleSize) {
         const take = sampleSize === undefined ? KB_SURVEILLANCE_SAMPLE : sampleSize;
+        // A Knowledge Base analysis can hold the same clause more than once
+        // (its extraction batches overlapped). Each clause is asked once: the
+        // first occurrence stands, and a later one asking the same question
+        // under another number is dropped too.
+        const norm = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        const questionOf = (c) => (Array.isArray(c.checklistQuestions) && c.checklistQuestions[0]) || c.requirement || c.title || '';
         return (kbStandards || []).map(k => {
-            const all = (k.clauses || []).filter(c => c && c.clause && (c.requirement || c.title));
+            const seenRefs = new Set();
+            const seenQuestions = new Set();
+            const all = (k.clauses || []).filter(c => c && c.clause && (c.requirement || c.title)).filter(c => {
+                const ref = String(c.clause).trim();
+                const q = norm(questionOf(c));
+                if (seenRefs.has(ref) || (q && seenQuestions.has(q))) return false;
+                seenRefs.add(ref);
+                if (q) seenQuestions.add(q);
+                return true;
+            });
             let list = all;
             if (auditType === 'surveillance' && take != null && all.length > take) {
                 const step = all.length / take;

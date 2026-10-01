@@ -243,6 +243,22 @@ describe('Build Checklist — Knowledge Base standards join the registry ones in
         expect(notes.pop().msg).toMatch(/^ISO 18587:2017 has no clause set in the registry or the Knowledge Base/);
     });
 
+    it('asks a repeated Knowledge Base clause once — the analysis held 4.1 twice and two clauses with one question', () => {
+        const repeated = [
+            { clause: '4.1', title: 'General', requirement: 'r1', checklistQuestions: ['Does the MS render messages faithfully?'] },
+            { clause: '4.2', title: 'Roles', requirement: 'r2', checklistQuestions: ['How are interpreter roles defined?'] },
+            { clause: '4.1', title: 'General', requirement: 'r1', checklistQuestions: ['Does the MS render messages faithfully?'] },
+            { clause: '4.3', title: 'Roles (again)', requirement: 'r3', checklistQuestions: ['How are interpreter roles defined?'] },
+            { clause: '5.1', title: 'Competence', requirement: 'r4', checklistQuestions: ['How is interpreter competence verified?'] }
+        ];
+        const ck = B.buildClientChecklist(LS(), DOC, { auditType: 'initial', standardIds: ['iso9001'],
+            kbStandards: [{ name: 'ISO 18841:2018', docName: 'ISO 18841:2018', clauses: repeated }] });
+        const section = ck.clauses.find(c => c.mainClause === 'ISO 18841:2018');
+        expect(section.subClauses.map(s => s.clause)).toEqual(['4.1', '4.2', '5.1']);
+        const qa = M.QA.validate(ck, ck.qaContext);
+        expect(qa.issues.filter(i => (i.code === 'DUPLICATE_QUESTION' || i.code === 'NEAR_DUPLICATE') && /^[45]\.\d$/.test(i.itemRef))).toEqual([]);
+    });
+
     it('ISO 9001 + ISO 14001 ask the general improvement clause once, not twice', () => {
         const ck = B.buildClientChecklist(LS(), DOC, { auditType: 'initial', standardIds: ['iso9001', 'iso14001'], manDays: 2 });
         const tens = ck.clauses.flatMap(c => (c.subClauses || []).map(i => i)).filter(i => i.clause === '10.1');

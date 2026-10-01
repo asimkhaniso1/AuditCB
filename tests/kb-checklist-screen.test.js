@@ -158,6 +158,20 @@ describe('Checklist creation uses the analysis screen', () => {
         expect(held2015.standard).toBe('ISO 14001:2026');
     });
 
+    it('a fresh analysis whose parts overlap stores each clause once', async () => {
+        // Standard depth runs several batches; the model returned the same
+        // clauses for each, as overlapping batches do at their edges.
+        window.AI_SERVICE = { callProxyAPI: vi.fn(async () => JSON.stringify([
+            { clause: '4.1', title: 'Organisation', requirement: 'x', checklistQuestions: ['Is the organisation chart current?'] },
+            { clause: '5.1', title: 'Personnel', requirement: 'y', checklistQuestions: ['Are duties defined?'] }
+        ])) };
+        const doc = window.state.knowledgeBase.standards[0];
+        await window.generateChecklistFromStandard(9001, 'standard', 'surveillance', '');
+        expect(window.AI_SERVICE.callProxyAPI.mock.calls.length).toBeGreaterThan(1);
+        expect(doc.clauses.map(c => c.clause)).toEqual(['4.1', '5.1']);
+        expect(doc.generatedChecklist.map(q => q.clause)).toEqual(['4.1', '5.1']);
+    });
+
     it('reuses the last analysis when it already matches the chosen settings', async () => {
         window.AI_SERVICE = { callProxyAPI: vi.fn() };
         const ck = await window.generateChecklistFromStandard(9001, 'standard', 'initial', '');

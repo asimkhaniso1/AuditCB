@@ -1301,6 +1301,16 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
                     const auditableSection = isNaN(clauseNum) || clauseNum >= 4;
                     return auditableSection && _isValidClauseRef(c.clause);
                 });
+                // Batches overlap at their edges, so a clause can come back
+                // twice. The first extraction stands; a repeat adds nothing
+                // but a duplicate checklist question.
+                const seenClauses = new Set(allClauses.map(c => String(c.clause).trim()));
+                batchClauses = batchClauses.filter(c => {
+                    const key = String(c.clause).trim();
+                    if (seenClauses.has(key)) return false;
+                    seenClauses.add(key);
+                    return true;
+                });
                 allClauses = allClauses.concat(batchClauses);
                 batchClauses.forEach(c => {
                     (c.checklistQuestions || []).forEach(q => {
