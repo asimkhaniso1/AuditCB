@@ -30,6 +30,9 @@
     <link rel="stylesheet" href="./styles.css?v=17.2_CYCLE_GRID">
     <link rel="stylesheet" href="./required-fields.css">
     <link rel="stylesheet" href="./font-fallback.css">
+    <link rel="stylesheet" href="./theme.css?v=1.0_DARK">
+    <!-- Synchronous on purpose: applies a saved dark theme before first paint. -->
+    <script src="./theme.js?v=1.0_DARK"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -138,6 +141,11 @@
                         style="border: none; background: transparent; color: var(--primary-color);"
                         title="Multi-Site Sampling Calculator (IAF MD 1)">
                         <i class="fa-solid fa-sitemap"></i>
+                    </button>
+                    <!-- Light / dark theme (theme.js keeps the icon and label in step) -->
+                    <button id="theme-toggle" type="button" data-action="toggleTheme"
+                        aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
+                        <i class="fa-solid fa-moon"></i>
                     </button>
                     <!-- Notification Bell -->
                     <button id="notification-bell" class="btn btn-icon" data-action="toggleNotificationPanel"

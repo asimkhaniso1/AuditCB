@@ -1959,9 +1959,11 @@ textarea:focus:invalid {
     background: rgba(239, 68, 68, 0.1) !important;
 }
 
-/* Dark mode removed — was incomplete (only modals/some elements styled)
-   and produced inconsistent appearance (dark inputs/headers on light cards).
-   Reintroduce later as an explicit user toggle, not OS-driven. */
+/* Dark mode lives in theme.css (explicit toggle via theme.js, never
+   OS-driven). The first attempt, built here on variables, was withdrawn: the
+   templates paint colours inline, so variables alone left dark inputs and
+   headers on light cards. Do not reintroduce per-component dark overrides
+   here — theme.css works on the rendered page and reaches inline colours. */
 
 /* ============================================
    Certification cycle cards — column alignment
