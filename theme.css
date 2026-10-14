@@ -1,0 +1,87 @@
+/* ============================================
+   DARK THEME — explicit toggle (theme.js), never OS-driven
+   ============================================
+   The UI paints about two thousand colours inline from JS templates
+   (style="background:#f8fafc; color:#475569"), so a theme built on CSS
+   variables alone left light panels with near-invisible text — which is why
+   the first dark mode was withdrawn. This one inverts the RENDERED page and
+   rotates hue back instead, so every inline colour follows, and every
+   text/background pair keeps its contrast by construction.
+
+   Anything that must look like itself — photos, logos, video, embedded
+   documents, and the vivid gradient tiles that carry white text — is inverted
+   a second time, which restores it: invert, hue-rotate(180deg) and contrast
+   about mid-grey commute and each undoes itself, so the pair cancels out.
+   Only the OUTERMOST such element is restored; an image inside a restored
+   tile is already right and must not be flipped again.
+
+   Screen only. Print and exported PDFs keep the light design.
+
+   The contrast() pair softens pure black and pure white to easier greys; the
+   restore factor is its reciprocal (1 / 0.92). */
+
+@media screen {
+    html[data-theme="dark"] {
+        /* The canvas behind the page; dark once inverted. */
+        background: #fff;
+        filter: invert(1) hue-rotate(180deg) contrast(0.92);
+    }
+
+    html[data-theme="dark"] :is(
+        img, video, picture, iframe, embed, object,
+        [style*="url("],
+        [style*="linear-gradient"][style*="color: white"],
+        [style*="linear-gradient"][style*="color:white"],
+        [style*="linear-gradient"][style*="color: #fff"],
+        [style*="linear-gradient"][style*="color:#fff"],
+        .theme-keep-colors
+    ):not(:is(
+        img, video, picture, iframe, embed, object,
+        [style*="url("],
+        [style*="linear-gradient"][style*="color: white"],
+        [style*="linear-gradient"][style*="color:white"],
+        [style*="linear-gradient"][style*="color: #fff"],
+        [style*="linear-gradient"][style*="color:#fff"],
+        .theme-keep-colors
+    ) *) {
+        filter: invert(1) hue-rotate(180deg) contrast(1.087);
+    }
+
+    /* Dimming backdrops behind modals, lightboxes and the report preview are
+       dark translucent layers, and a dark layer inverts into a LIGHT one — the
+       page behind a modal washed out instead of dimming. Give them a light
+       translucent layer instead, which inverts into proper dimming while the
+       dialog inside keeps the dark theme. Matched by class/id for the shared
+       ones, and for backdrops built inline by being fixed, full-screen and
+       backed by a dark rgba — keyed on `background` so a box-shadow never
+       triggers it. Both the authored (`position:fixed`) and the browser's
+       serialised (`position: fixed`) spellings are covered. */
+    html[data-theme="dark"] .modal-overlay,
+    html[data-theme="dark"] .mobile-overlay,
+    html[data-theme="dark"] #report-preview-overlay,
+    html[data-theme="dark"] :is([style*="position: fixed"], [style*="position:fixed"]):is([style*="inset"], [style*="width: 100%"], [style*="width:100%"], [style*="bottom:0"], [style*="bottom: 0"]):is([style*="background: rgba(0"], [style*="background:rgba(0"], [style*="background: rgba(15"], [style*="background:rgba(15"]) {
+        background: rgba(255, 255, 255, 0.55) !important;
+    }
+}
+
+/* The header switch. */
+#theme-toggle {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 8px;
+    line-height: 1;
+}
+
+#theme-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+#theme-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
