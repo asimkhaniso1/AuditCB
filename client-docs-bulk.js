@@ -742,6 +742,7 @@
         const inScope = auditType === 'surveillance'
             ? processes.filter(p => ['Core', 'Outsourced'].includes(p.category))
             : processes;
+        const walkUsed = new Set();
         inScope.slice(0, 25).forEach(p => {
             const name = p.name || p;
             const owner = p.owner ? `, owner ${p.owner}` : '';
@@ -753,7 +754,7 @@
                 applyCriterionSuggestion(item, text, standard, 'org-context', annexSLFallback ? '8.4' : '');
                 out.push(item);
             } else {
-                const text = `Sample the ${name} process end to end${owner} — verify it runs as planned, the required records are produced, and its performance is monitored.`;
+                const text = processWalkText(name, owner, walkUsed);
                 const item = question('ORG', label, text);
                 // End-to-end process sampling -> 8.1 (operational planning and control).
                 applyCriterionSuggestion(item, text, standard, 'org-context', annexSLFallback ? '8.1' : '');
@@ -971,6 +972,93 @@
         [/risk/i, ['isms-risk']]
     ];
 
+    // What to look at when walking a client's key process. Every walkthrough
+    // used to be the same sentence with the process name swapped in, so a
+    // client with five core processes got five questions the QA check
+    // rightly flagged as near-duplicates (84-88% the same words) — and an
+    // auditor could not tell from the checklist what each walk was for. A
+    // process is matched on the distinctive words of its name; each focus
+    // names the sample, the controls and records, and the measure for that
+    // kind of process. Order matters only for ties: a name matching two
+    // focuses takes the first one not already used on this checklist.
+    const PROCESS_WALK_FOCUS = [
+        [/translat|interpret|localis|localiz|transcri|subtitl/i,
+            'sample completed jobs and check the translator and reviser assigned against their qualification records, the revision by a second linguist, the terminology and reference material used, and the client\'s acceptance of the delivery',
+            'on-time delivery and the rework or complaint rate'],
+        [/enquir|inquir|quot|tender|\bbid\b|estimat|order (entry|intake)|contract review/i,
+            'sample recent enquiries and check how the client\'s requirements were captured and reviewed, the quotation issued against them, approval before the job was accepted, and how later changes to an agreed job were handled',
+            'quotation turnaround and enquiries converted'],
+        [/specification|planning|scheduling|\bdesign\b/i,
+            'sample planned jobs and check the specification agreed with the client, the resources and deadlines allocated, the risks identified for the job, and that the plan was approved before work started',
+            'jobs delivered to plan'],
+        [/service desk|help ?desk|ticket|\bsupport\b/i,
+            'sample tickets and check logging and categorisation, prioritisation against the agreed service levels, escalation, resolution and closure with the user',
+            'service-level attainment and reopened tickets'],
+        [/provision|delivery|production|manufactur|operation|fulfil|execution/i,
+            'follow a sample of jobs from release to delivery and check the work instructions used, the in-process checks, the release criteria, and what was done when an output did not conform',
+            'first-time-right output and late deliveries'],
+        [/client handling|customer|complain|feedback|account manag|relationship/i,
+            'sample client contacts and complaints and check how each was logged, answered within the target time, escalated and closed, and how client satisfaction is gathered and acted on',
+            'response time and client satisfaction results'],
+        [/onboard/i,
+            'sample recently onboarded clients and check the requirements and confidentiality or security terms agreed, the access and accounts set up, and the hand-over to the delivery team',
+            'onboarding lead time and set-up errors'],
+        [/purchas|procure|supplier|vendor|freelanc|subcontract|outsourc/i,
+            'sample suppliers and purchases and check the selection and approval criteria, the requirements passed to the supplier, the checks on what was received, and the periodic re-evaluation',
+            'supplier performance ratings'],
+        [/recruit|\bhr\b|human resource|training|competen|people|staff/i,
+            'sample people in key roles and check the competence required, the evidence they hold it, training given and its effectiveness, and awareness of the policy and their contribution',
+            'training completed against plan'],
+        [/maint|calibrat|equipment|infrastructure|facilit/i,
+            'sample equipment and infrastructure and check the maintenance or calibration schedule, records of work done, how a failed check is handled, and the effect on output already produced',
+            'planned maintenance completed and breakdowns'],
+        [/document|record|information manag/i,
+            'sample controlled documents and records and check approval before issue, version control, access and protection, retention and disposal',
+            'documents overdue for review'],
+        [/invoic|billing|financ|payment|account(s|ing)\b/i,
+            'sample invoices and check they match the agreed quotation and the work delivered, how disputes and credit notes are handled, and the controls over who can change client billing details',
+            'billing errors and disputed invoices'],
+        [/warehouse|storage|stores|dispatch|logistic|shipping|packing/i,
+            'sample stored and dispatched items and check identification, preservation and storage conditions, picking against the order, and the dispatch records',
+            'dispatch accuracy and damage in transit'],
+        [/quality control|inspection|testing|\bqc\b|verification/i,
+            'sample inspections and tests and check the acceptance criteria applied, who performed and authorised them, the equipment used, and the treatment of anything that failed',
+            'reject and rework rates'],
+        [/information technolog|\bnetwork|system admin|software/i,
+            'sample changes and operations on the systems in scope and check access, change approval, testing before release, backup and the monitoring of the service',
+            'availability and failed changes'],
+        [/marketing|sales/i,
+            'sample marketing material and sales commitments and check that claims made to clients are accurate, approved, and within what the organisation is able to deliver',
+            'sales commitments delivered as promised']
+    ];
+    // A process whose name matches no focus — or only focuses already used —
+    // is walked from a different angle to the others, so no two walkthroughs
+    // on one checklist ask the same thing.
+    const PROCESS_WALK_ANGLES = [
+        ['concentrating on what triggers it and how its inputs and requirements are confirmed before work starts', 'requirements confirmed before work starts'],
+        ['concentrating on how it is controlled while it runs — the checks performed, who performs them, and what is done when one fails', 'checks passed at the first attempt'],
+        ['concentrating on the competence and resources it depends on, and how a change to the process is planned, approved and communicated', 'changes implemented as planned'],
+        ['concentrating on the outputs it releases and the records that prove each one met its requirements', 'outputs released without correction'],
+        ['concentrating on the risks identified for it, the actions taken on them, and the improvements made since the last audit', 'improvement actions closed on time']
+    ];
+
+    /**
+     * The walkthrough question for one key process. `used` is shared across
+     * the checklist being built, so each focus and each angle is used once.
+     */
+    function processWalkText(name, owner, used) {
+        const taken = used || new Set();
+        const focus = PROCESS_WALK_FOCUS.find(f => f[0].test(String(name || '')) && !taken.has(f[0].source));
+        if (focus) {
+            taken.add(focus[0].source);
+            return `Walk the ${name} process end to end${owner}: ${focus[1]}. Confirm its performance is measured against a defined target (${focus[2]}).`;
+        }
+        const index = PROCESS_WALK_ANGLES.findIndex((a, i) => !taken.has('angle:' + i));
+        const angle = PROCESS_WALK_ANGLES[index === -1 ? taken.size % PROCESS_WALK_ANGLES.length : index];
+        if (index !== -1) taken.add('angle:' + index);
+        return `Walk the ${name} process end to end${owner}, ${angle[0]}. Confirm its performance is measured against a defined target (${angle[1]}).`;
+    }
+
     /** The theme that already audits this named process, or null. */
     function themeCoveringProcess(name, themes) {
         for (const [re, ids] of PROCESS_THEME_MATCH) {
@@ -1056,6 +1144,7 @@
                 refs, { source: 'org-context' }));
         }
 
+        const walkUsed = new Set();
         walk.slice(0, budget.processSample).forEach(p => {
             const name = p.name || p;
             const owner = p.owner ? `, owner ${p.owner}` : '';
@@ -1068,7 +1157,7 @@
             } else {
                 const refs = refFor('process');
                 out.push(scopedQuestion(displayRefFor(refs) || 'ORG', label,
-                    `Walk the ${name} process end to end${owner} — its inputs, controls, records and handoffs — and verify it runs as planned, produces the required records, and that its performance is measured against a defined target.`,
+                    processWalkText(name, owner, walkUsed),
                     refs, { source: 'org-context' }));
             }
         });
@@ -3892,6 +3981,7 @@
         riskBasedBudget,
         questionCeiling,
         scopedOrgQuestions,
+        processWalkText,
         sampleAnnexAControls,
         documentSampleQuestions,
         evidenceHint,
