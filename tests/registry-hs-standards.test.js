@@ -75,8 +75,8 @@ describe('supporting documents: a standard is inferred only among those the clie
 describe('agenda for the new registry standards', () => {
     const client = { id: 'c', name: 'Acme', sites: [{ name: 'HQ', employees: 60 }], contacts: [] };
     const auditors = [{ id: 'a1', name: 'Lead', role: 'Lead Auditor' }];
-    const build = (standard, days, hoursPerDay) => IPI.assemble({
-        plan: { id: 'p', client: 'Acme', standard, auditType: 'Recertification', date: '2027-01-11', endDate: '2027-01-13', team: ['Lead'], auditorIds: ['a1'], selectedSites: [{ name: 'HQ' }], durationCalculation: { finalDays: days }, manDays: days },
+    const build = (standard, days, hoursPerDay, endDate = '2027-01-13') => IPI.assemble({
+        plan: { id: 'p', client: 'Acme', standard, auditType: 'Recertification', date: '2027-01-11', endDate, team: ['Lead'], auditorIds: ['a1'], selectedSites: [{ name: 'HQ' }], durationCalculation: { finalDays: days }, manDays: days },
         client, auditors, state: { ncrs: [], auditReports: [], auditPlans: [] }, settings: {}, hoursPerDay
     }).agenda;
 
@@ -117,11 +117,39 @@ describe('agenda for the new registry standards', () => {
     });
 
     it('builds a short audit (half a day) with tighter sessions instead of refusing', () => {
-        const a = build('ISO 9001:2015', 0.5);
+        const a = build('ISO 9001:2015', 0.5, undefined, '2027-01-11');
         expect(a.errors).toEqual([]);
         expect(a.rows[0].item).toBe('Opening meeting');
         expect(a.rows.at(-1).item).toBe('Closing meeting');
         expect(a.rows.at(-1).end).toBe('12:30');
+    });
+
+    // The plan keeps its dates and its approved duration; when it is
+    // scheduled over more dates than the hours fill, each day gets an even
+    // share — 1.5 auditor-days over three dates is a four-hour morning each.
+    it('spreads the approved hours over every scheduled date as half-day sessions', () => {
+        const a = build('ISO 9001:2015', 1.5);
+        expect(a.errors).toEqual([]);
+        const days = [...new Set(a.rows.map(r => r.day))];
+        expect(days).toEqual(['Day 1', 'Day 2', 'Day 3']);
+        expect([...new Set(a.rows.map(r => r.date))]).toEqual(['2027-01-11', '2027-01-12', '2027-01-13']);
+        expect(a.rows.some(r => r.kind === 'lunch')).toBe(false);
+        const mins = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+        days.forEach(d => {
+            const rows = a.rows.filter(r => r.day === d);
+            expect(rows[0].start).toBe('08:30');
+            expect(rows.at(-1).end).toBe('12:30');
+            expect(rows.reduce((t, r) => t + mins(r.end) - mins(r.start), 0)).toBe(240);
+        });
+        expect(a.rows[0].item).toBe('Opening meeting');
+        expect(a.rows.at(-1).item).toBe('Closing meeting');
+        expect(a.warnings.join(' ')).toMatch(/spread over the 3 scheduled dates \(4 \+ 4 \+ 4 h\)/);
+    });
+
+    it('fills whole working days when the dates need no spreading', () => {
+        const a = build('ISO 9001:2015', 1.5, undefined, '2027-01-12');
+        expect([...new Set(a.rows.map(r => r.day))]).toEqual(['Day 1', 'Day 2']);
+        expect(a.rows.some(r => r.kind === 'lunch' && r.day === 'Day 1')).toBe(true);
     });
 
     it('says why when a scope genuinely cannot fit the duration', () => {

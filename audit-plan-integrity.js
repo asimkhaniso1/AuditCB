@@ -602,20 +602,33 @@
             .concat([fixed.find(function (b) { return b.fixed === 'end-1'; }), fixed.find(function (b) { return b.fixed === 'end'; })]).filter(Boolean);
 
         // 3. Lay the blocks into working days: AM window, lunch, PM window.
-        const dayCount = Math.max(1, Math.ceil(finalDays));
+        // The approved hours fill whole working days — unless the plan is
+        // scheduled over MORE dates than that needs. Then the hours are spread
+        // evenly across every scheduled date (1.5 auditor-days over three
+        // dates is a four-hour morning each day), so the agenda keeps the
+        // plan's dates and the approved duration and only the day gets
+        // shorter. Extra quarter-hours go to the earliest days.
+        const dates = DF().eachDay(c.plan && c.plan.date, c.plan && c.plan.endDate);
+        const fullDays = Math.max(1, Math.ceil(finalDays));
+        const spread = dates.length > fullDays;
+        const dayCount = spread ? dates.length : fullDays;
+        const quarters = Math.round(total * 4);
+        const dayHours = function (d) {
+            const base = Math.floor(quarters / dayCount);
+            return (base + (d <= quarters - base * dayCount ? 1 : 0)) / 4;
+        };
         const startMin = toMin(c.dayStart || '08:30');
         const half = hoursPerDay / 2;
         const lunchLen = 60;
         const slots = [];
         let remaining = total;
         for (let d = 1; d <= dayCount; d++) {
-            const cap = Math.min(hoursPerDay, remaining);
+            const cap = spread ? dayHours(d) : Math.min(hoursPerDay, remaining);
             remaining = Math.round((remaining - cap) * 4) / 4;
             const am = Math.min(cap, half);
             slots.push({ day: d, half: 'am', start: startMin, cap: am });
             if (cap > half) slots.push({ day: d, half: 'pm', start: startMin + half * 60 + lunchLen, cap: cap - half, lunchBefore: true });
         }
-        const dates = DF().eachDay(c.plan && c.plan.date, c.plan && c.plan.endDate);
         const parts = [];
         let bi = 0; let bLeft = blocks[0] ? blocks[0].hours : 0;
         slots.forEach(function (slot) {
@@ -630,6 +643,7 @@
             }
         });
         if (bi < blocks.length) errors.push('The agenda could not be fitted into ' + dayCount + ' day(s) at ' + hoursPerDay + ' productive hours per day.');
+        if (spread) warnings.push('The approved ' + total + ' h are spread over the ' + dayCount + ' scheduled dates (' + uniq(slots.map(function (x) { return x.day; })).map(function (d) { return dayHours(d); }).join(' + ') + ' h), so each day is shorter than a full working day.');
 
         // 4. Assign auditors. Single stream; opening, consolidation and closing are the Lead's.
         const lead = assigned[0];
