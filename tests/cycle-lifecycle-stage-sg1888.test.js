@@ -61,13 +61,15 @@ describe('SG 1888 — stage follows the lifecycle on the Initial-Date cycle', ()
         expect(c.certificates[0]).toEqual(HALAL);
     });
 
-    it('Halal: once S2 is recorded, Recertification is current and the next cycle follows', () => {
+    // USER RULE (2026-10-15): records do not move the lifecycle.
+    it('Halal: recording S2 does not move the stage — S2 stays current while its window is open', () => {
         const c = client();
         c.certificationLifecycleEvents.push({ id: 'ev-s2', certificateId: 'C-HALAL', type: 'surveillance-2-completed', occurredAt: '2026-09-25', createdAt: '2026-09-25' });
         const { cycleState, record } = resolve(HALAL, c);
-        expect(cycleState.stage).toBe('Recertification');
-        expect(cycleState.nextStage).toBe('Surveillance 1 (next cycle)');
-        expect(record.auditType).toBe('Recertification');
+        expect(cycleState.completed.s2).toBe(true);
+        expect(cycleState.stage).toBe('Surveillance 2');
+        expect(cycleState.nextStage).toBe('Recertification');
+        expect(record.auditType).toBe('Surveillance 2');
         expect(cycleState.cycleLabel).toBe('Cycle 1 · Year 3');
     });
 
@@ -133,16 +135,16 @@ describe('SG 1888 overview card', () => {
         expect(card.textContent).toMatch(/For Surveillance 2/);
         expect(byLabel['CURRENT ISSUE / EXPIRY']).toBe('14/09/2026 – 13/09/2027');
         expect(card.textContent).toMatch(/Cycle 1 · Year 3/);
-        expect(dots).toContain('Surveillance 1 performed 10/09/2025 — recorded completion');
-        expect(dots).toContain('Surveillance 2 — current stage, audit window open (15/08/2026 – 14/10/2026)');
-        expect(dots).toContain('Recertification — future stage');
+        expect(dots).toContain('Surveillance 1 — period completed (due 14/09/2025). Surveillance 1 audit on record: performed 10/09/2025');
+        expect(dots).toContain('Surveillance 2 — current stage, audit window open (15/08/2026 – 14/10/2026). No Surveillance 2 audit record on file');
+        expect(dots.some(t => /^Recertification — future stage/.test(t))).toBe(true);
     });
 
     it('a recorded completion names its date, source, organization and evidence on the dot', () => {
         const c = client();
         c.certificationLifecycleEvents[0].metadata = { category: 'completion', source: 'third-party', auditor: 'Previous CB & Co', evidence: [{ name: 'S1.pdf', path: 'p/S1.pdf' }] };
         const { dots } = cardFor(render(c), 'Halal');
-        expect(dots).toContain('Surveillance 1 performed 10/09/2025 by Previous CB & Co (third-party audit) · 1 evidence file');
+        expect(dots).toContain('Surveillance 1 — period completed (due 14/09/2025). Surveillance 1 audit on record: performed 10/09/2025 by Previous CB & Co (third-party audit) · 1 evidence file');
     });
 
     it('ISO 9001 and cGMP show Surveillance 1 then Surveillance 2', () => {

@@ -53,7 +53,7 @@ describe('certification-cycle-driven audit planning domain', () => {
         expect(context.certificateIds).toEqual(['PC-CERT-1', 'PC-CERT-2', 'PC-CERT-3']);
         expect(context.certificateExpiry).toBe('2026-12-15');
         expect(context.policy.version).toBe('CB-PLAN-2026-01');
-        expect(context.cycles.every((cycle) => cycle.stageSource === 'lifecycle')).toBe(true);
+        expect(context.cycles.every((cycle) => cycle.stageSource === 'calendar')).toBe(true);
     });
 
     it('reads the same stage from the calendar when PC CONNECTION has no finalized audit history', () => {
@@ -70,17 +70,27 @@ describe('certification-cycle-driven audit planning domain', () => {
         expect(context.stage).toBe('Recertification');
         expect(context.auditType).toBe('Recertification');
         expect(context.certificateExpiry).toBe('2026-12-15');
-        expect(context.cycles.every((cycle) => cycle.stageSource === 'lifecycle')).toBe(true);
+        expect(context.cycles.every((cycle) => cycle.stageSource === 'calendar')).toBe(true);
     });
 
-    it('requires separate plans when stages differ or planning windows do not intersect', () => {
-        // Year 2, S2 window open (due 16/12/2025): one certificate already had
-        // its S2, so it owes Recertification while the other two still owe S2.
+    it('a recorded audit on one certificate does not split the integrated plan', () => {
+        // USER RULE (2026-10-15): the lifecycle runs on the Initial Date, so an
+        // S2 recorded against one certificate does not move it ahead of the
+        // other two.
         const client = pcConnectionFixture();
         client.certificationLifecycleEvents.push({
             id: 'PC-S2-3', certificateId: 'PC-CERT-3', type: 'surveillance-2-completed',
             occurredAt: '2025-11-20T12:00:00Z', user: 'Certification Manager', role: 'Certification Manager'
         });
+        const context = Domain.resolveCycleContext({ client, now: '2025-12-01', settings: {}, cycleStateResolver: ReportStats.cycleState });
+        expect(context.valid).toBe(true);
+    });
+
+    it('requires separate plans when stages differ or planning windows do not intersect', () => {
+        // One certificate was first issued a year later: its calendar puts it
+        // at Surveillance 1 while the other two owe Surveillance 2.
+        const client = pcConnectionFixture();
+        Object.assign(client.certificates[2], { initialDate: '2024-12-16', currentIssue: '2024-12-16', expiryDate: '2027-12-15' });
         const context = Domain.resolveCycleContext({ client, now: '2025-12-01', settings: {}, cycleStateResolver: ReportStats.cycleState });
         expect(context.valid).toBe(false);
         expect(context.conflict).toContain('separate plans');

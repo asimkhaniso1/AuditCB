@@ -160,6 +160,15 @@ window.getClientCertificatesHTML = function (client) {
                         <input type="date" class="form-control" value="${cert.expiryDate || ''}" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="expiryDate" data-arg4="this.value">
                     </div>
                     <div>
+                        <label style="font-size: 0.8rem;">Transfer Date <span style="color:#94a3b8;font-weight:400;">(if transferred)</span></label>
+                        <input type="date" class="form-control" value="${cert.transferDate || ''}" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="transferDate" data-arg4="this.value">
+                        <small style="color:#64748b;">Keep Initial Date as the original certification.</small>
+                    </div>
+                    <div>
+                        <label style="font-size: 0.8rem;">Previous CB</label>
+                        <input type="text" class="form-control" value="${window.UTILS.escapeHtml(cert.previousCB || '')}" placeholder="Transferred from" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="previousCB" data-arg4="this.value">
+                    </div>
+                    <div>
                         <label style="font-size:0.8rem;">Current Cycle Stage</label>
                         ${(() => {
             // Name the override in force, if any: it decides which audit this

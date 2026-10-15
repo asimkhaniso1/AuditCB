@@ -2537,7 +2537,9 @@ const SupabaseClient = {
                 revision: c.decision_record?.revision || '00',
                 siteScopes: c.decision_record?.site_scopes || {},
                 initialDate: c.decision_record?.initial_date || '',
-                currentIssue: c.decision_record?.current_issue || ''
+                currentIssue: c.decision_record?.current_issue || '',
+                transferDate: c.decision_record?.transfer_date || '',
+                previousCB: c.decision_record?.previous_cb || ''
             }));
 
             // Also keep the raw decisions for other uses if needed
@@ -2572,7 +2574,9 @@ const SupabaseClient = {
                 revision: cert.revision,
                 site_scopes: cert.siteScopes,
                 initial_date: cert.initialDate,
-                current_issue: cert.currentIssue
+                current_issue: cert.currentIssue,
+                transfer_date: cert.transferDate || null,
+                previous_cb: cert.previousCB || null
             };
 
             const payload = {

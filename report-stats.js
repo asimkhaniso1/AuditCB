@@ -626,6 +626,66 @@
     //
     // Returns null when there is no usable certificate (caller keeps its own
     // "no cycle started" empty state).
+    // Records name their client by id, or only by name, and the name on an
+    // audit record is not always written the way the client record has it
+    // ("PC CONNECTION" against "PC CONNECTION, INC."). Case, punctuation and a
+    // trailing legal form are not part of who the client is.
+    const LEGAL_FORM = /\s(incorporated|inc|corporation|corp|company|co|limited|ltd|llc|llp|plc|pvt|private|gmbh|pty|sa|srl|bv)$/;
+    function organisationKey(name) {
+        let key = trim(name).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+        for (let i = 0; i < 3; i++) {
+            const next = key.replace(LEGAL_FORM, '').trim();
+            if (next === key || !next) break;
+            key = next;
+        }
+        return key;
+    }
+
+    // Does this report or plan belong to the client? The id decides when both
+    // carry one. Reports in the field carry no clientId at all, and an id check
+    // skipped whenever either side lacked one made every finalized audit count
+    // as every client's history, so a record naming neither the id nor the
+    // client is attributed to nobody rather than to all.
+    function recordBelongsTo(record, client) {
+        if (!record || !client) return false;
+        if (record.clientId != null && client.id != null) return String(record.clientId) === String(client.id);
+        const named = organisationKey(record.client || record.clientName);
+        const ours = organisationKey(client.name);
+        return !!named && !!ours && named === ours;
+    }
+
+    // An integrated audit's record lists several standards.
+    function coversStandard(record, want) {
+        const wanted = trim(want).toLowerCase();
+        if (!wanted) return true;
+        const listed = [].concat(safeArr(record.standards), String(record.standard || '').split(/\s*[,;+]\s*/))
+            .map((x) => trim(x).toLowerCase()).filter(Boolean);
+        return !listed.length || listed.includes(wanted);
+    }
+
+    // Every completed audit on record for a client and standard, oldest first:
+    // finalized reports, and audit plans marked Completed or Closed — an audit
+    // the CB ran and closed out is on record even where no report was
+    // finalized in the app.
+    const FINAL_REPORT_STATUSES = new Set(['final', 'finalized', 'approved', 'published', 'completed']);
+    const COMPLETED_PLAN_STATUSES = new Set(['completed', 'closed']);
+    function completedAuditRecords(client, standard, allReports, allPlans, today) {
+        const out = [];
+        safeArr(allReports).forEach((r) => {
+            if (!r || !recordBelongsTo(r, client) || !coversStandard(r, standard)) return;
+            if (!FINAL_REPORT_STATUSES.has(trim(r.reportStatus || r.status).toLowerCase())) return;
+            const d = parseDateSafe(r.date || r.createdAt);
+            if (d && d <= today) out.push({ origin: 'report', id: r.id || null, auditType: trim(r.auditType || r.type), date: d });
+        });
+        safeArr(allPlans).forEach((plan) => {
+            if (!plan || !recordBelongsTo(plan, client) || !coversStandard(plan, standard)) return;
+            if (!COMPLETED_PLAN_STATUSES.has(trim(plan.status).toLowerCase())) return;
+            const d = parseDateSafe(plan.endDate || plan.date || plan.startDate);
+            if (d && d <= today) out.push({ origin: 'plan', id: plan.id || null, auditType: trim(plan.auditType || plan.type), date: d });
+        });
+        return out.sort((a, b) => a.date - b.date);
+    }
+
     function cycleState(input) {
         try {
             return cycleStateInner(input || {});
@@ -661,60 +721,39 @@
         // Finalized audits belonging to THIS cycle, oldest first. The window
         // opens 60 days before the anchor so the initial-certification audit
         // that produced the certificate still counts as in-cycle.
-        const clientId = client.id;
         const windowStart = new Date(anchor.getTime());
         windowStart.setDate(windowStart.getDate() - 60);
 
-        // Does this report or plan belong to THIS client? The id check used to
-        // be skipped whenever either side lacked one — and reports in the field
-        // carry no clientId at all, so every finalized audit counted as every
-        // client's history. One client's surveillance was ticking S1 for every
-        // other client holding the same standard. A record that names neither
-        // the id nor the client is attributed to nobody rather than to all.
-        const ourName = trim(client.name).toLowerCase();
-        const belongsToThisClient = (record) => {
-            if (record.clientId != null && clientId != null) return String(record.clientId) === String(clientId);
-            const named = trim(record.client || record.clientName).toLowerCase();
-            if (named && ourName) return named === ourName;
-            return false;
-        };
-        const reportsInCycle = (forStandard) => allReports.filter((r) => {
-            if (!r) return false;
-            if (!belongsToThisClient(r)) return false;
-            const want = trim(forStandard);
-            if (want && trim(r.standard) && trim(r.standard).toLowerCase() !== want.toLowerCase()) return false;
-            const st = trim(r.reportStatus || r.status).toLowerCase();
-            if (st !== 'final' && st !== 'finalized' && st !== 'approved' && st !== 'published') return false;
-            const d = parseDateSafe(r.date || r.createdAt);
-            return !!d && d >= windowStart && d <= today;
-        }).sort((a, b) => (parseDateSafe(a.date || a.createdAt) - parseDateSafe(b.date || b.createdAt)));
+        const belongsToThisClient = (record) => recordBelongsTo(record, client);
+        const reportsInCycle = (forStandard) => completedAuditRecords(client, forStandard, allReports, allPlans, today)
+            .filter((r) => r.date >= windowStart);
 
-        // Slot each finalized surveillance visit. An explicitly numbered type
-        // wins; a generic "Surveillance" is slotted by which due date it sits
-        // closest to (mirroring buildProgramme), and a later visit can never
-        // regress to an earlier slot than one already completed.
+        // Slot each completed audit against the milestone it evidences. An
+        // explicitly numbered type wins; a generic "Surveillance" goes to the
+        // due date it sits closest to, and a second generic visit long after
+        // the first Surveillance 1 is the Surveillance 2. Each milestone ticks
+        // from ITS OWN record only: a Surveillance 2 on file says nothing about
+        // whether Surveillance 1 took place, so it never ticks S1 as well.
         const tallyVisits = (list) => {
-            let done = 0;
-            let recert = false;
+            const slot = { s1: null, s2: null, recert: null };
             list.forEach((r) => {
-                const typeStr = trim(r.auditType || r.type);
-                const sid = classifyAuditType(typeStr);
-                if (sid === 'recert') { recert = true; return; }
+                const sid = classifyAuditType(r.auditType);
+                if (sid === 'recert') { if (!slot.recert) slot.recert = r; return; }
                 if (sid === 's1' || sid === 's2') return; // stage 1 / initial certification audit
-                let slot = sid === 'sv2' ? 2 : (/surveillance\s*1|sv1|1st|first/i.test(typeStr) ? 1 : 0);
-                if (!slot) {
-                    const d = parseDateSafe(r.date || r.createdAt);
-                    slot = Math.abs(d - surv2Due) < Math.abs(d - surv1Due) ? 2 : 1;
+                let key;
+                if (sid === 'sv2') key = 's2';
+                else if (/surveillance\s*1|sv1|1st|first/i.test(r.auditType)) key = 's1';
+                else {
+                    key = Math.abs(r.date - surv2Due) < Math.abs(r.date - surv1Due) ? 's2' : 's1';
+                    if (key === 's1' && slot.s1 && r.date - slot.s1.date > 120 * 24 * 60 * 60 * 1000) key = 's2';
                 }
-                done = Math.min(2, Math.max(done, Math.max(slot, done + 1)));
+                if (!slot[key]) slot[key] = r;
             });
-            return { surveillancesDone: done, recertDone: recert };
+            return { s1: slot.s1, s2: slot.s2, recert: slot.recert, recertDone: !!slot.recert };
         };
 
         const history = reportsInCycle(standard);
         const ownVisits = tallyVisits(history);
-        let surveillancesDone = ownVisits.surveillancesDone;
-        let recertDone = ownVisits.recertDone;
 
         // Append-only certification lifecycle events supplement finalized report
         // history. They never overwrite certificate fields, and authorized stage
@@ -793,8 +832,8 @@
                 .map((event) => trim(event.type).toLowerCase()));
             return {
                 name: sib.certificateNo || sib.standard || certIdOf(sib),
-                s1: visits.surveillancesDone >= 1 || types.has('surveillance-1-completed'),
-                s2: visits.surveillancesDone >= 2 || types.has('surveillance-2-completed'),
+                s1: !!visits.s1 || types.has('surveillance-1-completed'),
+                s2: !!visits.s2 || types.has('surveillance-2-completed'),
                 recert: visits.recertDone || types.has('recertification-completed') || types.has('certification-renewal')
             };
         });
@@ -802,16 +841,19 @@
         // the widget names it, so a tick is always traceable to its record.
         const sharedEvidence = { s1: null, s2: null, recert: null };
         const sharedFrom = (milestone) => (siblingProgress.find((sib) => sib[milestone]) || {}).name || null;
-        if (lifecycleTypes.has('surveillance-1-completed')) surveillancesDone = Math.max(surveillancesDone, 1);
-        else if (surveillancesDone < 1 && (sharedEvidence.s1 = sharedFrom('s1'))) surveillancesDone = 1;
-        if (lifecycleTypes.has('surveillance-2-completed')) surveillancesDone = Math.max(surveillancesDone, 2);
-        else if (surveillancesDone < 2 && (sharedEvidence.s2 = sharedFrom('s2'))) surveillancesDone = 2;
-        if (lifecycleTypes.has('recertification-completed') || lifecycleTypes.has('certification-renewal')) recertDone = true;
-        else if ((sharedEvidence.recert = sharedFrom('recert'))) recertDone = true;
+        let s1Done = !!ownVisits.s1 || lifecycleTypes.has('surveillance-1-completed');
+        if (!s1Done && (sharedEvidence.s1 = sharedFrom('s1'))) s1Done = true;
+        let s2Done = !!ownVisits.s2 || lifecycleTypes.has('surveillance-2-completed');
+        if (!s2Done && (sharedEvidence.s2 = sharedFrom('s2'))) s2Done = true;
+        let recertDone = ownVisits.recertDone || lifecycleTypes.has('recertification-completed') || lifecycleTypes.has('certification-renewal');
+        if (!recertDone && (sharedEvidence.recert = sharedFrom('recert'))) recertDone = true;
+        const surveillancesDone = (s1Done ? 1 : 0) + (s2Done ? 1 : 0);
+        // The report or plan that evidenced each milestone, so a tick names it.
+        const recordedAudits = { s1: ownVisits.s1, s2: ownVisits.s2, recert: ownVisits.recert };
         const completed = {
             certification: true,
-            s1: surveillancesDone >= 1,
-            s2: surveillancesDone >= 2,
+            s1: s1Done,
+            s2: s2Done,
             recert: recertDone,
             technicalReview: lifecycleTypes.has('technical-review'),
             certificationDecision: lifecycleTypes.has('certification-decision'),
@@ -819,13 +861,15 @@
         };
         const hasHistory = history.length > 0;
 
-        // The CYCLE is the calendar's: three-year cycles from the Initial Date,
-        // and the year and annual period follow the date alone. The STAGE is
-        // the lifecycle's — Certification, Surveillance 1, Surveillance 2,
-        // Recertification, in that order — and is the audit the cycle owes now
-        // (set below, with the due date). The Current Issue / Expiry on file
-        // never moves either.
-        const stageSource = 'lifecycle';
+        // USER RULE (2026-10-15): the lifecycle follows the Initial Date
+        // alone. The cycle, its year, the stage, the next audit and every
+        // milestone's status come from the calendar; whether an audit was
+        // recorded, finalized or its plan closed does not move any of them.
+        // Audit records are kept beside the lifecycle (completed,
+        // recordedAudits, completionRecords) so a milestone can say what is on
+        // file, but a missing record is never read as a missed audit and a
+        // recorded one never advances the stage.
+        const stageSource = 'calendar';
         const cycleYear = today < surv1Due ? 1 : (today < surv2Due ? 2 : 3);
         const monthsFromFirst = (anchor.getFullYear() - firstCertified.getFullYear()) * 12 + (anchor.getMonth() - firstCertified.getMonth());
         const cycleNumber = Math.max(1, Math.round(monthsFromFirst / CYCLE_MONTHS) + 1);
@@ -840,32 +884,40 @@
         const cycleLabel = 'Cycle ' + cycleNumber + ' · Year ' + cycleYear;
         let progress = Math.max(0, Math.min(100, Math.round((today - anchor) / (cycleEnd - anchor) * 100)));
 
-        // The audit owed next: the first milestone of this cycle not yet
-        // performed whose window has not closed. A surveillance just past its
-        // due date is still owed while its window runs; once the window shuts
-        // it is missed and the cycle moves on. A performed audit is never asked
-        // for twice. The planning domain applies the same rule with the CB's
-        // configured window (graceDays mirrors surveillanceWindowAfterDays).
-        //
-        // That audit is also the Current Stage, and the one after it the Next
-        // Stage: with Surveillance 1 performed and Surveillance 2 still in its
-        // window, the stage is Surveillance 2 and Recertification follows — even
-        // in the third calendar year. The calendar used to name the stage
-        // (Year 3 = Recertification), which skipped a surveillance that was
-        // still owed. A milestone whose window closed unperformed is missed
-        // (its node shows it) and the stage moves on, so a client whose audits
-        // were never captured here still progresses through the cycle.
+        // The stage is the first milestone whose window — its due date from
+        // the Initial Date plus the grace the CB allows after it — has not
+        // closed: Surveillance 1, then Surveillance 2, then Recertification.
+        // Dates alone decide it, so the stage and the planner's recommended
+        // window always name the same audit (graceDays mirrors the planning
+        // policy's surveillanceWindowAfterDays). The Next Audit Stage is the
+        // next audit this certificate actually requires within the cycle: it
+        // stops at Recertification and never names the next cycle's
+        // Surveillance 1, which is projected separately (nextCycle).
         const graceDays = Number.isFinite(Number(input.graceDays)) ? Number(input.graceDays) : 30;
         const stillOpen = (due) => { const end = new Date(due.getTime()); end.setDate(end.getDate() + graceDays); return end >= today; };
         const MILESTONES = ['Surveillance 1', 'Surveillance 2', 'Recertification'];
-        const owed = recertDone ? 3
-            : (!completed.s1 && !completed.s2 && stillOpen(surv1Due)) ? 0
-                : (!completed.s2 && stillOpen(surv2Due)) ? 1
-                    : 2;
-        let stage = owed === 3 ? 'Recertification completed' : MILESTONES[owed];
-        let nextStage = owed >= 2 ? 'Surveillance 1 (next cycle)' : MILESTONES[owed + 1];
-        let dueDate = [surv1Due, surv2Due, recertDue][owed] || null;
-        if (!recertDone && today > cycleEnd) { stage = 'Certificate expired'; nextStage = 'Recertification'; dueDate = null; progress = 100; }
+        const DUES = [surv1Due, surv2Due, recertDue];
+        const stageIndex = stillOpen(surv1Due) ? 0 : stillOpen(surv2Due) ? 1 : 2;
+        let stage = MILESTONES[stageIndex];
+        let nextStage = MILESTONES[Math.min(stageIndex + 1, 2)];
+        let dueDate = DUES[stageIndex];
+        const nextDue = DUES[Math.min(stageIndex + 1, 2)];
+        if (today > cycleEnd) { stage = 'Certificate expired'; nextStage = 'Recertification'; dueDate = null; progress = 100; }
+        // Milestones the calendar has moved past. This, not a record, is what
+        // turns a node green; a milestone with no record is never "missed".
+        const periodComplete = { s1: stageIndex >= 1, s2: stageIndex >= 2, recert: false };
+
+        // The cycle after this one, projected from where this one ends. Shown
+        // apart from the current cycle's milestones and never as owed.
+        const nextStart = new Date(cycleLastDay.getTime());
+        nextStart.setDate(nextStart.getDate() + 1);
+        const nextRecertDue = addMonths(nextStart, CYCLE_MONTHS);
+        nextRecertDue.setDate(nextRecertDue.getDate() - 60);
+        const nextCycle = {
+            number: cycleNumber + 1, start: nextStart,
+            surv1Due: addMonths(nextStart, 12), surv2Due: addMonths(nextStart, 24), recertDue: nextRecertDue,
+            projected: true
+        };
 
         // A real scheduled plan always beats a computed due date.
         let nextAudit = dueDate ? { date: dueDate, source: 'calendar', label: stage } : null;
@@ -892,12 +944,110 @@
             // it is re-issued annually: that is a re-issue overdue, not the end
             // of certification, and the two must not be conflated.
             certificateExpired: !!rawExpiry && today > rawExpiry,
-            completed, completionRecords, surveillancesDone, recertDone, hasHistory, sharedEvidence,
-            stage, nextStage, stageSource, progress, nextAudit,
+            completed, completionRecords, recordedAudits, surveillancesDone, recertDone, hasHistory, sharedEvidence,
+            stage, nextStage, nextDue, stageSource, progress, nextAudit, nextCycle, periodComplete,
             cycleNumber, cycleYear, cycleLabel, periodStart, periodEnd, cycleLastDay,
-            expired: !recertDone && today > cycleEnd,
+            expired: today > cycleEnd,
             lifecycleEvents
         };
+    }
+
+    // ─── Certification history — every cycle, read-only ─────────────────────
+    // The original certification, a transfer from another certification body,
+    // each cycle boundary (a recertification) and every audit on record —
+    // completion records, finalized reports and completed plans — across ALL
+    // cycles, oldest first. cycleState only reads the current cycle; this
+    // keeps the earlier ones visible. Nothing here is derived into a decision
+    // or written back: a boundary with no recertification on record says so.
+    const HISTORY_EVENT_LABELS = {
+        'surveillance-1-completed': 'Surveillance 1 performed',
+        'surveillance-2-completed': 'Surveillance 2 performed',
+        'recertification-completed': 'Recertification performed',
+        'certification-renewal': 'Certification renewed',
+        'certificate-issue': 'Certificate issued',
+        'certification-decision': 'Certification decision',
+        'technical-review': 'Technical review'
+    };
+    function certificationHistory(input) {
+        try {
+            return certificationHistoryInner(input || {});
+        } catch (_e) {
+            return [];
+        }
+    }
+    function certificationHistoryInner(input) {
+        const client = input.client || {};
+        const certs = safeArr(client.certificates);
+        const standard = trim(input.standard);
+        const cert = input.certificate
+            || (standard ? certs.find((c) => trim(c.standard).toLowerCase() === standard.toLowerCase()) : null)
+            || certs[0] || null;
+        if (!cert) return [];
+        const today = parseDateSafe(input.today) || new Date();
+        const first = parseDateSafe(cert.initialDate) || parseDateSafe(cert.issueDate) || parseDateSafe(cert.currentIssue);
+        const DAY = 24 * 60 * 60 * 1000;
+        // Which cycle a date belongs to. An audit up to 60 days before a
+        // boundary is the next cycle's (the same window cycleState reads).
+        const cycleOf = (d) => {
+            if (!first || !d) return null;
+            const shifted = new Date(d.getTime() + 60 * DAY);
+            if (shifted < first) return null;
+            let n = 1;
+            let start = first;
+            while (n < 40 && addMonths(start, CYCLE_MONTHS) <= shifted) { start = addMonths(start, CYCLE_MONTHS); n++; }
+            return n;
+        };
+        const entries = [];
+        if (first) entries.push({ date: first, kind: 'certification', label: 'Original certification', detail: 'Initial Date on the certificate record', cycle: 1 });
+        const transfer = parseDateSafe(cert.transferDate);
+        if (transfer) {
+            entries.push({
+                date: transfer, kind: 'transfer', label: 'Certificate transferred',
+                detail: trim(cert.previousCB) ? 'From ' + trim(cert.previousCB) : 'From the previous certification body', cycle: cycleOf(transfer)
+            });
+        }
+
+        const certificateId = String(cert.id || cert.certificateId || cert.certificateNo || '');
+        const events = safeArr(client.certificationLifecycleEvents)
+            .filter((event) => event && HISTORY_EVENT_LABELS[trim(event.type).toLowerCase()]
+                && (!certificateId || String(event.certificateId || '') === certificateId));
+        events.forEach((event) => {
+            const when = parseDateSafe(event.occurredAt || event.createdAt);
+            if (!when) return;
+            const meta = event.metadata || {};
+            const by = meta.source === 'third-party' ? 'Third-party audit' + (trim(meta.auditor) ? ': ' + trim(meta.auditor) : '')
+                : meta.source === 'cci' ? 'CCI' + (trim(meta.auditor) ? ': ' + trim(meta.auditor) : '') : '';
+            entries.push({
+                date: when, kind: 'event', type: trim(event.type).toLowerCase(), label: HISTORY_EVENT_LABELS[trim(event.type).toLowerCase()],
+                detail: [by, trim(event.reason)].filter(Boolean).join(' — ') || 'Recorded on the certificate', cycle: cycleOf(when)
+            });
+        });
+        const records = completedAuditRecords(client, standard || cert.standard, input.allReports, input.allPlans, today);
+        records.forEach((r) => {
+            entries.push({
+                date: r.date, kind: 'audit', type: classifyAuditType(r.auditType), label: r.auditType || 'Audit',
+                detail: r.origin === 'plan' ? 'Audit plan marked Completed' : 'Finalized audit report', cycle: cycleOf(r.date)
+            });
+        });
+
+        // Each cycle boundary reached so far, with the recertification behind
+        // it where one is on record.
+        if (first) {
+            const isRecert = (e) => (e.kind === 'event' && (e.type === 'recertification-completed' || e.type === 'certification-renewal'))
+                || (e.kind === 'audit' && e.type === 'recert');
+            let boundary = addMonths(first, CYCLE_MONTHS);
+            for (let n = 2; n < 40 && boundary <= today; n++) {
+                const lo = boundary.getTime() - 180 * DAY;
+                const hi = boundary.getTime() + 90 * DAY;
+                const evidence = entries.filter(isRecert).find((e) => e.date.getTime() >= lo && e.date.getTime() <= hi);
+                entries.push({
+                    date: new Date(boundary.getTime()), kind: 'cycle', label: 'Cycle ' + n + ' began — recertification',
+                    detail: evidence ? 'Recertification on record' : 'No recertification record on file', cycle: n
+                });
+                boundary = addMonths(boundary, CYCLE_MONTHS);
+            }
+        }
+        return entries.sort((a, b) => a.date - b.date);
     }
 
     // ─── Clause Area Performance — single computation for the whole report ────
@@ -1527,6 +1677,7 @@
         recommendationText,
         buildProgramme,
         cycleState,
+        certificationHistory,
         formatCriterion,
         classifyCriterion,
         cleanEvidenceText,

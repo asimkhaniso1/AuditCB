@@ -46,7 +46,7 @@ describe('recording an audit that was performed but never captured', () => {
         expect(after.cycleState.completed.s2).toBe(false);
         // The stage stays the calendar's (Year 3 of the cycle begun 05/07/2024)
         // — recording an audit ticks its milestone, it does not move the stage.
-        expect(after.cycleState.stageSource).toBe('lifecycle');
+        expect(after.cycleState.stageSource).toBe('calendar');
         expect(after.cycleState.stage).toBe('Recertification');
         // S2 was due 05/07/2026 and its window closed 04/08/2026 without one:
         // missed, so it no longer holds planning back.

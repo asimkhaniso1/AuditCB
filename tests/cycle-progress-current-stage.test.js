@@ -96,19 +96,20 @@ describe('cycle card follows the current stage', () => {
         expect(c.cells['RECOMMENDED AUDIT WINDOW'].style.color).toBe(rgb('#b45309'));
     });
 
-    it('Current Recertification: bar reaches Re, S1 and S2 green', () => {
+    // USER RULE (2026-10-15): the lifecycle runs on the Initial Date; a
+    // recorded audit does not move the bar or colour a dot.
+    it('Recording S2 does not move the bar: S2 stays current while its window is open', () => {
         const c = card(HALAL, [ev('C-HALAL', 'surveillance-1-completed', '2025-09-10T00:00:00.000Z'), ev('C-HALAL', 'surveillance-2-completed', '2026-09-25T00:00:00.000Z')]);
-        expect(c.cells['CURRENT STAGE'].textContent.trim()).toBe('Recertification');
-        expect(c.bar).toMatchObject({ current: 'recert', doneWidth: '66.7%', currentWidth: '100%' });
-        expect(c.nodes.s1.state).toBe('completed');
-        expect(c.nodes.s2.state).toBe('completed');
-        expect(c.nodes.recert.state).toBe(c.bar.status);
-        expect(['upcoming', 'open']).toContain(c.nodes.recert.state);
+        expect(c.cells['CURRENT STAGE'].textContent.trim()).toBe('Surveillance 2');
+        expect(c.bar).toMatchObject({ current: 's2', status: 'open' });
+        expect(c.nodes.s2.title).toMatch(/Surveillance 2 audit on record: performed 25\/09\/2026/);
     });
 
-    it('A surveillance missed outright shows red, the stage it gave way to is current, later ones grey', () => {
+    it('A surveillance with no record on file is not marked missed: its period passed, so it is green and says so', () => {
         const c = card(HALAL);   // no S1 on file; its window closed in 2025
-        expect(c.nodes.s1).toMatchObject({ state: 'missed', bg: rgb(RED) });
+        expect(c.nodes.s1).toMatchObject({ state: 'completed', bg: rgb(GREEN) });
+        expect(c.nodes.s1.title).toMatch(/No Surveillance 1 audit record on file/);
+        expect(c.nodes.s1.title).not.toMatch(/missed/i);
         expect(c.nodes.s2.state).toBe('open');
         expect(c.nodes.recert.state).toBe('future');
     });
@@ -149,7 +150,7 @@ describe('cycleLifecycleView', () => {
 
     it('an expired cycle puts Recertification overdue', () => {
         const v = view({ current: 'Certificate expired', done: { s1: true }, expired: true, dues, today, windowState: null });
-        expect(states(v)).toEqual(['completed', 'missed', 'overdue']);
+        expect(states(v)).toEqual(['completed', 'completed', 'overdue']);
         expect(v.currentKey).toBe('recert');
     });
 });
