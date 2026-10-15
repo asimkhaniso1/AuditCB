@@ -39,7 +39,7 @@ describe('PC CONNECTION on 26/09/2026 — Initial Date 16/12/2022', () => {
 
     it('names the stage by the year — Surveillance 1 — not "New cycle started"', () => {
         expect(cycleState.stage).toBe('Surveillance 1');
-        expect(cycleState.stageSource).toBe('lifecycle');
+        expect(cycleState.stageSource).toBe('calendar');
     });
 
     it('shows the current annual period as Current Issue 16/12/2025 and Expiry 15/12/2026', () => {
@@ -54,20 +54,21 @@ describe('PC CONNECTION on 26/09/2026 — Initial Date 16/12/2022', () => {
     });
 });
 
-describe('the stage follows the audits performed, on the calendar cycle', () => {
-    it('moves from Surveillance 1 to Surveillance 2 once Surveillance 1 is finalized', () => {
+// USER RULE (2026-10-15): the lifecycle follows the Initial Date alone; a
+// finalized or recorded audit goes on record but moves nothing.
+describe('the stage follows the calendar, not the audits on record', () => {
+    it('a finalized Surveillance 1 is on record but moves neither the stage nor the plan', () => {
         const without = resolve({ certificate: pcCert(), today: '2026-11-30' });
         const withS1 = resolve({
             certificate: pcCert(), today: '2026-11-30',
             reports: [{ client: 'PC CONNECTION, INC.', standard: 'ISO/IEC 27001:2022', auditType: 'Surveillance 1', reportStatus: 'final', date: '2026-11-20' }]
         });
         expect(without.cycleState.stage).toBe('Surveillance 1');
-        expect(withS1.cycleState.stage).toBe('Surveillance 2');
+        expect(withS1.cycleState.stage).toBe('Surveillance 1');
         expect(withS1.cycleState.cycleLabel).toBe(without.cycleState.cycleLabel);
         expect(withS1.cycleState.completed.s1).toBe(true);
         expect(without.cycleState.completed.s1).toBe(false);
-        // A performed audit is never asked for twice: the next one is S2.
-        expect(withS1.record.auditType).toBe('Surveillance 2');
+        expect(withS1.record.auditType).toBe('Surveillance 1');
         expect(without.record.auditType).toBe('Surveillance 1');
     });
 
@@ -81,7 +82,7 @@ describe('the stage follows the audits performed, on the calendar cycle', () => 
 
         const afterWindow = resolve({ certificate: pcCert(), today: '2027-02-01' });
         expect(afterWindow.cycleState.stage).toBe('Surveillance 2');
-        expect(afterWindow.cycleState.completed.s1).toBe(false);      // the node shows it missed
+        expect(afterWindow.cycleState.completed.s1).toBe(false);      // no record on file — not marked missed
         expect(afterWindow.record.auditType).toBe('Surveillance 2');   // but it no longer holds planning back
     });
 

@@ -124,7 +124,7 @@ describe('Record Completed Audit modal', () => {
         expect(cs.completionRecords.s1.evidence).toHaveLength(1);
     });
 
-    it('a CCI S2 moves the stage on to Recertification', async () => {
+    it('a CCI S2 is put on record without moving the stage', async () => {
         client.certificationLifecycleEvents.push({ id: 'e1', certificateId: 'C-HALAL', type: 'surveillance-1-completed', occurredAt: '2025-09-10T00:00:00.000Z', metadata: {} });
         window.recordCompletedCertificationAudit('sg', 0);
         set('completion-date', '2026-09-25');
@@ -134,7 +134,8 @@ describe('Record Completed Audit modal', () => {
         expect(uploads).toHaveLength(0);
         const cs = ReportStats.cycleState({ client, standard: 'Halal', certificate: client.certificates[0], allReports: [], allPlans: [], today: '2026-09-30' });
         expect(cs.completed.s2).toBe(true);
-        expect(cs.stage).toBe('Recertification');
+        // USER RULE (2026-10-15): S2's window is still open, so S2 stays current.
+        expect(cs.stage).toBe('Surveillance 2');
         expect(cs.completionRecords.s2).toMatchObject({ source: 'cci', auditor: 'Hassan Javed.' });
     });
 

@@ -267,9 +267,9 @@ describe('KTD surveillance acceptance', () => {
         });
     });
 
-    // Cycle state drives the dashboard widget's stage ticks. A stage is
-    // complete because its audit was FINALIZED — publishing the report is what
-    // advances the cycle, not the calendar rolling past a due date.
+    // USER RULE (2026-10-15): the lifecycle runs on the Initial Date alone.
+    // A finalized report is put on record against its milestone (completed.*)
+    // but never moves the stage.
     describe('ReportStats.cycleState', () => {
         const ANNUAL_CERT_CLIENT = () => ({
             id: 'ktd-1', name: 'KTD Select',
@@ -290,22 +290,22 @@ describe('KTD surveillance acceptance', () => {
             expect(cs.hasHistory).toBe(false);
         });
 
-        it('publishing the surveillance report ticks S1 and S2 and moves the next audit on', () => {
+        it('publishing the surveillance report puts S2 on record and leaves the stage on the calendar', () => {
             const cs = window.ReportStats.cycleState(args([sv2Report('final')]));
             // Dated a year after SV1 was due, so it slots as the SECOND
-            // surveillance — matching how buildProgramme slots the same record.
-            expect(cs.surveillancesDone).toBe(2);
-            expect(cs.completed.s1).toBe(true);
+            // surveillance — and says nothing about whether S1 took place.
+            expect(cs.surveillancesDone).toBe(1);
+            expect(cs.completed.s1).toBe(false);
             expect(cs.completed.s2).toBe(true);
+            expect(cs.recordedAudits.s2.origin).toBe('report');
             expect(cs.completed.recert).toBe(false);
-            // With both surveillances performed, the audit owed — and the
-            // stage — is Recertification, though the calendar is in Year 2.
-            expect(cs.stage).toBe('Recertification');
-            expect(cs.nextStage).toBe('Surveillance 1 (next cycle)');
+            // Year 2 of the cycle: the stage is Surveillance 2, next Recertification.
+            expect(cs.stage).toBe('Surveillance 2');
+            expect(cs.nextStage).toBe('Recertification');
             // Annual cert expiry (Aug 2026) is NOT the cycle end — recert is
             // driven by the true 3-year cycle end (Aug 2027).
             expect(cs.cycleEnd.getFullYear()).toBe(2027);
-            expect(cs.nextAudit.date.getFullYear()).toBe(2027);
+            expect(cs.recertDue.getFullYear()).toBe(2027);
         });
 
         it('a finalized recertification audit ticks the recert milestone', () => {
@@ -319,8 +319,9 @@ describe('KTD surveillance acceptance', () => {
 
             const after = window.ReportStats.cycleState(Object.assign({}, base, { today: '2027-06-20' }));
             expect(after.completed.recert).toBe(true);
-            expect(after.stage).toBe('Recertification completed');
-            expect(after.nextAudit).toBeNull();
+            // On record, but the stage stays the calendar's Year 3.
+            expect(after.stage).toBe('Recertification');
+            expect(after.nextStage).toBe('Recertification');
         });
 
         it('a scheduled plan outranks the computed due date for the next audit', () => {
@@ -350,17 +351,17 @@ describe('KTD surveillance acceptance', () => {
         // no audit on file, S1's window has closed (missed) and S2 is owed.
         it('reads the stage from the lifecycle with no finalized audit on file', () => {
             const cs = window.ReportStats.cycleState(args([sv2Report('draft')]));
-            expect(cs.stageSource).toBe('lifecycle');
+            expect(cs.stageSource).toBe('calendar');
             expect(cs.stage).toBe('Surveillance 2');
             expect(cs.cycleLabel).toBe('Cycle 1 · Year 2');
         });
 
-        it('moves the stage on once the owed audit is finalized, in the same cycle year', () => {
+        it('a finalized audit does not move the stage', () => {
             const without = window.ReportStats.cycleState(args([sv2Report('draft')]));
             const withAudit = window.ReportStats.cycleState(args([sv2Report('final')]));
-            expect(withAudit.stageSource).toBe('lifecycle');
+            expect(withAudit.stageSource).toBe('calendar');
             expect(without.stage).toBe('Surveillance 2');
-            expect(withAudit.stage).toBe('Recertification');
+            expect(withAudit.stage).toBe('Surveillance 2');
             expect(withAudit.cycleLabel).toBe(without.cycleLabel);
             expect(withAudit.completed.s2).toBe(true);
         });

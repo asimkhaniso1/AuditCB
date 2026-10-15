@@ -172,16 +172,10 @@
         // Every branch below reports the override it did NOT apply, so the
         // card can say why a stage someone authorised is not in force.
         const withSuperseded = (result) => Object.assign({ supersededOverride, supersededReason }, result);
-        // The lifecycle decides, on the cycle the Initial Date anchors: the
-        // audit owed — and so the stage — is the first
-        // milestone of THIS cycle not yet performed whose window has not
-        // closed. A surveillance just past its due date is still owed while its
-        // window runs (that is what the recommended window promises); once the
-        // window shuts it is missed and the cycle moves on — a missed audit
-        // never holds planning back. A performed one is never planned twice.
-        // Completion comes only from cycleState, whose evidence is scoped to
-        // this cycle: the raw lifecycle events span every cycle, and a
-        // surveillance done in the last one must not satisfy this one.
+        // The calendar decides, on the cycle the Initial Date anchors: a
+        // surveillance just past its due date is still the audit to plan while
+        // its window runs (that is what the recommended window promises); once
+        // the window shuts the cycle moves on.
         if (cycleState?.surv1Due) {
             if (/certificate expired/i.test(String(cycleState.stage || ''))) {
                 return withSuperseded({ auditType: 'Recertification', stage: cycleState.stage, projected: true });
@@ -193,12 +187,14 @@
                 if (!dueDate) return false;
                 return addDays(dueDate, cfg.surveillanceWindowAfterDays) >= reference;
             };
-            const done = cycleState.completed || {};
-            if (done.recert) return withSuperseded({ auditType: 'Recertification', stage: cycleState.stage, complete: true, projected: true });
-            if (!done.s1 && stillSchedulable(cycleState.surv1Due)) {
+            // USER RULE (2026-10-15): the lifecycle runs on the Initial Date
+            // alone — a recorded, finalized or closed audit does not move it.
+            // The audit planned is the first milestone whose window has not
+            // closed, by date only.
+            if (stillSchedulable(cycleState.surv1Due)) {
                 return withSuperseded({ auditType: 'Surveillance 1', stage: 'Surveillance 1', projected: true });
             }
-            if (!done.s2 && stillSchedulable(cycleState.surv2Due)) {
+            if (stillSchedulable(cycleState.surv2Due)) {
                 return withSuperseded({ auditType: 'Surveillance 2', stage: 'Surveillance 2', projected: true });
             }
             return withSuperseded({ auditType: 'Recertification', stage: 'Recertification', projected: true });
