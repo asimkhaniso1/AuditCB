@@ -646,13 +646,30 @@
         return when >= addDays(anchor, -60);
     }
 
+    // IAF MD 1 site sample for the planning modal's calculator: √n, scaled by
+    // risk and site factors, never below 25% of sites nor above the total.
+    function calculateMultiSiteSample(totalSites, riskLevel, hasNCRs, hasComplexProcesses) {
+        const sites = Math.max(0, Math.floor(Number(totalSites) || 0));
+        if (!sites) return { baseSample: 0, adjustedSample: 0, percentage: 0 };
+        const baseSample = Math.ceil(Math.sqrt(sites));
+        const riskMultiplier = { Low: 0.8, Medium: 1.0, High: 1.2 };
+        let adjusted = baseSample * (riskMultiplier[riskLevel] || 1.0);
+        if (hasNCRs) adjusted *= 1.2;
+        if (hasComplexProcesses) adjusted *= 1.1;
+        adjusted = Math.ceil(adjusted);
+        adjusted = Math.max(adjusted, Math.ceil(sites * 0.25));
+        adjusted = Math.min(adjusted, sites);
+        return { baseSample, adjustedSample: adjusted, percentage: Math.round((adjusted / sites) * 100) };
+    }
+
     const api = {
         POLICY_VERSION, PLAN_STATES, DEFAULT_POLICY, DEFAULT_DURATION_VERSION, DEFAULT_DURATION_TABLES, DEFAULT_IMS_RULE, EVENT_TYPES, policy, standardFamily,
         lifecycleEvents, createLifecycleEvent, resolveCycleContext, resolveCertificateCycle, describeCycleWindow,
         resolveDurationMethodology, resolveProvisionalDurationMethodology,
         calculateConfiguredDuration, validateDuration, validateCompetence, buildCoverageMatrix, reconcileAgenda, canTransition,
         createOverride, createOverrideRevocation, latestAuthorizedStageOverride,
-        COMPLETION_MILESTONES, createCompletionRecord, completionFallsInCycle
+        COMPLETION_MILESTONES, createCompletionRecord, completionFallsInCycle,
+        calculateMultiSiteSample
     };
     global.AuditPlanningDomain = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

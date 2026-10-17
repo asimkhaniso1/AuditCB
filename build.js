@@ -93,7 +93,8 @@ for (const file of jsFiles) {
     }
 }
 
-// 3b. Minify all CSS files in dist (no extra dependency needed)
+// 3b. Minify all CSS files in dist (clean-css — see tools/minify-css.js)
+const { minifyCss } = require('./tools/minify-css.js');
 const cssFiles = [];
 function findCSS(dir) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -111,17 +112,7 @@ for (const file of cssFiles) {
     const original = fs.statSync(file).size;
     cssOriginal += original;
     try {
-        let css = fs.readFileSync(file, 'utf8');
-        // Remove comments
-        css = css.replace(/\/\*[\s\S]*?\*\//g, '');
-        // Remove leading/trailing whitespace per line
-        css = css.replace(/^\s+/gm, '').replace(/\s+$/gm, '');
-        // Collapse multiple whitespace/newlines
-        css = css.replace(/\s*\n\s*/g, '').replace(/\s{2,}/g, ' ');
-        // Remove spaces around selectors/braces
-        css = css.replace(/\s*([{}:;,>~+])\s*/g, '$1');
-        // Remove trailing semicolons before }
-        css = css.replace(/;}/g, '}');
+        const css = minifyCss(fs.readFileSync(file, 'utf8'));
         fs.writeFileSync(file, css, 'utf8');
         const minified = fs.statSync(file).size;
         cssMinified += minified;

@@ -254,6 +254,7 @@ function openCreateReportModal() {
     // Filter out plans that already have a report OR are marked Completed
     const allOpenPlans = state.auditPlans.filter(p => !p.reportId && !window.DataService.isPlanCompleted(p));
     allOpenPlans.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const uniqueClients = [...new Set(allOpenPlans.map(p => p.client).filter(Boolean))].sort();
 
     // Helpers exposed for HTML interaction
     window.selectAuditPlan = (id) => {
@@ -306,7 +307,7 @@ function openCreateReportModal() {
             <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; display: block;">Filter by Company:</label>
             <select class="form-control" id="start-audit-client-filter" data-action-change="filterAuditPlansStart" data-id="this.value" style="margin-bottom: 1rem; border-color: var(--primary-color);" ${activeClient ? 'disabled' : ''}>
                 <option value="">-- All Companies with Open Plans --</option>
-                ${uniqueClients.map(c => `<option value="${c}" ${c === initialClientName ? 'selected' : ''}>${c}</option>`).join('')}
+                ${uniqueClients.map(c => `<option value="${window.UTILS.escapeHtml(c)}" ${c === initialClientName ? 'selected' : ''}>${window.UTILS.escapeHtml(c)}</option>`).join('')}
             </select>
 
             <div style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
