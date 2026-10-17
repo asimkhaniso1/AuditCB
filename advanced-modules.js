@@ -1173,7 +1173,11 @@ function renderAuditorTab(auditor, tabName) {
                                         </div>
                                     </div>
                                     <div style="display: flex; gap: 0.5rem;">
-                                        ${d.cloudUrl ? `
+                                        ${d.cloudPath ? `
+                                            <button class="btn btn-sm btn-outline-primary" data-action="openStoredDocument" data-arg1="${window.UTILS.escapeHtml(d.cloudPath)}" title="View/Download" aria-label="Download">
+                                                <i class="fa-solid fa-download"></i>
+                                            </button>
+                                        ` : d.cloudUrl ? `
                                             <button class="btn btn-sm btn-outline-primary" data-action="open" data-arg1="${d.cloudUrl}" data-arg2="_blank" title="View/Download" aria-label="Download">
                                                 <i class="fa-solid fa-download"></i>
                                             </button>

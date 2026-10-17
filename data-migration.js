@@ -432,16 +432,8 @@ const DataMigration = {
                 auditorAssignments: []
             };
 
-            // Re-initialize default admin if cleared and no users
-            if (window.state.users.length === 0 && !options.keepAdmin) {
-                window.state.users = [{
-                    id: 1,
-                    name: 'System Admin',
-                    email: 'admin@auditcb.com',
-                    role: 'Admin',
-                    password: 'admin' // SECURITY: bootstrap-only; auto-migrated to SHA-256 hash on first login
-                }];
-            }
+            // No local admin is re-seeded: accounts live in Supabase Auth and
+            // state.users is refilled from profiles on the next sign-in.
 
 
             // Directly write to IndexedDB to ensure immediate persistence

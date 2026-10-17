@@ -1287,52 +1287,13 @@ window.renderLoginModal = function () {
     }
 };
 
-// Handle Login Logic
-window.loginUser = function (form) {
-    const email = form.email.value;
-    const password = form.password.value;
-
-    // 1. Check against local users (Admin)
-    const users = window.state.users || [];
-    // Ensure default admin exists if list is empty (fallback)
-    if (users.length === 0) {
-        users.push({
-            id: 1,
-            name: 'System Admin',
-            email: 'info@companycertification.com',
-            role: 'Admin',
-            password: 'admin' // SECURITY: bootstrap-only; auto-migrated to SHA-256 hash on first login (see handleLoginSubmit)
-        });
-        window.state.users = users;
-    }
-
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-
-    if (user) {
-        window.state.currentUser = user;
-        window.saveData();
-        window.showNotification('Login Successful', 'success');
+// Handle Login Logic — the modal uses the same Supabase sign-in as the
+// full-page login form; there is no local password store.
+window.loginUser = async function (form) {
+    await window.handleLoginSubmit(form);
+    if (window.state.currentUser && typeof window.closeModal === 'function') {
         window.closeModal();
-        window.renderRoleSwitcher(); // Re-render sidebar
-        window.location.reload(); // Reload to apply full permissions
-    } else {
-        window.showNotification('Invalid email or password', 'error');
     }
-};
-
-// Exit demo mode and set as real Admin user
-window.exitDemoMode = function () {
-    state.currentUser = {
-        name: 'Admin User',
-        email: 'admin@companycertification.com',
-        role: 'Admin',
-        isDemo: false
-    };
-    saveState();
-    renderRoleSwitcher();
-    updateNavigationForRole('Admin');
-    window.showNotification('Logged in as Admin. Demo mode disabled.', 'success');
-    handleRouteChange();
 };
 
 // Logout user
@@ -1731,16 +1692,19 @@ window.handleLoginSubmit = async function (form) {
             const authResult = await window.SupabaseClient.signIn(email, password);
             if (authResult?.user) {
                 // Supabase auth successful
+                // profiles.role / app_metadata only — user_metadata is user-editable
+                const role = await window.SupabaseClient.resolveUserRole(authResult.user);
                 user = {
                     id: authResult.user.id,
                     email: authResult.user.email,
                     name: authResult.user.user_metadata?.full_name || authResult.user.email.split('@')[0],
-                    role: authResult.user.user_metadata?.role || 'Admin',
+                    role,
+                    permissions: window.SupabaseClient.permissionsForRole(role),
                     supabaseAuth: true
                 };
             }
         } catch (authError) {
-            console.warn('Supabase Auth failed, trying local auth:', authError.message);
+            console.warn('Supabase Auth failed:', authError.message);
             // A plain wrong password stays generic, but every other auth failure
             // (rate-limit lockout, unconfirmed email, banned user, network) was
             // being collapsed into "Invalid email or password" — hiding the real
@@ -1756,41 +1720,10 @@ window.handleLoginSubmit = async function (form) {
                 authFailureReason = 'Could not reach the authentication service — check your connection and try again.';
             }
         }
-    }
-
-    // Fallback to local auth if Supabase auth failed
-    if (!user) {
-        // Ensure default admin exists
-        if (!window.state.users || window.state.users.length === 0) {
-            window.state.users = [{
-                id: 1,
-                name: 'System Admin',
-                email: 'info@companycertification.com',
-                role: 'Admin',
-                password: 'admin' // SECURITY: bootstrap-only; auto-migrated to SHA-256 hash on first login
-            }];
-        }
-
-        // Try local user verification
-        for (const u of window.state.users) {
-            if (u.email.toLowerCase() === email.toLowerCase()) {
-                if (u.password_hash) {
-                    const isValid = await window.PasswordUtils.verifyPassword(password, u.password_hash);
-                    if (isValid) {
-                        user = u;
-                        break;
-                    }
-                } else if (u.password) {
-                    if (u.password === password) {
-                        user = u;
-                        u.password_hash = await window.PasswordUtils.hashPassword(password);
-                        delete u.password;
-                        window.saveData();
-                        break;
-                    }
-                }
-            }
-        }
+    } else {
+        // No local-password fallback: without Supabase there is no way to
+        // verify credentials, so sign-in is refused.
+        authFailureReason = 'Sign-in is unavailable — the authentication service is not configured. Contact your administrator.';
     }
 
     if (user) {

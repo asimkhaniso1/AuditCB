@@ -1077,12 +1077,21 @@ async function extractStandardClauses(doc, standardName, mode = 'standard', audi
     // Fix: Define docContent from the document object
     let docContent = doc.extractedText || '';
 
-    // If no extracted text, try to re-extract from cloud URL
-    if ((!docContent || docContent.length < 100) && doc.cloudUrl) {
+    // If no extracted text, try to re-extract from the stored file. The
+    // documents bucket is private, so download by path with the user's
+    // session; the saved public URL is only a fallback for old records.
+    if ((!docContent || docContent.length < 100) && (doc.cloudPath || doc.cloudUrl)) {
         try {
-            const response = await fetch(doc.cloudUrl);
-            if (response.ok) {
-                const blob = await response.blob();
+            let blob = null;
+            if (doc.cloudPath && window.SupabaseClient?.isInitialized) {
+                const { data, error } = await window.SupabaseClient.client.storage.from('documents').download(doc.cloudPath);
+                if (!error && data) blob = data;
+            }
+            if (!blob && doc.cloudUrl) {
+                const response = await fetch(doc.cloudUrl);
+                if (response.ok) blob = await response.blob();
+            }
+            if (blob) {
                 const file = new File([blob], doc.fileName || 'document.pdf', { type: blob.type });
                 const reExtracted = await window.extractTextFromFile(file);
                 if (reExtracted && reExtracted.length > 100) {

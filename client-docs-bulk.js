@@ -3142,8 +3142,10 @@
             .from('documents')
             .upload(path, file, { cacheControl: '3600', upsert: false });
         if (error) throw error;
-        const { data } = window.SupabaseClient.client.storage.from('documents').getPublicUrl(path);
-        return { path, url: data && data.publicUrl };
+        // The documents bucket is private: a public URL would not resolve and a
+        // signed one expires, so only the path is stored. Open the file with a
+        // fresh signed URL at view time (window.openStoredDocument).
+        return { path, url: '' };
     }
 
     window.confirmBulkDocImport = async function (clientId) {

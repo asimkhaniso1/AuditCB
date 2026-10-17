@@ -344,7 +344,7 @@ Vercel (CI/CD + Hosting)
     │
     ├── Serverless APIs (Node.js 20.x)
     │     ├── /api/gemini.js (AI proxy)
-    │     └── /api/send-email.js (email delivery)
+    │     └── /api/site-scan.js (client website reader)
     │
     └── Database: Supabase Cloud
           ├── PostgreSQL (data)

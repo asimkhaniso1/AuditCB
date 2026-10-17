@@ -201,40 +201,55 @@ const SupabaseClient = {
     },
 
     /**
+     * Authoritative role for a signed-in Supabase user: profiles.role first,
+     * then app_metadata.role (settable only with the service role). Falls
+     * back to the least-privileged role when neither is available.
+     */
+    resolveUserRole: async function (user) {
+        if (!user) return 'Auditor';
+        if (this.client) {
+            try {
+                const { data, error } = await this.client
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .maybeSingle();
+                if (!error && data && data.role) return data.role;
+            } catch (error) {
+                Logger.warn('Could not read profile role:', error.message);
+            }
+        }
+        return user.app_metadata?.role || 'Auditor';
+    },
+
+    permissionsForRole: function (role) {
+        const rolePermissions = {
+            'Admin': ['all'],
+            'Certification Manager': ['view_all', 'edit_clients', 'approve_reports', 'manage_auditors'],
+            'Lead Auditor': ['view_assigned', 'edit_reports', 'create_ncr'],
+            'Auditor': ['view_assigned']
+        };
+        return rolePermissions[role] || ['view_assigned'];
+    },
+
+    /**
      * Handle sign in
      */
     handleSignIn: async function (session) {
         const user = session.user;
 
-        // Determine role based on email if not set in metadata
-        let userRole = user.user_metadata?.role;
-        let userPermissions = user.user_metadata?.permissions;
-
-        // Check if admin email (configured in settings or user management)
-        const cbEmail = window.state?.cbSettings?.cbEmail?.toLowerCase() || '';
-        const adminUsers = (window.state?.users || [])
-            .filter(u => u.role === 'Admin')
-            .map(u => u.email?.toLowerCase());
-
-        // Include CB email as admin if configured
-        if (cbEmail) adminUsers.push(cbEmail);
-
-        if (adminUsers.includes(user.email.toLowerCase())) {
-            userRole = 'Admin';
-            userPermissions = ['all'];
-        } else if (!userRole) {
-            // Default to Auditor if no role set
-            userRole = 'Auditor';
-            userPermissions = ['view_assigned'];
-        }
+        // Role comes from profiles.role (what RLS's is_admin() reads) or the
+        // server-only app_metadata — never from user_metadata, which any user
+        // can set on themselves at signup or via auth.updateUser().
+        const userRole = await this.resolveUserRole(user);
 
         // Update app state with user info
         window.state.currentUser = {
             id: user.id,
             email: user.email,
-            name: user.user_metadata?.name || user.email,
+            name: user.user_metadata?.full_name || user.user_metadata?.name || user.email,
             role: userRole,
-            permissions: userPermissions
+            permissions: this.permissionsForRole(userRole)
         };
 
         Logger.info('User signed in:', window.state.currentUser.email, 'Initial Role:', userRole);
@@ -245,24 +260,13 @@ const SupabaseClient = {
             await this.loadUserDataFromCloud();
             Logger.info('User data loaded successfully from cloud');
 
-            // Now update role from user management system
+            // Display name from user management; the role stays the one
+            // resolved from profiles above.
             const managedUser = window.state?.users?.find(u =>
                 u.email?.toLowerCase() === window.state.currentUser.email.toLowerCase()
             );
-
-            if (managedUser && managedUser.role) {
-                window.state.currentUser.role = managedUser.role;
-                window.state.currentUser.name = managedUser.name || window.state.currentUser.name;
-
-                // Update permissions based on role
-                const rolePermissions = {
-                    'Admin': ['all'],
-                    'Certification Manager': ['view_all', 'edit_clients', 'approve_reports', 'manage_auditors'],
-                    'Lead Auditor': ['view_assigned', 'edit_reports', 'create_ncr'],
-                    'Auditor': ['view_assigned']
-                };
-                window.state.currentUser.permissions = rolePermissions[managedUser.role] || ['view_assigned'];
-                Logger.info('Role updated from user management:', managedUser.role);
+            if (managedUser && managedUser.name) {
+                window.state.currentUser.name = managedUser.name;
             }
         } catch (error) {
             Logger.warn('Failed to load cloud data, using local data:', error.message);
@@ -402,6 +406,18 @@ const SupabaseClient = {
             Logger.error('Get session failed:', error);
             return null;
         }
+    },
+
+    /**
+     * Authorization header for the app's own /api/* functions, which verify
+     * the Supabase access token. Empty when there is no session — the API
+     * then answers 401.
+     */
+    async getAuthHeaders() {
+        const session = await this.getSession();
+        return session && session.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {};
     },
 
     /**
@@ -2872,6 +2888,42 @@ const SupabaseClient = {
 
 // Window export (used by all existing code)
 window.SupabaseClient = SupabaseClient;
+
+/**
+ * Headers for a JSON POST to the app's /api/* functions, including the
+ * caller's Supabase access token.
+ */
+window.apiJsonHeaders = async function () {
+    const auth = await SupabaseClient.getAuthHeaders().catch(() => ({}));
+    return { 'Content-Type': 'application/json', ...auth };
+};
+
+/**
+ * Open a file from the private 'documents' bucket in a new tab via a
+ * short-lived signed URL (same pattern as the lifecycle evidence viewer).
+ */
+window.openStoredDocument = async function (path) {
+    if (!path) return;
+    // Open the tab synchronously so the popup blocker treats it as user-initiated.
+    const tab = window.open('', '_blank');
+    let url = null;
+    if (SupabaseClient.isInitialized) {
+        try {
+            const { data, error } = await SupabaseClient.client.storage.from('documents').createSignedUrl(path, 600);
+            if (!error && data?.signedUrl) url = data.signedUrl;
+        } catch (err) {
+            Logger.warn('[Storage] Signed URL failed:', err);
+        }
+    }
+    if (!url) {
+        if (tab) tab.close();
+        if (typeof window.showNotification === 'function') {
+            window.showNotification('Could not open the file — sign in again or check your connection.', 'error');
+        }
+        return;
+    }
+    if (tab) { tab.opener = null; tab.location.href = url; } else { window.location.assign(url); }
+};
 
 // Auto-initialize if Supabase is available
 if (typeof supabase !== 'undefined') {

@@ -285,7 +285,7 @@
     async function scanWebsite(url) {
         const response = await fetch('/api/site-scan', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: await window.AI_SERVICE.proxyHeaders(),
             body: JSON.stringify({ url })
         });
         const data = await response.json();
