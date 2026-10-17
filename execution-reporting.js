@@ -1815,7 +1815,7 @@
                             </table>
                         </div>
                         
-                        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+                        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.js"></script>
                         <script>
                         (function() {
                             // Wait for Chart.js to load
@@ -2597,7 +2597,7 @@
                 renderCharts();
             } else {
                 const s = document.createElement('script');
-                s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+                s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.js';
                 s.onload = renderCharts;
                 document.head.appendChild(s);
             }
@@ -4073,7 +4073,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
             + '<title>Audit Report — ' + d.report.client + '</title>'
             + '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">'
-            + '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>'
+            + '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.js"></script>'
             + '<style>'
             + "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');"
             + '*{margin:0;padding:0;box-sizing:border-box;}'

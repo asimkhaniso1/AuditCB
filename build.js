@@ -13,8 +13,8 @@ const path = require('path');
 const SRC = __dirname;
 const DIST = path.join(__dirname, 'dist');
 
-// Files/dirs to skip when copying to dist
-const SKIP = new Set(['dist', 'node_modules', '.git', '.agent', '.gemini', '.claude', 'migrations', 'docs', 'tools', 'supabase', 'coverage', 'tests']);
+// Only root files the browser loads ship (see tools/ship-allowlist.js).
+const { shouldShip } = require('./tools/ship-allowlist.js');
 
 // 1. Clean dist
 if (fs.existsSync(DIST)) {
@@ -22,31 +22,13 @@ if (fs.existsSync(DIST)) {
 }
 fs.mkdirSync(DIST, { recursive: true });
 
-// 2. Copy files to dist (excluding skipped dirs)
-function copyRecursive(src, dest) {
-    const entries = fs.readdirSync(src, { withFileTypes: true });
-    for (const entry of entries) {
-        if (SKIP.has(entry.name)) continue;
-        const srcPath = path.join(src, entry.name);
-        const destPath = path.join(dest, entry.name);
-        if (entry.isDirectory()) {
-            fs.mkdirSync(destPath, { recursive: true });
-            copyRecursive(srcPath, destPath);
-        } else {
-            fs.copyFileSync(srcPath, destPath);
-        }
-    }
-}
-
+// 2. Copy shippable root files to dist (no subdirectories — Vercel builds
+//    api/ functions from the project root, so dist/ never needs api/)
 console.log('📦 Copying files to dist/...');
-copyRecursive(SRC, DIST);
-
-// Also copy api/ directory (needed for Vercel serverless functions)
-const apiSrc = path.join(SRC, 'api');
-const apiDest = path.join(DIST, 'api');
-if (fs.existsSync(apiSrc)) {
-    fs.mkdirSync(apiDest, { recursive: true });
-    copyRecursive(apiSrc, apiDest);
+for (const entry of fs.readdirSync(SRC, { withFileTypes: true })) {
+    if (entry.isFile() && shouldShip(entry.name)) {
+        fs.copyFileSync(path.join(SRC, entry.name), path.join(DIST, entry.name));
+    }
 }
 
 // 3. Minify all JS files in dist
@@ -189,9 +171,12 @@ if (fs.existsSync(indexPath)) {
     const envConfigPath = path.join(DIST, 'env-config.js');
     fs.writeFileSync(envConfigPath, envFileContent, 'utf8');
 
-    // Inject <script src="./env-config.js"> before </head> (CSP-safe external script)
+    // Inject <script src="./env-config.js"> before </head> (CSP-safe external script).
+    // It is written after step 4, so it gets its own content hash here — *.js is
+    // cached for a year, and a key/DSN rotation must reach returning browsers.
     if (!html.includes('env-config.js')) {
-        html = html.replace('</head>', '<script src="./env-config.js"></script>\n</head>');
+        const envHash = crypto.createHash('md5').update(envFileContent).digest('hex').substring(0, 8);
+        html = html.replace('</head>', `<script src="./env-config.js?h=${envHash}"></script>\n</head>`);
         fs.writeFileSync(indexPath, html, 'utf8');
     }
 
