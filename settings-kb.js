@@ -2206,31 +2206,14 @@ window.createChecklistFromKB = async function (docId, opts) {
     window.state.checklists.push(newChecklist);
     window.saveData();
 
-    // Sync to Supabase checklists table
-    if (window.SupabaseClient?.isInitialized) {
-        try {
-            await window.SupabaseClient.client
-                .from('checklists')
-                .upsert({
-                    id: String(newChecklist.id),
-                    name: newChecklist.name,
-                    standard: newChecklist.standard,
-                    type: newChecklist.type,
-                    audit_type: newChecklist.auditType || null,
-                    client_id: newChecklist.clientId || null,
-                    client_name: newChecklist.clientName || null,
-                    clauses: newChecklist.clauses,
-                    created_by: newChecklist.createdBy,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'id' });
-        } catch (dbErr) {
-            console.error('[KB] Failed to sync checklist to Supabase:', dbErr);
-        }
-    }
+    // Sync to Supabase checklists table (error is checked inside upsertChecklist)
+    const cloud = window.SupabaseClient?.isInitialized
+        ? await window.SupabaseClient.upsertChecklist(newChecklist)
+        : { ok: true };
 
     window.closeModal();
     window.showNotification(`Created checklist "${newChecklist.name}" with ${auditableItems.length} questions (clauses 4-10)!`, 'success');
+    if (!cloud.ok) window.showNotification(`Checklist "${newChecklist.name}" was saved on this device but NOT to the cloud: ${cloud.error?.message || 'unknown error'}`, 'error');
     return newChecklist;
 };
 
@@ -2282,16 +2265,17 @@ window.deleteKnowledgeDoc = async function (type, id) {
             }
 
             // Delete from documents table
-            await window.SupabaseClient.client
+            const { error: dbDelErr } = await window.SupabaseClient.client
                 .from('documents')
                 .delete()
                 .eq('id', id);
+            if (dbDelErr) throw dbDelErr;
 
             // Sync settings (KB metadata)
             await window.DataService.syncSettings({ saveLocal: false, silent: true });
         } catch (e) {
             console.error('Cloud deletion failed:', e);
-            window.showNotification('Document deleted locally, but cloud sync failed', 'warning');
+            window.showNotification(`Document deleted locally, but cloud deletion failed: ${e?.message || 'unknown error'}`, 'error');
         }
     }
 };

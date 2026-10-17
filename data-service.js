@@ -148,27 +148,34 @@
         );
     }
 
+    // supabase-js resolves RLS / schema failures as { error } instead of
+    // rejecting; turn that into a rejection so syncToCloud reports it.
+    function throwOnError(res) {
+        if (res && res.error) throw res.error;
+        return res;
+    }
+
     /**
      * Generic table operation via Supabase .from() proxy.
      * Use for entities without dedicated upsert methods.
      */
     function tableInsert(table, data, options = {}) {
         return syncToCloud(`${table}:insert`, () =>
-            window.SupabaseClient.client.from(table).insert(data),
+            window.SupabaseClient.client.from(table).insert(data).then(throwOnError),
             options
         );
     }
 
     function tableUpdate(table, data, match, options = {}) {
         return syncToCloud(`${table}:update`, () =>
-            window.SupabaseClient.client.from(table).update(data).match(match),
+            window.SupabaseClient.client.from(table).update(data).match(match).then(throwOnError),
             options
         );
     }
 
     function tableDelete(table, match, options = {}) {
         return syncToCloud(`${table}:delete`, () =>
-            window.SupabaseClient.client.from(table).delete().match(match),
+            window.SupabaseClient.client.from(table).delete().match(match).then(throwOnError),
             { ...options, saveLocal: false }
         );
     }

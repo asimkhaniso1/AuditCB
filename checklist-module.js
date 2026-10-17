@@ -2738,13 +2738,9 @@ function permanentDeleteChecklist(id) {
     window.saveData();
 
     if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-        window.SupabaseClient.client
-            .from('checklists')
-            .delete()
-            .eq('id', id)
-            .then(({ error }) => {
-                if (error) console.error('Permanent delete DB error:', error);
-            });
+        window.SupabaseClient.deleteChecklist(id).then(res => {
+            if (!res.ok) window.showNotification(`"${checklist.name}" was deleted on this device but NOT from the cloud — it may reappear on the next sync: ${(res.error && res.error.message) || 'unknown error'}`, 'error');
+        });
     }
 
     window.showNotification(`"${checklist.name}" permanently deleted.`, 'success');
