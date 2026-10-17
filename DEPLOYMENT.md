@@ -35,11 +35,10 @@ if used). Names are read literally by the code at the cited locations.
 
 | Variable | Read by | Required? | Purpose / symptom if missing |
 |---|---|---|---|
-| `GEMINI_API_KEY` | [api/gemini.js:26](api/gemini.js:26) | **Yes** | Google Gemini key for the AI proxy. Missing → `500`, **all AI features dead** (KB analysis, audit scoping, report gen, NCR findings). |
-| `SUPABASE_URL` | [build.js:187](build.js:187) | Yes | Baked into `env-config.js` at build. Missing → app uses localStorage fallback for Supabase config. |
-| `SUPABASE_ANON_KEY` | [build.js:188](build.js:188) | Yes | As above (public anon key — safe client-side). |
-| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` | [api/send-email.js:12-17](api/send-email.js:12) | For email | SMTP creds for the Vercel email endpoint. Missing → outbound email fails. |
-| `CORS_ORIGIN` | [api/gemini.js:5](api/gemini.js:5), [api/send-email.js:28](api/send-email.js:28) | On new domain | Add the production origin (`https://audit360.isoxpert.com`). Same-origin `/api/*` calls work without it, but set it so cross-origin callers aren't rejected. |
+| `GEMINI_API_KEY` | [api/gemini.js](api/gemini.js) | **Yes** | Google Gemini key for the AI proxy. Missing → `500`, **all AI features dead** (KB analysis, audit scoping, report gen, NCR findings). |
+| `SUPABASE_URL` | [build.js:187](build.js:187), [api/_auth.js](api/_auth.js) | **Yes** | Baked into `env-config.js` at build, and read at runtime by `/api/*` to verify the caller's session. Missing → app uses localStorage fallback for Supabase config, and every `/api/*` call returns `500`. |
+| `SUPABASE_ANON_KEY` | [build.js:188](build.js:188), [api/_auth.js](api/_auth.js) | **Yes** | As above (public anon key — safe client-side). |
+| `CORS_ORIGIN` | [api/_auth.js](api/_auth.js) | Optional | Extra allowed origin for `/api/*`. `https://audit360.isoxpert.com` and `https://audit-cb.vercel.app` are built in; same-origin calls never need it. |
 | `SENTRY_DSN` | [build.js:189](build.js:189) | Optional | Error monitoring; leave empty to disable. |
 | `VERCEL_URL` | (auto) | — | Provided by Vercel automatically; do not set manually. |
 
@@ -58,7 +57,7 @@ These are **separate** from Vercel and are set with `supabase secrets set NAME=.
 | `SUPABASE_URL` | invite-user, send-email, validate-client | Project URL (auto-populated for edge fns in most cases). |
 | `SUPABASE_SERVICE_ROLE_KEY` | [invite-user](supabase/functions/invite-user/index.ts:28), [send-email](supabase/functions/send-email/index.ts:74) | **Service-role** key — admin user creation, privileged writes. Keep secret; never expose client-side. |
 | `SUPABASE_ANON_KEY` | validate-client | Anon key for user-context validation. |
-| `RESEND_API_KEY` | [send-email](supabase/functions/send-email/index.ts:35) | Resend email provider (note: the Supabase send-email fn uses Resend, while the Vercel `api/send-email.js` uses SMTP — two different email paths). |
+| `RESEND_API_KEY` | [send-email](supabase/functions/send-email/index.ts) | Resend email provider — the only outbound email path (the old Vercel SMTP endpoint was removed). |
 
 ---
 

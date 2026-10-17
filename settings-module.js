@@ -3531,7 +3531,7 @@ window.testAIConnection = async function () {
     try {
         const response = await fetch('/api/gemini', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: await window.AI_SERVICE.proxyHeaders(),
             body: JSON.stringify({
                 mode: 'list'
             })

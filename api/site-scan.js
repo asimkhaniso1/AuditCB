@@ -13,6 +13,7 @@
  */
 import dns from 'node:dns/promises';
 import net from 'node:net';
+import { applyCors, requireUser } from './_auth.js';
 
 const PAGE_TIMEOUT_MS = 8000;
 const MAX_PAGES = 5;
@@ -20,6 +21,13 @@ const MAX_HTML_BYTES = 600 * 1024;
 const MAX_TEXT_CHARS = 14000;
 
 const INTERESTING_PATH = /(about|company|profile|product|service|solution|capabilit|industr|manufactur|quality|certification|what-we-do|our-work|expertise)/i;
+
+/** An error whose message is safe to show the caller. */
+function scanError(message) {
+    const error = new Error(message);
+    error.userFacing = true;
+    return error;
+}
 
 function isPrivateAddress(ip) {
     if (net.isIPv4(ip)) {
@@ -45,34 +53,34 @@ async function assertPublicUrl(rawUrl) {
     try {
         url = new URL(rawUrl);
     } catch {
-        throw new Error('That does not look like a valid URL');
+        throw scanError('That does not look like a valid URL');
     }
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-        throw new Error('Only http and https URLs can be scanned');
+        throw scanError('Only http and https URLs can be scanned');
     }
     const host = url.hostname.toLowerCase();
     if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal') || host.endsWith('.local')) {
-        throw new Error('That host cannot be scanned');
+        throw scanError('That host cannot be scanned');
     }
     if (net.isIP(host)) {
-        if (isPrivateAddress(host)) throw new Error('That host cannot be scanned');
+        if (isPrivateAddress(host)) throw scanError('That host cannot be scanned');
         return url;
     }
     let resolved;
     try {
         resolved = await dns.lookup(host, { all: true });
     } catch {
-        throw new Error(`Could not resolve ${host}`);
+        throw scanError(`Could not resolve ${host}`);
     }
     if (!resolved.length || resolved.some(r => isPrivateAddress(r.address))) {
-        throw new Error('That host cannot be scanned');
+        throw scanError('That host cannot be scanned');
     }
     return url;
 }
 
 /** Fetch one page, following redirects by hand so every hop is re-validated. */
 async function fetchPage(rawUrl, hops = 0) {
-    if (hops > 3) throw new Error('Too many redirects');
+    if (hops > 3) throw scanError('Too many redirects');
     const url = await assertPublicUrl(rawUrl);
 
     const controller = new AbortController();
@@ -93,14 +101,14 @@ async function fetchPage(rawUrl, hops = 0) {
 
     if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get('location');
-        if (!location) throw new Error(`HTTP ${response.status} with no redirect target`);
+        if (!location) throw scanError(`HTTP ${response.status} with no redirect target`);
         return fetchPage(new URL(location, url.href).href, hops + 1);
     }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw scanError(`HTTP ${response.status}`);
 
     const contentType = response.headers.get('content-type') || '';
     if (!/text\/html|application\/xhtml/i.test(contentType)) {
-        throw new Error('Not an HTML page');
+        throw scanError('Not an HTML page');
     }
 
     const buffer = await response.arrayBuffer();
@@ -176,25 +184,16 @@ function findInterestingLinks(html, baseUrl) {
 }
 
 export default async function handler(req, res) {
-    const allowedOrigins = [
-        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-        process.env.CORS_ORIGIN || null,
-        'http://localhost:3000',
-        'http://localhost:5173',
-        'http://127.0.0.1:3000'
-    ].filter(Boolean);
-    const origin = req.headers.origin || '';
-    const isAllowed = allowedOrigins.some(o => origin === o) || origin.endsWith('.vercel.app');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : allowedOrigins[0] || '');
-    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    applyCors(req, res);
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
+    const user = await requireUser(req, res);
+    if (!user) return;
+
     const { url, maxPages } = req.body || {};
-    if (!url) return res.status(400).json({ error: 'A url is required' });
+    if (!url || typeof url !== 'string') return res.status(400).json({ error: 'A url is required' });
 
     try {
         const first = await fetchPage(url);
@@ -232,7 +231,11 @@ export default async function handler(req, res) {
         });
     } catch (error) {
         console.error('Site scan error:', error.message);
-        const message = error.name === 'AbortError' ? 'The site took too long to respond' : error.message;
-        return res.status(400).json({ error: message || 'Could not read that website' });
+        // Only our own validation messages go back to the caller; anything else
+        // (network/DNS internals) stays in the server log.
+        let message = 'Could not read that website';
+        if (error.name === 'AbortError') message = 'The site took too long to respond';
+        else if (error.userFacing) message = error.message;
+        return res.status(400).json({ error: message });
     }
 }

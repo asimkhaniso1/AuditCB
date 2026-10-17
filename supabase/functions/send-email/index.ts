@@ -1,10 +1,33 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// Only signed-in Admins and Certification Managers (public.is_admin_or_cert_manager(),
+// which reads profiles.role) may send mail through this function. The JWT is
+// verified here rather than relying on the platform's verify_jwt setting,
+// because the deploy scripts use --no-verify-jwt.
+
+const DEFAULT_ORIGINS = [
+  'https://audit360.isoxpert.com',
+  'https://audit-cb.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:8080',
+  'http://127.0.0.1:8080'
+]
+
+// Extra origins can be added with: supabase secrets set ALLOWED_ORIGINS=https://a,https://b
+const ALLOWED_ORIGINS = new Set([
+  ...DEFAULT_ORIGINS,
+  ...(Deno.env.get('ALLOWED_ORIGINS') ?? '').split(',').map(s => s.trim()).filter(Boolean)
+])
+
+// The sender is fixed server-side; callers cannot choose it.
+// Override with: supabase secrets set EMAIL_FROM="AuditCB <noreply@yourdomain>"
+const EMAIL_FROM = Deno.env.get('EMAIL_FROM') || 'AuditCB <onboarding@resend.dev>'
+
+const EMAIL_TYPES = new Set(['user_invitation', 'audit_assignment', 'report_approval', 'certificate_issued'])
+const URL_FIELDS = new Set(['confirmation_url', 'redirect_url', 'audit_url', 'report_url', 'certificate_url'])
+const EMAIL_RE = /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/
 
 interface EmailRequest {
   type: 'user_invitation' | 'audit_assignment' | 'report_approval' | 'certificate_issued'
@@ -12,24 +35,126 @@ interface EmailRequest {
   data: any
 }
 
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin') ?? ''
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin'
+  }
+  if (ALLOWED_ORIGINS.has(origin)) headers['Access-Control-Allow-Origin'] = origin
+  return headers
+}
+
+function json(req: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeadersFor(req), 'Content-Type': 'application/json' }
+  })
+}
+
+/** The verified caller's user id when they are an Admin or Certification Manager, else null. */
+async function authorizedSender(req: Request): Promise<string | null> {
+  const authHeader = req.headers.get('Authorization') ?? ''
+  if (!/^Bearer\s+\S+/i.test(authHeader)) return null
+
+  const supabaseUser = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    {
+      global: { headers: { Authorization: authHeader } },
+      auth: { autoRefreshToken: false, persistSession: false }
+    }
+  )
+
+  const { data: userData, error: userError } = await supabaseUser.auth.getUser()
+  if (userError || !userData?.user) return null
+
+  const { data: allowed, error: rpcError } = await supabaseUser.rpc('is_admin_or_cert_manager')
+  if (rpcError) {
+    console.error('is_admin_or_cert_manager() check failed:', rpcError.message)
+    return null
+  }
+  return allowed === true ? userData.user.id : null
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * Template data with every string HTML-escaped and every link restricted to
+ * http(s), so caller-supplied values cannot inject markup or javascript: links
+ * into the email body.
+ */
+function sanitizeTemplateData(data: any): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (!data || typeof data !== 'object') return out
+  for (const [key, value] of Object.entries(data)) {
+    if (value === null || value === undefined || typeof value === 'object') continue
+    const text = String(value)
+    if (URL_FIELDS.has(key)) {
+      try {
+        const url = new URL(text)
+        if (url.protocol === 'https:' || url.protocol === 'http:') out[key] = escapeHtml(url.href)
+      } catch {
+        // drop invalid URLs
+      }
+      continue
+    }
+    out[key] = escapeHtml(text)
+  }
+  return out
+}
+
+/** Subject lines are plain text: keep them single-line and bounded. */
+function plainText(data: any): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (!data || typeof data !== 'object') return out
+  for (const [key, value] of Object.entries(data)) {
+    if (value === null || value === undefined || typeof value === 'object') continue
+    out[key] = String(value).replace(/[\r\n]+/g, ' ').slice(0, 200)
+  }
+  return out
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeadersFor(req) })
+  }
+
+  if (req.method !== 'POST') {
+    return json(req, { error: 'Method Not Allowed' }, 405)
   }
 
   try {
+    const senderId = await authorizedSender(req)
+    if (!senderId) {
+      return json(req, { error: 'Not authorized to send email' }, 403)
+    }
+
     const { type, to, data }: EmailRequest = await req.json()
 
     if (!to || !type) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields: to, type' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return json(req, { error: 'Missing required fields: to, type' }, 400)
+    }
+
+    if (!EMAIL_TYPES.has(type)) {
+      return json(req, { error: 'Unknown email type' }, 400)
+    }
+
+    if (typeof to !== 'string' || !EMAIL_RE.test(to.trim())) {
+      return json(req, { error: 'Invalid recipient' }, 400)
     }
 
     // Get email template
-    const emailContent = getEmailTemplate(type, data)
+    const emailContent = getEmailTemplate(type, sanitizeTemplateData(data), plainText(data))
 
     // Send email using Resend API
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
@@ -38,14 +163,11 @@ serve(async (req) => {
       console.warn('RESEND_API_KEY not configured, email will be logged but not sent')
       console.log('Email would be sent:', { to, subject: emailContent.subject })
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Email logged (Resend not configured)',
-          preview: emailContent.subject
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return json(req, {
+        success: true,
+        message: 'Email logged (Resend not configured)',
+        preview: emailContent.subject
+      })
     }
 
     const response = await fetch('https://api.resend.com/emails', {
@@ -55,8 +177,8 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: data.from || 'AuditCB <onboarding@resend.dev>',
-        to: to,
+        from: EMAIL_FROM,
+        to: to.trim(),
         subject: emailContent.subject,
         html: emailContent.html,
       }),
@@ -65,7 +187,8 @@ serve(async (req) => {
     const result = await response.json()
 
     if (!response.ok) {
-      throw new Error(result.message || 'Failed to send email')
+      console.error('Resend error:', result?.message)
+      return json(req, { error: 'Failed to send email' }, 502)
     }
 
     // Log email send to database
@@ -76,34 +199,28 @@ serve(async (req) => {
 
     await supabase.from('audit_log').insert({
       action: 'email_sent',
-      user_id: data.user_id || null,
+      user_id: senderId,
       details: {
         type: type,
-        to: to,
+        to: to.trim(),
         subject: emailContent.subject,
         email_id: result.id
       }
     })
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        email_id: result.id,
-        message: 'Email sent successfully'
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return json(req, {
+      success: true,
+      email_id: result.id,
+      message: 'Email sent successfully'
+    })
 
   } catch (error) {
     console.error('Email send error:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return json(req, { error: 'Failed to send email' }, 500)
   }
 })
 
-function getEmailTemplate(type: string, data: any): { subject: string, html: string } {
+function getEmailTemplate(type: string, data: Record<string, string>, plain: Record<string, string>): { subject: string, html: string } {
   switch (type) {
     case 'user_invitation':
       return {
@@ -113,19 +230,19 @@ function getEmailTemplate(type: string, data: any): { subject: string, html: str
 
     case 'audit_assignment':
       return {
-        subject: `New Audit Assignment: ${data.client_name}`,
+        subject: `New Audit Assignment: ${plain.client_name}`,
         html: getAuditAssignmentTemplate(data)
       }
 
     case 'report_approval':
       return {
-        subject: `Report ${data.status}: ${data.client_name}`,
+        subject: `Report ${plain.status}: ${plain.client_name}`,
         html: getReportApprovalTemplate(data)
       }
 
     case 'certificate_issued':
       return {
-        subject: `Certificate Issued: ${data.client_name}`,
+        subject: `Certificate Issued: ${plain.client_name}`,
         html: getCertificateIssuedTemplate(data)
       }
 
@@ -309,7 +426,7 @@ function getReportApprovalTemplate(data: any): string {
               <h2 style="color: #333333; margin: 0 0 20px 0; font-size: 22px;">Hi ${data.auditor_name},</h2>
               
               <p style="color: #666666; line-height: 1.6; margin: 0 0 20px 0;">
-                Your audit report for <strong>${data.client_name}</strong> has been <strong style="color: ${statusColor};">${data.status.toLowerCase()}</strong>.
+                Your audit report for <strong>${data.client_name}</strong> has been <strong style="color: ${statusColor};">${(data.status || '').toLowerCase()}</strong>.
               </p>
               
               ${data.comments ? `

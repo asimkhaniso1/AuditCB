@@ -1602,6 +1602,13 @@ Example:
 `;
     },
 
+    // JSON headers plus the caller's Supabase access token — /api/gemini
+    // rejects requests without a valid session.
+    proxyHeaders: async () => {
+        if (typeof window.apiJsonHeaders === 'function') return window.apiJsonHeaders();
+        return { 'Content-Type': 'application/json' };
+    },
+
     // Call Vercel Serverless Function with Fallback Logic
     callProxyAPI: async (prompt, options = {}) => {
         // Model fallback list — use current, supported models only
@@ -1619,9 +1626,16 @@ Example:
             try {
                 const response = await fetch('/api/gemini', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: await AI_SERVICE.proxyHeaders(),
                     body: JSON.stringify({ prompt, model, maxTokens })
                 });
+
+                if (response.status === 401) {
+                    // Every model would get the same answer — stop here.
+                    const authError = new Error('Your session has expired. Please sign in again to use AI features.');
+                    authError.authRequired = true;
+                    throw authError;
+                }
 
                 if (!response.ok) {
                     const text = await response.text();
@@ -1661,6 +1675,7 @@ Example:
                 return AI_SERVICE.extractTextFromResponse(data);
 
             } catch (error) {
+                if (error.authRequired) throw error;
                 console.warn(`Error with model ${model}: `, error);
                 lastError = error;
 
@@ -1755,7 +1770,7 @@ Example:
                 try {
                     const response = await fetch('/api/gemini', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: await AI_SERVICE.proxyHeaders(),
                         body: JSON.stringify({ prompt, model })
                     });
 
@@ -1790,7 +1805,7 @@ Example:
     getAvailableModels: async () => {
         const response = await fetch('/api/gemini', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: await AI_SERVICE.proxyHeaders(),
             body: JSON.stringify({ mode: 'list' })
         });
 

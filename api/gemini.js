@@ -1,18 +1,50 @@
+import { applyCors, requireUser } from './_auth.js';
+
+// Map old/retired model names to current, valid v1beta models.
+// gemini-2.0-flash, gemini-2.0-flash-lite, and gemini-1.5-flash were
+// retired (June 2026 / earlier) — callers (e.g. ai-service.js) still
+// request them in sequence as a fallback chain, so each legacy name is
+// mapped to a distinct, currently-active replacement to preserve that
+// chain's redundancy across model generations.
+const MODEL_MAP = {
+    'gemini-pro': 'gemini-2.5-flash',
+    'gemini-1.5-flash': 'gemini-3.5-flash-lite',
+    'gemini-1.5-flash-latest': 'gemini-3.5-flash-lite',
+    'gemini-1.5-pro': 'gemini-2.5-pro',
+    'gemini-1.5-pro-latest': 'gemini-2.5-pro',
+    'gemini-2.0-flash': 'gemini-2.5-flash-lite',
+    'gemini-2.0-flash-lite': 'gemini-2.5-flash'
+};
+
+// Only the models the map resolves to may be called. Anything else — including
+// an arbitrary name a caller sends — is rejected so the key can't be spent on
+// models (or model paths) we never chose.
+const ALLOWED_MODELS = new Set(Object.values(MODEL_MAP));
+
+const DEFAULT_MAX_TOKENS = 32768;
+const MAX_TOKENS_CAP = 65536;
+const MAX_PROMPT_CHARS = 1_000_000;
+
+function resolveModel(requested) {
+    const name = String(requested || 'gemini-2.0-flash');
+    const mapped = MODEL_MAP[name] || name;
+    return ALLOWED_MODELS.has(mapped) ? mapped : null;
+}
+
+function clampMaxTokens(value) {
+    const n = Math.floor(Number(value));
+    if (!Number.isFinite(n) || n <= 0) return DEFAULT_MAX_TOKENS;
+    return Math.min(n, MAX_TOKENS_CAP);
+}
+
+function clampTemperature(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0.4;
+    return Math.min(Math.max(n, 0), 2);
+}
+
 export default async function handler(req, res) {
-    // CORS: restrict to same-origin or known deployment domains
-    const allowedOrigins = [
-        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-        process.env.CORS_ORIGIN || null,
-        'http://localhost:3000',
-        'http://localhost:5173',
-        'http://127.0.0.1:3000'
-    ].filter(Boolean);
-    const origin = req.headers.origin || '';
-    const isAllowed = allowedOrigins.some(o => origin === o) || origin.endsWith('.vercel.app');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : allowedOrigins[0] || '');
-    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    applyCors(req, res);
 
     if (req.method === 'OPTIONS') {
         res.status(200).end();
@@ -23,17 +55,26 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
+    const user = await requireUser(req, res);
+    if (!user) return;
+
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
         console.error('GEMINI_API_KEY is not set in environment variables');
-        return res.status(500).json({ error: 'Server configuration error: API Key not found' });
+        return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    const { prompt, mode } = req.body;
+    const body = req.body || {};
+    const { prompt, mode } = body;
 
-    if (!prompt && mode !== 'list') {
-        return res.status(400).json({ error: 'Prompt is required' });
+    if (mode !== 'list') {
+        if (typeof prompt !== 'string' || !prompt) {
+            return res.status(400).json({ error: 'Prompt is required' });
+        }
+        if (prompt.length > MAX_PROMPT_CHARS) {
+            return res.status(413).json({ error: 'Prompt is too large' });
+        }
     }
 
     try {
@@ -47,24 +88,10 @@ export default async function handler(req, res) {
                 headers: { 'Content-Type': 'application/json' }
             };
         } else {
-            // Use the requested model or fallback to current stable model
-            const requestedModel = req.body.model || 'gemini-2.0-flash';
-            // Map old/retired model names to current, valid v1beta models.
-            // gemini-2.0-flash, gemini-2.0-flash-lite, and gemini-1.5-flash were
-            // retired (June 2026 / earlier) — callers (e.g. ai-service.js) still
-            // request them in sequence as a fallback chain, so each legacy name is
-            // mapped to a distinct, currently-active replacement to preserve that
-            // chain's redundancy across model generations.
-            const modelMap = {
-                'gemini-pro': 'gemini-2.5-flash',
-                'gemini-1.5-flash': 'gemini-3.5-flash-lite',
-                'gemini-1.5-flash-latest': 'gemini-3.5-flash-lite',
-                'gemini-1.5-pro': 'gemini-2.5-pro',
-                'gemini-1.5-pro-latest': 'gemini-2.5-pro',
-                'gemini-2.0-flash': 'gemini-2.5-flash-lite',
-                'gemini-2.0-flash-lite': 'gemini-2.5-flash'
-            };
-            const modelName = modelMap[requestedModel] || requestedModel;
+            const modelName = resolveModel(body.model);
+            if (!modelName) {
+                return res.status(400).json({ error: 'Model not allowed' });
+            }
             url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
             // System-level guardrail applied to EVERY proxied call, regardless of
@@ -91,8 +118,8 @@ export default async function handler(req, res) {
                         parts: [{ text: prompt }]
                     }],
                     generationConfig: {
-                        maxOutputTokens: req.body.maxTokens || 65536,
-                        temperature: req.body.temperature ?? 0.4
+                        maxOutputTokens: clampMaxTokens(body.maxTokens),
+                        temperature: clampTemperature(body.temperature)
                     }
                 })
             };
@@ -104,7 +131,19 @@ export default async function handler(req, res) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error?.message || 'Gemini API replied with an error');
+            // Log the upstream detail server-side; the caller only needs to know
+            // to try the next model in its fallback chain.
+            console.error('Gemini upstream error:', response.status, data?.error?.message);
+            return res.status(502).json({ error: 'AI model request failed' });
+        }
+
+        if (mode === 'list') {
+            // Only expose the models this proxy will actually call, so a
+            // client-side "discover more models" fallback stays inside the allowlist.
+            const models = (data.models || []).filter(m =>
+                ALLOWED_MODELS.has(String(m.name || '').replace(/^models\//, ''))
+            );
+            return res.status(200).json({ models });
         }
 
         // Extract usage metadata if available
@@ -122,6 +161,6 @@ export default async function handler(req, res) {
 
     } catch (error) {
         console.error('Gemini Proxy Error:', error);
-        return res.status(500).json({ error: error.message || 'Internal Server Error' });
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 }
