@@ -1965,7 +1965,7 @@ window.openMultiSiteSamplingCalculatorModal = function () {
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
 
-                const totalSites = parseInt(document.getElementById('modal-total-sites', 10).value);
+                const totalSites = parseInt(document.getElementById('modal-total-sites').value, 10);
                 const riskLevel = document.getElementById('modal-site-risk').value;
                 const hasNCRs = document.getElementById('modal-sites-with-ncrs').value === 'true';
                 const hasComplex = document.getElementById('modal-complex-processes').value === 'true';
@@ -1976,8 +1976,7 @@ window.openMultiSiteSamplingCalculatorModal = function () {
                 if (document.getElementById('modal-include-special').checked) mandatory++;
                 if (document.getElementById('modal-include-new').checked) mandatory++;
 
-                // Use the existing calculation function
-                const results = calculateMultiSiteSample(totalSites, riskLevel, hasNCRs, hasComplex);
+                const results = window.AuditPlanningDomain.calculateMultiSiteSample(totalSites, riskLevel, hasNCRs, hasComplex);
 
                 // Final Check
                 const finalCount = Math.max(results.adjustedSample, mandatory);

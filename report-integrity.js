@@ -473,28 +473,26 @@
     // the programme still has stages nominally 'Planned' (a data contradiction).
     function checkB9NextAuditChronology(input, results) {
         const { report, auditPlan, client } = input;
-        try {
-            if (!(global.ReportStats && typeof global.ReportStats.buildProgramme === 'function')) return;
-            const allReports = safeArr(global.state && global.state.auditReports);
-            const programme = global.ReportStats.buildProgramme({ client, auditPlan, report, allReports });
-            const chronoIssues = safeArr(programme && programme.issues).filter((issue) => {
-                const msg = typeof issue === 'string' ? issue : (issue && issue.message) || '';
-                return /not after the current audit/i.test(msg);
-            });
-            const hasPlannedRemaining = safeArr(programme && programme.stages).some((s) => s.status === 'Planned');
-            if (chronoIssues.length === 0 && !(programme && programme.nextAudit == null && hasPlannedRemaining)) return;
-            const msg = chronoIssues.length
-                ? (typeof chronoIssues[0] === 'string' ? chronoIssues[0] : chronoIssues[0].message)
-                : 'The certification programme has no valid next audit / recertification date after the current audit.';
-            results.blockers.push(item(
-                'B9',
-                'blocker',
-                'programme',
-                msg,
-                'ReportStats.buildProgramme',
-                'Correct the certificate expiry date or the certification programme stage dates before issuing.'
-            ));
-        } catch (_e) { /* skip */ }
+        if (!(global.ReportStats && typeof global.ReportStats.buildProgramme === 'function')) return;
+        const allReports = safeArr(global.state && global.state.auditReports);
+        const programme = global.ReportStats.buildProgramme({ client, auditPlan, report, allReports });
+        const chronoIssues = safeArr(programme && programme.issues).filter((issue) => {
+            const msg = typeof issue === 'string' ? issue : (issue && issue.message) || '';
+            return /not after the current audit/i.test(msg);
+        });
+        const hasPlannedRemaining = safeArr(programme && programme.stages).some((s) => s.status === 'Planned');
+        if (chronoIssues.length === 0 && !(programme && programme.nextAudit == null && hasPlannedRemaining)) return;
+        const msg = chronoIssues.length
+            ? (typeof chronoIssues[0] === 'string' ? chronoIssues[0] : chronoIssues[0].message)
+            : 'The certification programme has no valid next audit / recertification date after the current audit.';
+        results.blockers.push(item(
+            'B9',
+            'blocker',
+            'programme',
+            msg,
+            'ReportStats.buildProgramme',
+            'Correct the certificate expiry date or the certification programme stage dates before issuing.'
+        ));
     }
 
     // B10: no certification recommendation can be resolved from anywhere.
@@ -1169,26 +1167,24 @@
     // programme actually schedules next.
     function checkW15NextAuditType(input, results) {
         const { report, auditPlan, client } = input;
-        try {
-            if (!(global.ReportStats && typeof global.ReportStats.buildProgramme === 'function')) return;
-            const allReports = safeArr(global.state && global.state.auditReports);
-            const programme = global.ReportStats.buildProgramme({ client, auditPlan, report, allReports });
-            const nextLabel = lower((programme && programme.nextAudit && (programme.nextAudit.label || programme.nextAudit.type)) || '');
-            if (!/recert/.test(nextLabel)) return;
-            const narrative = narrativeFields(report);
-            Object.keys(narrative).forEach((key) => {
-                const text = narrative[key];
-                if (!text || !/next\s+surveillance\s+audit/i.test(text)) return;
-                results.warnings.push(item(
-                    'W15-' + key,
-                    'warning',
-                    'programme',
-                    `Narrative (${key}) refers to the next event as a surveillance audit, but the certification programme schedules recertification next.`,
-                    'report.' + key + ' vs ReportStats.buildProgramme',
-                    'Refer to the next audit by the stage the certification cycle actually schedules.'
-                ));
-            });
-        } catch (_e) { /* skip */ }
+        if (!(global.ReportStats && typeof global.ReportStats.buildProgramme === 'function')) return;
+        const allReports = safeArr(global.state && global.state.auditReports);
+        const programme = global.ReportStats.buildProgramme({ client, auditPlan, report, allReports });
+        const nextLabel = lower((programme && programme.nextAudit && (programme.nextAudit.label || programme.nextAudit.type)) || '');
+        if (!/recert/.test(nextLabel)) return;
+        const narrative = narrativeFields(report);
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text || !/next\s+surveillance\s+audit/i.test(text)) return;
+            results.warnings.push(item(
+                'W15-' + key,
+                'warning',
+                'programme',
+                `Narrative (${key}) refers to the next event as a surveillance audit, but the certification programme schedules recertification next.`,
+                'report.' + key + ' vs ReportStats.buildProgramme',
+                'Refer to the next audit by the stage the certification cycle actually schedules.'
+            ));
+        });
     }
 
     // ── Editorial rules ─────────────────────────────────────────────────────
@@ -1906,6 +1902,29 @@
 
     // ── Main entry point ────────────────────────────────────────────────────
 
+    // A rule that throws has not verified anything, so it must not read as a
+    // pass: the issuance gate fails closed with a blocker naming the rule.
+    function runCheck(name, fn, results) {
+        try {
+            fn();
+        } catch (err) {
+            const reason = (err && err.message) || String(err);
+            if (global.Logger && typeof global.Logger.error === 'function') {
+                global.Logger.error('ReportIntegrity', `Check ${name} could not run: ${reason}`, err);
+            } else if (typeof console !== 'undefined') {
+                console.error(`[ReportIntegrity] Check ${name} could not run:`, err);
+            }
+            results.blockers.push(item(
+                'BX-' + name,
+                'blocker',
+                'integrity',
+                `Check ${name} could not run: ${reason}`,
+                'ReportIntegrity.' + name,
+                'The report could not be fully verified. Correct the data this check reads, or report the error, before issuing.'
+            ));
+        }
+    }
+
     function check(input) {
         const safeInput = input || {};
         const report = safeInput.report || {};
@@ -1918,62 +1937,62 @@
         const results = { blockers: [], warnings: [], information: [], editorial: [] };
         const ncrs = allNCRs(report);
 
-        try { checkB1FocusCriterion(ncrs, results); } catch (_e) { /* skip */ }
-        try { checkB1NarrativeInternalRef(report, results); } catch (_e) { /* skip */ }
-        try { checkB2Chronology({ report, auditPlan, client, stats }, results); } catch (_e) { /* skip */ }
-        try { checkB3MissingEvidence(ncrs, results); } catch (_e) { /* skip */ }
-        try { checkB4MissingCriterion(ncrs, results); } catch (_e) { /* skip */ }
-        try { checkB5RecommendationMismatch({ report, auditPlan, stats }, results); } catch (_e) { /* skip */ }
-        try { checkB6FinancialClaims(report, results); } catch (_e) { /* skip */ }
-        try { checkB6BannedPhrases(report, results); } catch (_e) { /* skip */ }
-        try { checkB7RecurringWithoutHistory(report, client, results); } catch (_e) { /* skip */ }
-        try { checkB8MissingStandard(report, auditPlan, ncrs, results); } catch (_e) { /* skip */ }
-        try { checkB9NextAuditChronology({ report, auditPlan, client }, results); } catch (_e) { /* skip */ }
-        try { checkB10MissingRecommendation({ report, stats }, results); } catch (_e) { /* skip */ }
+        runCheck('checkB1FocusCriterion', () => checkB1FocusCriterion(ncrs, results), results);
+        runCheck('checkB1NarrativeInternalRef', () => checkB1NarrativeInternalRef(report, results), results);
+        runCheck('checkB2Chronology', () => checkB2Chronology({ report, auditPlan, client, stats }, results), results);
+        runCheck('checkB3MissingEvidence', () => checkB3MissingEvidence(ncrs, results), results);
+        runCheck('checkB4MissingCriterion', () => checkB4MissingCriterion(ncrs, results), results);
+        runCheck('checkB5RecommendationMismatch', () => checkB5RecommendationMismatch({ report, auditPlan, stats }, results), results);
+        runCheck('checkB6FinancialClaims', () => checkB6FinancialClaims(report, results), results);
+        runCheck('checkB6BannedPhrases', () => checkB6BannedPhrases(report, results), results);
+        runCheck('checkB7RecurringWithoutHistory', () => checkB7RecurringWithoutHistory(report, client, results), results);
+        runCheck('checkB8MissingStandard', () => checkB8MissingStandard(report, auditPlan, ncrs, results), results);
+        runCheck('checkB9NextAuditChronology', () => checkB9NextAuditChronology({ report, auditPlan, client }, results), results);
+        runCheck('checkB10MissingRecommendation', () => checkB10MissingRecommendation({ report, stats }, results), results);
 
-        try { checkW1StrengthNcOverlap(ncrs, report, results); } catch (_e) { /* skip */ }
-        try { checkW2RiskWithoutAssessment(ncrs, report, results); } catch (_e) { /* skip */ }
-        try { checkW3DepartmentPlaceholder(ncrs, results); } catch (_e) { /* skip */ }
-        try { checkW4AutoGeneratedRCA(report, results); } catch (_e) { /* skip */ }
-        try { checkW5AddressInconsistency({ client, auditPlan, report, certificate: safeInput.certificate }, results); } catch (_e) { /* skip */ }
-        try { checkW6UnreviewedAIContent(report, results); } catch (_e) { /* skip */ }
-        try { checkW7ObservationPseudoCriterion(report, results); } catch (_e) { /* skip */ }
-        try { checkW9LowCoverage(stats, results); } catch (_e) { /* skip */ }
-        try { checkW10MaturityLanguage(report, results); } catch (_e) { /* skip */ }
-        try { checkW11NarrativeLocation(report, client, results); } catch (_e) { /* skip */ }
+        runCheck('checkW1StrengthNcOverlap', () => checkW1StrengthNcOverlap(ncrs, report, results), results);
+        runCheck('checkW2RiskWithoutAssessment', () => checkW2RiskWithoutAssessment(ncrs, report, results), results);
+        runCheck('checkW3DepartmentPlaceholder', () => checkW3DepartmentPlaceholder(ncrs, results), results);
+        runCheck('checkW4AutoGeneratedRCA', () => checkW4AutoGeneratedRCA(report, results), results);
+        runCheck('checkW5AddressInconsistency', () => checkW5AddressInconsistency({ client, auditPlan, report, certificate: safeInput.certificate }, results), results);
+        runCheck('checkW6UnreviewedAIContent', () => checkW6UnreviewedAIContent(report, results), results);
+        runCheck('checkW7ObservationPseudoCriterion', () => checkW7ObservationPseudoCriterion(report, results), results);
+        runCheck('checkW9LowCoverage', () => checkW9LowCoverage(stats, results), results);
+        runCheck('checkW10MaturityLanguage', () => checkW10MaturityLanguage(report, results), results);
+        runCheck('checkW11NarrativeLocation', () => checkW11NarrativeLocation(report, client, results), results);
 
         // Phase A — report says what the validated dataset says, and internal
         // machinery stays out of the client document.
-        try { checkB11InternalMetadata(report, results); } catch (_e) { /* skip */ }
-        try { checkB12AuditMethodContradiction({ report, auditPlan }, results); } catch (_e) { /* skip */ }
-        try { checkB12RevOnsiteMethodRemoteNarrative({ report, auditPlan }, results); } catch (_e) { /* skip */ }
-        try { checkW21UnsetAuditMethodOnsiteClaim({ report, auditPlan }, results); } catch (_e) { /* skip */ }
-        try { checkB13NarrativeCounts({ report, stats }, results); } catch (_e) { /* skip */ }
-        try { checkB14ClauseReconciliation(ncrs, results); } catch (_e) { /* skip */ }
-        try { checkB16ClauseAreaReconciliation(stats, results); } catch (_e) { /* skip */ }
-        try { checkB17OfiNarrativeCount({ report, stats }, results); } catch (_e) { /* skip */ }
-        try { checkW12EmployeeCount(report, client, results); } catch (_e) { /* skip */ }
-        try { checkW13DesignApplicability(report, client, auditPlan, results); } catch (_e) { /* skip */ }
-        try { checkW14PreviousFindings(report, auditPlan, results); } catch (_e) { /* skip */ }
-        try { checkW15NextAuditType({ report, auditPlan, client }, results); } catch (_e) { /* skip */ }
-        try { checkW16ChangesContradiction(report, client, results); } catch (_e) { /* skip */ }
-        try { checkW17AdvisoryClassification(report, results); } catch (_e) { /* skip */ }
-        try { checkW18DuplicateAdvisories(report, ncrs, results); } catch (_e) { /* skip */ }
-        try { checkW19ConsultancyLanguage(report, results); } catch (_e) { /* skip */ }
-        try { checkB15CriterionBelongsToStandard(ncrs, results); } catch (_e) { /* skip */ }
-        try { checkE1RawAuditorNotes(report, results); } catch (_e) { /* skip */ }
+        runCheck('checkB11InternalMetadata', () => checkB11InternalMetadata(report, results), results);
+        runCheck('checkB12AuditMethodContradiction', () => checkB12AuditMethodContradiction({ report, auditPlan }, results), results);
+        runCheck('checkB12RevOnsiteMethodRemoteNarrative', () => checkB12RevOnsiteMethodRemoteNarrative({ report, auditPlan }, results), results);
+        runCheck('checkW21UnsetAuditMethodOnsiteClaim', () => checkW21UnsetAuditMethodOnsiteClaim({ report, auditPlan }, results), results);
+        runCheck('checkB13NarrativeCounts', () => checkB13NarrativeCounts({ report, stats }, results), results);
+        runCheck('checkB14ClauseReconciliation', () => checkB14ClauseReconciliation(ncrs, results), results);
+        runCheck('checkB16ClauseAreaReconciliation', () => checkB16ClauseAreaReconciliation(stats, results), results);
+        runCheck('checkB17OfiNarrativeCount', () => checkB17OfiNarrativeCount({ report, stats }, results), results);
+        runCheck('checkW12EmployeeCount', () => checkW12EmployeeCount(report, client, results), results);
+        runCheck('checkW13DesignApplicability', () => checkW13DesignApplicability(report, client, auditPlan, results), results);
+        runCheck('checkW14PreviousFindings', () => checkW14PreviousFindings(report, auditPlan, results), results);
+        runCheck('checkW15NextAuditType', () => checkW15NextAuditType({ report, auditPlan, client }, results), results);
+        runCheck('checkW16ChangesContradiction', () => checkW16ChangesContradiction(report, client, results), results);
+        runCheck('checkW17AdvisoryClassification', () => checkW17AdvisoryClassification(report, results), results);
+        runCheck('checkW18DuplicateAdvisories', () => checkW18DuplicateAdvisories(report, ncrs, results), results);
+        runCheck('checkW19ConsultancyLanguage', () => checkW19ConsultancyLanguage(report, results), results);
+        runCheck('checkB15CriterionBelongsToStandard', () => checkB15CriterionBelongsToStandard(ncrs, results), results);
+        runCheck('checkE1RawAuditorNotes', () => checkE1RawAuditorNotes(report, results), results);
 
         // Phase B — classification, clause reference/title, conclusion and
         // previous-findings contradictions.
-        try { checkB18ClauseClassificationContradiction(report, ncrs, results); } catch (_e) { /* skip */ }
-        try { checkW23ClauseCitedNoRecord(report, ncrs, results); } catch (_e) { /* skip */ }
-        try { checkB19ClauseTitleIsDepartmentName(report, client, results); } catch (_e) { /* skip */ }
-        try { checkW22ClauseTitleInconsistent(report, results); } catch (_e) { /* skip */ }
-        try { checkB20ConclusionOmitsContingency(report, ncrs, results); } catch (_e) { /* skip */ }
-        try { checkW24PreviousFindingsClosureContradiction({ report, auditPlan, client }, results); } catch (_e) { /* skip */ }
-        try { checkW25BareParentClauseCitation({ report, auditPlan, ncrs }, results); } catch (_e) { /* skip */ }
+        runCheck('checkB18ClauseClassificationContradiction', () => checkB18ClauseClassificationContradiction(report, ncrs, results), results);
+        runCheck('checkW23ClauseCitedNoRecord', () => checkW23ClauseCitedNoRecord(report, ncrs, results), results);
+        runCheck('checkB19ClauseTitleIsDepartmentName', () => checkB19ClauseTitleIsDepartmentName(report, client, results), results);
+        runCheck('checkW22ClauseTitleInconsistent', () => checkW22ClauseTitleInconsistent(report, results), results);
+        runCheck('checkB20ConclusionOmitsContingency', () => checkB20ConclusionOmitsContingency(report, ncrs, results), results);
+        runCheck('checkW24PreviousFindingsClosureContradiction', () => checkW24PreviousFindingsClosureContradiction({ report, auditPlan, client }, results), results);
+        runCheck('checkW25BareParentClauseCitation', () => checkW25BareParentClauseCitation({ report, auditPlan, ncrs }, results), results);
 
-        try { checkInformation(report, results); } catch (_e) { /* skip */ }
+        runCheck('checkInformation', () => checkInformation(report, results), results);
 
         const status = results.blockers.length === 0 ? 'READY FOR AUDITOR REVIEW' : 'BLOCKED';
         return {
@@ -2027,8 +2046,15 @@
             } catch (_e) { stats = null; }
 
             return check({ report, auditPlan, client, stats });
-        } catch (_e) {
-            return { blockers: [], warnings: [], information: [], editorial: [], status: 'READY FOR AUDITOR REVIEW' };
+        } catch (err) {
+            const reason = (err && err.message) || String(err);
+            if (global.Logger && typeof global.Logger.error === 'function') {
+                global.Logger.error('ReportIntegrity', `Integrity check could not run: ${reason}`, err);
+            }
+            return {
+                blockers: [item('BX-checkById', 'blocker', 'integrity', `Integrity check could not run: ${reason}`, 'ReportIntegrity.checkById', 'The report could not be verified. Report the error before issuing.')],
+                warnings: [], information: [], editorial: [], status: 'BLOCKED'
+            };
         }
     }
 

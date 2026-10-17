@@ -945,15 +945,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 // Init clause section drag-to-reorder
                 if (window.initClauseDragReorder) window.initClauseDragReorder();
 
-                // Setup bulk action button listeners
-                document.querySelectorAll('.bulk-action-btn').forEach(btn => {
-                    btn.addEventListener('click', function () {
-                        const action = this.getAttribute('data-action');
-                        const reportId = parseInt(this.getAttribute('data-report-id'), 10);
-                        window.Logger.debug('Execution', 'Bulk action clicked:', { action, reportId });
-                        window.bulkUpdateStatus(reportId, action);
-                    });
-                });
+                // Bulk action buttons are handled by the document delegate in
+                // bindExecutionDocumentDelegates() — exactly once per click,
+                // because bulkUpdateStatus clears the selection and a second
+                // call would re-apply the status to every visible item.
 
                 // CRITICAL: Restore saved status to buttons after render
                 document.querySelectorAll('.status-input').forEach(input => {
@@ -4570,6 +4565,37 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     // Persistent stream for remote audits
     // Screen capture & webcam extracted to execution-evidence.js
 
+    // These document-level delegates read only the DOM and window.*, so bind
+    // them once: this function runs on every tab click, and re-binding made
+    // each click (bulk status updates included) fire once per tab visited.
+    if (!document._auditExecutionDelegatesBound) {
+        document._auditExecutionDelegatesBound = true;
+        bindExecutionDocumentDelegates();
+    }
+
+    // Helper to update meeting records (Opening/Closing)
+    window.updateMeetingData = function (reportId, meetingType, field, value) {
+        const report = window.DataService.findAuditReport(reportId);
+        if (!report) return;
+
+        if (!report[meetingType + 'Meeting']) {
+            report[meetingType + 'Meeting'] = {};
+        }
+
+        if (field === 'attendees') {
+            // Split by comma and clean up
+            report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
+        } else {
+            report[meetingType + 'Meeting'][field] = value;
+        }
+
+        window.saveData();
+        window.saveChecklist(reportId);
+    };
+
+}
+
+function bindExecutionDocumentDelegates() {
     // Global event delegation for section checkboxes (works with dynamically rendered content)
     document.addEventListener('click', function (e) {
         if (e.target.classList.contains('section-checkbox')) {
@@ -4636,7 +4662,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const reportId = btn.getAttribute('data-report-id');
 
             if (action && reportId) {
-                window.bulkUpdateStatus(parseInt(reportId, 10), action);
+                window.bulkUpdateStatus(reportId, action);
 
                 // Close menu
                 const menu = document.getElementById('bulk-menu-' + reportId);
@@ -4675,27 +4701,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             }
         }
     }, true); // true = capture phase
-
-    // Helper to update meeting records (Opening/Closing)
-    window.updateMeetingData = function (reportId, meetingType, field, value) {
-        const report = window.DataService.findAuditReport(reportId);
-        if (!report) return;
-
-        if (!report[meetingType + 'Meeting']) {
-            report[meetingType + 'Meeting'] = {};
-        }
-
-        if (field === 'attendees') {
-            // Split by comma and clean up
-            report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
-        } else {
-            report[meetingType + 'Meeting'][field] = value;
-        }
-
-        window.saveData();
-        window.saveChecklist(reportId);
-    };
-
 }
 
 // Support CommonJS/test environments

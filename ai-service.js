@@ -2070,15 +2070,21 @@ window.computeIssuanceGate = function (reportId) {
 
     // ─── Report Integrity Validator: additional cross-cutting checks (evidence,
     // criterion refs, chronology, financial claims, AI-content review, etc).
-    // Defensive — the validator module may not have loaded, or may throw on
-    // unexpected data shapes; never let it block finalize on its own failure. ───
+    // Fails closed: a report the validator could not examine is unverified, so
+    // a missing module or a thrown error blocks issuance rather than passing. ───
     let integrityResult = null;
     try {
         if (window.ReportIntegrity && typeof window.ReportIntegrity.check === 'function') {
             const client = _resolveClientForReport(report, plan);
             integrityResult = window.ReportIntegrity.check({ report, auditPlan: plan, client, stats: rs });
+        } else {
+            gateBlockers.push('Report integrity validator is not loaded — reload the page before issuing.');
         }
-    } catch (e) { console.error('ReportIntegrity.check failed during finalize gate:', e); }
+    } catch (e) {
+        if (window.Logger) window.Logger.error('AI_SERVICE', 'ReportIntegrity.check failed during finalize gate', e);
+        else console.error('ReportIntegrity.check failed during finalize gate:', e);
+        gateBlockers.push('Report integrity check could not run: ' + ((e && e.message) || String(e)));
+    }
 
     return { report, plan, stats: rs, gateBlockers, gateWarnings, integrity: integrityResult };
 };

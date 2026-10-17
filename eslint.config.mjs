@@ -166,6 +166,8 @@ export default [
             'coverage/**',
             'tests/**',
             '.agent/**',
+            // Claude Code worktrees are full repo copies, often of stale branches.
+            '.claude/**',
             'build.js',
             'vitest.config.js',
             'tools/**',
