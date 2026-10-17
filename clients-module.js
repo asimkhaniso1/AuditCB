@@ -457,7 +457,7 @@ function getClientInfoHTML(client) {
     <div class="card" style="margin-top: 1.5rem;">
         <h3 style="margin-bottom: 1rem;">
             <i class="fa-solid fa-user-check" style="margin-right: 0.5rem; color: var(--success-color);"></i>
-            Auditors with ${client.industry || 'Matching'} Industry Experience
+            Auditors with ${window.UTILS.escapeHtml(client.industry || 'Matching')} Industry Experience
         </h3>
         ${matchingAuditors.length > 0 ? `
                     <div style="display: grid; gap: 0.75rem;">
@@ -473,7 +473,7 @@ function getClientInfoHTML(client) {
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 0.5rem;">
-                                    ${(a.standards || []).map(s => `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${s}</span>`).join('')}
+                                    ${(a.standards || []).map(s => `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${window.UTILS.escapeHtml(s)}</span>`).join('')}
                                 </div>
                             </div>
                         `).join('')}
@@ -481,7 +481,7 @@ function getClientInfoHTML(client) {
                 ` : `
                     <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">
                         <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                        No auditors found with ${client.industry || 'this'} industry experience. 
+                        No auditors found with ${window.UTILS.escapeHtml(client.industry || 'this')} industry experience. 
                         <a href="#" data-action="renderModule" data-id="auditors" style="color: var(--primary-color);">Add auditors</a> with relevant industry expertise.
                     </p>
                 `}
@@ -1102,7 +1102,7 @@ function getClientAuditsHTML(client) {
         return `
                             <div style="display: flex; align-items: center; padding: 1rem; background: #f8fafc; border-radius: 8px; border-left: 4px solid ${window.DataService.isPlanCompleted(plan) ? '#10b981' : '#3b82f6'};">
                                 <div style="flex: 1;">
-                                    <div style="font-weight: 600;">${plan.type || 'Audit'} - ${plan.standard || client.standard}</div>
+                                    <div style="font-weight: 600;">${window.UTILS.escapeHtml(plan.type || 'Audit')} - ${window.UTILS.escapeHtml(plan.standard || client.standard)}</div>
                                     <div style="font-size: 0.85rem; color: #64748b;">
                                         <i class="fa-solid fa-calendar"></i> ${plan.date}
                                         <span style="margin-left: 1rem;"><i class="fa-solid fa-user"></i> ${plan.team ? plan.team[0] : 'TBD'}</span>
@@ -1147,13 +1147,13 @@ function getClientAuditsHTML(client) {
                                     <td style="white-space: nowrap;">${ncr.auditDate || '-'}</td>
                                     <td>
                                         <span class="badge" style="background: ${ncr.type === 'major' ? '#dc2626' : ncr.type === 'minor' ? '#d97706' : '#8b5cf6'}; font-size: 0.7rem;">
-                                            ${(ncr.type || 'OBS').toUpperCase()}
+                                            ${window.UTILS.escapeHtml((ncr.type || 'OBS').toUpperCase())}
                                         </span>
                                     </td>
-                                    <td style="max-width: 300px;">${ncr.description || ncr.ncrDescription || '-'}</td>
+                                    <td style="max-width: 300px;">${window.UTILS.escapeText(ncr.description || ncr.ncrDescription || '-')}</td>
                                     <td style="font-size: 0.85rem;">
-                                        ${ncr.designation ? `<div>${ncr.designation}</div>` : ''}
-                                        ${ncr.department ? `<div style="color: #64748b;">${ncr.department}</div>` : ''}
+                                        ${ncr.designation ? `<div>${window.UTILS.escapeText(ncr.designation)}</div>` : ''}
+                                        ${ncr.department ? `<div style="color: #64748b;">${window.UTILS.escapeText(ncr.department)}</div>` : ''}
                                         ${!ncr.designation && !ncr.department ? '-' : ''}
                                     </td>
                                     <td>
@@ -1431,10 +1431,10 @@ function getClientComplianceHTML(client) {
                         <tbody>
                             ${changesLog.map(log => `
                                 <tr>
-                                    <td>${log.date}</td>
-                                    <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${log.type}</span></td>
-                                    <td>${log.description}</td>
-                                    <td>${log.reportedBy}</td>
+                                    <td>${window.UTILS.escapeHtml(log.date)}</td>
+                                    <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(log.type)}</span></td>
+                                    <td>${window.UTILS.escapeText(log.description)}</td>
+                                    <td>${window.UTILS.escapeHtml(log.reportedBy)}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -1966,7 +1966,7 @@ window.renderEditClient = function (clientId) {
                 </button>
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <h1 style="font-size: 1.75rem; font-weight: 700; background: linear-gradient(135deg, #1e293b 0%, #334155 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
-                        Edit Client: ${client.name}
+                        Edit Client: ${window.UTILS.escapeHtml(client.name)}
                     </h1>
                      <span class="status-badge status-${(client.status || 'Active').toLowerCase()}" style="font-size: 0.8em; vertical-align: middle;">${client.status}</span>
                 </div>
@@ -1997,7 +1997,7 @@ window.renderEditClient = function (clientId) {
                              <label style="font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;">Company Name <span class="text-danger">*</span></label>
                             <div class="input-with-icon" style="position: relative;">
                                 <i class="fa-solid fa-id-card input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
-                                <input type="text" class="form-control" id="client-name" value="${client.name}" required style="padding-left: 2.5rem;">
+                                <input type="text" class="form-control" id="client-name" value="${window.UTILS.escapeHtml(client.name)}" required style="padding-left: 2.5rem;">
                             </div>
                         </div>
 
@@ -2009,7 +2009,7 @@ window.renderEditClient = function (clientId) {
                                 <option value="Other" ${!['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education', ''].includes(client.industry) ? 'selected' : ''}>Other (Please Specify)</option>
                             </select>
                             <div id="industry-other-container" style="display: ${!['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education', ''].includes(client.industry) ? 'block' : 'none'}; margin-top: 0.75rem;">
-                                <input type="text" class="form-control" id="client-industry-custom" value="${!['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education', ''].includes(client.industry) ? client.industry : ''}" placeholder="Enter custom sector...">
+                                <input type="text" class="form-control" id="client-industry-custom" value="${window.UTILS.escapeHtml(!['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education', ''].includes(client.industry) ? client.industry : '')}" placeholder="Enter custom sector...">
                             </div>
                         </div>
                         
@@ -2017,7 +2017,7 @@ window.renderEditClient = function (clientId) {
                              <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Website</label>
                              <div class="input-with-icon" style="position: relative;">
                                 <i class="fa-solid fa-globe input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
-                                <input type="url" class="form-control" id="client-website" value="${client.website || ''}" placeholder="https://..." style="padding-left: 2.5rem;">
+                                <input type="url" class="form-control" id="client-website" value="${window.UTILS.escapeHtml(client.website || '')}" placeholder="https://..." style="padding-left: 2.5rem;">
                              </div>
                         </div>
 
@@ -2059,15 +2059,15 @@ window.renderEditClient = function (clientId) {
                     <div style="padding: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                          <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Street Address</label>
-                            <input type="text" class="form-control" id="client-address" value="${firstSite.address || ''}" placeholder="123 Business Blvd, Suite 100">
+                            <input type="text" class="form-control" id="client-address" value="${window.UTILS.escapeHtml(firstSite.address || '')}" placeholder="123 Business Blvd, Suite 100">
                         </div>
                         <div class="form-group">
                             <label>City</label>
-                            <input type="text" class="form-control" id="client-city" value="${firstSite.city || ''}" placeholder="Metropolis">
+                            <input type="text" class="form-control" id="client-city" value="${window.UTILS.escapeHtml(firstSite.city || '')}" placeholder="Metropolis">
                         </div>
                          <div class="form-group">
                             <label>Country</label>
-                            <input type="text" class="form-control" id="client-country" value="${firstSite.country || ''}" placeholder="Country">
+                            <input type="text" class="form-control" id="client-country" value="${window.UTILS.escapeHtml(firstSite.country || '')}" placeholder="Country">
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
                              <label style="display: flex; justify-content: space-between;">
@@ -2129,20 +2129,20 @@ window.renderEditClient = function (clientId) {
                             <label style="font-size: 0.8rem;">Full Name <span class="text-danger">*</span></label>
                              <div class="input-with-icon" style="position: relative;">
                                 <i class="fa-solid fa-user input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
-                                <input type="text" class="form-control" id="client-contact-name" value="${firstContact.name || ''}" style="padding-left: 2.5rem;" required>
+                                <input type="text" class="form-control" id="client-contact-name" value="${window.UTILS.escapeHtml(firstContact.name || '')}" style="padding-left: 2.5rem;" required>
                             </div>
                         </div>
                         <div class="form-group">
                             <label style="font-size: 0.8rem;">Designation</label>
-                            <input type="text" class="form-control" id="client-contact-designation" value="${firstContact.designation || ''}" placeholder="e.g. Quality Manager">
+                            <input type="text" class="form-control" id="client-contact-designation" value="${window.UTILS.escapeHtml(firstContact.designation || '')}" placeholder="e.g. Quality Manager">
                         </div>
                         <div class="form-group">
                             <label style="font-size: 0.8rem;">Phone</label>
-                            <input type="tel" class="form-control" id="client-contact-phone" value="${firstContact.phone || ''}">
+                            <input type="tel" class="form-control" id="client-contact-phone" value="${window.UTILS.escapeHtml(firstContact.phone || '')}">
                         </div>
                         <div class="form-group">
                             <label style="font-size: 0.8rem;">Email</label>
-                            <input type="email" class="form-control" id="client-contact-email" value="${firstContact.email || ''}">
+                            <input type="email" class="form-control" id="client-contact-email" value="${window.UTILS.escapeHtml(firstContact.email || '')}">
                         </div>
                     </div>
                 </div>
@@ -2768,7 +2768,7 @@ window.handleIndustryChange = function (select) {
             </div>
             <div class="form-group">
                 <label>Reported By</label>
-                <input type="text" id="change-reported-by" class="form-control" value="${window.state.currentUser?.name || ''}" placeholder="Who reported this change?">
+                <input type="text" id="change-reported-by" class="form-control" value="${window.UTILS.escapeHtml(window.state.currentUser?.name || '')}" placeholder="Who reported this change?">
             </div>
             <div style="padding: 1rem; background: #fef3c7; border-radius: 6px; margin-top: 1rem;">
                 <p style="margin: 0; font-size: 0.85rem; color: #92400e;">

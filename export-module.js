@@ -45,7 +45,7 @@ function exportToPDF(title, content) {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>${title}</title>
+            <title>${window.UTILS.escapeHtml(title)}</title>
             <style>
                 @page {
                     margin: 2cm;
@@ -146,7 +146,7 @@ function exportToPDF(title, content) {
         </head>
         <body>
             <div class="header">
-                <h1>${title}</h1>
+                <h1>${window.UTILS.escapeHtml(title)}</h1>
                 <div class="meta-info">
                     Generated on: ${new Date().toLocaleString()}<br>
                     AuditCB360 - ISO CB Auditor & Audit Management
@@ -221,11 +221,11 @@ function exportAuditProgramsToCSV() {
 function exportClientsToPDF() {
     const tableRows = state.clients.map(client => `
         <tr>
-            <td>${client.id}</td>
-            <td>${client.name}</td>
-            <td>${client.standard}</td>
-            <td><span class="status-badge">${client.status}</span></td>
-            <td>${client.nextAudit}</td>
+            <td>${window.UTILS.escapeHtml(client.id)}</td>
+            <td>${window.UTILS.escapeHtml(client.name)}</td>
+            <td>${window.UTILS.escapeHtml(client.standard)}</td>
+            <td><span class="status-badge">${window.UTILS.escapeHtml(client.status)}</span></td>
+            <td>${window.UTILS.escapeHtml(client.nextAudit)}</td>
         </tr>
     `).join('');
 
@@ -264,19 +264,19 @@ function exportAuditProgramToPDF(programId) {
         <table>
             <tr>
                 <th>Client</th>
-                <td>${program.client}</td>
+                <td>${window.UTILS.escapeHtml(program.client)}</td>
             </tr>
             <tr>
                 <th>Standard</th>
-                <td>${program.standard}</td>
+                <td>${window.UTILS.escapeHtml(program.standard)}</td>
             </tr>
             <tr>
                 <th>Cycle Period</th>
-                <td>${program.cycleStart} to ${program.cycleEnd}</td>
+                <td>${window.UTILS.escapeHtml(program.cycleStart)} to ${window.UTILS.escapeHtml(program.cycleEnd)}</td>
             </tr>
             <tr>
                 <th>Status</th>
-                <td><span class="status-badge">${program.status}</span></td>
+                <td><span class="status-badge">${window.UTILS.escapeHtml(program.status)}</span></td>
             </tr>
         </table>
         
@@ -358,10 +358,10 @@ function exportDashboardToPDF() {
             <tbody>
                 ${state.clients.slice(0, 10).map(client => `
                     <tr>
-                        <td>${client.name}</td>
-                        <td>${client.standard}</td>
-                        <td>${client.status}</td>
-                        <td>${client.nextAudit}</td>
+                        <td>${window.UTILS.escapeHtml(client.name)}</td>
+                        <td>${window.UTILS.escapeHtml(client.standard)}</td>
+                        <td>${window.UTILS.escapeHtml(client.status)}</td>
+                        <td>${window.UTILS.escapeHtml(client.nextAudit)}</td>
                     </tr>
                 `).join('')}
             </tbody>

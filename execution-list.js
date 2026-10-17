@@ -81,18 +81,18 @@ function renderAuditExecutionEnhanced() {
                     `<span class="badge" style="background: #3b82f6; color: white; cursor: pointer; font-weight: 600;" 
                            data-hash="client/${clientId}/plans" data-stop-prop="true" 
                            title="View linked audit plan">
-                        <i class="fa-solid fa-link" style="margin-right: 0.25rem;"></i>${planRef}
+                        <i class="fa-solid fa-link" style="margin-right: 0.25rem;"></i>${window.UTILS.escapeHtml(planRef)}
                     </span>` :
                     `<span style="color: var(--text-secondary); font-size: 0.85rem;">No Plan</span>`
                 }
             </td>
-            <td>${report.client}</td>
+            <td>${window.UTILS.escapeHtml(report.client)}</td>
             <td>${window.UTILS.formatDate(report.date)}</td>
-            <td><span style="background: ${report.findings > 0 ? 'var(--danger-color)' : 'var(--success-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.findings}</span></td>
+            <td><span style="background: ${report.findings > 0 ? 'var(--danger-color)' : 'var(--success-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(report.findings)}</span></td>
             <td><span style="background: ${report.status === window.CONSTANTS.STATUS.FINALIZED ? 'var(--success-color)' :
                     report.status === 'Approved' ? '#7c3aed' :
                         report.status === 'In Review' ? 'var(--warning-color)' :
-                            '#64748b'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.status}</span></td>
+                            '#64748b'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(report.status)}</span></td>
             <td>
                 <button class="btn btn-sm view-execution" data-report-id="${report.id}" style="color: var(--primary-color); margin-right: 0.5rem;" title="View Report" aria-label="View"><i class="fa-solid fa-eye"></i></button>
                 <button class="btn btn-sm edit-execution" data-report-id="${report.id}" style="color: #f59e0b; margin-right: 0.5rem;" title="Edit Report" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>

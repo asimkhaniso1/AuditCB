@@ -527,7 +527,7 @@ window.openAddMeetingModal = function () {
                         <div style="margin-bottom: 0.25rem;">
                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                                 <input type="checkbox" class="meeting-attendee" value="${m.id}">
-                                <span>${window.UTILS.escapeHtml(m.name)} <small style="color: grey;">(${m.role})</small></span>
+                                <span>${window.UTILS.escapeHtml(m.name)} <small style="color: grey;">(${window.UTILS.escapeHtml(m.role)})</small></span>
                             </label>
                         </div>
                     `).join('')}
@@ -864,7 +864,7 @@ window.editMeeting = function (id) {
                         <div style="margin-bottom: 0.25rem;">
                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                                 <input type="checkbox" class="meeting-attendee" value="${m.id}" ${meeting.attendees.includes(String(m.id)) ? 'checked' : ''}>
-                                <span>${window.UTILS.escapeHtml(m.name)} <small style="color: grey;">(${m.role})</small></span>
+                                <span>${window.UTILS.escapeHtml(m.name)} <small style="color: grey;">(${window.UTILS.escapeHtml(m.role)})</small></span>
                             </label>
                         </div>
                     `).join('')}

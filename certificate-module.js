@@ -87,7 +87,7 @@ window.exportCertificatePDF = function (certId) {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Certificate - ${cert.certificateNumber}</title>
+    <title>Certificate - ${window.UTILS.escapeHtml(cert.certificateNumber)}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @page { size: A4; margin: 0; }
@@ -235,18 +235,18 @@ window.exportCertificatePDF = function (certId) {
             <div class="logo">
                 <i class="fa-solid fa-certificate"></i>
             </div>
-            <div class="cb-name">${cbSettings.cbName || 'ISOXPERT Audit360'}</div>
+            <div class="cb-name">${window.UTILS.escapeHtml(cbSettings.cbName || 'ISOXPERT Audit360')}</div>
             ${cert.accreditationBody ? `
                 <div class="accreditation">
-                    Accredited by ${cert.accreditationBody}
-                    ${cert.accreditationNumber ? `| Accreditation No: ${cert.accreditationNumber}` : ''}
+                    Accredited by ${window.UTILS.escapeHtml(cert.accreditationBody)}
+                    ${cert.accreditationNumber ? `| Accreditation No: ${window.UTILS.escapeHtml(cert.accreditationNumber)}` : ''}
                 </div>
             ` : ''}
         </div>
 
         <!-- Title -->
         <div class="title">Certificate of Conformity</div>
-        <div class="subtitle">${cert.standard}</div>
+        <div class="subtitle">${window.UTILS.escapeHtml(cert.standard)}</div>
 
         <!-- Content -->
         <div class="content">
@@ -255,12 +255,12 @@ window.exportCertificatePDF = function (certId) {
             </p>
             
             <p style="text-align: center; font-size: 28px; font-weight: bold; color: #1e3a8a; margin: 20px 0;">
-                ${client?.name || cert.clientName}
+                ${window.UTILS.escapeHtml(client?.name || cert.clientName)}
             </p>
             
             ${client?.address ? `
                 <p style="text-align: center; font-size: 14px; color: #64748b; margin-bottom: 30px;">
-                    ${client.address}
+                    ${window.UTILS.escapeHtml(client.address)}
                 </p>
             ` : ''}
 
@@ -269,7 +269,7 @@ window.exportCertificatePDF = function (certId) {
             </p>
 
             <p style="text-align: center; font-size: 20px; font-weight: bold; color: #1e3a8a; margin: 20px 0;">
-                ${cert.standard}
+                ${window.UTILS.escapeHtml(cert.standard)}
             </p>
 
             <p style="text-align: center; margin: 30px 0;">
@@ -277,7 +277,7 @@ window.exportCertificatePDF = function (certId) {
             </p>
 
             <p style="text-align: center; font-style: italic; color: #475569; padding: 20px; background: #f8fafc; border-radius: 8px;">
-                ${cert.scope || 'No scope specified'}
+                ${window.UTILS.escapeText(cert.scope || 'No scope specified')}
             </p>
         </div>
 
@@ -286,7 +286,7 @@ window.exportCertificatePDF = function (certId) {
             <table>
                 <tr>
                     <td>Certificate Number:</td>
-                    <td><strong>${cert.certificateNumber}</strong></td>
+                    <td><strong>${window.UTILS.escapeHtml(cert.certificateNumber)}</strong></td>
                 </tr>
                 <tr>
                     <td>Certification Date:</td>
@@ -303,7 +303,7 @@ window.exportCertificatePDF = function (certId) {
         <div class="signature-section">
             <div class="signature">
                 <div class="signature-line">
-                    ${cert.issuedBy}
+                    ${window.UTILS.escapeHtml(cert.issuedBy)}
                 </div>
                 <div style="font-size: 12px; color: #64748b;">Certification Manager</div>
             </div>
@@ -317,8 +317,8 @@ window.exportCertificatePDF = function (certId) {
 
         <!-- Footer -->
         <div class="footer">
-            <p>${cbSettings.cbEmail || 'info@auditcb.com'} | ${cbSettings.cbPhone || ''}</p>
-            <p>This certificate remains the property of ${cbSettings.cbName || 'the certification body'} and must be returned upon request.</p>
+            <p>${window.UTILS.escapeHtml(cbSettings.cbEmail || 'info@auditcb.com')} | ${window.UTILS.escapeHtml(cbSettings.cbPhone || '')}</p>
+            <p>This certificate remains the property of ${window.UTILS.escapeHtml(cbSettings.cbName || 'the certification body')} and must be returned upon request.</p>
         </div>
     </div>
 
@@ -435,11 +435,11 @@ window.renderCertificates = function () {
                             ${certificatesWithStatus.map(cert => `
                                 <tr style="border-bottom: 1px solid #e2e8f0;">
                                     <td style="padding: 1rem;">
-                                        <strong>${cert.certificateNumber}</strong>
+                                        <strong>${window.UTILS.escapeHtml(cert.certificateNumber)}</strong>
                                     </td>
-                                    <td style="padding: 1rem;">${cert.clientName}</td>
+                                    <td style="padding: 1rem;">${window.UTILS.escapeHtml(cert.clientName)}</td>
                                     <td style="padding: 1rem;">
-                                        <span style="font-size: 0.85rem; color: #64748b;">${cert.standard}</span>
+                                        <span style="font-size: 0.85rem; color: #64748b;">${window.UTILS.escapeHtml(cert.standard)}</span>
                                     </td>
                                     <td style="padding: 1rem;">${new Date(cert.issueDate).toLocaleDateString()}</td>
                                     <td style="padding: 1rem;">

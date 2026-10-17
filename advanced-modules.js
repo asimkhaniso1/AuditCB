@@ -508,7 +508,7 @@ function renderAuditorTab(auditor, tabName) {
                 const client = state.clients.find(c => c.name === plan.client);
                 const location = client?.sites?.[0]?.city || client?.city || 'TBD';
                 return `
-                                    <div class="upcoming-audit-item" data-date="${plan.date}" data-location="${location.toLowerCase()}" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); border-left: 4px solid var(--primary-color);">
+                                    <div class="upcoming-audit-item" data-date="${plan.date}" data-location="${window.UTILS.escapeHtml(location.toLowerCase())}" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); border-left: 4px solid var(--primary-color);">
                                         <div>
                                             <div style="font-weight: 500; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(plan.client)}</div>
                                             <div style="font-size: 0.85rem; color: var(--text-secondary);">
@@ -804,11 +804,11 @@ function renderAuditorTab(auditor, tabName) {
                                 <tbody>
                                     ${linkedComplaints.map(c => `
                                         <tr>
-                                            <td>${c.date}</td>
+                                            <td>${window.UTILS.escapeHtml(c.date)}</td>
                                             <td>CMP-${String(c.complaintId).padStart(3, '0')}</td>
-                                            <td>${c.subject}</td>
-                                            <td><span class="badge" style="background: ${c.severity === 'Critical' || c.severity === 'High' ? '#fee2e2' : '#fef3c7'}; color: ${c.severity === 'Critical' || c.severity === 'High' ? '#991b1b' : '#92400e'};">${c.severity || 'Medium'}</span></td>
-                                            <td><span class="badge" style="background: #f3f4f6; color: #374151;">${c.status}</span></td>
+                                            <td>${window.UTILS.escapeText(c.subject)}</td>
+                                            <td><span class="badge" style="background: ${c.severity === 'Critical' || c.severity === 'High' ? '#fee2e2' : '#fef3c7'}; color: ${c.severity === 'Critical' || c.severity === 'High' ? '#991b1b' : '#92400e'};">${window.UTILS.escapeHtml(c.severity || 'Medium')}</span></td>
+                                            <td><span class="badge" style="background: #f3f4f6; color: #374151;">${window.UTILS.escapeHtml(c.status)}</span></td>
                                             <td>
                                                 <button class="btn btn-sm btn-outline-primary" data-action="viewComplaintDetail" data-id="${c.complaintId}">
                                                     View
@@ -932,9 +932,9 @@ function renderAuditorTab(auditor, tabName) {
                                 <tbody>
                                     ${rptReviews.map(r => `
                                         <tr>
-                                            <td>${r.reviewDate}</td>
-                                            <td>${r.reportType}</td>
-                                            <td>${r.client}</td>
+                                            <td>${window.UTILS.escapeHtml(r.reviewDate)}</td>
+                                            <td>${window.UTILS.escapeHtml(r.reportType)}</td>
+                                            <td>${window.UTILS.escapeHtml(r.client)}</td>
                                             <td>${r.qualityRating}/5</td>
                                             <td>${r.completenessRating}/5</td>
                                             <td>${r.technicalRating}/5</td>
@@ -989,11 +989,11 @@ function renderAuditorTab(auditor, tabName) {
                                 <tbody>
                                     ${auditLinkedComplaints.map(c => `
                                         <tr>
-                                            <td>${c.date}</td>
+                                            <td>${window.UTILS.escapeHtml(c.date)}</td>
                                             <td><strong>CMP-${String(c.complaintId).padStart(3, '0')}</strong></td>
-                                            <td>${c.subject}</td>
-                                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${c.type}</span></td>
-                                            <td><span class="badge" style="background: ${c.severity === 'Critical' || c.severity === 'High' ? '#fee2e2' : '#fef3c7'}; color: ${c.severity === 'Critical' || c.severity === 'High' ? '#991b1b' : '#92400e'};">${c.severity || 'Medium'}</span></td>
+                                            <td>${window.UTILS.escapeText(c.subject)}</td>
+                                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(c.type)}</span></td>
+                                            <td><span class="badge" style="background: ${c.severity === 'Critical' || c.severity === 'High' ? '#fee2e2' : '#fef3c7'}; color: ${c.severity === 'Critical' || c.severity === 'High' ? '#991b1b' : '#92400e'};">${window.UTILS.escapeHtml(c.severity || 'Medium')}</span></td>
                                             <td><span class="badge" style="background: #f3f4f6; color: #374151;">${c.status}</span></td>
                                             <td>
                                                 <button class="btn btn-sm btn-outline-primary" data-action="viewComplaintDetail" data-id="${c.complaintId}" aria-label="View">
@@ -1086,10 +1086,10 @@ function renderAuditorTab(auditor, tabName) {
                 const status = getQualStatus(q.expiryDate);
                 return `
                                     <tr>
-                                        <td style="font-weight: 500;">${q.standard}</td>
-                                        <td><span style="background: ${q.level === 'Lead Auditor' ? '#dbeafe' : '#f1f5f9'}; color: ${q.level === 'Lead Auditor' ? '#1e40af' : '#475569'}; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${q.level}</span></td>
-                                        <td style="font-family: monospace; font-size: 0.85rem;">${q.certNumber}</td>
-                                        <td>${q.issuingBody}</td>
+                                        <td style="font-weight: 500;">${window.UTILS.escapeHtml(q.standard)}</td>
+                                        <td><span style="background: ${q.level === 'Lead Auditor' ? '#dbeafe' : '#f1f5f9'}; color: ${q.level === 'Lead Auditor' ? '#1e40af' : '#475569'}; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(q.level)}</span></td>
+                                        <td style="font-family: monospace; font-size: 0.85rem;">${window.UTILS.escapeHtml(q.certNumber)}</td>
+                                        <td>${window.UTILS.escapeHtml(q.issuingBody)}</td>
                                         <td>${q.issueDate}</td>
                                         <td>${q.expiryDate}</td>
                                         <td><span style="background: ${status.bg}; color: ${status.color}; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 500;">${status.status}</span></td>
@@ -1417,7 +1417,7 @@ function renderMatrixTab(tabName, standards, industries, getExperienceBadge, get
                             <tbody>
                                 ${state.auditors.map(auditor => `
                                     <tr>
-                                        <td style="font-weight: 500;">${auditor.name}</td>
+                                        <td style="font-weight: 500;">${window.UTILS.escapeHtml(auditor.name)}</td>
                                         <td>${getExperienceBadge(auditor.experience)}</td>
                                         ${industries.map(ind => {
                 const hasInd = auditor.industries && auditor.industries.includes(ind);
@@ -1473,7 +1473,7 @@ function renderMatrixTab(tabName, standards, industries, getExperienceBadge, get
                                         `}
                                         <div>
                                             <h4 style="margin: 0 0 0.25rem 0;">${window.UTILS.escapeHtml(auditor.name)}</h4>
-                                            <span style="background: ${auditor.role === 'Lead Auditor' ? 'var(--primary-color)' : 'var(--secondary-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${auditor.role}</span>
+                                            <span style="background: ${auditor.role === 'Lead Auditor' ? 'var(--primary-color)' : 'var(--secondary-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${window.UTILS.escapeHtml(auditor.role)}</span>
                                         </div>
                                     </div>
                                     ${getExperienceBadge(auditor.experience)}
@@ -2835,7 +2835,7 @@ window.addWitnessAudit = function (auditorId) {
                                                                                                                 </div>
                                                                                                                 <div class="form-group">
                                                                                                                     <label>Witnessed By</label>
-                                                                                                                    <input type="text" id="witness-by" class="form-control" value="${window.state.currentUser?.name || ''}" required>
+                                                                                                                    <input type="text" id="witness-by" class="form-control" value="${window.UTILS.escapeHtml(window.state.currentUser?.name || '')}" required>
                                                                                                                 </div>
                                                                                                                 <div class="form-group" style="grid-column: 1 / -1;">
                                                                                                                     <label>Overall Rating</label>
@@ -2936,7 +2936,7 @@ window.addPerformanceReview = function (auditorId) {
                                                                                                                 </div>
                                                                                                                 <div class="form-group">
                                                                                                                     <label>Reviewed By</label>
-                                                                                                                    <input type="text" id="review-by" class="form-control" value="${window.state.currentUser?.name || ''}" required>
+                                                                                                                    <input type="text" id="review-by" class="form-control" value="${window.UTILS.escapeHtml(window.state.currentUser?.name || '')}" required>
                                                                                                                 </div>
                                                                                                                 <div class="form-group" style="grid-column: 1 / -1;">
                                                                                                                     <label>Outcome/Decision</label>
@@ -3009,7 +3009,7 @@ window.addReportReview = function (auditorId) {
                                                                                                                 </div>
                                                                                                                 <div class="form-group">
                                                                                                                     <label>Reviewer</label>
-                                                                                                                    <input type="text" id="reviewer-name" class="form-control" value="${window.state.currentUser?.name || ''}" required>
+                                                                                                                    <input type="text" id="reviewer-name" class="form-control" value="${window.UTILS.escapeHtml(window.state.currentUser?.name || '')}" required>
                                                                                                                 </div>
                                                                                                                 <div class="form-group">
                                                                                                                     <label>Quality Rating (1-5)</label>
