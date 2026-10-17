@@ -1,15 +1,11 @@
-// window.toggleAccordion is defined TWICE — csp-adapters.js (element-based,
-// for checklist-module.js's Checklist Library markup, which sets no data-id)
-// and execution-module-v2.js (section-id-based, for the Execution view, which
-// does). index.html loads execution-module-v2.js after csp-adapters.js, so the
-// id-based definition won at runtime; the Checklist Library then passed a DOM
-// element into getElementById(), got null, and its accordions silently stopped
-// opening.
-//
-// Both definitions are now shape-agnostic and equivalent, so whichever loads
-// last, BOTH call sites keep working. These tests run each definition against
-// both shapes — that symmetry is the actual guarantee, so a future edit to one
-// file can't quietly reintroduce the collision.
+// window.toggleAccordion is defined once, in csp-adapters.js, and serves two
+// call shapes: checklist-module.js's Checklist Library passes the clicked
+// header ELEMENT (its markup sets no data-id), the Execution view passes a
+// SECTION ID. execution-module-v2.js used to define a second, id-only copy that
+// replaced this one once the Execution view rendered, which killed the
+// library's accordions. That copy is gone; these tests pin both shapes on the
+// one definition, and tests/duplicate-globals.test.js keeps a second
+// definition from coming back.
 import { describe, it, expect, beforeEach } from 'vitest';
 
 globalThis.window = globalThis.window || globalThis;
@@ -19,17 +15,6 @@ const path = await import('path');
 
 function loadCspAdapters() {
     eval(fs.readFileSync(path.resolve('./csp-adapters.js'), 'utf8'));
-}
-
-// execution-module-v2.js's export tail references names only ever assigned as
-// window.* inside nested functions, so shadow `module` to keep that branch
-// dead during eval — same approach tests/ncr-checklist-sync.test.js uses.
-function loadExecutionModule() {
-    const src = fs.readFileSync(path.resolve('./execution-module-v2.js'), 'utf8');
-    // eslint-disable-next-line no-unused-vars
-    const module = undefined;
-    window.state = window.state || { auditReports: [], ncrs: [], clients: [], auditPlans: [] };
-    eval(src);
 }
 
 /** Checklist Library shape: header element, panel is the next sibling. */
@@ -63,79 +48,50 @@ function idMarkup(initialDisplay) {
     };
 }
 
-const LOADERS = [
-    ['csp-adapters.js', loadCspAdapters],
-    ['execution-module-v2.js', loadExecutionModule]
-];
-
-LOADERS.forEach(([name, load]) => {
-    describe(`window.toggleAccordion as defined by ${name}`, () => {
-        beforeEach(() => {
-            document.body.innerHTML = '';
-            load();
-        });
-
-        it('opens a collapsed panel when handed the header ELEMENT (Checklist Library)', () => {
-            const { header, content, icon } = elementMarkup('none');
-            window.toggleAccordion(header);
-            expect(content.style.display).toBe('block');
-            expect(icon.style.transform).toBe('rotate(180deg)');
-        });
-
-        it('closes an open panel when handed the header ELEMENT', () => {
-            const { header, content, icon } = elementMarkup('block');
-            window.toggleAccordion(header);
-            expect(content.style.display).toBe('none');
-            expect(icon.style.transform).toBe('rotate(0deg)');
-        });
-
-        it('opens a collapsed panel when handed a SECTION ID (Execution view)', () => {
-            const { content, icon } = idMarkup('none');
-            window.toggleAccordion('sec-1');
-            expect(content.style.display).toBe('block');
-            expect(icon.style.transform).toBe('rotate(180deg)');
-        });
-
-        it('closes an open panel when handed a SECTION ID', () => {
-            const { content, icon } = idMarkup('block');
-            window.toggleAccordion('sec-1');
-            expect(content.style.display).toBe('none');
-            expect(icon.style.transform).toBe('rotate(0deg)');
-        });
-
-        it('round-trips: two toggles return to the starting state', () => {
-            const { header, content } = elementMarkup('none');
-            window.toggleAccordion(header);
-            window.toggleAccordion(header);
-            expect(content.style.display).toBe('none');
-        });
-
-        it('does nothing rather than throwing on an unresolvable target', () => {
-            expect(() => window.toggleAccordion('no-such-id')).not.toThrow();
-            expect(() => window.toggleAccordion(null)).not.toThrow();
-            expect(() => window.toggleAccordion(undefined)).not.toThrow();
-        });
-    });
-});
-
-// The collision itself: load both files in index.html's order and confirm the
-// surviving definition still serves the view that does NOT own it.
-describe('load-order collision between the two toggleAccordion definitions', () => {
-    it('the Checklist Library still opens after execution-module-v2.js overwrites the handler', () => {
+describe('window.toggleAccordion (csp-adapters.js)', () => {
+    beforeEach(() => {
         document.body.innerHTML = '';
-        loadCspAdapters();        // index.html line 258
-        loadExecutionModule();    // index.html line 278 — wins
-        const { header, content } = elementMarkup('none');
+        loadCspAdapters();
+    });
+
+    it('opens a collapsed panel when handed the header ELEMENT (Checklist Library)', () => {
+        const { header, content, icon } = elementMarkup('none');
         window.toggleAccordion(header);
         expect(content.style.display).toBe('block');
+        expect(icon.style.transform).toBe('rotate(180deg)');
     });
 
-    it('the Execution view still opens under the reverse load order', () => {
-        document.body.innerHTML = '';
-        loadExecutionModule();
-        loadCspAdapters();        // wins in this order
-        const { content } = idMarkup('none');
+    it('closes an open panel when handed the header ELEMENT', () => {
+        const { header, content, icon } = elementMarkup('block');
+        window.toggleAccordion(header);
+        expect(content.style.display).toBe('none');
+        expect(icon.style.transform).toBe('rotate(0deg)');
+    });
+
+    it('opens a collapsed panel when handed a SECTION ID (Execution view)', () => {
+        const { content, icon } = idMarkup('none');
         window.toggleAccordion('sec-1');
         expect(content.style.display).toBe('block');
+        expect(icon.style.transform).toBe('rotate(180deg)');
+    });
+
+    it('closes an open panel when handed a SECTION ID', () => {
+        const { content, icon } = idMarkup('block');
+        window.toggleAccordion('sec-1');
+        expect(content.style.display).toBe('none');
+        expect(icon.style.transform).toBe('rotate(0deg)');
+    });
+
+    it('round-trips: two toggles return to the starting state', () => {
+        const { header, content } = elementMarkup('none');
+        window.toggleAccordion(header);
+        window.toggleAccordion(header);
+        expect(content.style.display).toBe('none');
+    });
+
+    it('does nothing rather than throwing on an unresolvable target', () => {
+        expect(() => window.toggleAccordion('no-such-id')).not.toThrow();
+        expect(() => window.toggleAccordion(null)).not.toThrow();
+        expect(() => window.toggleAccordion(undefined)).not.toThrow();
     });
 });

@@ -80,13 +80,11 @@
     //   execution-module-v2.js  data-action="toggleAccordion" data-id="<id>"
     //     -> the delegator passes the SECTION ID string; panel and chevron are
     //        looked up by id.
-    // execution-module-v2.js defines its own window.toggleAccordion and loads
-    // AFTER this file, so whichever definition happens to win must understand
-    // both shapes or one view silently stops working — which is exactly what
-    // happened: the id-based version won, the Checklist Library passed an
-    // element, getElementById(<HTMLElement>) returned null, and the library's
-    // accordions were dead. Both definitions are now identical and
-    // shape-agnostic, so load order cannot break either view again.
+    // execution-module-v2.js used to define its own window.toggleAccordion,
+    // which replaced this one once the Execution view rendered; the id-only
+    // version won, the Checklist Library passed an element, and the library's
+    // accordions were dead. This is now the only definition, and it handles
+    // both shapes.
     window.toggleAccordion = function (target) {
         let content = null;
         let icon = null;
@@ -122,32 +120,6 @@
             label.style.borderColor = el.checked ? '#3b82f6' : '#cbd5e1';
             label.style.color = el.checked ? '#2563eb' : '#64748b';
         }
-    };
-
-    // ─── Format date and update previous sibling ────────────────────
-    window.formatDatePrev = function (el) {
-        if (!el.value) return;
-        let formatted = new Date(el.value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-        let prev = el.previousElementSibling;
-        if (prev) {
-            prev.value = formatted;
-            prev.dispatchEvent(new Event('change'));
-        }
-    };
-
-    // ─── Update cert field + auto-fill expiry ───────────────────────
-    window.updateCertFieldAndExpiry = function (el, dataset) {
-        let clientId = dataset.arg1;
-        let index = dataset.arg2;
-        let field = dataset.arg3;
-        if (window.updateCertField) window.updateCertField(clientId, index, field, el.value);
-        if (window.autoFillExpiry) window.autoFillExpiry(el);
-    };
-
-    // ─── Finalize org setup ─────────────────────────────────────────
-    window.finalizeOrgSetup = function (clientId) {
-        if (window.showNotification) window.showNotification('Organization setup finalized successfully!', 'success');
-        if (window.switchClientDetailTab) window.switchClientDetailTab(clientId, 'scopes');
     };
 
     // ─── NCR toggle closed CAPAs ────────────────────────────────────
@@ -297,5 +269,5 @@
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { toggleDisplay, toggleOrigNotes, viewEvidenceImageByUrlSelf, clickTab, setReportRecommendation, setGalleryMainSrc, toggleElementIfValue, toggleAccordion, toggleSubAccordion, toggleCheckboxStyle, formatDatePrev, updateCertFieldAndExpiry, finalizeOrgSetup, toggleClosedCAPAs, toggleClientDocsBody, navigateToAuditorDetail, clearActivityLogs, updateSkillValue, copyCertEmbed, handleDocFileChange, handleDocFileChangeAlways };
+    module.exports = { toggleDisplay, toggleOrigNotes, viewEvidenceImageByUrlSelf, clickTab, setReportRecommendation, setGalleryMainSrc, toggleElementIfValue, toggleAccordion, toggleSubAccordion, toggleCheckboxStyle, toggleClosedCAPAs, toggleClientDocsBody, navigateToAuditorDetail, clearActivityLogs, updateSkillValue, copyCertEmbed, handleDocFileChange, handleDocFileChangeAlways };
 }

@@ -44,7 +44,11 @@ function renderClientsEnhanced() {
         window.state.clientPagination = { currentPage: 1, itemsPerPage: 10 };
     }
 
-    let filteredClients = window.state.clients.filter(client => {
+    // Auditors only see clients they are assigned to (script.js getVisibleClients);
+    // listing window.state.clients showed every client to every role.
+    const visibleClients = (typeof window.getVisibleClients === 'function') ? window.getVisibleClients() : window.state.clients;
+
+    let filteredClients = visibleClients.filter(client => {
         const name = client.name || 'Unnamed Client';
         const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = filterStatus === 'All' || client.status === filterStatus;
@@ -145,7 +149,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Clients</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${visibleClients.length}</div>
                     </div>
                 </div>
                 <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
@@ -154,7 +158,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Active</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.filter(c => c.status === 'Active').length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${visibleClients.filter(c => c.status === 'Active').length}</div>
                     </div>
                 </div>
                 <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
@@ -163,7 +167,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Inactive</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.filter(c => ['Suspended', 'Withdrawn'].includes(c.status)).length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${visibleClients.filter(c => ['Suspended', 'Withdrawn'].includes(c.status)).length}</div>
                     </div>
                 </div>
                 <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
@@ -172,7 +176,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Sites</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.reduce((acc, c) => acc + (c.sites ? c.sites.length : 1), 0)}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${visibleClients.reduce((acc, c) => acc + (c.sites ? c.sites.length : 1), 0)}</div>
                     </div>
                 </div>
             </div>
@@ -408,7 +412,16 @@ window.changeClientItemsPerPage = function (val) {
     }
 };
 
-// Window export (used by all existing code) (overrides clients-module.js version)
+// Show/Hide Analytics button. This was only ever assigned inside the old
+// clients-module.js renderClientsEnhanced, which never ran (this file's
+// version replaced it), so the button had no handler.
+window.toggleClientAnalytics = function () {
+    if (window.state.showClientAnalytics === undefined) window.state.showClientAnalytics = true;
+    window.state.showClientAnalytics = !window.state.showClientAnalytics;
+    renderClientsEnhanced();
+};
+
+// Window export (used by all existing code)
 window.renderClientsEnhanced = renderClientsEnhanced;
 
 Logger.info('Clients List module loaded (Dynamic Event Binding Fix - v3.1)');

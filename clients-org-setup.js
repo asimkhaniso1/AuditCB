@@ -593,8 +593,8 @@ window.generateCertificatesFromStandards = function (clientId) {
             : 'Every standard on the client and its sites already has a certificate record', created.length ? 'success' : 'info');
     }
 };
-window.updateCertField = function (clientId, certIndex, field, value) { const client = window.DataService.findClient(clientId); if (client) client.certificates[certIndex][field] = value; };
-window.updateSiteScope = function (clientId, certIndex, siteName, value) { const client = window.DataService.findClient(clientId); if (client) { if (!client.certificates[certIndex].siteScopes) client.certificates[certIndex].siteScopes = {}; client.certificates[certIndex].siteScopes[siteName] = value; } };
+window.updateCertField = function (clientId, certIndex, field, value) { const client = window.DataService.findClient(clientId); if (client && client.certificates && client.certificates[certIndex]) client.certificates[certIndex][field] = value; };
+window.updateSiteScope = function (clientId, certIndex, siteName, value) { const client = window.DataService.findClient(clientId); if (client && client.certificates && client.certificates[certIndex]) { if (!client.certificates[certIndex].siteScopes) client.certificates[certIndex].siteScopes = {}; client.certificates[certIndex].siteScopes[siteName] = value; } };
 // saveCertificateDetails is defined in clients-import.js (full implementation:
 // local save + client JSONB sync + per-certificate upsert to Supabase).
 // A local-only stub here used to load later and overwrite it, so cert numbers,
@@ -838,6 +838,7 @@ window._orgPrintItem = function (type, data) {
 window.getClientProfileHTML = function (client) {
     const profile = client.profile || '';
     const lastUpdated = client.profileUpdated ? new Date(client.profileUpdated).toLocaleString() : 'Never';
+    const isAdmin = window.AuthManager && window.AuthManager.canPerform('edit', 'client');
     function formatProfileText(text) {
         if (!text) return '';
         let esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml(text) : text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -874,10 +875,10 @@ window.getClientProfileHTML = function (client) {
                 <h3 style="margin:0;color:white;font-size:1.1rem"><i class="fa-solid fa-building" style="margin-right:0.5rem"></i>Organization Context</h3>
                 <p style="margin:0.3rem 0 0 0;color:rgba(255,255,255,0.8);font-size:0.8rem">Last updated: ${lastUpdated}</p>
             </div>
-            <div style="display:flex;gap:0.5rem">
+            ${isAdmin ? `<div style="display:flex;gap:0.5rem">
                 <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3);font-size:0.8rem" data-action="editCompanyProfile" data-id="${client.id}" aria-label="Edit"><i class="fa-solid fa-pen"></i> Edit</button>
                 <button class="btn btn-sm" style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;border:none;font-size:0.8rem" data-action="generateCompanyProfile" data-id="${client.id}" aria-label="Auto-generate"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Generate</button>
-            </div>
+            </div>` : ''}
         </div>
         <div style="padding:1.5rem">
             ${profile ? formatProfileText(profile) : '<div style="text-align:center;padding:2rem;color:#94a3b8"><i class="fa-solid fa-file-circle-plus" style="font-size:2rem;margin-bottom:0.5rem;display:block"></i>No profile generated yet. Click AI Generate to create one.</div>'}
@@ -911,7 +912,7 @@ window.getClientSitesHTML = function (client) {
             </tr></thead><tbody>${sites.map((s, i) => `<tr>
                 ${window._orgSelectTd('sites', i)}
                 <td class="name-cell">${window.UTILS.escapeHtml(s.name)}</td>
-                <td>${(s.standards || 'Inherited').split(',').map(st => '<span class="badge-tag badge-primary">' + st.trim() + '</span>').join('')}</td>
+                <td>${(s.standards || 'Inherited').split(',').map(st => '<span class="badge-tag badge-primary">' + window.UTILS.escapeHtml(st.trim()) + '</span>').join('')}</td>
                 <td>${window.UTILS.escapeHtml(s.address || '-')}</td>
                 <td>${window.UTILS.escapeHtml(s.city || '-')}${s.country ? ', ' + window.UTILS.escapeHtml(s.country) : ''}</td>
                 <td>${s.employees ? '<span class="badge-tag badge-green"><i class="fa-solid fa-users" style="margin-right:3px"></i>' + s.employees + '</span>' : '-'}</td>
@@ -933,14 +934,15 @@ window.getClientSitesHTML = function (client) {
 
 window.getClientContactsHTML = function (client) {
     const contacts = client.contacts || [];
+    const isAdmin = window.AuthManager && window.AuthManager.canPerform('edit', 'client');
     return `
     <div class="org-table-wrapper">
         <div class="org-table-header">
             <h3><i class="fa-solid fa-address-book" style="color: #8b5cf6;"></i> Personnel / Contacts <span class="count-badge">${contacts.length}</span></h3>
-            <div style="display: flex; gap: 0.5rem;">
+            ${isAdmin ? `<div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadContacts" data-id="${client.id}" aria-label="Upload"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
                 <button class="btn btn-sm" style="background:#8b5cf6;color:white;border:none;border-radius:8px" data-action="addContactPerson" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i> Add</button>
-            </div>
+            </div>` : ''}
         </div>
         ${contacts.length > 0 ? `
         <div class="org-table-toolbar">
@@ -957,9 +959,9 @@ window.getClientContactsHTML = function (client) {
                 <td>${window.UTILS.escapeHtml(c.email || '-')}</td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Contact" data-json='${JSON.stringify({ Name: c.name || '-', Designation: c.designation || '-', Department: c.department || '-', Email: c.email || '-', Phone: c.phone || '-' }).replace(/'/g, "&#39;")}' aria-label="View"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" data-action="editContact" data-arg1="${client.id}" data-arg2="${i}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
+                    ${isAdmin ? `<button class="action-btn edit" title="Edit" data-action="editContact" data-arg1="${client.id}" data-arg2="${i}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>` : ''}
                     <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Contact" data-json='${JSON.stringify({ Name: c.name || '-', Designation: c.designation || '-', Department: c.department || '-', Email: c.email || '-' }).replace(/'/g, "&#39;")}' aria-label="Print"><i class="fa-solid fa-print"></i></button>
-                    <button class="action-btn delete" title="Delete" data-action="deleteContact" data-arg1="${client.id}" data-arg2="${i}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
+                    ${isAdmin ? `<button class="action-btn delete" title="Delete" data-action="deleteContact" data-arg1="${client.id}" data-arg2="${i}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div></td>
             </tr>`).join('')}</tbody></table>
         </div>` : '<div class="org-table-empty"><i class="fa-solid fa-address-book"></i><p>No contacts added yet.</p></div>'}
@@ -968,16 +970,17 @@ window.getClientContactsHTML = function (client) {
 
 window.getClientDepartmentsHTML = function (client) {
     const departments = client.departments || [];
+    const isAdmin = window.AuthManager && window.AuthManager.canPerform('edit', 'client');
     const contacts = client.contacts || [];
     return `
     <div class="org-table-wrapper">
         <div class="org-table-header">
             <h3><i class="fa-solid fa-sitemap" style="color: #f59e0b;"></i> Departments <span class="count-badge">${departments.length}</span></h3>
-            <div style="display: flex; gap: 0.5rem;">
+            ${isAdmin ? `<div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-outline-secondary" data-action="openAISuggestModal" data-arg1="${client.id}" data-arg2="departments" aria-label="AI suggestions"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest</button>
                 <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDepartments" data-id="${client.id}" aria-label="Upload"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
                 <button class="btn btn-sm" style="background:#f59e0b;color:white;border:none;border-radius:8px" data-action="addDepartment" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i> Add</button>
-            </div>
+            </div>` : ''}
         </div>
         ${departments.length > 0 ? `
         <div class="org-table-toolbar">
@@ -994,9 +997,9 @@ window.getClientDepartmentsHTML = function (client) {
                 <td>${deptHead !== '-' ? '<span class="badge-tag badge-blue">' + window.UTILS.escapeHtml(deptHead) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Department" data-json='${JSON.stringify({ Name: dept.name || '-', Head: deptHead || '-' }).replace(/'/g, "&#39;")}' aria-label="View"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" data-action="editDepartment" data-arg1="${client.id}" data-arg2="${i}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
+                    ${isAdmin ? `<button class="action-btn edit" title="Edit" data-action="editDepartment" data-arg1="${client.id}" data-arg2="${i}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>` : ''}
                     <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Department" data-json='${JSON.stringify({ Name: dept.name || '-', Head: deptHead || '-' }).replace(/'/g, "&#39;")}' aria-label="Print"><i class="fa-solid fa-print"></i></button>
-                    <button class="action-btn delete" title="Delete" data-action="deleteDepartment" data-arg1="${client.id}" data-arg2="${i}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
+                    ${isAdmin ? `<button class="action-btn delete" title="Delete" data-action="deleteDepartment" data-arg1="${client.id}" data-arg2="${i}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div></td>
             </tr>`;
     }).join('')}</tbody></table>
@@ -1006,15 +1009,16 @@ window.getClientDepartmentsHTML = function (client) {
 
 window.getClientGoodsServicesHTML = function (client) {
     const items = client.goodsServices || [];
+    const isAdmin = window.AuthManager && window.AuthManager.canPerform('edit', 'client');
     return `
     <div class="org-table-wrapper">
         <div class="org-table-header">
             <h3><i class="fa-solid fa-boxes-stacked" style="color: #10b981;"></i> Goods & Services <span class="count-badge">${items.length}</span></h3>
-            <div style="display: flex; gap: 0.5rem;">
+            ${isAdmin ? `<div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-outline-secondary" data-action="openAISuggestModal" data-arg1="${client.id}" data-arg2="goods" aria-label="AI suggestions"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest</button>
                 <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadGoodsServices" data-id="${client.id}" aria-label="Upload"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
                 <button class="btn btn-sm" style="background:#10b981;color:white;border:none;border-radius:8px" data-action="addGoodsService" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i> Add</button>
-            </div>
+            </div>` : ''}
         </div>
         ${items.length > 0 ? `
         <div class="org-table-toolbar">
@@ -1029,9 +1033,9 @@ window.getClientGoodsServicesHTML = function (client) {
                 <td><span class="badge-tag badge-green">${window.UTILS.escapeHtml(item.category || '-')}</span></td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Item" data-json='${JSON.stringify({ Name: item.name || '-', Category: item.category || '-' }).replace(/'/g, "&#39;")}' aria-label="View"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" data-action="editGoodsService" data-arg1="${client.id}" data-arg2="${i}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
+                    ${isAdmin ? `<button class="action-btn edit" title="Edit" data-action="editGoodsService" data-arg1="${client.id}" data-arg2="${i}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>` : ''}
                     <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Item" data-json='${JSON.stringify({ Name: item.name || '-', Category: item.category || '-' }).replace(/'/g, "&#39;")}' aria-label="Print"><i class="fa-solid fa-print"></i></button>
-                    <button class="action-btn delete" title="Delete" data-action="deleteGoodsService" data-arg1="${client.id}" data-arg2="${i}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
+                    ${isAdmin ? `<button class="action-btn delete" title="Delete" data-action="deleteGoodsService" data-arg1="${client.id}" data-arg2="${i}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div></td>
             </tr>`).join('')}</tbody></table>
         </div>` : '<div class="org-table-empty"><i class="fa-solid fa-boxes-stacked"></i><p>No goods or services added yet.</p></div>'}
@@ -1040,15 +1044,16 @@ window.getClientGoodsServicesHTML = function (client) {
 
 window.getClientKeyProcessesHTML = function (client) {
     const processes = client.keyProcesses || [];
+    const isAdmin = window.AuthManager && window.AuthManager.canPerform('edit', 'client');
     return `
     <div class="org-table-wrapper">
         <div class="org-table-header">
             <h3><i class="fa-solid fa-gears" style="color: #6366f1;"></i> Key Processes <span class="count-badge">${processes.length}</span></h3>
-            <div style="display: flex; gap: 0.5rem;">
+            ${isAdmin ? `<div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-outline-secondary" data-action="openAISuggestModal" data-arg1="${client.id}" data-arg2="processes" aria-label="AI suggestions"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest</button>
                 <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadKeyProcesses" data-id="${client.id}" aria-label="Upload"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
                 <button class="btn btn-sm" style="background:#6366f1;color:white;border:none;border-radius:8px" data-action="addKeyProcess" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i> Add</button>
-            </div>
+            </div>` : ''}
         </div>
         ${processes.length > 0 ? `
         <div class="org-table-toolbar">
@@ -1063,9 +1068,9 @@ window.getClientKeyProcessesHTML = function (client) {
                 <td><span class="badge-tag badge-amber">${window.UTILS.escapeHtml(proc.category || '-')}</span></td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Process" data-json='${JSON.stringify({ Name: proc.name || '-', Category: proc.category || '-' }).replace(/'/g, "&#39;")}' aria-label="View"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" data-action="editKeyProcess" data-arg1="${client.id}" data-arg2="${i}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
+                    ${isAdmin ? `<button class="action-btn edit" title="Edit" data-action="editKeyProcess" data-arg1="${client.id}" data-arg2="${i}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>` : ''}
                     <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Process" data-json='${JSON.stringify({ Name: proc.name || '-', Category: proc.category || '-' }).replace(/'/g, "&#39;")}' aria-label="Print"><i class="fa-solid fa-print"></i></button>
-                    <button class="action-btn delete" title="Delete" data-action="deleteKeyProcess" data-arg1="${client.id}" data-arg2="${i}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
+                    ${isAdmin ? `<button class="action-btn delete" title="Delete" data-action="deleteKeyProcess" data-arg1="${client.id}" data-arg2="${i}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div></td>
             </tr>`).join('')}</tbody></table>
         </div>` : '<div class="org-table-empty"><i class="fa-solid fa-gears"></i><p>No key processes added yet.</p></div>'}
@@ -1074,16 +1079,17 @@ window.getClientKeyProcessesHTML = function (client) {
 
 window.getClientDesignationsHTML = function (client) {
     const designations = client.designations || [];
+    const isAdmin = window.AuthManager && window.AuthManager.canPerform('edit', 'client');
     const contacts = client.contacts || [];
     return `
     <div class="org-table-wrapper">
         <div class="org-table-header">
             <h3><i class="fa-solid fa-id-badge" style="color: #ec4899;"></i> Designations <span class="count-badge">${designations.length}</span></h3>
-            <div style="display: flex; gap: 0.5rem;">
+            ${isAdmin ? `<div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-outline-secondary" data-action="openAISuggestModal" data-arg1="${client.id}" data-arg2="designations" aria-label="AI suggestions"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest</button>
                 <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDesignations" data-id="${client.id}" aria-label="Upload"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
                 <button class="btn btn-sm" style="background:#ec4899;color:white;border:none;border-radius:8px" data-action="addClientDesignation" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i> Add</button>
-            </div>
+            </div>` : ''}
         </div>
         ${designations.length > 0 ? `
         <div class="org-table-toolbar">
@@ -1101,9 +1107,9 @@ window.getClientDesignationsHTML = function (client) {
                 <td>${desDept ? '<span class="badge-tag badge-gray">' + window.UTILS.escapeHtml(desDept) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Designation" data-json='${JSON.stringify({ Title: desTitle || '-', Department: desDept || '-' }).replace(/'/g, "&#39;")}' aria-label="View"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" data-action="editClientDesignation" data-arg1="${client.id}" data-arg2="${i}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
+                    ${isAdmin ? `<button class="action-btn edit" title="Edit" data-action="editClientDesignation" data-arg1="${client.id}" data-arg2="${i}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>` : ''}
                     <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Designation" data-json='${JSON.stringify({ Title: desTitle || '-', Department: desDept || '-' }).replace(/'/g, "&#39;")}' aria-label="Print"><i class="fa-solid fa-print"></i></button>
-                    <button class="action-btn delete" title="Delete" data-action="deleteClientDesignation" data-arg1="${client.id}" data-arg2="${i}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
+                    ${isAdmin ? `<button class="action-btn delete" title="Delete" data-action="deleteClientDesignation" data-arg1="${client.id}" data-arg2="${i}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div></td>
             </tr>`;
     }).join('')}</tbody></table>
@@ -1118,14 +1124,17 @@ window.getClientAuditTeamHTML = function (client) {
         .filter(a => String(a.clientId) === String(client.id))
         .map(a => String(a.auditorId));
     const assignedAuditors = auditors.filter(a => assignedAuditorIds.includes(String(a.id)));
+    // Assignments grant access to this client's data, so only these roles manage them.
+    const userRole = window.state.currentUser?.role;
+    const canManage = userRole === 'Admin' || userRole === 'Certification Manager';
 
     return `
     <div class="card" id="client-audit-team-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-user-shield" style="margin-right: 0.5rem; color: #0ea5e9;"></i>Audit Team</h3>
-             <button class="btn btn-primary" data-action="openClientAuditorAssignmentModal" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(client.name)}" aria-label="Add user">
+             ${canManage ? `<button class="btn btn-primary" data-action="openClientAuditorAssignmentModal" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(client.name)}" aria-label="Add user">
                 <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i> Assign Auditor
-            </button>
+            </button>` : ''}
         </div>
         ${assignedAuditors.length > 0 ? `
             <div style="display: grid; gap: 1rem;">
@@ -1135,7 +1144,7 @@ window.getClientAuditTeamHTML = function (client) {
                             <div style="font-weight: 600;">${window.UTILS.escapeHtml(auditor.name)}</div>
                             <div style="font-size: 0.85rem; color: #64748b;">${window.UTILS.escapeHtml(auditor.role || 'Auditor')}</div>
                         </div>
-                        <button class="btn btn-sm btn-outline-danger" data-action="removeClientAuditorAssignment" data-arg1="${client.id}" data-arg2="${auditor.id}" aria-label="Remove user"><i class="fa-solid fa-user-minus"></i> Remove</button>
+                        ${canManage ? `<button class="btn btn-sm btn-outline-danger" data-action="removeClientAuditorAssignment" data-arg1="${client.id}" data-arg2="${auditor.id}" aria-label="Remove user"><i class="fa-solid fa-user-minus"></i> Remove</button>` : ''}
                     </div>`).join('')}
             </div>` : `<div style="text-align: center; padding: 2rem;"><p>No auditors assigned.</p></div>`}
     </div>`;
@@ -1227,6 +1236,7 @@ window.bulkUploadSites = function (clientId) {
 };
 
 window.deleteSite = function (clientId, index) {
+    if (!window.AuthManager || !window.AuthManager.canPerform('edit', 'client')) return;
     window.DataService.confirmAction('Delete?', () => {
         const client = window.DataService.findClient(clientId);
         if (client && client.sites) { client.sites.splice(index, 1); window.saveData(); window.DataService.syncClient(client, { saveLocal: false }); renderClientDetail(clientId); window.showNotification('Deleted'); }
@@ -1498,10 +1508,12 @@ window.addGoodsService = function (clientId) {
 window.deleteGoodsService = function (clientId, index) {
     const client = window.DataService.findClient(clientId);
     if (client && client.goodsServices) {
-        client.goodsServices.splice(index, 1);
-        window.saveData();
-        window.DataService.syncClient(client, { saveLocal: false });
-        window.setSetupWizardStep(clientId, 6);
+        window.DataService.confirmAction('Delete this item?', () => {
+            client.goodsServices.splice(index, 1);
+            window.saveData();
+            window.DataService.syncClient(client, { saveLocal: false });
+            window.setSetupWizardStep(clientId, 6);
+        });
     }
 };
 window.editGoodsService = function (clientId, index) {
@@ -1553,10 +1565,12 @@ window.addKeyProcess = function (clientId) {
 window.deleteKeyProcess = function (clientId, index) {
     const client = window.DataService.findClient(clientId);
     if (client && client.keyProcesses) {
-        client.keyProcesses.splice(index, 1);
-        window.saveData();
-        window.DataService.syncClient(client, { saveLocal: false });
-        window.setSetupWizardStep(clientId, 7);
+        window.DataService.confirmAction('Delete this process?', () => {
+            client.keyProcesses.splice(index, 1);
+            window.saveData();
+            window.DataService.syncClient(client, { saveLocal: false });
+            window.setSetupWizardStep(clientId, 7);
+        });
     }
 };
 window.editKeyProcess = function (clientId, index) {
@@ -1596,20 +1610,34 @@ window.bulkUploadKeyProcesses = function (clientId) {
 window.openClientAuditorAssignmentModal = function (clientId, clientName) {
     const _client = window.DataService.findClient(clientId);
     if (!window.state.auditors) { window.showNotification('No auditors loaded', 'error'); return; }
+    // Only offer auditors not already on this client: picking one again
+    // pushed a second, duplicate assignment row.
+    const assignedIds = new Set((window.state.auditorAssignments || [])
+        .filter(a => String(a.clientId) === String(clientId))
+        .map(a => String(a.auditorId)));
+    const availableAuditors = window.state.auditors.filter(a => !assignedIds.has(String(a.id)));
+    if (window.state.auditors.length > 0 && availableAuditors.length === 0) {
+        window.showNotification('All auditors are already assigned to this client.', 'info');
+        return;
+    }
 
     window.openModal(`Assign Auditor to ${clientName}`, `
         <div class="form-group"><label>Select Auditor</label>
         <select id="assign-auditor" class="form-control">
             <option value="">-- Select --</option>
-            ${window.state.auditors.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
+            ${availableAuditors.map(a => `<option value="${a.id}">${window.UTILS.escapeHtml(a.name)}</option>`).join('')}
         </select></div>`, () => {
         const auditorId = document.getElementById('assign-auditor').value;
         if (auditorId) {
             if (!window.state.auditorAssignments) window.state.auditorAssignments = [];
+            const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
             window.state.auditorAssignments.push({
                 id: Date.now(),
                 clientId: String(clientId),
                 auditorId: String(auditorId),
+                userId: auditor?.userId || auditor?.user_id || null,
+                role: auditor?.role || 'Auditor',
+                assignedBy: window.state.currentUser?.name || 'System',
                 assignedAt: new Date().toISOString()
             });
             window.DataService.syncAuditorAssignments();
@@ -1684,6 +1712,9 @@ window.editSite = function (clientId, siteIndex) {
         if (name) {
             let standards = Array.from(document.getElementById('site-standards').selectedOptions).map(function (o) { return o.value }).join(', ');
             client.sites[siteIndex] = Object.assign({}, site, { name: name, address: address, city: city, country: country, geotag: geotag, employees: employees, shift: shift, standards: standards });
+            // Auto-sync: update company-level employees from sum of site employees (same as addSite)
+            const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees, 10) || 0), 0);
+            if (siteTotal > 0) client.employees = siteTotal;
             window.DataService.syncClient(client);
             window.closeModal();
             if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
