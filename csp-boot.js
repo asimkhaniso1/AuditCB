@@ -48,31 +48,45 @@
     // ─── 2. Cache-Busting / Service Worker Purge (v19.0) ───────────
     var APP_VERSION = '19.0';
 
-    // Purge Cache API (Breaking the most stubborn level of caching)
-    if ('caches' in window) {
-        caches.keys().then(function (names) {
-            for (var i = 0; i < names.length; i++) {
-                caches.delete(names[i]);
-            }
-        });
+    // No forced reload: build.js content-hashes every JS/CSS URL (?h=<md5>)
+    // and index.html is served no-cache, so a fresh page load already gets
+    // fresh assets. The old "?v=&purge=" redirect made every first-time or
+    // private-window visitor download the whole app twice.
+    //
+    // One-time (per APP_VERSION) cleanup of what older builds left behind: a
+    // registered service worker and its Cache API entries. Runs once, not on
+    // every load. The flag key is the one the old reload logic set, so
+    // browsers that already purged for this version skip it.
+    var CLEANUP_KEY = 'v' + APP_VERSION + '_reloaded';
+    var cleanedUp = true;
+    try { cleanedUp = !!localStorage.getItem(CLEANUP_KEY); } catch (_e) { /* storage blocked: skip */ }
+    if (!cleanedUp) {
+        try { localStorage.setItem(CLEANUP_KEY, 'true'); } catch (_e) { /* ignore */ }
+
+        if ('caches' in window) {
+            caches.keys().then(function (names) {
+                for (var i = 0; i < names.length; i++) {
+                    caches.delete(names[i]);
+                }
+            }).catch(function () { /* ignore */ });
+        }
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (var i = 0; i < registrations.length; i++) {
+                    registrations[i].unregister();
+                }
+            }).catch(function () { /* ignore */ });
+        }
     }
 
-    // Unregister all Service Workers
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function (registrations) {
-            for (var i = 0; i < registrations.length; i++) {
-                registrations[i].unregister();
-            }
+    // A stale bookmark / shared link from the old redirect (?v=19.0&purge=…):
+    // drop just those two params, in place, without navigating.
+    if (/[?&](v|purge)=/.test(window.location.search)) {
+        var kept = window.location.search.replace(/^\?/, '').split('&').filter(function (p) {
+            return p && !/^(v|purge)=/.test(p);
         });
-    }
-
-    // Force Reload logic
-    if (window.location.search.indexOf('v=' + APP_VERSION) === -1 && !localStorage.getItem('v' + APP_VERSION + '_reloaded')) {
-        localStorage.setItem('v' + APP_VERSION + '_reloaded', 'true');
-        window.location.href = window.location.pathname + '?v=' + APP_VERSION + '&purge=' + Date.now() + window.location.hash;
-    } else if (window.location.search) {
-        // Clean up URL after purge - remove query params
-        window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+        window.history.replaceState(null, '', window.location.pathname + (kept.length ? '?' + kept.join('&') : '') + window.location.hash);
     }
 })();
 
