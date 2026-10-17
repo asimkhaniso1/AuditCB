@@ -353,7 +353,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                     <label>Client <span style="color: var(--danger-color);">*</span></label>
                                     <select class="form-control" id="plan-client" required data-action-change="updateClientDetails" data-id="this.value" ${window.state.activeClientId ? 'disabled' : ''}>
                                         <option value="">-- Select Client --</option>
-                                        ${state.clients.map(c => `<option value="${c.name}" ${window.state.activeClientId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                        ${state.clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}" ${window.state.activeClientId === c.id ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                                     </select>
                                 </div>
                                 <div class="form-group" style="margin: 0;">
@@ -444,13 +444,13 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                     <label>Lead Auditor</label>
                                     <select class="form-control" id="plan-lead-auditor">
                                         <option value="">-- Select Lead Auditor --</option>
-                                        ${state.auditors.filter(a => a.role === 'Lead Auditor').map(a => `<option value="${a.name}" data-id="${a.id}">${a.name}</option>`).join('')}
+                                        ${state.auditors.filter(a => a.role === 'Lead Auditor').map(a => `<option value="${window.UTILS.escapeHtml(a.name)}" data-id="${a.id}">${window.UTILS.escapeHtml(a.name)}</option>`).join('')}
                                     </select>
                                 </div>
                                 <div class="form-group" style="margin: 0;">
                                     <label>Team Members</label>
                                     <select class="form-control" id="plan-team" multiple style="height: 100px;">
-                                        ${state.auditors.filter(a => a.role !== 'Lead Auditor').map(a => `<option value="${a.name}" data-id="${a.id}">${a.name}</option>`).join('')}
+                                        ${state.auditors.filter(a => a.role !== 'Lead Auditor').map(a => `<option value="${window.UTILS.escapeHtml(a.name)}" data-id="${a.id}">${window.UTILS.escapeHtml(a.name)}</option>`).join('')}
                                     </select>
                                     <small style="color: var(--text-secondary); display: block; margin-top: 4px;">Hold Ctrl/Cmd to select multiple</small>
                                 </div>
@@ -768,7 +768,7 @@ function renderTeamCompetence() {
         const competence = auditor.standards || [];
         const covers = cycle.standards.filter(std => competence.some(c => normalizeStandardFamily(c) === normalizeStandardFamily(std)));
         return `<div style="display:grid;grid-template-columns:1fr auto;gap:.75rem;padding:.65rem 0;border-bottom:1px solid #e2e8f0;">
-            <div><strong>${window.UTILS.escapeHtml(name)}</strong> — ${index === 0 ? 'Lead Auditor' : (auditor.role || 'Team Member')}<br><span style="color:${covers.length ? '#166534' : '#b91c1c'};">Competence: ${competence.join(', ') || 'None recorded'} · Covers ${covers.length}/${cycle.standards.length}</span></div>
+            <div><strong>${window.UTILS.escapeHtml(name)}</strong> — ${window.UTILS.escapeHtml(index === 0 ? 'Lead Auditor' : (auditor.role || 'Team Member'))}<br><span style="color:${covers.length ? '#166534' : '#b91c1c'};">Competence: ${competence.join(', ') || 'None recorded'} · Covers ${covers.length}/${cycle.standards.length}</span></div>
             <label style="white-space:nowrap;">Days <input type="number" class="team-day-allocation" data-auditor="${window.UTILS.escapeHtml(name)}" min="0" step="0.5" value="${defaultAllocation}" style="width:70px;"></label>
         </div>`;
     }).join('');
@@ -983,10 +983,10 @@ function updateClientDetails(clientName) {
 
             siteCheckboxes.innerHTML = client.sites.map((s, _i) => `
                 <div style="padding: 10px; background: #fff; border-radius: 6px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; width: 100%; box-sizing: border-box;">
-                    <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" data-standards="${s.standards || ''}" checked style="cursor: pointer; margin-top: 4px; width: 16px; height: 16px;">
+                    <input type="checkbox" class="site-checkbox" data-name="${window.UTILS.escapeHtml(s.name)}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" data-standards="${window.UTILS.escapeHtml(s.standards || '')}" checked style="cursor: pointer; margin-top: 4px; width: 16px; height: 16px;">
                     <div style="overflow: hidden;">
-                        <div style="font-weight: 600; font-size: 0.9rem; color: #1e293b; line-height: 1.4; margin-bottom: 2px;">${s.name || 'Unnamed Site'}</div>
-                        <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">${s.city || 'No Location'} · <strong>${s.employees || 0}</strong> emp${s.shift === 'Yes' ? ' · <span style="color:#f59e0b">Shifts</span>' : ''}</div>
+                        <div style="font-weight: 600; font-size: 0.9rem; color: #1e293b; line-height: 1.4; margin-bottom: 2px;">${window.UTILS.escapeHtml(s.name || 'Unnamed Site')}</div>
+                        <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">${window.UTILS.escapeHtml(s.city || 'No Location')} · <strong>${s.employees || 0}</strong> emp${s.shift === 'Yes' ? ' · <span style="color:#f59e0b">Shifts</span>' : ''}</div>
                         <div style="font-size: 0.75rem; color: #3b82f6; margin-top: 3px;">${(s.standards || 'Inherited').split(',').map(st => '<span style="background:#eff6ff;padding:1px 6px;border-radius:4px;margin-right:3px;display:inline-block;margin-bottom:2px">' + st.trim() + '</span>').join('')}</div>
                     </div>
                 </div>
@@ -1025,11 +1025,11 @@ function updateClientDetails(clientName) {
             const primaryContact = (client.contacts && client.contacts[0]) || {};
             clientInfoPanel.innerHTML = `
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
-                    <div><strong>Industry:</strong> ${client.industry || '-'}</div>
+                    <div><strong>Industry:</strong> ${window.UTILS.escapeHtml(client.industry || '-')}</div>
                     <div><strong>Employees:</strong> ${client.employees || 0}</div>
                     <div><strong>Total Sites:</strong> ${sitesCount}</div>
                     <div><strong>Shifts:</strong> ${client.shifts || 'No'}</div>
-                    <div><strong>Contact:</strong> ${primaryContact.name || '-'}</div>
+                    <div><strong>Contact:</strong> ${window.UTILS.escapeHtml(primaryContact.name || '-')}</div>
                     <div><strong>Status:</strong> <span style="color: ${client.status === 'Active' ? 'var(--success-color)' : 'var(--danger-color)'}; font-weight: 600;">${client.status || 'Draft'}</span></div>
                 </div>
                 `;
@@ -1041,7 +1041,7 @@ function updateClientDetails(clientName) {
             auditeeSelect.innerHTML = `
                 <option value="">--Select Contact Person--</option>
                     ${client.contacts.map(contact => `
-                    <option value="${contact.name}">${contact.name}${contact.designation ? ` - ${contact.designation}` : ''}</option>
+                    <option value="${window.UTILS.escapeHtml(contact.name)}">${window.UTILS.escapeHtml(contact.name)}${contact.designation ? ` - ${window.UTILS.escapeHtml(contact.designation)}` : ''}</option>
                 `).join('')
                 }
             `;
@@ -1290,7 +1290,7 @@ function viewAuditPlan(id) {
         return `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;">
                 <div>
-                    <p style="font-weight: 500; margin: 0;">${cl.name}</p>
+                    <p style="font-weight: 500; margin: 0;">${window.UTILS.escapeHtml(cl.name)}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${itemCount} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
                 </div>
                 <button class="btn btn-sm" data-action="viewChecklistDetail" data-id="${cl.id}" aria-label="View">
@@ -1347,8 +1347,8 @@ function viewAuditPlan(id) {
                         <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Plans
                     </button>
                     <div>
-                        <h2 style="margin: 0; font-size: 1.5rem;">${plan.client}</h2>
-                        <span style="color: var(--text-secondary); font-size: 0.9rem;">Audit Plan Details • ${plan.standard}</span>
+                        <h2 style="margin: 0; font-size: 1.5rem;">${window.UTILS.escapeHtml(plan.client)}</h2>
+                        <span style="color: var(--text-secondary); font-size: 0.9rem;">Audit Plan Details • ${window.UTILS.escapeHtml(plan.standard)}</span>
                     </div>
                 </div>
                 <div style="display: flex; gap: 1rem;">
@@ -1375,9 +1375,9 @@ function viewAuditPlan(id) {
                     
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
                         <div>
-                            <div style="font-weight: 700; font-size: 1.25rem; color: #1e293b; margin-bottom: 0.25rem;">${client?.name}</div>
+                            <div style="font-weight: 700; font-size: 1.25rem; color: #1e293b; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(client?.name)}</div>
                             <div style="color: var(--text-secondary); font-size: 0.9rem;">
-                                <i class="fa-solid fa-industry" style="margin-right: 0.5rem; width: 16px;"></i> ${client?.industry || 'N/A'} 
+                                <i class="fa-solid fa-industry" style="margin-right: 0.5rem; width: 16px;"></i> ${window.UTILS.escapeHtml(client?.industry || 'N/A')} 
                                 <span style="margin: 0 0.5rem;">•</span>
                                 <i class="fa-solid fa-users" style="margin-right: 0.5rem; width: 16px;"></i> ${client?.employees || 0} Employees
                             </div>
@@ -1390,7 +1390,7 @@ function viewAuditPlan(id) {
                             <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Goods & Services</div>
                             ${(client?.goodsServices && client.goodsServices.length > 0) ? `
                                 <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
-                                    ${client.goodsServices.map(g => `<span class="badge" style="background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;">${g.name}</span>`).join('')}
+                                    ${client.goodsServices.map(g => `<span class="badge" style="background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;">${window.UTILS.escapeHtml(g.name)}</span>`).join('')}
                                 </div>
                             ` : `<p style="color: #94a3b8; font-size: 0.85rem; font-style: italic;">Not defined</p>`}
                         </div>
@@ -1400,7 +1400,7 @@ function viewAuditPlan(id) {
                             <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Key Processes</div>
                             ${(client?.keyProcesses && client.keyProcesses.length > 0) ? `
                                 <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
-                                    ${client.keyProcesses.map(p => `<span class="badge" style="background: ${p.category === 'Core' ? '#f0fdf4' : '#f0f9ff'}; color: ${p.category === 'Core' ? '#166534' : '#075985'}; border: 1px solid ${p.category === 'Core' ? '#bbf7d0' : '#bae6fd'};">${p.name}</span>`).join('')}
+                                    ${client.keyProcesses.map(p => `<span class="badge" style="background: ${p.category === 'Core' ? '#f0fdf4' : '#f0f9ff'}; color: ${p.category === 'Core' ? '#166534' : '#075985'}; border: 1px solid ${p.category === 'Core' ? '#bbf7d0' : '#bae6fd'};">${window.UTILS.escapeHtml(p.name)}</span>`).join('')}
                                 </div>
                             ` : `<p style="color: #94a3b8; font-size: 0.85rem; font-style: italic;">Not defined</p>`}
                         </div>
@@ -1416,7 +1416,7 @@ function viewAuditPlan(id) {
                     <!-- Standard & Type -->
                     <div style="margin-bottom: 1.25rem;">
                          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                            <span class="badge" style="background: var(--primary-color); color: white; padding: 4px 8px;">${plan.standard}</span>
+                            <span class="badge" style="background: var(--primary-color); color: white; padding: 4px 8px;">${window.UTILS.escapeHtml(plan.standard)}</span>
                             <span class="badge" style="background: #e2e8f0; color: #475569;">${plan.type || 'Stage 1'}</span>
                          </div>
                     </div>
@@ -1437,7 +1437,7 @@ function viewAuditPlan(id) {
                 return sites.map(s => {
                     const sScope = siteScopes[s.name] || '';
                     return '<div style="margin-bottom: 0.5rem; padding: 0.5rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">'
-                        + '<div style="font-size: 0.9rem; color: #334155; font-weight: 600;"><i class="fa-solid fa-map-pin" style="color: var(--danger-color); margin-right: 0.5rem;"></i>' + s.name + '</div>'
+                        + '<div style="font-size: 0.9rem; color: #334155; font-weight: 600;"><i class="fa-solid fa-map-pin" style="color: var(--danger-color); margin-right: 0.5rem;"></i>' + window.UTILS.escapeHtml(s.name) + '</div>'
                         + (sScope ? '<div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem; padding-left: 1.25rem;">' + sScope + '</div>' : '')
                         + '</div>';
                 }).join('');
@@ -1471,7 +1471,7 @@ function viewAuditPlan(id) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem;">
                     <div>
                         <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Objectives</div>
-                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.objectives || plan.auditObjectives || 'Not recorded'}</div>
+                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${window.UTILS.escapeText(plan.objectives || plan.auditObjectives || 'Not recorded')}</div>
                     </div>
                     <div>
                         <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Criteria</div>
@@ -1651,7 +1651,7 @@ window.printAuditChecklist = function (planId) {
         let content = `
             <html>
             <head>
-                <title>Audit Checklist Report - ${plan.client}</title>
+                <title>Audit Checklist Report - ${window.UTILS.escapeHtml(plan.client)}</title>
                 <style>
                     body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; -webkit-print-color-adjust: exact; padding: 20px; }
                     .header { text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem; position: relative; }
@@ -1670,8 +1670,8 @@ window.printAuditChecklist = function (planId) {
                         <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
                     </div>
                     <h1>Audit Checklist Execution Report</h1>
-                    <p><strong>Client:</strong> ${plan.client} | <strong>Standard:</strong> ${plan.standard} | <strong>Date:</strong> ${window.UTILS.formatDate(plan.date)}</p>
-                    <p><strong>Auditor(s):</strong> ${auditorNames} | <strong>Status:</strong> ${report ? 'Finalized' : 'In Progress'}</p>
+                    <p><strong>Client:</strong> ${window.UTILS.escapeHtml(plan.client)} | <strong>Standard:</strong> ${window.UTILS.escapeHtml(plan.standard)} | <strong>Date:</strong> ${window.UTILS.formatDate(plan.date)}</p>
+                    <p><strong>Auditor(s):</strong> ${window.UTILS.escapeHtml(auditorNames)} | <strong>Status:</strong> ${report ? 'Finalized' : 'In Progress'}</p>
                 </div>
         `;
 
@@ -1681,7 +1681,7 @@ window.printAuditChecklist = function (planId) {
 
             content += `
                 <div class="section">
-                    <h2>${cl.name}</h2>
+                    <h2>${window.UTILS.escapeHtml(cl.name)}</h2>
                     <table>
                         <thead>
                             <tr>
@@ -1697,7 +1697,7 @@ window.printAuditChecklist = function (planId) {
             if (cl.clauses) {
                 // Hierarchical
                 cl.clauses.forEach(clause => {
-                    content += `<tr class="main-clause"><td colspan="4">${clause.mainClause} ${clause.title || ''}</td></tr>`;
+                    content += `<tr class="main-clause"><td colspan="4">${window.UTILS.escapeHtml(clause.mainClause)} ${window.UTILS.escapeHtml(clause.title || '')}</td></tr>`;
                     (clause.subClauses || []).forEach((sub, subIdx) => {
                         // Check if this sub-clause has nested items
                         if (sub.items && sub.items.length > 0) {
@@ -1711,10 +1711,10 @@ window.printAuditChecklist = function (planId) {
 
                                 content += `
                                     <tr>
-                                        <td>${item.clause || sub.clause || ''}</td>
-                                        <td>${reqText}</td>
+                                        <td>${window.UTILS.escapeHtml(item.clause || sub.clause || '')}</td>
+                                        <td>${window.UTILS.escapeText(reqText)}</td>
                                         <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
-                                        <td>${c}</td>
+                                        <td>${window.UTILS.escapeText(c)}</td>
                                     </tr>
                                  `;
                             });
@@ -1728,10 +1728,10 @@ window.printAuditChecklist = function (planId) {
 
                             content += `
                                 <tr>
-                                    <td>${sub.clause || ''}</td>
-                                    <td>${reqText}</td>
+                                    <td>${window.UTILS.escapeHtml(sub.clause || '')}</td>
+                                    <td>${window.UTILS.escapeText(reqText)}</td>
                                     <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
-                                    <td>${c}</td>
+                                    <td>${window.UTILS.escapeText(c)}</td>
                                 </tr>
                              `;
                         }
@@ -1747,10 +1747,10 @@ window.printAuditChecklist = function (planId) {
 
                     content += `
                         <tr>
-                            <td>${item.clause || ''}</td>
-                            <td>${item.requirement || item.text || item.title || ''}</td>
+                            <td>${window.UTILS.escapeHtml(item.clause || '')}</td>
+                            <td>${window.UTILS.escapeText(item.requirement || item.text || item.title || '')}</td>
                             <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
-                            <td>${c}</td>
+                            <td>${window.UTILS.escapeText(c)}</td>
                         </tr>
                     `;
                 });
@@ -1773,10 +1773,10 @@ window.printAuditChecklist = function (planId) {
                         <tbody>
                             ${report.checklistProgress.map(p => `
                                 <tr>
-                                    <td>${p.clause || ''}</td>
-                                    <td>${p.requirement || p.text || ''}</td>
+                                    <td>${window.UTILS.escapeHtml(p.clause || '')}</td>
+                                    <td>${window.UTILS.escapeText(p.requirement || p.text || '')}</td>
                                     <td style="color: ${statusColor[p.status || ''] || '#333'}; font-weight: bold;">${statusText[p.status || ''] || 'Not Assessed'}</td>
-                                    <td>${p.comment || '-'}</td>
+                                    <td>${window.UTILS.escapeText(p.comment || '-')}</td>
                                 </tr>`).join('')}
                         </tbody>
                     </table>
@@ -1786,7 +1786,7 @@ window.printAuditChecklist = function (planId) {
         if (report && report.ncrs && report.ncrs.length > 0) {
             content += `<div class="section"><h2>Audit Findings (NCRs)</h2><ul>`;
             report.ncrs.forEach(ncr => {
-                content += `<li><strong>${ncr.type} (${ncr.clause}):</strong> ${ncr.description}</li>`;
+                content += `<li><strong>${window.UTILS.escapeText(ncr.type)} (${window.UTILS.escapeText(ncr.clause)}):</strong> ${window.UTILS.escapeText(ncr.description)}</li>`;
             });
             content += `</ul></div>`;
         }
@@ -2035,8 +2035,8 @@ window.renderConfigureChecklist = async function (planId) {
                                     <div style="display: flex; align-items: center; gap: 1rem;">
                                         <input type="checkbox" class="checklist-select-cb" data-id="${cl.id}" ${isMainSelected ? 'checked' : ''} style="width: 20px; height: 20px; cursor: pointer;">
                                         <div>
-                                            <h4 style="margin: 0; cursor: pointer;" data-action="toggleCardItems">${cl.name}</h4>
-                                            <small style="color: var(--text-secondary);">${items.length} items • ${cl.standard || 'General'}</small>
+                                            <h4 style="margin: 0; cursor: pointer;" data-action="toggleCardItems">${window.UTILS.escapeHtml(cl.name)}</h4>
+                                            <small style="color: var(--text-secondary);">${items.length} items • ${window.UTILS.escapeHtml(cl.standard || 'General')}</small>
                                         </div>
                                     </div>
                                     <button class="btn btn-sm btn-outline-secondary" data-action="toggleCardItems" aria-label="Collapse">
@@ -2076,7 +2076,7 @@ window.renderConfigureChecklist = async function (planId) {
                                                 <td style="padding: 10px; text-align: center; vertical-align: top;">
                                                     <input type="checkbox" class="item-select-cb" data-item-id="${item.id}" data-checklist-id="${cl.id}" ${itemSelected ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px;" data-action-change="configItemSelectionChanged" data-arg1="${cl.id}">
                                                 </td>
-                                                <td style="padding: 10px; font-weight: 600; color: #475569; font-family: monospace; vertical-align: top;">${item.clause || '-'}</td>
+                                                <td style="padding: 10px; font-weight: 600; color: #475569; font-family: monospace; vertical-align: top;">${window.UTILS.escapeHtml(item.clause || '-')}</td>
                                                 <td style="padding: 10px; line-height: 1.5; vertical-align: top;">
                                                     <span class="item-text" style="${isOverridden ? 'color: #0369a1; font-style: italic;' : ''}">${window.UTILS.escapeHtml(overrideText)}</span>
                                                     ${isOverridden ? '<span style="margin-left: 8px; font-size: 0.7rem; background: #dbeafe; color: #1d4ed8; padding: 2px 6px; border-radius: 4px;">Overridden</span>' : ''}
@@ -2107,7 +2107,7 @@ window.renderConfigureChecklist = async function (planId) {
                     <i class="fa-solid fa-arrow-left"></i> Back to Plan
                 </button>
                 <h2 style="margin: 0;">Configure Checklists</h2>
-                <p style="color: var(--text-secondary); margin: 0;">Tailor the audit scope and requirements for <strong>${plan.client}</strong></p>
+                <p style="color: var(--text-secondary); margin: 0;">Tailor the audit scope and requirements for <strong>${window.UTILS.escapeHtml(plan.client)}</strong></p>
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <button class="btn btn-outline-secondary" data-action="viewAuditPlan" data-id="${planId}">Cancel</button>
@@ -2151,8 +2151,8 @@ window.renderConfigureChecklist = async function (planId) {
                 ${clientChecklists.length > 0 ? renderGroup(`${plan.client} Checklists`, clientChecklists, 'fa-solid fa-building', '#7c3aed') : `
                     <div style="margin-bottom: 2rem; padding: 1.5rem; background: #faf5ff; border: 2px dashed #c4b5fd; border-radius: 12px; text-align: center;">
                         <i class="fa-solid fa-building" style="font-size: 2rem; color: #7c3aed; margin-bottom: 0.5rem;"></i>
-                        <h4 style="margin: 0 0 0.25rem; color: #7c3aed;">${plan.client} &mdash; No Custom Checklists Yet</h4>
-                        <p style="margin: 0 0 1rem; font-size: 0.85rem; color: #6b7280;">Built from the documents ${plan.client} supplied and their organisation context</p>
+                        <h4 style="margin: 0 0 0.25rem; color: #7c3aed;">${window.UTILS.escapeHtml(plan.client)} &mdash; No Custom Checklists Yet</h4>
+                        <p style="margin: 0 0 1rem; font-size: 0.85rem; color: #6b7280;">Built from the documents ${window.UTILS.escapeHtml(plan.client)} supplied and their organisation context</p>
                         <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
                             <button class="btn btn-sm" style="background: #7c3aed; color: white; border: none;" data-action="createClientChecklistForPlan" data-id="${planId}" aria-label="Build from Client Documents">
                                 <i class="fa-solid fa-file-circle-check" style="margin-right: 0.25rem;"></i>Build from Client Documents
@@ -3927,11 +3927,11 @@ window.renderPreAuditReview = function (planId) {
                     </button>
                     <h2 style="margin: 1rem 0 0.5rem 0;">Pre-Audit Review (Stage 1)</h2>
                     <p style="color: var(--text-secondary); margin: 0;">
-                        <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>${client?.name || plan.client}
+                        <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>${window.UTILS.escapeHtml(client?.name || plan.client)}
                         <span style="margin: 0 0.75rem;">•</span>
                         <i class="fa-solid fa-calendar" style="margin-right: 0.5rem;"></i>${window.UTILS.formatDate(plan.date)}
                         <span style="margin: 0 0.75rem;">•</span>
-                        ${plan.standard}
+                        ${window.UTILS.escapeHtml(plan.standard)}
                     </p>
                 </div>
                 <div style="display: flex; gap: 1rem;">
@@ -4079,7 +4079,7 @@ window.renderPreAuditReview = function (planId) {
                                                 placeholder="Notes, findings, or recommendations..."
                                                 style="width: 100%; min-height: 60px; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: var(--radius-sm); resize: vertical; font-size: 0.9rem;"
                                                 data-action-change="updatePreAuditNotes" data-arg1="${planId}" data-arg2="${item.id}" data-arg3="this.value"
-                                            >${review.notes || ''}</textarea>
+                                            >${window.UTILS.escapeText(review.notes || '')}</textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -4115,7 +4115,7 @@ window.renderPreAuditReview = function (planId) {
                             placeholder="Overall assessment, key findings, and recommendations for the client..."
                             style="width: 100%; min-height: 120px; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: var(--radius-md); resize: vertical;"
                             data-action-change="updateReadinessNotes" data-arg1="${planId}" data-arg2="this.value"
-                        >${plan.preAudit.notes || ''}</textarea>
+                        >${window.UTILS.escapeText(plan.preAudit.notes || '')}</textarea>
                     </div>
                 </div>
             </div>
@@ -4386,7 +4386,7 @@ window.exportPreAuditPDF = function (planId) {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Pre-Audit Review Report — ${plan.client}</title>
+            <title>Pre-Audit Review Report — ${window.UTILS.escapeHtml(plan.client)}</title>
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -4436,8 +4436,8 @@ window.exportPreAuditPDF = function (planId) {
                 <h1>Pre-Audit Review Report</h1>
                 <div class="subtitle">ISO 17021-1 Stage 1 Assessment</div>
                 <div class="meta">
-                    <div><strong>Client:</strong> ${client?.name || plan.client}</div>
-                    <div><strong>Standard:</strong> ${plan.standard}</div>
+                    <div><strong>Client:</strong> ${window.UTILS.escapeHtml(client?.name || plan.client)}</div>
+                    <div><strong>Standard:</strong> ${window.UTILS.escapeHtml(plan.standard)}</div>
                     <div><strong>Audit Date:</strong> ${window.UTILS.formatDate(plan.date)}</div>
                     <div><strong>Review Completed:</strong> ${plan.preAudit.completedDate || 'In Progress'}</div>
                     <div><strong>Reviewed By:</strong> ${plan.preAudit.completedBy || 'Auditor'}</div>
@@ -4459,7 +4459,7 @@ window.exportPreAuditPDF = function (planId) {
                         <i class="fa-solid fa-${plan.preAudit.readinessDecision === 'Ready' ? 'check-circle' : plan.preAudit.readinessDecision === 'Conditional' ? 'exclamation-triangle' : 'times-circle'}"></i>
                         Decision: ${plan.preAudit.readinessDecision || 'Pending'}
                     </h3>
-                    <p style="white-space: pre-wrap; margin-top: 0.5rem;">${plan.preAudit.notes || 'No summary provided.'}</p>
+                    <p style="white-space: pre-wrap; margin-top: 0.5rem;">${window.UTILS.escapeText(plan.preAudit.notes || 'No summary provided.')}</p>
                 </div>
 
                 <!-- Stage 1 findings summary — what the document review established -->
@@ -4514,7 +4514,7 @@ window.exportPreAuditPDF = function (planId) {
                             <tr>
                                 <td>${item.label}</td>
                                 <td>${statusBadge}</td>
-                                <td style="font-size: 0.9rem; color: #475569;">${review.notes || '—'}</td>
+                                <td style="font-size: 0.9rem; color: #475569;">${window.UTILS.escapeText(review.notes || '—')}</td>
                             </tr>
                         `;
     }).join('')}

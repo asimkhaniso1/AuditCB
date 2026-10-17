@@ -94,14 +94,14 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
                      <div>
                          <label style="font-size: 0.8rem;">Interviewee Designation</label>
-                         <input type="text" id="ncr-designation-${uniqueId}" class="form-control form-control-sm" placeholder="e.g., Quality Manager" value="${saved.designation || ''}">
+                         <input type="text" id="ncr-designation-${uniqueId}" class="form-control form-control-sm" placeholder="e.g., Quality Manager" value="${window.UTILS.escapeText(saved.designation || '')}">
                      </div>
                      <div>
                          <label style="font-size: 0.8rem;">Department</label>
                          <select id="ncr-department-${uniqueId}" class="form-control form-control-sm">
                             <option value="">-- Select --</option>
-                            ${departments.map(d => `<option value="${d}" ${saved.department === d ? 'selected' : ''}>${d}</option>`).join('')}
-                            ${saved.department && !departments.includes(saved.department) ? `<option value="${saved.department}" selected>${saved.department}</option>` : ''}
+                            ${departments.map(d => `<option value="${window.UTILS.escapeHtml(d)}" ${saved.department === d ? 'selected' : ''}>${window.UTILS.escapeHtml(d)}</option>`).join('')}
+                            ${saved.department && !departments.includes(saved.department) ? `<option value="${window.UTILS.escapeText(saved.department)}" selected>${window.UTILS.escapeText(saved.department)}</option>` : ''}
                          </select>
                      </div>
                  </div>

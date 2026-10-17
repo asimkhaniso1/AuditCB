@@ -129,14 +129,23 @@ const UTILS = {
     },
 
     escapeHtml: function (unsafe) {
-        if (!unsafe) return '';
-        if (typeof unsafe !== 'string') return String(unsafe);
-        return unsafe
+        // null/undefined render as blank, but 0 and false must still show
+        // ("0 NCRs"), and non-strings are escaped too (an object's toString
+        // can carry markup).
+        return String(unsafe ?? '')
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    },
+
+    // escapeHtml for fields that older/current write paths stored through
+    // Sanitizer.sanitizeText (already entity-encoded: checklist comments, NCR
+    // descriptions, executive summary). Decoding first means the value is
+    // escaped exactly once — plain escapeHtml would print "&amp;amp;".
+    escapeText: function (value) {
+        return UTILS.escapeHtml(UTILS.decodeEntities(String(value ?? '')));
     },
 
     formatDate: function (dateStr, specificFormat) {
