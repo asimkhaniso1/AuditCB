@@ -199,7 +199,11 @@ window.openAddUserModal = function (userId = null) {
                 <small style="color: var(--text-secondary);"><i class="fa-solid fa-lock"></i> Only administrators can assign roles.</small>
                 `}
             </div>
-            ${!isEdit ? `
+            ${!isEdit && window.SupabaseClient?.isInitialized ? `
+            <div class="form-group">
+                <small style="color: var(--text-secondary);"><i class="fa-solid fa-envelope"></i> The user will receive an invitation email to set their own password.</small>
+            </div>
+            ` : !isEdit ? `
             <div class="form-group">
                 <label>Temporary Password <span style="color: var(--danger-color);">*</span></label>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -373,53 +377,31 @@ window.saveUser = async function (userId) {
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
         };
 
-        // Add to Supabase if available
+        // Add to Supabase if available. The invite-user edge function creates
+        // the auth user and its profiles row server-side (admin only), so no
+        // password is set here: the user picks one from the invitation email.
         if (window.SupabaseClient?.isInitialized) {
             try {
-                // Create Supabase Auth user first
-                const signUpResult = await window.SupabaseClient.signUp(email, defaultPassword, {
-                    full_name: name,
-                    role: role
-                });
+                const invited = await window.callInviteUserFunction(email, name, role);
 
-                if (signUpResult?.user) {
-                    // Update user ID to match Supabase Auth ID
-                    newUser.id = signUpResult.user.id;
-                    newUser.supabaseId = signUpResult.user.id;
-                    newUser.isLocal = false;
-
-                    Logger.info('Supabase Auth user created:', signUpResult.user.id);
-                }
-
-                // Create/Update in profiles table
-                const { error: profileError } = await window.SupabaseClient.client
-                    .from('profiles')
-                    .upsert([{
-                        id: newUser.supabaseId || newUser.id,
-                        email: email,
-                        full_name: name,
-                        role: role,
-                        avatar_url: newUser.avatar
-                    }], {
-                        onConflict: 'id'
-                    });
-
-                if (profileError) {
-                    console.warn('Profile creation warning:', profileError);
-                }
+                newUser.id = invited.id;
+                newUser.supabaseId = invited.id;
+                newUser.isLocal = false;
+                Logger.info('User invited via edge function:', invited.id);
 
                 // If role is Auditor or Lead Auditor, auto-create auditor profile
                 if (role === 'Auditor' || role === 'Lead Auditor') {
-                    await ensureAuditorProfile(newUser.supabaseId || newUser.id, name);
+                    await ensureAuditorProfile(newUser.id, name);
                 }
 
-                window.showNotification(`User created successfully! Login: ${email} / Password: ${defaultPassword}`, 'success');
+                window.showNotification(`User created! An invitation email has been sent to ${email}.`, 'success');
             } catch (error) {
                 Logger.error('Supabase user creation failed:', error);
-                window.showNotification('User created locally (cloud sync pending)', 'warning');
+                window.showNotification('Failed to create user: ' + error.message, 'error');
+                return;
             }
         } else {
-            window.showNotification('User created successfully', 'success');
+            window.showNotification(`User created locally. Temporary password: ${defaultPassword}`, 'success');
         }
 
         window.state.users.push(newUser);
@@ -607,6 +589,35 @@ window.sendPasswordReset = async function (email) {
 };
 
 
+// Create a user through the invite-user edge function (public signup is off,
+// so the browser cannot create auth users itself). Resolves with the
+// function's `user`; throws an Error carrying the function's own message.
+window.callInviteUserFunction = async function (email, fullName, role) {
+    const { data, error } = await window.SupabaseClient.client.functions.invoke('invite-user', {
+        body: { email: email, full_name: fullName, role: role }
+    });
+
+    if (error) {
+        // On a non-2xx reply supabase-js only says "non-2xx status code";
+        // the function's JSON body ({ error }) is on error.context.
+        let message = error.message;
+        const response = error.context;
+        if (response && typeof response.json === 'function') {
+            try {
+                const body = await response.clone().json();
+                if (body?.error) message = body.error;
+            } catch { /* body was not JSON */ }
+            if (response.status === 403) {
+                message += ' (your account does not have the Admin role)';
+            }
+        }
+        throw new Error(message);
+    }
+    if (data?.error) throw new Error(data.error);
+    if (!data?.user?.id) throw new Error('invite-user returned no user');
+    return data.user;
+};
+
 // Invite user (create with email invitation)
 window.inviteUser = async function () {
     const email = document.getElementById('invite-email').value.trim();
@@ -638,49 +649,16 @@ window.inviteUser = async function () {
             throw new Error('Supabase is not configured. Please set up Supabase in System Settings.');
         }
 
-        // Use Supabase's signUp with email confirmation
-        const tempPassword = 'TempPass' + Math.random().toString(36).substring(2, 15) + '!';
         const fullName = email.split('@')[0]; // Use email username as temporary name
 
-        const { data: authData, error: signUpError } = await window.SupabaseClient.client.auth.signUp({
-            email: email,
-            password: tempPassword,
-            options: {
-                data: {
-                    full_name: fullName,
-                    role: role
-                },
-                emailRedirectTo: `${window.location.origin}/#auth/callback`
-            }
-        });
-
-        if (signUpError) {
-            throw signUpError;
-        }
-
-        Logger.info('Auth user created:', authData.user.id);
-
-        // Create profile entry
-        const { error: profileError } = await window.SupabaseClient.client
-            .from('profiles')
-            .upsert([{
-                id: authData.user.id,
-                email: email,
-                full_name: fullName,
-                role: role,
-                avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`
-            }], {
-                onConflict: 'id'
-            });
-
-        if (profileError) {
-            Logger.warn('Profile creation warning:', profileError.message);
-            // Continue anyway - profile might be created by database trigger
-        }
+        // The edge function creates the auth user + profiles row and has
+        // Supabase send the invitation email.
+        const invited = await window.callInviteUserFunction(email, fullName, role);
+        Logger.info('User invited via edge function:', invited.id);
 
         // Add to local state
         const newUser = {
-            id: authData.user.id,
+            id: invited.id,
             name: fullName,
             email: email,
             role: role,
@@ -696,51 +674,16 @@ window.inviteUser = async function () {
 
         window.closeModal();
 
-        // Send invitation email
-        if (window.EmailService?.isAvailable()) {
-            const confirmationUrl = authData.user.confirmation_url ||
-                `${window.location.origin}/#auth/confirm?token=${authData.user.id}`;
-
-            const emailResult = await window.EmailService.sendUserInvitation(
-                email,
-                fullName,
-                role,
-                confirmationUrl
-            );
-
-            if (emailResult.success) {
-                window.showNotification(
-                    `User created! Invitation email sent to ${email}.`,
-                    'success'
-                );
-            } else {
-                window.showNotification(
-                    `User created but email failed to send. Please contact ${email} manually.`,
-                    'warning'
-                );
-            }
-        } else {
-            window.showNotification(
-                `User created! A confirmation email has been sent to ${email}.`,
-                'success'
-            );
-        }
+        window.showNotification(
+            `User created! An invitation email has been sent to ${email}.`,
+            'success'
+        );
 
         Logger.info('User invited successfully:', newUser);
 
     } catch (error) {
         Logger.error('Failed to invite user:', error);
-
-        let errorMessage = 'Failed to send invitation: ' + error.message;
-
-        // Provide helpful error messages
-        if (error.message.includes('already registered')) {
-            errorMessage = 'This email is already registered. User may already have an account.';
-        } else if (error.message.includes('email')) {
-            errorMessage = 'Email configuration error. Please configure Supabase email settings.';
-        }
-
-        window.showNotification(errorMessage, 'error');
+        window.showNotification('Failed to send invitation: ' + error.message, 'error');
     }
 };
 
