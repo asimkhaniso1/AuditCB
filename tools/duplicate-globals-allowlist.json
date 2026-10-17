@@ -1,0 +1,6 @@
+{
+    "$comment": "Globals deliberately defined in more than one browser script. Checked by tools/check-duplicate-globals.js (npm run check:globals, tests/duplicate-globals.test.js). Every entry needs a reason; an entry that is no longer duplicated fails the check so this list cannot rot.",
+    "Sanitizer": "Boot shim: csp-boot.js (loaded first, not deferred) assigns `window.Sanitizer || {...emergency escapes}` so early scripts never hit a ReferenceError; sanitization.js replaces it with the real object a few scripts later.",
+    "UTILS": "Boot shim: csp-boot.js assigns `window.UTILS || { escapeHtml }` as an emergency fallback in case utils.js fails to load; utils.js replaces it with the real object.",
+    "state": "Shared app state object, not a function: script.js creates and exports it, and data-migration.js's clearAllData() deliberately replaces it with a fresh empty state when the user resets the database."
+}
