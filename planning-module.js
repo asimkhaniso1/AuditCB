@@ -2316,30 +2316,15 @@ window.deleteSelectedChecklistItems = function (planId, clId) {
 
         window.saveData();
 
-        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-            try {
-                // Carry client_id / client_name through: this path re-upserts an
-                // EXISTING checklist after editing its questions, so dropping
-                // them here would strip a client-specific checklist of its owner
-                // (syncChecklistsFromSupabase reads both back) and remove it from
-                // that client's Checklists view.
-                await window.SupabaseClient.client.from('checklists').upsert({
-                    id: String(checklist.id),
-                    name: checklist.name,
-                    standard: checklist.standard,
-                    type: checklist.type,
-                    client_id: checklist.clientId || null,
-                    client_name: checklist.clientName || null,
-                    clauses: checklist.clauses,
-                    created_by: checklist.createdBy,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'id' });
-            } catch (err) {
-                if (window.Logger) window.Logger.error('Planning', 'Checklist sync failed: ' + err.message);
-            }
-        }
+        // This path re-upserts an EXISTING checklist after editing its
+        // questions; upsertChecklist carries the full canonical row (incl.
+        // client_id / client_name) and reports the returned error.
+        const cloud = (window.SupabaseClient && window.SupabaseClient.isInitialized)
+            ? await window.SupabaseClient.upsertChecklist(checklist)
+            : { ok: true };
 
         window.showNotification(`Deleted ${doomed.size} question${doomed.size === 1 ? '' : 's'} — ${after.length} remaining`, 'success');
+        if (!cloud.ok) window.showNotification(`Questions deleted on this device but NOT saved to the cloud: ${(cloud.error && cloud.error.message) || 'unknown error'}`, 'error');
         window.renderConfigureChecklist(planId);
     });
 };

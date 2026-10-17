@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Setup window globals
 globalThis.window = globalThis.window || globalThis;
@@ -140,6 +140,30 @@ describe('DataService', () => {
         it('should not call saveData (delete is saveLocal: false)', async () => {
             await window.DataService.deleteAuditorAssignment('a1', 'c1');
             expect(window.saveData).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('tableInsert / tableUpdate / tableDelete — a returned { error } is a failure', () => {
+        function chain(result) {
+            const p = Promise.resolve(result);
+            const c = { match: () => p, then: (a, b) => p.then(a, b) };
+            return { insert: () => c, update: () => c, delete: () => c };
+        }
+        afterEach(() => { delete window.SupabaseClient.client; });
+
+        it('reports failure and warns when supabase-js resolves with an error', async () => {
+            window.SupabaseClient.client = { from: () => chain({ data: null, error: { message: 'RLS denied' } }) };
+            expect(await window.DataService.tableInsert('t', { a: 1 })).toBe(false);
+            expect(await window.DataService.tableUpdate('t', { a: 1 }, { id: 1 })).toBe(false);
+            expect(await window.DataService.tableDelete('t', { id: 1 })).toBe(false);
+            expect(window.showNotification).toHaveBeenCalledWith(expect.stringMatching(/Cloud sync failed/), 'warning');
+        });
+
+        it('reports success when there is no error', async () => {
+            window.SupabaseClient.client = { from: () => chain({ data: [], error: null }) };
+            expect(await window.DataService.tableInsert('t', { a: 1 })).toBe(true);
+            expect(await window.DataService.tableDelete('t', { id: 1 })).toBe(true);
+            expect(window.showNotification).not.toHaveBeenCalled();
         });
     });
 

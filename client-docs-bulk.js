@@ -3891,32 +3891,13 @@
             window.saveData();
         }
 
+        let cloudError = null;
         if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-            try {
-                // client_id / client_name are what make this a CLIENT-specific
-                // checklist; syncChecklistsFromSupabase reads them back, so
-                // omitting them here orphaned the checklist on the first cloud
-                // round-trip and it disappeared from the client's own view.
-                await window.SupabaseClient.client.from('checklists').upsert({
-                    id: String(checklist.id),
-                    name: checklist.name,
-                    standard: checklist.standard,
-                    type: checklist.type,
-                    audit_type: checklist.auditType || null,
-                    client_id: checklist.clientId || null,
-                    client_name: checklist.clientName || null,
-                    clauses: checklist.clauses,
-                    qa_context: {
-                        ...(checklist.qaContext || {}),
-                        sourceDocuments: checklist.sourceDocumentSnapshot || []
-                    },
-                    created_by: checklist.createdBy,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'id' });
-            } catch (err) {
-                if (window.Logger) window.Logger.error('ClientDocsBulk', 'Checklist sync failed: ' + err.message);
-            }
+            // upsertChecklist writes the canonical column set (incl. client_id /
+            // client_name) and reads the returned error, which supabase-js
+            // reports instead of throwing.
+            const res = await window.SupabaseClient.upsertChecklist(checklist);
+            if (!res.ok) cloudError = res.error || new Error('unknown error');
         }
 
         setWideModal(false);
@@ -3931,6 +3912,8 @@
             (qa ? `. ${window.ChecklistQA.summarize(qa)}` : ''),
             qa && qa.blocking ? 'warning' : 'success'
         );
+        // Shown after the success toast so it is the one left on top.
+        if (cloudError) notify(`Checklist "${checklist.name}" was saved on this device but NOT to the cloud: ${cloudError.message}`, 'error');
         if (qa && qa.blocking && window.Logger) {
             qa.issues.filter(i => i.severity === 'critical')
                 .forEach(i => window.Logger.warn('ChecklistQA', `${i.code} @ ${i.itemRef}: ${i.message}`));

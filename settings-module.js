@@ -843,7 +843,11 @@ window.runSupabaseDiagnostics = async function () {
         } else {
             log('Clients table insert SUCCESS! Schema is correct.', 'success');
             // Cleanup
-            await window.SupabaseClient.client.from('clients').delete().eq('id', testId);
+            const { error: cleanupErr } = await window.SupabaseClient.client.from('clients').delete().eq('id', testId);
+            if (cleanupErr) {
+                log(`Cleanup Failed: test client ${testId} was not deleted — ${cleanupErr.message}`, 'error');
+                window.showNotification(`Diagnostic test client ${testId} could not be deleted: ${cleanupErr.message}`, 'error');
+            }
         }
 
     } catch (e) {

@@ -2086,6 +2086,83 @@ const SupabaseClient = {
     },
 
     /**
+     * The one canonical checklists row. Every writer of the checklists table
+     * goes through this so no path drops a column the reader depends on.
+     * created_at is deliberately absent: the column defaults to NOW() on insert,
+     * and leaving it out of an upsert keeps the original date on update.
+     */
+    _checklistRow(checklist) {
+        return {
+            id: String(checklist.id),
+            name: checklist.name,
+            standard: checklist.standard,
+            type: checklist.type || 'global',
+            audit_type: checklist.auditType || null,
+            audit_scope: checklist.auditScope || null,
+            created_by: checklist.createdBy || null,
+            // client_id / client_name are what make a checklist CLIENT-specific;
+            // syncChecklistsFromSupabase reads both back.
+            client_id: checklist.clientId || null,
+            client_name: checklist.clientName || null,
+            clauses: checklist.clauses || [],
+            // The Ready-for-Audit gate's state. Without these the release
+            // record, the auditor's recorded dispositions and the scope the
+            // checklist was judged against exist only in the browser that
+            // made them.
+            ready_for_audit: checklist.readyForAudit || null,
+            resolved_issues: checklist.resolvedIssues || null,
+            qa_context: {
+                ...(checklist.qaContext || {}),
+                sourceDocuments: checklist.sourceDocumentSnapshot || checklist.qaContext?.sourceDocuments || []
+            },
+            updated_at: new Date().toISOString()
+        };
+    },
+
+    /**
+     * Upsert a single checklist. supabase-js reports RLS / schema failures in
+     * the returned `error` rather than throwing, so this checks it and never
+     * lets a failed write look like success.
+     * @returns {Promise<{ok: boolean, error?: Error}>}
+     */
+    async upsertChecklist(checklist) {
+        if (!this.isInitialized || !this.client) {
+            return { ok: false, error: new Error('Supabase not initialized') };
+        }
+        try {
+            const { error } = await this.client
+                .from('checklists')
+                .upsert(this._checklistRow(checklist), { onConflict: 'id' });
+            if (error) throw error;
+            return { ok: true };
+        } catch (error) {
+            Logger.error('Checklist upsert failed:', error);
+            return { ok: false, error };
+        }
+    },
+
+    /**
+     * Delete a single checklist, reading the returned error (see upsertChecklist).
+     * @returns {Promise<{ok: boolean, error?: Error}>}
+     */
+    async deleteChecklist(id) {
+        if (!this.isInitialized || !this.client) {
+            return { ok: false, error: new Error('Supabase not initialized') };
+        }
+        try {
+            const { error } = await this.client
+                .from('checklists')
+                .delete()
+                .eq('id', String(id));
+            if (error) throw error;
+            return { ok: true };
+        } catch (error) {
+            Logger.error('Checklist delete failed:', error);
+            return { ok: false, error };
+        }
+    },
+
+    /**
      * Sync checklists to Supabase
      */
     async syncChecklistsToSupabase(checklists) {
@@ -2097,29 +2174,7 @@ const SupabaseClient = {
             // client-specific checklist on its first cloud round-trip — the
             // checklist survived, but its owner did not, so it vanished from the
             // client's own Checklists view while still showing in the global one.
-            const batch = checklists.map(checklist => ({
-                id: checklist.id,
-                name: checklist.name,
-                standard: checklist.standard,
-                type: checklist.type || 'global',
-                audit_type: checklist.auditType || null,
-                audit_scope: checklist.auditScope || null,
-                created_by: checklist.createdBy || null,
-                client_id: checklist.clientId || null,
-                client_name: checklist.clientName || null,
-                clauses: checklist.clauses || [],
-                // The Ready-for-Audit gate's state. Without these the release
-                // record, the auditor's recorded dispositions and the scope the
-                // checklist was judged against exist only in the browser that
-                // made them.
-                ready_for_audit: checklist.readyForAudit || null,
-                resolved_issues: checklist.resolvedIssues || null,
-                qa_context: {
-                    ...(checklist.qaContext || {}),
-                    sourceDocuments: checklist.sourceDocumentSnapshot || checklist.qaContext?.sourceDocuments || []
-                },
-                updated_at: new Date().toISOString()
-            }));
+            const batch = checklists.map(checklist => this._checklistRow(checklist));
 
             if (batch.length > 0) {
                 const { error } = await this.client

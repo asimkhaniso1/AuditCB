@@ -15,6 +15,10 @@ const path = await import('path');
 const utils = await import('../utils.js');
 window.UTILS = window.UTILS || utils.default || utils;
 new Function(fs.readFileSync(path.resolve('./settings-kb.js'), 'utf8'))();
+window.Logger = window.Logger || { debug() { }, info() { }, warn() { }, error() { } };
+globalThis.Logger = window.Logger;
+const { createRequire } = await import('module');
+const RealSupabaseClient = createRequire(import.meta.url)('../supabase-client.js');
 
 const GMP = {
     id: 9001, name: 'GMP Guidelines Pakistan', fileName: 'GMP.pdf', uploadDate: '2026-09-29', status: 'ready',
@@ -46,7 +50,10 @@ describe('Checklist creation uses the analysis screen', () => {
         window.state.knowledgeBase = { standards: [JSON.parse(JSON.stringify(GMP))], sops: [], policies: [], marketing: [] };
         window.SupabaseClient = {
             isInitialized: true,
-            client: { from: () => ({ upsert: async (row) => { upserts.push(row); return {}; } }) }
+            client: { from: () => ({ upsert: async (row) => { upserts.push(row); return {}; } }) },
+            // The real single-checklist writer, run against the fake client.
+            _checklistRow: RealSupabaseClient._checklistRow,
+            upsertChecklist: RealSupabaseClient.upsertChecklist
         };
         window.AI_SERVICE = undefined;
         mount();
@@ -135,6 +142,25 @@ describe('Checklist creation uses the analysis screen', () => {
         const doc = window.state.knowledgeBase.standards[0];
         expect(doc.lastAuditType).toBe('initial');
         expect(doc.lastClientId).toBe('sg');
+    });
+
+    it('tells the user when the database refuses the checklist (supabase-js returns the error, it does not throw)', async () => {
+        window.SupabaseClient.client = {
+            from: () => ({ upsert: async () => ({ data: null, error: { message: 'new row violates row-level security policy' } }) })
+        };
+        const ck = await window.generateChecklistFromStandard(9001, 'standard', 'initial', '');
+        // Local behaviour is unchanged: the checklist is kept on this device.
+        expect(ck).toBeTruthy();
+        expect(window.state.checklists).toHaveLength(1);
+        const err = notes.find(n => n.type === 'error');
+        expect(err).toBeTruthy();
+        expect(err.msg).toMatch(/NOT to the cloud: new row violates row-level security policy/);
+    });
+
+    it('raises no error toast when the checklist reaches the database', async () => {
+        await window.generateChecklistFromStandard(9001, 'standard', 'initial', '');
+        expect(upserts).toHaveLength(1);
+        expect(notes.some(n => n.type === 'error')).toBe(false);
     });
 
     it('labels the checklist with the standard, not the Knowledge Base document title', async () => {
