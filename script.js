@@ -792,7 +792,7 @@ async function renderModule(moduleName, syncHash = true) {
             <div class="fade-in" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-exclamation-triangle" style="font-size: 3rem; color: var(--danger-color); margin-bottom: 1rem;"></i>
                 <h3>Error Loading Module</h3>
-                <p style="color: var(--text-secondary);">${error.message}</p>
+                <p style="color: var(--text-secondary);">${window.UTILS.escapeHtml(error.message)}</p>
                 <button class="btn btn-primary" data-action="renderModule" data-id="${moduleName}" aria-label="Sync">
                     <i class="fa-solid fa-sync"></i> Retry
                 </button>
@@ -1032,7 +1032,7 @@ function showNotification(message, type = 'success') {
 
     notification.innerHTML = `
         <i class="fa-solid ${style.icon}" style="font-size: 1.25rem;"></i>
-        <span>${message}</span>
+        <span>${window.UTILS.escapeHtml(message)}</span>
     `;
 
     document.body.appendChild(notification);
@@ -2005,8 +2005,8 @@ window.toggleUserMenu = function () {
         if (nameEl) nameEl.textContent = window.state.currentUser.name || 'User';
         if (infoEl) {
             infoEl.innerHTML = `
-        <div style="font-weight: 600; color: var(--text-color);">${window.state.currentUser.name || 'User'}</div>
-        <div style="font-size: 0.8rem; color: var(--text-secondary);">${window.state.currentUser.role || 'Role'}</div>
+        <div style="font-weight: 600; color: var(--text-color);">${window.UTILS.escapeHtml(window.state.currentUser.name || 'User')}</div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(window.state.currentUser.role || 'Role')}</div>
     `;
         }
     }

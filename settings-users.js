@@ -147,7 +147,7 @@ function renderUsersList(users) {
                             </button>
                             ` : ''}
                             ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
-                            <button class="btn btn-sm btn-icon" data-action="sendPasswordReset" data-id="${user.email}" title="Send Password Reset">
+                            <button class="btn btn-sm btn-icon" data-action="sendPasswordReset" data-id="${window.UTILS.escapeHtml(user.email)}" title="Send Password Reset">
                                 <i class="fa-solid fa-key" style="color: #f59e0b;"></i>
                             </button>
                             ` : ''}
@@ -176,11 +176,11 @@ window.openAddUserModal = function (userId = null) {
     <form id="user-form">
             <div class="form-group">
                 <label>Full Name <span style="color: var(--danger-color);">*</span></label>
-                <input type="text" class="form-control" id="user-name" value="${user.name || ''}" required>
+                <input type="text" class="form-control" id="user-name" value="${window.UTILS.escapeHtml(user.name || '')}" required>
             </div>
             <div class="form-group">
                 <label>Email Address <span style="color: var(--danger-color);">*</span></label>
-                <input type="email" class="form-control" id="user-email" value="${user.email || ''}" required ${isEdit && window.state.currentUser?.role !== 'Admin' ? 'disabled' : ''}>
+                <input type="email" class="form-control" id="user-email" value="${window.UTILS.escapeHtml(user.email || '')}" required ${isEdit && window.state.currentUser?.role !== 'Admin' ? 'disabled' : ''}>
                 ${isEdit && window.state.currentUser?.role !== 'Admin' ? '<small style="color: var(--text-secondary);">Email cannot be changed. Contact an Admin.</small>' : ''}
             </div>
             <div class="form-group">
@@ -194,8 +194,8 @@ window.openAddUserModal = function (userId = null) {
                     <option value="Technical Expert" ${user.role === 'Technical Expert' ? 'selected' : ''}>Technical Expert</option>
                 </select>
                 ` : `
-                <input type="text" class="form-control" id="user-role-display" value="${user.role || 'Auditor'}" readonly style="background: #f1f5f9;">
-                <input type="hidden" id="user-role" value="${user.role || 'Auditor'}">
+                <input type="text" class="form-control" id="user-role-display" value="${window.UTILS.escapeHtml(user.role || 'Auditor')}" readonly style="background: #f1f5f9;">
+                <input type="hidden" id="user-role" value="${window.UTILS.escapeHtml(user.role || 'Auditor')}">
                 <small style="color: var(--text-secondary);"><i class="fa-solid fa-lock"></i> Only administrators can assign roles.</small>
                 `}
             </div>

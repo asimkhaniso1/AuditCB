@@ -1111,7 +1111,7 @@ function renderChecklistEditor(checklistId) {
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Checklist Name <span style="color: var(--danger-color);">*</span></label>
-                            <input type="text" class="form-control" id="checklist-name" placeholder="e.g. ISO 9001 Core Requirements" value="${checklist?.name || ''}" required>
+                            <input type="text" class="form-control" id="checklist-name" placeholder="e.g. ISO 9001 Core Requirements" value="${window.UTILS.escapeHtml(checklist?.name || '')}" required>
                         </div>
                         <div class="form-group">
                             <label>Standard</label>
@@ -1574,9 +1574,9 @@ function viewChecklistDetail(id) {
             <div class="card" style="margin-bottom: 1.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: start;">
                     <div>
-                        <h2 style="margin-bottom: 0.5rem;">${checklist.name}</h2>
+                        <h2 style="margin-bottom: 0.5rem;">${window.UTILS.escapeHtml(checklist.name)}</h2>
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <span style="background: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">${checklist.standard}</span>
+                            <span style="background: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">${window.UTILS.escapeHtml(checklist.standard)}</span>
                             <span style="background: ${checklist.type === 'global' ? '#fef3c7' : '#d1fae5'}; color: ${checklist.type === 'global' ? '#d97706' : '#059669'}; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">
                                 <i class="fa-solid fa-${checklist.type === 'global' ? 'globe' : 'user'}" style="margin-right: 0.25rem;"></i>${checklist.type === 'global' ? 'Global' : 'Custom'}
                             </span>
@@ -1619,8 +1619,8 @@ function viewChecklistDetail(id) {
                     <div class="accordion-section" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
                         <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); color: #1e293b; cursor: pointer; user-select: none;" data-action="toggleAccordion">
                             <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">Clause ${mainClause.mainClause}</span>
-                                <span style="font-weight: 600; color: #1e293b;">${mainClause.title}</span>
+                                <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">Clause ${window.UTILS.escapeHtml(mainClause.mainClause)}</span>
+                                <span style="font-weight: 600; color: #1e293b;">${window.UTILS.escapeHtml(mainClause.title)}</span>
                                 <span style="color: var(--text-secondary); font-size: 0.85rem;">(${(mainClause.subClauses || []).reduce((t, sub) => t + (sub.items && sub.items.length > 0 ? sub.items.length : (sub.requirement ? 1 : 0)), 0)} items)</span>
                             </div>
                             <i class="fa-solid fa-chevron-down accordion-icon" style="transition: transform 0.3s; transform: ${idx === 0 ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
@@ -1636,8 +1636,8 @@ function viewChecklistDetail(id) {
                                     <div style="border-bottom: 1px solid #f1f5f9;">
                                         <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #f0f9ff; color: #1e293b; cursor: pointer; user-select: none;" data-action="toggleSubAccordion">
                                             <i class="fa-solid fa-caret-right sub-icon" style="transition: transform 0.2s; transform: rotate(90deg); color: #0369a1; font-size: 0.8rem;"></i>
-                                            <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">${sub.clause}</span>
-                                            <span style="font-weight: 500; color: #334155;">${sub.title || ''}</span>
+                                            <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">${window.UTILS.escapeHtml(sub.clause)}</span>
+                                            <span style="font-weight: 500; color: #334155;">${window.UTILS.escapeHtml(sub.title || '')}</span>
                                             <span style="color: var(--text-secondary); font-size: 0.8rem;">(${sub.items.length} items)</span>
                                         </div>
                                         <div style="display: block;">
@@ -1646,8 +1646,8 @@ function viewChecklistDetail(id) {
                                                     ${sub.items.map((item, itemIdx) => `
                                                         <tr style="border-bottom: 1px solid #f8fafc;">
                                                             <td style="width: 40px; padding: 0.5rem 0.5rem 0.5rem 2.5rem; font-weight: 400; color: var(--text-secondary); font-size: 0.85rem;">${itemIdx + 1}</td>
-                                                            <td style="width: 90px; padding: 0.5rem;"><span style="background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-weight: 500; font-size: 0.8rem;">${item.clause}</span></td>
-                                                            <td style="padding: 0.5rem; font-size: 0.9rem; color: #334155;">${item.requirement}</td>
+                                                            <td style="width: 90px; padding: 0.5rem;"><span style="background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-weight: 500; font-size: 0.8rem;">${window.UTILS.escapeHtml(item.clause)}</span></td>
+                                                            <td style="padding: 0.5rem; font-size: 0.9rem; color: #334155;">${window.UTILS.escapeHtml(item.requirement)}</td>
                                                         </tr>
                                                     `).join('')}
                                                 </tbody>
@@ -1658,8 +1658,8 @@ function viewChecklistDetail(id) {
             // Legacy flat structure or single-item sub-clause
             return `
                                     <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9;">
-                                        <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; white-space: nowrap;">${sub.clause}</span>
-                                        <span style="font-size: 0.9rem; color: #334155;">${sub.requirement || ''}</span>
+                                        <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; white-space: nowrap;">${window.UTILS.escapeHtml(sub.clause)}</span>
+                                        <span style="font-size: 0.9rem; color: #334155;">${window.UTILS.escapeHtml(sub.requirement || '')}</span>
                                     </div>`;
         }
     }).join('')}
@@ -1679,8 +1679,8 @@ function viewChecklistDetail(id) {
                                 ${(checklist.items || []).map((item, idx) => `
                                     <tr>
                                         <td style="font-weight: 500; color: var(--text-secondary);">${idx + 1}</td>
-                                        <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-weight: 500;">${item.clause || '-'}</span></td>
-                                        <td>${item.requirement || '-'}</td>
+                                        <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-weight: 500;">${window.UTILS.escapeHtml(item.clause || '-')}</span></td>
+                                        <td>${window.UTILS.escapeHtml(item.requirement || '-')}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>

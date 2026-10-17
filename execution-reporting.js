@@ -8,6 +8,28 @@
 (function () {
     'use strict';
 
+    // Stored text (client names, auditor remarks, AI narrative) is plain text and
+    // must be escaped where it enters an HTML string. Some report fields were
+    // written through Sanitizer.sanitizeText (escaped on WRITE), so htmlEsc
+    // decodes first — escaping is applied exactly once, never double.
+    const htmlEsc = (v) => {
+        const U = window.UTILS || {};
+        const raw = String(v ?? '');
+        const plain = U.decodeEntities ? U.decodeEntities(raw) : raw;
+        return U.escapeHtml
+            ? U.escapeHtml(plain)
+            : plain.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    };
+    // Rich-text fields edited in a contenteditable (conclusion, executive
+    // summary) legitimately carry <b>/<br>/<div>: sanitize, don't escape.
+    const richHtml = (v) => {
+        if (v == null || v === '') return '';
+        return (window.Sanitizer && typeof window.Sanitizer.sanitizeHTML === 'function')
+            ? window.Sanitizer.sanitizeHTML(String(v))
+            : htmlEsc(v);
+    };
+    window._reportHtmlEsc = htmlEsc;
+
     // Render-time editorial polish for auditor free-text remarks. Does not mutate stored data.
     // Safe transforms only: whitespace, punctuation, capitalization, common typos, brand casing.
     const fmtRemark = (t) => {
@@ -431,7 +453,8 @@
         const titleStyle = (opts && opts.titleStyle) || '';
         const reqStyle = (opts && opts.reqStyle) || 'margin-top:4px;color:#475569;font-size:0.85em;line-height:1.5;';
         const reqText = req || '';
-        const reqDisplay = (maxLen && reqText.length > maxLen) ? reqText.substring(0, maxLen) + '...' : reqText;
+        const reqDisplay = htmlEsc((maxLen && reqText.length > maxLen) ? reqText.substring(0, maxLen) + '...' : reqText);
+        title = title ? htmlEsc(title) : title;
 
         const fc = (window.ReportStats && typeof window.ReportStats.formatCriterion === 'function')
             ? (function () { try { return window.ReportStats.formatCriterion(item); } catch (_e) { return null; } })()
@@ -452,9 +475,9 @@
         }
 
         const approvedEvidence = item.clientEvidenceStatement ? String(item.clientEvidenceStatement).trim() : '';
-        const evidenceHtml = approvedEvidence || cleanEvidenceText(item.comment);
+        const evidenceHtml = htmlEsc(approvedEvidence || cleanEvidenceText(item.comment));
         const stmtRaw = String(item.ncrDescription || '').trim();
-        const stmtHtml = stmtRaw ? cleanEvidenceText(stmtRaw) : '';
+        const stmtHtml = stmtRaw ? htmlEsc(cleanEvidenceText(stmtRaw)) : '';
         const LBL = 'display:block;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#64748b;margin-bottom:2px;';
         const remarksHtml = '<div><span style="' + LBL + '">Objective Evidence</span>'
             + (evidenceHtml || '<span style="color:#94a3b8;">No evidence recorded.</span>') + '</div>'
@@ -1258,7 +1281,7 @@
         const renderEvThumbs = (item) => {
             const imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
             if (!imgs.length) return '';
-            return `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${imgs.map(url => `<img src="${url}" data-ev-thumb="1" style="height:50px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" data-action="open" data-arg1="${url}" data-arg2="_blank">`).join('')}</div>`;
+            return `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${imgs.map(url => `<img src="${htmlEsc(url)}" data-ev-thumb="1" style="height:50px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" data-action="open" data-arg1="${htmlEsc(url)}" data-arg2="_blank">`).join('')}</div>`;
         };
 
         const ncRows = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() !== 'observation' && (i.ncrType || '').toLowerCase() !== 'ofi').map((item, idx) => {
@@ -1285,7 +1308,7 @@
             const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return `<tr style="background:${idx % 2 ? '#f5f3ff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f5f3ff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:10px 14px;color:#334155;">${htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         // OFI rows (Opportunities for Improvement only)
@@ -1293,7 +1316,7 @@
             const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return `<tr style="background:${idx % 2 ? '#f0fbff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f0fbff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:10px 14px;color:#334155;">${htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         // Conformance rows (items with comments or evidence)
@@ -1301,7 +1324,7 @@
             const clause = displayCriterion(item, false);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return `<tr style="background:${idx % 2 ? '#f0fdf4' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f0fdf4' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">${htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         const overlay = document.createElement('div');
@@ -1353,7 +1376,7 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <div>
                         <h2 style="margin:0 0 4px;font-size:1.25rem;"><i class="fa-solid fa-file-pdf" style="margin-right:8px;"></i>Report Preview & Edit</h2>
-                        <div style="opacity:0.8;font-size:0.88rem;">${d.report.client} — ${d.report.standard || 'ISO Standard'}</div>
+                        <div style="opacity:0.8;font-size:0.88rem;">${htmlEsc(d.report.client)} — ${htmlEsc(d.report.standard || 'ISO Standard')}</div>
                     </div>
                     <button data-action="removeElement" data-id="report-preview-overlay" style="background:rgba(255,255,255,0.15);border:none;color:white;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;" aria-label="Close"><i class="fa-solid fa-times"></i></button>
                 </div>
@@ -1384,13 +1407,13 @@
                     <!-- CB Branding Header -->
                     <div style="text-align:center;margin-bottom:3rem;">
                         ${d.cbLogo ? `
-                        <img src="${d.cbLogo}" alt="CB Logo" style="height:80px;object-fit:contain;margin-bottom:1rem;">
+                        <img src="${htmlEsc(d.cbLogo)}" alt="CB Logo" style="height:80px;object-fit:contain;margin-bottom:1rem;">
                         ` : `
                         <div style="width:80px;height:80px;margin:0 auto 1rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(37,99,235,0.3);">
                             <i class="fa-solid fa-certificate" style="color:white;font-size:2.5rem;"></i>
                         </div>
                         `}
-                        <h1 style="margin:0 0 0.5rem;font-size:1.8rem;color:#1e293b;font-weight:700;">${d.cbName || 'ISOXPERT Audit360'}</h1>
+                        <h1 style="margin:0 0 0.5rem;font-size:1.8rem;color:#1e293b;font-weight:700;">${htmlEsc(d.cbName || 'ISOXPERT Audit360')}</h1>
                         <div style="font-size:0.95rem;color:#64748b;font-weight:500;">ISO Certification Body</div>
                         <div style="width:60px;height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed);margin:1.5rem auto;border-radius:2px;"></div>
                     </div>
@@ -1398,16 +1421,16 @@
                     <!-- Report Title -->
                     <div style="text-align:center;margin-bottom:3rem;">
                         <div style="font-size:0.85rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:0.75rem;">Audit Report</div>
-                        <h2 style="margin:0 0 1rem;font-size:2rem;color:#0f172a;font-weight:800;line-height:1.3;">${d.report.client}</h2>
+                        <h2 style="margin:0 0 1rem;font-size:2rem;color:#0f172a;font-weight:800;line-height:1.3;">${htmlEsc(d.report.client)}</h2>
                         <div style="display:inline-block;padding:8px 20px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:2px solid #3b82f6;border-radius:25px;color:#1d4ed8;font-weight:700;font-size:1rem;">
-                            ${d.report.standard || 'ISO Standard'}
+                            ${htmlEsc(d.report.standard || 'ISO Standard')}
                         </div>
                     </div>
                     
                     <!-- Client Logo -->
                     <div style="text-align:center;margin:2rem 0;">
                         ${d.clientLogo ? `
-                        <img src="${d.clientLogo}" alt="Client Logo" style="height:100px;object-fit:contain;">
+                        <img src="${htmlEsc(d.clientLogo)}" alt="Client Logo" style="height:100px;object-fit:contain;">
                         ` : `
                         <div style="width:120px;height:120px;margin:0 auto;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0.5rem;">
                             <i class="fa-solid fa-building" style="font-size:2rem;color:#94a3b8;"></i>
@@ -1421,7 +1444,7 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Type</div>
-                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.auditPlan?.type || 'Certification Audit'}</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${htmlEsc(d.auditPlan?.type || 'Certification Audit')}</div>
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Date</div>
@@ -1429,7 +1452,7 @@
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Lead Auditor</div>
-                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.report.leadAuditor || '—'}</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${htmlEsc(d.report.leadAuditor || '—')}</div>
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Report ID</div>
@@ -1438,12 +1461,12 @@
                             ${d.auditPlan?.team && d.auditPlan.team.length > 1 ? `
                             <div style="grid-column:span 2;">
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Team</div>
-                                <div style="font-size:0.95rem;color:#1e293b;font-weight:600;">${d.auditPlan.team.join(', ')}</div>
+                                <div style="font-size:0.95rem;color:#1e293b;font-weight:600;">${htmlEsc(d.auditPlan.team.join(', '))}</div>
                             </div>` : ''}
                             ${d.auditPlan?.scope ? `
                             <div style="grid-column:span 2;">
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Scope</div>
-                                <div style="font-size:0.9rem;color:#334155;line-height:1.5;">${typeof d.auditPlan.scope === 'string' ? d.auditPlan.scope : (d.client?.goodsServices || []).map(g => g.name).join(', ') || 'As per certification scope'}</div>
+                                <div style="font-size:0.9rem;color:#334155;line-height:1.5;">${htmlEsc(typeof d.auditPlan.scope === 'string' ? d.auditPlan.scope : (d.client?.goodsServices || []).map(g => g.name).join(', ') || 'As per certification scope')}</div>
                             </div>` : ''}
                         </div>
                     </div>
@@ -1470,13 +1493,13 @@
                             <table style="width:100%;font-size:0.75rem;border-collapse:collapse;">
                                 <thead><tr style="background:#f1f5f9;"><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Ver</th><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Date</th><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Author</th><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Description</th></tr></thead>
                                 <tbody>
-                                    ${window._getRevisionRows(d.report, d.today).map(r => `<tr><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.ver}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.date}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.author}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.desc}</td></tr>`).join('')}
+                                    ${window._getRevisionRows(d.report, d.today).map(r => `<tr><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${htmlEsc(r.ver)}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${htmlEsc(r.date)}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${htmlEsc(r.author)}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${htmlEsc(r.desc)}</td></tr>`).join('')}
                                 </tbody>
                             </table>
                         </div>` : ''}
                         <div style="margin-top:0.75rem;padding:0.75rem;background:#fef3c7;border-radius:6px;text-align:center;font-size:0.75rem;color:#92400e;">
                             <i class="fa-solid fa-lock" style="margin-right:0.25rem;"></i>
-                            <strong>Confidential Document</strong> — For authorized use only. This report is the property of ${d.cbName || 'the Certification Body'}.
+                            <strong>Confidential Document</strong> — For authorized use only. This report is the property of ${htmlEsc(d.cbName || 'the Certification Body')}.
                         </div>
                     </div>
                 </div>
@@ -1487,19 +1510,19 @@
                     <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#1e3a5f,#2563eb);" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">1</span>AUDIT INFORMATION<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <table style="width:100%;font-size:0.86rem;border-collapse:collapse;">
-                            <tr><td style="padding:7px 12px;width:35%;color:#64748b;font-weight:600;">Client</td><td style="padding:7px 12px;">${d.report.client}</td></tr>
-                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Industry</td><td style="padding:7px 12px;">${d.client.industry || '—'}</td></tr>
-                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Certification Scope</td><td style="padding:7px 12px;">${d.client.certificationScope || '—'}</td></tr>
-                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Standard</td><td style="padding:7px 12px;">${d.report.standard || d.auditPlan?.standard || '—'}</td></tr>
-                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Audit Type</td><td style="padding:7px 12px;">${d.auditPlan?.auditType || 'Initial'}</td></tr>
+                            <tr><td style="padding:7px 12px;width:35%;color:#64748b;font-weight:600;">Client</td><td style="padding:7px 12px;">${htmlEsc(d.report.client)}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Industry</td><td style="padding:7px 12px;">${htmlEsc(d.client.industry || '—')}</td></tr>
+                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Certification Scope</td><td style="padding:7px 12px;">${htmlEsc(d.client.certificationScope || '—')}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Standard</td><td style="padding:7px 12px;">${htmlEsc(d.report.standard || d.auditPlan?.standard || '—')}</td></tr>
+                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Audit Type</td><td style="padding:7px 12px;">${htmlEsc(d.auditPlan?.auditType || 'Initial')}</td></tr>
                             <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Dates</td><td style="padding:7px 12px;">${d.report.date || '—'} ${d.report.endDate ? '→ ' + d.report.endDate : ''}</td></tr>
-                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Lead Auditor</td><td style="padding:7px 12px;">${d.report.leadAuditor || '—'}</td></tr>
-                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${(function () { var s = (d.client.sites && d.client.sites[0]) || {}; return [d.client.address || s.address, d.client.city || s.city, d.client.province, d.client.country || s.country].filter(Boolean).join(', ') || '—'; })()}</td></tr>
+                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Lead Auditor</td><td style="padding:7px 12px;">${htmlEsc(d.report.leadAuditor || '—')}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${(function () { var s = (d.client.sites && d.client.sites[0]) || {}; return htmlEsc([d.client.address || s.address, d.client.city || s.city, d.client.province, d.client.country || s.country].filter(Boolean).join(', ') || '—'); })()}</td></tr>
                 ${(() => {
                 const locAddr = [d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ');
-                const addrFallback = locAddr ? `<div style="padding:16px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;text-align:center;"><i class="fa-solid fa-map-location-dot" style="font-size:1.5rem;color:#64748b;margin-bottom:6px;display:block;"></i><div style="color:#334155;font-size:0.9rem;font-weight:600;">${locAddr}</div></div>` : '';
+                const addrFallback = locAddr ? `<div style="padding:16px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;text-align:center;"><i class="fa-solid fa-map-location-dot" style="font-size:1.5rem;color:#64748b;margin-bottom:6px;display:block;"></i><div style="color:#334155;font-size:0.9rem;font-weight:600;">${htmlEsc(locAddr)}</div></div>` : '';
                 if (d.client.latitude && d.client.longitude) {
-                    return `<tr><td colspan="2" style="padding:8px 12px;"><iframe src="https://www.openstreetmap.org/export/embed.html?bbox=${(parseFloat(d.client.longitude) - 0.015).toFixed(4)},${(parseFloat(d.client.latitude) - 0.008).toFixed(4)},${(parseFloat(d.client.longitude) + 0.015).toFixed(4)},${(parseFloat(d.client.latitude) + 0.008).toFixed(4)}&layer=mapnik&marker=${d.client.latitude},${d.client.longitude}" style="width:100%;height:140px;border:none;border-radius:8px;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';"></iframe><div style="display:none;">${addrFallback}</div></td></tr>`;
+                    return `<tr><td colspan="2" style="padding:8px 12px;"><iframe src="https://www.openstreetmap.org/export/embed.html?bbox=${(parseFloat(d.client.longitude) - 0.015).toFixed(4)},${(parseFloat(d.client.latitude) - 0.008).toFixed(4)},${(parseFloat(d.client.longitude) + 0.015).toFixed(4)},${(parseFloat(d.client.latitude) + 0.008).toFixed(4)}&layer=mapnik&marker=${htmlEsc(d.client.latitude)},${htmlEsc(d.client.longitude)}" style="width:100%;height:140px;border:none;border-radius:8px;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';"></iframe><div style="display:none;">${addrFallback}</div></td></tr>`;
                 }
                 if (locAddr) {
                     return `<tr><td colspan="2" style="padding:8px 12px;">${addrFallback}</td></tr>`;
@@ -1539,7 +1562,7 @@
         const addr = [s.address, s.city, s.country].filter(Boolean).join(', ') || '—';
         const scope = pvSiteScopes[s.name] || d.client.certificationScope || '—';
         const sampled = pvSampledSiteNames.indexOf(s.name) !== -1;
-        return `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:7px 12px;font-weight:600;">${s.name}</td><td style="padding:7px 12px;">${addr}</td><td style="padding:7px 12px;">${scope}</td><td style="padding:7px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sampled ? 'background:#dcfce7;color:#166534;' : 'background:#f1f5f9;color:#64748b;'}">${sampled ? 'Yes' : 'No'}</span></td></tr>`;
+        return `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:7px 12px;font-weight:600;">${htmlEsc(s.name)}</td><td style="padding:7px 12px;">${htmlEsc(addr)}</td><td style="padding:7px 12px;">${htmlEsc(scope)}</td><td style="padding:7px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sampled ? 'background:#dcfce7;color:#166534;' : 'background:#f1f5f9;color:#64748b;'}">${sampled ? 'Yes' : 'No'}</span></td></tr>`;
     }).join('')}
                             </tbody>
                         </table>
@@ -1553,15 +1576,15 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;">
                             <div>
                                 <h4 style="margin:0 0 0.75rem;font-size:0.9rem;color:#0891b2;"><i class="fa-solid fa-bullseye" style="margin-right:0.4rem;"></i>Audit Objectives</h4>
-                                <div id="rp-objectives" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${d.auditPlan?.auditObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system'}</div>
+                                <div id="rp-objectives" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${htmlEsc(d.auditPlan?.auditObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system')}</div>
                             </div>
                             <div>
                                 <h4 style="margin:0 0 0.75rem;font-size:0.9rem;color:#6366f1;"><i class="fa-solid fa-scale-balanced" style="margin-right:0.4rem;"></i>Audit Criteria</h4>
-                                <div id="rp-criteria" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${d.auditPlan?.auditCriteria || '• ' + (d.report.standard || 'Applicable ISO standard(s)') + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records'}</div>
+                                <div id="rp-criteria" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${htmlEsc(d.auditPlan?.auditCriteria || '• ' + (d.report.standard || 'Applicable ISO standard(s)') + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records')}</div>
                             </div>
                             <div>
                                 <h4 style="margin:0 0 0.75rem;font-size:0.9rem;color:#0d9488;"><i class="fa-solid fa-microscope" style="margin-right:0.4rem;"></i>Audit Methodology</h4>
-                                <div id="rp-methodology" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${d.auditPlan?.auditMethodology || methodologyDefaultText(d.auditPlan) || METHODOLOGY_NEUTRAL_TEXT}</div>
+                                <div id="rp-methodology" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${htmlEsc(d.auditPlan?.auditMethodology || methodologyDefaultText(d.auditPlan) || METHODOLOGY_NEUTRAL_TEXT)}</div>
                             </div>
                         </div>
                     </div>
@@ -1577,9 +1600,9 @@
                             // is re-read on export and formatRichText strips markup first).
                             const raw = d.report.executiveSummary || '';
                             if (!raw) return '<em style="color:#94a3b8;">Click to add executive summary...</em>';
-                            if (/<p[\s>]/i.test(raw) || raw.indexOf('\n') !== -1 || raw.length < 300) return raw;
+                            if (/<p[\s>]/i.test(raw) || raw.indexOf('\n') !== -1 || raw.length < 300) return richHtml(raw);
                             const sentences = raw.split(/(?<=[.!?])\s+/);
-                            if (sentences.length <= 3) return raw;
+                            if (sentences.length <= 3) return richHtml(raw);
                             const paras = []; let cur = [];
                             for (let i = 0; i < sentences.length; i++) {
                                 cur.push(sentences[i]);
@@ -1588,7 +1611,7 @@
                                 }
                             }
                             if (cur.length) paras.push(cur.join(' '));
-                            return paras.map(p => '<p style="margin:0 0 10px 0;">' + p + '</p>').join('');
+                            return paras.map(p => '<p style="margin:0 0 10px 0;">' + richHtml(p) + '</p>').join('');
                         })()}</div>
                         
                         <!-- AI-Visual Insights Section -->
@@ -1600,7 +1623,7 @@
                                 </div>
                                 <div>
                                     <h3 style="margin:0;color:#075985;font-size:1.1rem;">AI-Powered Audit Insights</h3>
-                                    <div style="color:#0c4a6e;font-size:0.85rem;opacity:0.8;">Analysis for ${d.report.client} — ${d.report.standard || 'ISO Audit'}</div>
+                                    <div style="color:#0c4a6e;font-size:0.85rem;opacity:0.8;">Analysis for ${htmlEsc(d.report.client)} — ${htmlEsc(d.report.standard || 'ISO Audit')}</div>
                                 </div>
                             </div>
                             
@@ -1662,7 +1685,7 @@
                         return items.map((obs, idx) => `
                                         <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;align-items:start;">
                                             <div style="min-width:32px;height:32px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.85rem;">${idx + 1}</div>
-                                            <div style="flex:1;padding-top:0.25rem;">${obs}</div>
+                                            <div style="flex:1;padding-top:0.25rem;">${richHtml(obs)}</div>
                                         </div>
                                         `).join('');
                     })()}
@@ -1698,7 +1721,7 @@
                                             <div style="min-width:32px;height:32px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.85rem;">
                                                 <i class="fa-solid fa-arrow-up" style="font-size:0.75rem;"></i>
                                             </div>
-                                            <div style="flex:1;padding-top:0.25rem;">${typeof ofi === 'string' ? ofi : ofi}</div>
+                                            <div style="flex:1;padding-top:0.25rem;">${richHtml(typeof ofi === 'string' ? ofi : ofi)}</div>
                                         </div>
                                         `).join('');
                     })()}
@@ -1710,7 +1733,7 @@
                             <div style="margin-top:1rem;padding:0.75rem;background:rgba(255,255,255,0.6);border-radius:8px;text-align:center;">
                                 <div style="font-size:0.75rem;color:#64748b;">
                                     <i class="fa-solid fa-robot" style="margin-right:0.25rem;"></i>
-                                    AI-Powered Analysis • Client Context: ${d.report.client} • Standard: ${d.report.standard || 'ISO'}
+                                    AI-Powered Analysis • Client Context: ${htmlEsc(d.report.client)} • Standard: ${htmlEsc(d.report.standard || 'ISO')}
                                 </div>
                             </div>
                         </div>
@@ -1809,7 +1832,7 @@
                 return Object.entries(deptMap).sort((a, b) => a[0].localeCompare(b[0])).map(([dept, data]) => {
                     const statusTxt = data.nc === 0 ? 'Satisfactory' : 'Minor Issues';
                     const statusColor = data.nc === 0 ? '#16a34a' : '#d97706';
-                    return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:8px 12px;font-weight:500;">' + dept + '</td><td style="padding:8px 12px;text-align:center;">' + data.personnel.size + '</td><td style="padding:8px 12px;text-align:center;">' + data.items + '</td><td style="padding:8px 12px;text-align:center;color:#16a34a;font-weight:600;">' + data.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;font-weight:600;">' + data.nc + '</td><td style="padding:8px 12px;text-align:center;white-space:nowrap;"><span style="display:inline-block;padding:3px 12px;border-radius:20px;font-weight:700;font-size:0.75rem;background:' + statusColor + '15;color:' + statusColor + ';white-space:nowrap;">' + statusTxt + '</span></td></tr>';
+                    return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:8px 12px;font-weight:500;">' + htmlEsc(dept) + '</td><td style="padding:8px 12px;text-align:center;">' + data.personnel.size + '</td><td style="padding:8px 12px;text-align:center;">' + data.items + '</td><td style="padding:8px 12px;text-align:center;color:#16a34a;font-weight:600;">' + data.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;font-weight:600;">' + data.nc + '</td><td style="padding:8px 12px;text-align:center;white-space:nowrap;"><span style="display:inline-block;padding:3px 12px;border-radius:20px;font-weight:700;font-size:0.75rem;background:' + statusColor + '15;color:' + statusColor + ';white-space:nowrap;">' + statusTxt + '</span></td></tr>';
                 }).join('');
             })()}</tbody>
                             </table>
@@ -2169,7 +2192,7 @@
                             const prevReport = prevReports[0];
                             // Pre-filled with the derived status (never invented/favourable) — the
                             // auditor's own previously-entered text still wins inside the helper itself.
-                            const prevFindingsNarrative = '<div style="margin-top:12px;"><div style="font-size:0.8rem;font-weight:600;color:#3730a3;margin-bottom:6px;">Previous Findings Status (editable)</div><div id="rp-prev-findings" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">' + _derivePreviousFindingsStatus(d) + '</div></div>';
+                            const prevFindingsNarrative = '<div style="margin-top:12px;"><div style="font-size:0.8rem;font-weight:600;color:#3730a3;margin-bottom:6px;">Previous Findings Status (editable)</div><div id="rp-prev-findings" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">' + htmlEsc(_derivePreviousFindingsStatus(d)) + '</div></div>';
                             if (!prevReport) {
                                 return '<div style="text-align:center;padding:20px;color:#94a3b8;"><i class="fa-solid fa-info-circle" style="margin-right:6px;"></i>No previous audit reports found for this client. Enter the previous findings status manually below.</div>' + prevFindingsNarrative;
                             }
@@ -2182,12 +2205,12 @@
                             }
                             let rows = '';
                             prevNCs.forEach(function (nc, i) {
-                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
+                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + htmlEsc(nc.clauseRef || nc.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(nc.ncrType || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
                             });
                             prevNCRs.forEach(function (ncr, i) {
-                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpLabel(ncr.status) + '</td></tr>';
+                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + htmlEsc(ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(ncr.type || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpLabel(ncr.status) + '</td></tr>';
                             });
-                            return '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i><strong>Previous Audit:</strong> ' + (prevReport.date || '—') + ' | ' + (prevReport.standard || d.report.standard || '') + ' | ' + (prevNCs.length + prevNCRs.length) + ' NC(s) raised</div>'
+                            return '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i><strong>Previous Audit:</strong> ' + (prevReport.date || '—') + ' | ' + htmlEsc(prevReport.standard || d.report.standard || '') + ' | ' + (prevNCs.length + prevNCRs.length) + ' NC(s) raised</div>'
                                 + '<table style="width:100%;font-size:0.84rem;border-collapse:collapse;"><thead><tr style="background:#eef2ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Ref</th><th style="padding:10px 14px;text-align:left;width:20%;">Clause</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:56%;">Follow-up Status (click to edit)</th></tr></thead><tbody>' + rows + '</tbody></table>';
                         })()}
                     </div>
@@ -2229,7 +2252,7 @@
                 <!-- 7: NCRs -->
                 <div class="rp-sec" id="sec-ncrs">
                     <div class="rp-sec-hdr" style="border-left-color:#ea580c;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">8</span>NCR REGISTER (${d.report.ncrs.length})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
-                    <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#dc2626' : '#f59e0b') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:0.85rem;"><div><strong>' + (ncr.type || '') + '</strong> — ' + formalCriterionCell(ncr, d.report.standard || d.auditPlan?.standard || '') + '</div><span style="color:#64748b;font-size:0.8rem;white-space:nowrap;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + fmtRemark(ncr.description) + '</div></div>').join('')}</div>
+                    <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#dc2626' : '#f59e0b') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:0.85rem;"><div><strong>' + htmlEsc(ncr.type || '') + '</strong> — ' + formalCriterionCell(ncr, d.report.standard || d.auditPlan?.standard || '') + '</div><span style="color:#64748b;font-size:0.8rem;white-space:nowrap;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + htmlEsc(fmtRemark(ncr.description)) + '</div></div>').join('')}</div>
                 </div>` : ''}
                 <!-- Corrective Action Requirements -->
                 ${(d.stats.ncCount) > 0 ? `
@@ -2279,7 +2302,7 @@
                     }
                     if (allNCs.length === 0) return '<tr><td colspan="6" style="padding:20px;text-align:center;color:#94a3b8;">No corrective actions required</td></tr>';
                     const carStandard = d.report.standard || d.auditPlan?.standard || '';
-                    return allNCs.map(nc => '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;font-family:monospace;color:#be185d;">' + nc.ref + '</td><td style="padding:10px 14px;">' + formalCriterionCell(nc, carStandard) + '</td><td style="padding:10px 14px;"><span style="padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;' + ((nc.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + nc.type + '</span></td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Root cause analysis and corrective action required for: ' + (nc.desc || '').substring(0, 120) + '</td><td style="padding:10px 14px;font-weight:600;color:#be185d;">' + nc.dueDate + '</td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Document review & follow-up audit</td></tr>').join('');
+                    return allNCs.map(nc => '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;font-family:monospace;color:#be185d;">' + htmlEsc(nc.ref) + '</td><td style="padding:10px 14px;">' + formalCriterionCell(nc, carStandard) + '</td><td style="padding:10px 14px;"><span style="padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;' + ((nc.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(nc.type) + '</span></td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Root cause analysis and corrective action required for: ' + htmlEsc((nc.desc || '').substring(0, 120)) + '</td><td style="padding:10px 14px;font-weight:600;color:#be185d;">' + nc.dueDate + '</td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Document review & follow-up audit</td></tr>').join('');
                 })()}</tbody>
                         </table>
                         <div style="margin-top:1rem;padding:0.75rem;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><i class="fa-solid fa-clock" style="margin-right:0.4rem;"></i>${capaTimeframesInnerHtml(d)}</div>
@@ -2289,14 +2312,14 @@
                 <div class="rp-sec" id="sec-meetings">
                     <div class="rp-sec-hdr" style="border-left-color:#0891b2;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">9</span>CLOSING MEETING<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1d4ed8;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || '—'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || '—'; return String(att); })()}</div><div id="rp-closing-summary" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${d.report.closingMeeting?.summary || '<em style="color:#94a3b8;">Click to add closing meeting summary...</em>'}</div></div>
+                        <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1d4ed8;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${htmlEsc(d.report.closingMeeting?.date || '—')}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return htmlEsc(att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || '—'); return htmlEsc(String(att)); })()}</div><div id="rp-closing-summary" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${htmlEsc(d.report.closingMeeting?.summary) || '<em style="color:#94a3b8;">Click to add closing meeting summary...</em>'}</div></div>
                     </div>
                 </div>
                 <!-- Changes Since Last Audit -->
                 <div class="rp-sec" id="sec-changes">
                     <div class="rp-sec-hdr" style="border-left-color:#78716c;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">11</span>CHANGES SINCE LAST AUDIT<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;"></i><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div id="rp-changes" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">${d.report.changesSinceLastAudit || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.'}</div>
+                        <div id="rp-changes" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">${htmlEsc(d.report.changesSinceLastAudit || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.')}</div>
                     </div>
                 </div>
                 <!-- Management System Effectiveness -->
@@ -2306,11 +2329,11 @@
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#ecfeff;"><th style="padding:10px 14px;text-align:left;width:38%;">Process</th><th style="padding:10px 14px;text-align:left;width:62%;">Effectiveness Status (click to edit)</th></tr></thead>
                             <tbody>
-                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Internal Audit Programme</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-internal-audit" class="rp-edit" contenteditable="true">${d.report.effInternalAudit || _effectivenessDefaults(d.report).internalAudit}</td></tr>
-                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Management Review</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-mgmt-review" class="rp-edit" contenteditable="true">${d.report.effMgmtReview || _effectivenessDefaults(d.report).mgmtReview}</td></tr>
-                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Handling of Complaints</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-complaints" class="rp-edit" contenteditable="true">${d.report.effComplaints || _effectivenessDefaults(d.report).complaints}</td></tr>
+                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Internal Audit Programme</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-internal-audit" class="rp-edit" contenteditable="true">${htmlEsc(d.report.effInternalAudit || _effectivenessDefaults(d.report).internalAudit)}</td></tr>
+                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Management Review</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-mgmt-review" class="rp-edit" contenteditable="true">${htmlEsc(d.report.effMgmtReview || _effectivenessDefaults(d.report).mgmtReview)}</td></tr>
+                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Handling of Complaints</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-complaints" class="rp-edit" contenteditable="true">${htmlEsc(d.report.effComplaints || _effectivenessDefaults(d.report).complaints)}</td></tr>
                                 <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Use of Certification Marks / Logo</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-marks" class="rp-edit" contenteditable="true">${d.report.effMarks || (/initial|stage/.test(String(d.auditPlan?.auditType || '').toLowerCase()) || !d.auditPlan?.auditType ? 'Not applicable — initial certification audit.' : 'Usage verified as conforming to CB rules.')}</td></tr>
-                                <tr><td style="padding:8px 14px;font-weight:600;">Legal &amp; Regulatory Compliance</td><td style="padding:8px 14px;" id="rp-eff-legal" class="rp-edit" contenteditable="true">${d.report.effLegal || _effectivenessDefaults(d.report).legal}</td></tr>
+                                <tr><td style="padding:8px 14px;font-weight:600;">Legal &amp; Regulatory Compliance</td><td style="padding:8px 14px;" id="rp-eff-legal" class="rp-edit" contenteditable="true">${htmlEsc(d.report.effLegal || _effectivenessDefaults(d.report).legal)}</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2332,10 +2355,10 @@
                             const ncrClauses = (d.report.ncrs || []).map(n => n.clause || '').filter(Boolean);
                             const allRiskClauses = [...new Set([...ncClauses, ...ncrClauses])];
                             if (allRiskClauses.length === 0) return '';
-                            return '<div style="margin-bottom:14px;padding:14px;background:#fef2f2;border-radius:10px;border-left:4px solid #dc2626;"><div style="font-size:0.82rem;font-weight:700;color:#991b1b;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>RISK AREAS IDENTIFIED</div><div style="font-size:0.85rem;color:#7f1d1d;line-height:1.6;">The following clause areas have been identified as requiring management attention due to non-conformity findings: <strong>' + allRiskClauses.join(', ') + '</strong>. These areas should be prioritized for corrective action and root cause analysis to prevent recurrence.</div></div>';
+                            return '<div style="margin-bottom:14px;padding:14px;background:#fef2f2;border-radius:10px;border-left:4px solid #dc2626;"><div style="font-size:0.82rem;font-weight:700;color:#991b1b;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>RISK AREAS IDENTIFIED</div><div style="font-size:0.85rem;color:#7f1d1d;line-height:1.6;">The following clause areas have been identified as requiring management attention due to non-conformity findings: <strong>' + htmlEsc(allRiskClauses.join(', ')) + '</strong>. These areas should be prioritized for corrective action and root cause analysis to prevent recurrence.</div></div>';
                         })()}
-                        <div id="rp-conclusion" class="rp-edit" contenteditable="true">${d.report.conclusion || ('Based on the audit findings, the audit team concludes that the organization\'s management system has been assessed against the applicable standard requirements. ' + (d.stats.rs && d.stats.rs.recommendation ? d.stats.rs.recommendation : d.stats.recommendation || '') + ' Click to edit this conclusion.')}</div>
-                        <div style="margin-top:14px;"><strong style="color:#334155;font-size:0.85rem;">Unresolved Issues / Diverging Opinions:</strong> <span id="rp-unresolved" class="rp-edit" contenteditable="true" style="margin-left:6px;">${d.report.unresolvedIssues || 'None. All findings were acknowledged by the auditee at the closing meeting.'}</span></div>
+                        <div id="rp-conclusion" class="rp-edit" contenteditable="true">${richHtml(d.report.conclusion || ('Based on the audit findings, the audit team concludes that the organization\'s management system has been assessed against the applicable standard requirements. ' + (d.stats.rs && d.stats.rs.recommendation ? d.stats.rs.recommendation : d.stats.recommendation || '') + ' Click to edit this conclusion.'))}</div>
+                        <div style="margin-top:14px;"><strong style="color:#334155;font-size:0.85rem;">Unresolved Issues / Diverging Opinions:</strong> <span id="rp-unresolved" class="rp-edit" contenteditable="true" style="margin-left:6px;">${htmlEsc(d.report.unresolvedIssues || 'None. All findings were acknowledged by the auditee at the closing meeting.')}</span></div>
                         <p style="font-style:italic;font-size:0.78rem;color:#64748b;margin-top:12px;">This audit was conducted through a sampling process of the available information. Consequently, nonconformities may exist which have not been identified within this report.</p>
                     </div>
                 </div>
@@ -2346,7 +2369,7 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;">
                             <div style="padding:1.5rem;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
                                 <div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;font-weight:600;">Lead Auditor</div>
-                                <div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:0.5rem;">${d.auditPlan?.team?.[0] || d.report.leadAuditor || 'Lead Auditor Name'}</div>
+                                <div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:0.5rem;">${htmlEsc(d.auditPlan?.team?.[0] || d.report.leadAuditor || 'Lead Auditor Name')}</div>
                                 <div style="border-bottom:2px solid #1e293b;width:100%;margin:1.5rem 0 0.5rem;"></div>
                                 <div style="font-size:0.8rem;color:#64748b;">Signature</div>
                                 <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Prepared: <span id="rp-sig-date" contenteditable="true" class="rp-edit" style="font-weight:600;">${new Date().toLocaleDateString('en-GB')}</span></div>
@@ -2370,7 +2393,7 @@
                                 })()}
                                 <div style="border-bottom:2px solid #1e293b;width:100%;margin:1rem 0 0.5rem;"></div>
                                 <div style="font-size:0.8rem;color:#64748b;">Signature</div>
-                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Reviewed: <input type="date" id="rp-reviewer-date" value="${resolveTechnicalReview(d.report).date || ''}" data-action-change="updateTechnicalReview" data-arg1="date" data-arg2="this.value" style="font-weight:600;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;"></div>
+                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Reviewed: <input type="date" id="rp-reviewer-date" value="${htmlEsc(resolveTechnicalReview(d.report).date || '')}" data-action-change="updateTechnicalReview" data-arg1="date" data-arg2="this.value" style="font-weight:600;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;"></div>
                             </div>
                         </div>
                         <div style="margin-top:1.5rem;padding:1rem;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:0.5rem;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body.</div>
@@ -2384,10 +2407,10 @@
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#f0fdfa;"><th style="padding:10px 14px;text-align:left;width:5%;">#</th><th style="padding:10px 14px;text-align:left;width:30%;">Recipient</th><th style="padding:10px 14px;text-align:left;width:25%;">Role</th><th style="padding:10px 14px;text-align:left;width:25%;">Organization</th><th style="padding:10px 14px;text-align:left;width:15%;">Format</th></tr></thead>
                             <tbody id="rp-distribution" class="rp-edit">
-                                <tr><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">1</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${d.report.leadAuditor || 'Lead Auditor'}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Lead Auditor</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Original</td></tr>
-                                <tr style="background:#f8fafc;"><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">2</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${resolveTechnicalReview(d.report).reviewer || 'Technical Reviewer'}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Technical Reviewer</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
-                                <tr><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">3</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${d.report.client}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Client Representative</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.report.client}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
-                                <tr style="background:#f8fafc;"><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">4</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Certification Records</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">File / Archive</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Archive</td></tr>
+                                <tr><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">1</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${htmlEsc(d.report.leadAuditor || 'Lead Auditor')}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Lead Auditor</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${htmlEsc(d.cbName || 'Certification Body')}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Original</td></tr>
+                                <tr style="background:#f8fafc;"><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">2</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${htmlEsc(resolveTechnicalReview(d.report).reviewer || 'Technical Reviewer')}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Technical Reviewer</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${htmlEsc(d.cbName || 'Certification Body')}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
+                                <tr><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">3</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${htmlEsc(d.report.client)}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Client Representative</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${htmlEsc(d.report.client)}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
+                                <tr style="background:#f8fafc;"><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">4</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Certification Records</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">File / Archive</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${htmlEsc(d.cbName || 'Certification Body')}</td><td contenteditable="true" style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Archive</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2399,7 +2422,7 @@
                         <div id="rp-annexures" class="rp-edit" contenteditable="true" style="min-height:80px;line-height:1.8;color:#334155;">
                             <div style="font-weight:600;margin-bottom:8px;">Annexure A — Audit Plan Reference</div>
                             <div style="margin-bottom:6px;">• Plan Reference: ${d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A'}</div>
-                            <div style="margin-bottom:12px;">• Standard: ${d.report.standard || 'ISO Standard'}</div>
+                            <div style="margin-bottom:12px;">• Standard: ${htmlEsc(d.report.standard || 'ISO Standard')}</div>
                             <div style="font-weight:600;margin-bottom:8px;">Annexure B — Checklist Summary</div>
                             <div style="margin-bottom:6px;">• Total Items Audited: ${d.stats.totalItems}</div>
                             <div style="margin-bottom:6px;">• Conforming: ${d.stats.conformCount} | NC: ${d.stats.ncCount} | Observations: ${d.stats.observationCount} | OFI: ${d.stats.ofiCount}</div>
@@ -3033,7 +3056,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     const sev = sevRaw;
                     const sevLc = String(sevRaw).toLowerCase();
                     const sevColor = sevLc === 'major' ? '#dc2626' : (sevLc === 'minor' || sevLc === 'nc') ? '#f59e0b' : sevLc === 'obs' ? '#3b82f6' : '#10b981';
-                    return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:8px 12px;font-weight:600;">' + clause + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;color:' + sevColor + ';">' + sev + '</span></td><td style="padding:8px 12px;color:#334155;font-size:0.88rem;line-height:1.6;">' + (fmtRemark(item.comment) || '-') + '</td></tr>';
+                    return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:8px 12px;font-weight:600;">' + clause + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;color:' + sevColor + ';">' + sev + '</span></td><td style="padding:8px 12px;color:#334155;font-size:0.88rem;line-height:1.6;">' + (htmlEsc(fmtRemark(item.comment)) || '-') + '</td></tr>';
                 }).join('');
             }
 
@@ -3050,7 +3073,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     const clause = displayCriterion(item, false);
                     const title = item.kbMatch ? item.kbMatch.title : '';
                     const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-                    return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:10px 14px;font-weight:700;">' + clause + '</td><td style="padding:10px 14px;">' + (title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req) + '</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks</span>') + renderEvThumbs(item) + '</td></tr>';
+                    return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:10px 14px;font-weight:700;">' + clause + '</td><td style="padding:10px 14px;">' + (title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)) + '</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">' + (htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks</span>') + renderEvThumbs(item) + '</td></tr>';
                 }).join('') || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No conformance evidence recorded</td></tr>';
             }
 
@@ -3339,10 +3362,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // sanitized to strip anything but simple table/text markup, falling back to the
         // original default rows if the region was never touched (or was cleared out).
         const defaultDistributionRows =
-            '<tr><td>1</td><td style="font-weight:600;">' + (d.report.leadAuditor || 'Lead Auditor') + '</td><td>Lead Auditor</td><td>' + (d.cbName || 'Certification Body') + '</td><td>Original</td></tr>'
-            + '<tr><td>2</td><td style="font-weight:600;">' + (technicalReviewForDist.reviewer || 'Technical Reviewer') + '</td><td>Technical Reviewer</td><td>' + (d.cbName || 'Certification Body') + '</td><td>Copy</td></tr>'
-            + '<tr><td>3</td><td style="font-weight:600;">' + d.report.client + '</td><td>Client Representative</td><td>' + d.report.client + '</td><td>Copy</td></tr>'
-            + '<tr><td>4</td><td>Certification Records</td><td>File / Archive</td><td>' + (d.cbName || 'Certification Body') + '</td><td>Archive</td></tr>';
+            '<tr><td>1</td><td style="font-weight:600;">' + htmlEsc(d.report.leadAuditor || 'Lead Auditor') + '</td><td>Lead Auditor</td><td>' + htmlEsc(d.cbName || 'Certification Body') + '</td><td>Original</td></tr>'
+            + '<tr><td>2</td><td style="font-weight:600;">' + htmlEsc(technicalReviewForDist.reviewer || 'Technical Reviewer') + '</td><td>Technical Reviewer</td><td>' + htmlEsc(d.cbName || 'Certification Body') + '</td><td>Copy</td></tr>'
+            + '<tr><td>3</td><td style="font-weight:600;">' + htmlEsc(d.report.client) + '</td><td>Client Representative</td><td>' + htmlEsc(d.report.client) + '</td><td>Copy</td></tr>'
+            + '<tr><td>4</td><td>Certification Records</td><td>File / Archive</td><td>' + htmlEsc(d.cbName || 'Certification Body') + '</td><td>Archive</td></tr>';
         let editedDistribution = document.getElementById('rp-distribution')?.innerHTML || '';
         editedDistribution = editedDistribution.replace(/&nbsp;/g, ' ').trim();
         if (editedDistribution && window.Sanitizer && window.Sanitizer.sanitizeHTML) {
@@ -3409,6 +3432,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 .replace(/<br\s*\/?>/gi, '\n')
                 .replace(/<\/?(div|p|li|ul|ol)[^>]*>/gi, '\n')
                 .replace(/<[^>]+>/g, '')
+                // Tag stripping leaves an unterminated '<img src=x onerror=…' intact;
+                // escape whatever angle brackets survive before markup is added.
+                .replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
                 .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
                 .replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>')
@@ -3477,6 +3503,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 .replace(/<br\s*\/?>/gi, '\n')
                 .replace(/<\/?(div|p|li|ul|ol)[^>]*>/gi, '\n')
                 .replace(/<[^>]+>/g, '')
+                // Tag stripping leaves an unterminated '<img src=x onerror=…' intact;
+                // escape whatever angle brackets survive before markup is added.
+                .replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .trim();
             let items = [];
             // Try numbered splitting: "1. ...", "2) ...", "3- ..."
@@ -3501,6 +3530,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 .replace(/<br\s*\/?>/gi, '\n')
                 .replace(/<\/?(div|p|li|ul|ol)[^>]*>/gi, '\n')
                 .replace(/<[^>]+>/g, '')
+                // Tag stripping leaves an unterminated '<img src=x onerror=…' intact;
+                // escape whatever angle brackets survive before markup is added.
+                .replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .trim();
             let items = [];
             let numbered = t.split(/(?:^|\n)\s*(\d+)[.):-]\s*/);
@@ -3533,7 +3565,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             let limited = thumbs.slice(0, 2);
             let extra = thumbs.length > 2 ? ' <span style="font-size:0.75rem;color:#64748b;">(+' + (thumbs.length - 2) + ' more in Evidence Pack)</span>' : '';
             let evIds = (item._evIds && item._evIds.length) ? '<div style="margin-top:3px;font-size:0.68rem;color:#64748b;">' + item._evIds.join(', ') + '</div>' : '';
-            return '<div class="ev-inline">' + limited.map(function (url) { return '<img src="' + url + '" style="height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;">'; }).join('') + extra + evIds + '</div>';
+            return '<div class="ev-inline">' + limited.map(function (url) { return '<img src="' + htmlEsc(url) + '" style="height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;">'; }).join('') + extra + evIds + '</div>';
         };
         const ncRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() !== 'observation' && (i.ncrType || '').toLowerCase() !== 'ofi').map((item, idx) => {
             const clause = displayCriterion(item);
@@ -3557,7 +3589,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return '<tr style="background:' + (idx % 2 ? '#f5f3ff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f5f3ff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + htmlEsc(req) + '</div>' : htmlEsc(req)) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
         // OFI rows for PDF (Opportunities for Improvement only)
@@ -3565,7 +3597,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return '<tr style="background:' + (idx % 2 ? '#f0fbff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f0fbff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + htmlEsc(req) + '</div>' : htmlEsc(req)) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
         // Conformance rows for PDF (items with comments or evidence)
@@ -3573,7 +3605,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const clause = displayCriterion(item, false);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + htmlEsc(req) + '</div>' : htmlEsc(req)) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
         // Build clause/area performance analysis from ReportStats.byClauseArea —
@@ -3608,7 +3640,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<td style="padding:8px 12px;text-align:center;">' + areaStatusCell(r) + '</td></tr>';
         }
         let areaTableRows = areaBreakdown.rows.map(function (r) {
-            return areaRowHtml(r, 'Clause ' + r.clause + ' — ' + r.area);
+            return areaRowHtml(r, 'Clause ' + htmlEsc(r.clause) + ' — ' + htmlEsc(r.area));
         }).join('');
         // Surface items whose criterion couldn't be resolved to a real clause 4-10
         // (an internal FOCUS/SURV/ORG/DOC reference, or a surveillance-programme
@@ -3717,7 +3749,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const clausesSorted = Array.from(g.clauses).sort(function (a, b) {
                     return parseFloat(a) - parseFloat(b) || a.localeCompare(b);
                 });
-                const personnelTxt = g.personnel.size ? Array.from(g.personnel).join(', ') : '<span style="color:#94a3b8;">Not recorded</span>';
+                const personnelTxt = g.personnel.size ? window.UTILS.escapeHtml(Array.from(g.personnel).join(', ')) : '<span style="color:#94a3b8;">Not recorded</span>';
                 const internalTxt = foldInternalRefs(Array.from(g.internalRefs));
                 let clausesTxt = '';
                 if (clausesSorted.length) clausesTxt += '<div>Clauses: ' + window.UTILS.escapeHtml(clausesSorted.join(', ')) + '</div>';
@@ -3804,10 +3836,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
 
             let rows = '';
             prevNCs.forEach(function (nc, i) {
-                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td>' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
+                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + htmlEsc(nc.clauseRef || nc.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(nc.ncrType || 'Minor') + '</span></td><td>' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
             });
             prevNCRs.forEach(function (ncr, i) {
-                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td>' + prevFollowUpLabel(ncr.status) + '</td></tr>';
+                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + htmlEsc(ncr.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(ncr.type || 'Minor') + '</span></td><td>' + prevFollowUpLabel(ncr.status) + '</td></tr>';
             });
             return rows;
         })();
@@ -4071,7 +4103,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const reportHtml = '<!DOCTYPE html><html lang="en"><head>'
             + '<meta charset="UTF-8">'
             + '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
-            + '<title>Audit Report — ' + d.report.client + '</title>'
+            + '<title>Audit Report — ' + htmlEsc(d.report.client) + '</title>'
             + '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">'
             + '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.js"></script>'
             + '<style>'
@@ -4246,7 +4278,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // Everything printable lives in one table so the header/footer rows repeat
             // per page and reserve their own space in flow (see .rpt-running above).
             + '<table class="rpt-running"><thead><tr><td>'
-            + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">Audit360 &mdash; ' + reportRef(d) + '</div></div>'
+            + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + htmlEsc(d.cbLogo) + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + htmlEsc(cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + htmlEsc(standard) + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">Audit360 &mdash; ' + reportRef(d) + '</div></div>'
             + '</td></tr></thead><tfoot><tr><td>'
             + '<div class="rpt-ftr"><div class="rpt-ftr-left">Confidential &mdash; ' + (isReportFinal(d.report) ? 'Final' : 'Draft') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">Generated by Audit360</div></div>'
             + '</td></tr></tfoot><tbody><tr><td>'
@@ -4261,24 +4293,24 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // logo gets its own self-contained, self-closed block instead of dangling
             // scaffolding. qrCodeUrl/cardUrl/qrFallback computation is untouched (report-card.js
             // '#verify=' route still works) so this can be reinstated without rebuilding it.
-            + (d.cbLogo ? '<div style="position:absolute;top:40px;left:50px;"><img src="' + d.cbLogo + '" style="height:60px;object-fit:contain;" alt="CB Logo"></div>' : '')
+            + (d.cbLogo ? '<div style="position:absolute;top:40px;left:50px;"><img src="' + htmlEsc(d.cbLogo) + '" style="height:60px;object-fit:contain;" alt="CB Logo"></div>' : '')
             + '<div style="margin-top:40px;"></div>'
             + '<div class="cover-line"></div>'
             + '<h1 style="font-size:2.8rem;font-weight:700;color:#0f172a;letter-spacing:1px;">AUDIT REPORT</h1>'
-            + '<p style="font-size:1.15rem;color:#64748b;margin-top:8px;">' + standard + '</p>'
+            + '<p style="font-size:1.15rem;color:#64748b;margin-top:8px;">' + htmlEsc(standard) + '</p>'
             + '<div style="margin-top:50px;">'
-            + (d.clientLogo ? '<img src="' + d.clientLogo + '" style="height:60px;object-fit:contain;margin-bottom:16px;" alt="Client">' : '')
-            + '<div style="font-size:2rem;font-weight:700;color:#1d4ed8;">' + d.report.client + '</div>'
-            + (d.client.industry ? '<div style="font-size:1rem;color:#64748b;margin-top:6px;">' + d.client.industry + '</div>' : '') + '</div>'
+            + (d.clientLogo ? '<img src="' + htmlEsc(d.clientLogo) + '" style="height:60px;object-fit:contain;margin-bottom:16px;" alt="Client">' : '')
+            + '<div style="font-size:2rem;font-weight:700;color:#1d4ed8;">' + htmlEsc(d.report.client) + '</div>'
+            + (d.client.industry ? '<div style="font-size:1rem;color:#64748b;margin-top:6px;">' + htmlEsc(d.client.industry) + '</div>' : '') + '</div>'
             + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:480px;text-align:left;margin-top:50px;">'
             // Labeled "Audit Date" (not "Report Date") — this is when the on-site audit
             // happened, not when the report was prepared/issued (client spec #26: the four
             // dates — Audit, Report Preparation, Technical Review, Issue — must stay distinct).
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.report.date || '—') + (d.report.endDate ? ' — ' + htmlEsc(d.report.endDate) : '') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + reportRef(d) + '</div></div>'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || '—') + '</div></div>'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
-            + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.report.leadAuditor || '—') + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.auditPlan?.auditType || 'Initial') + '</div></div>'
+            + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.auditPlan.team.join(', ')) + '</div></div>' : '')
             + '</div>'
             + '<div class="cover-doc" style="position:absolute;bottom:50px;left:50px;right:50px;border-top:2px solid #cbd5e1;padding-top:16px;">'
             + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;"><span><strong>Doc ID:</strong> ' + reportRef(d) + '</span><span><strong>Status:</strong> ' + (isReportFinal(d.report) ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
@@ -4313,10 +4345,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const revisionHistoryBlock = !hasActualRevisionHistory(d.report) ? '' : '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #e2e8f0;break-inside:avoid;page-break-inside:avoid;">'
                     + '<div style="font-size:0.66rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Document Revision History</div>'
                     + '<table style="width:100%;font-size:0.66rem;border-collapse:collapse;"><thead><tr style="background:#f1f5f9;"><th style="padding:4px 8px;text-align:left;">Ver</th><th style="padding:4px 8px;text-align:left;">Date</th><th style="padding:4px 8px;text-align:left;">Author</th><th style="padding:4px 8px;text-align:left;">Description</th></tr></thead><tbody>'
-                    + revisionRows.map(r => '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.ver + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.date + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.author + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.desc + '</td></tr>').join('')
+                    + revisionRows.map(r => '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + htmlEsc(r.ver) + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + htmlEsc(r.date) + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + htmlEsc(r.author) + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + htmlEsc(r.desc) + '</td></tr>').join('')
                     + '</tbody></table></div>';
                 return '<div class="toc page-break"><div class="toc-title">Contents</div>'
-                    + '<div class="toc-sub">' + d.report.client + ' — ' + standard + '</div>'
+                    + '<div class="toc-sub">' + htmlEsc(d.report.client) + ' — ' + htmlEsc(standard) + '</div>'
                     + '<div class="toc-line"></div>'
                     + '<div class="toc-list">'
                     + formalTocItems.join('')
@@ -4334,14 +4366,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + renderModSections(modFormalFront)
             // SECTION: AUDIT INFORMATION
             + (secMap['audit-info'] ? '<div id="sec-audit-info" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('audit-info') + 'AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
-                + '<tr><td>Client Name</td><td><strong>' + d.report.client + '</strong></td></tr>'
-                + '<tr><td>Industry</td><td>' + (d.client.industry || '—') + '</td></tr>'
-                + '<tr><td>Certification Scope</td><td>' + (d.client.certificationScope || '—') + '</td></tr>'
-                + '<tr><td>Number of Employees</td><td>' + (d.client.employees || d.client.numberOfEmployees || '—') + '</td></tr>'
-                + '<tr><td>Audit Standard</td><td>' + standard + '</td></tr>'
-                + '<tr><td>Audit Type</td><td>' + (d.auditPlan?.auditType || 'Initial') + '</td></tr>'
-                + '<tr><td>Audit Dates</td><td>' + (d.report.date || '—') + (d.report.endDate ? ' → ' + d.report.endDate : '') + '</td></tr>'
-                + '<tr><td>Lead Auditor</td><td>' + (d.report.leadAuditor || '—') + '</td></tr>'
+                + '<tr><td>Client Name</td><td><strong>' + htmlEsc(d.report.client) + '</strong></td></tr>'
+                + '<tr><td>Industry</td><td>' + htmlEsc(d.client.industry || '—') + '</td></tr>'
+                + '<tr><td>Certification Scope</td><td>' + htmlEsc(d.client.certificationScope || '—') + '</td></tr>'
+                + '<tr><td>Number of Employees</td><td>' + htmlEsc(d.client.employees || d.client.numberOfEmployees || '—') + '</td></tr>'
+                + '<tr><td>Audit Standard</td><td>' + htmlEsc(standard) + '</td></tr>'
+                + '<tr><td>Audit Type</td><td>' + htmlEsc(d.auditPlan?.auditType || 'Initial') + '</td></tr>'
+                + '<tr><td>Audit Dates</td><td>' + htmlEsc(d.report.date || '—') + (d.report.endDate ? ' → ' + htmlEsc(d.report.endDate) : '') + '</td></tr>'
+                + '<tr><td>Lead Auditor</td><td>' + htmlEsc(d.report.leadAuditor || '—') + '</td></tr>'
                 + '<tr><td>Audit Method</td><td>' + auditMethodLabel(d.auditPlan) + '</td></tr>'
                 + (function () {
                     var s = (d.client.sites && d.client.sites[0]) || {};
@@ -4354,12 +4386,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                         .filter(Boolean);
                     var seen = {};
                     var addr = parts.filter(function (p) { var k = p.toLowerCase(); if (seen[k]) return false; seen[k] = true; return true; }).join(', ') || '—';
-                    return '<tr><td>Audit Location</td><td>' + addr + '</td></tr>';
+                    return '<tr><td>Audit Location</td><td>' + htmlEsc(addr) + '</td></tr>';
                 })()
                 + '<tr><td>Plan Reference</td><td>' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'Not Linked') + '</td></tr>'
                 + '</table>'
-                + (d.client.goodsServices && d.client.goodsServices.length > 0 ? '<div style="margin-top:10px;font-size:0.85rem;color:#334155;"><strong>Goods & Services:</strong> ' + d.client.goodsServices.map(g => g.name + (g.category ? ' (' + g.category + ')' : '')).join(', ') + '</div>' : '')
-                + (d.client.keyProcesses && d.client.keyProcesses.length > 0 ? '<div style="margin-top:6px;font-size:0.85rem;color:#334155;"><strong>Key Processes:</strong> ' + d.client.keyProcesses.map(p => (p.name || p)).join(', ') + '</div>' : '')
+                + (d.client.goodsServices && d.client.goodsServices.length > 0 ? '<div style="margin-top:10px;font-size:0.85rem;color:#334155;"><strong>Goods & Services:</strong> ' + htmlEsc(d.client.goodsServices.map(g => g.name + (g.category ? ' (' + g.category + ')' : '')).join(', ')) + '</div>' : '')
+                + (d.client.keyProcesses && d.client.keyProcesses.length > 0 ? '<div style="margin-top:6px;font-size:0.85rem;color:#334155;"><strong>Key Processes:</strong> ' + htmlEsc(d.client.keyProcesses.map(p => (p.name || p)).join(', ')) + '</div>' : '')
                 + '</div>' : '')
             // SECTION: AUDIT PROGRAMME
             + (secMap['audit-programme'] ? '<div id="sec-audit-programme" class="sh" style="border-left-color:#0ea5e9;">' + sBadge('audit-programme') + 'AUDIT PROGRAMME</div><div class="sb">'
@@ -4371,7 +4403,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     const editedTxt = editedMap[s.editId] || s.def;
                     const statusBg = s.status === 'Completed' ? '#ecfdf5' : (s.status === 'This audit' ? '#eff6ff' : ((s.status === 'Unknown' || s.status === 'Requires scheduling') ? '#fffbeb' : '#f1f5f9'));
                     const statusFg = s.status === 'Completed' ? '#15803d' : (s.status === 'This audit' ? '#1d4ed8' : ((s.status === 'Unknown' || s.status === 'Requires scheduling') ? '#92400e' : '#64748b'));
-                    return '<tr><td style="font-weight:700;">' + s.label + '</td><td>' + s.timing + '</td><td>' + editedTxt + '</td><td style="text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">' + s.status + '</span></td></tr>';
+                    return '<tr><td style="font-weight:700;">' + s.label + '</td><td>' + s.timing + '</td><td>' + htmlEsc(editedTxt) + '</td><td style="text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">' + s.status + '</span></td></tr>';
                 }).join('')
                 + '</tbody></table></div>' : '')
             // SECTION: MULTI-SITE SAMPLING
@@ -4381,28 +4413,28 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     const addr = [s.address, s.city, s.country].filter(Boolean).join(', ') || '—';
                     const scope = siteScopesMap[s.name] || d.client.certificationScope || '—';
                     const sampled = sampledSiteNames.indexOf(s.name) !== -1;
-                    return '<tr><td style="font-weight:700;">' + s.name + '</td><td>' + addr + '</td><td>' + scope + '</td><td style="text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;' + (sampled ? 'background:#ecfdf5;color:#15803d;' : 'background:#f1f5f9;color:#64748b;') + '">' + (sampled ? 'Yes' : 'No') + '</span></td></tr>';
+                    return '<tr><td style="font-weight:700;">' + htmlEsc(s.name) + '</td><td>' + htmlEsc(addr) + '</td><td>' + htmlEsc(scope) + '</td><td style="text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;' + (sampled ? 'background:#ecfdf5;color:#15803d;' : 'background:#f1f5f9;color:#64748b;') + '">' + (sampled ? 'Yes' : 'No') + '</span></td></tr>';
                 }).join('')
                 + '</tbody></table>'
-                + '<div style="margin-top:12px;color:#334155;font-size:0.88rem;line-height:1.6;">' + (editedSiteSamplingNote || 'Site sampling conducted in accordance with IAF MD 1.') + '</div>'
+                + '<div style="margin-top:12px;color:#334155;font-size:0.88rem;line-height:1.6;">' + htmlEsc(editedSiteSamplingNote || 'Site sampling conducted in accordance with IAF MD 1.') + '</div>'
                 + '</div>' : '')
             // SECTION: OBJECTIVES, CRITERIA & METHODOLOGY
             + (secMap['objectives'] ? '<div id="sec-objectives" class="sh" style="border-left-color:#475569;">' + sBadge('objectives') + 'AUDIT OBJECTIVES, CRITERIA &amp; METHODOLOGY</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Objectives</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system') + '</div></div>'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#1d4ed8;">Audit Criteria</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedCriteria || '• ' + standard + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records') + '</div></div>'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedMethodology || methodologyDefaultText(d.auditPlan) || METHODOLOGY_NEUTRAL_TEXT) + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Objectives</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + htmlEsc(editedObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#1d4ed8;">Audit Criteria</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + htmlEsc(editedCriteria || '• ' + standard + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + htmlEsc(editedMethodology || methodologyDefaultText(d.auditPlan) || METHODOLOGY_NEUTRAL_TEXT) + '</div></div>'
                 + '</div></div>' : '')
             // SECTION: EXECUTIVE SUMMARY
             + (secMap['summary'] ? '<div id="sec-summary" class="sh" style="border-left-color:#059669;">' + sBadge('summary') + 'AUDIT SUMMARY &amp; OPENING MEETING</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
-                + '<div style="padding:10px 14px;background:#eff6ff;border-radius:8px;border-left:3px solid #1d4ed8;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
-                + '<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;border-left:3px solid #475569;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
+                + '<div style="padding:10px 14px;background:#eff6ff;border-radius:8px;border-left:3px solid #1d4ed8;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.auditPlan?.auditType || 'Initial') + '</div></div>'
+                + '<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;border-left:3px solid #475569;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.report.date || '—') + (d.report.endDate ? ' — ' + htmlEsc(d.report.endDate) : '') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#eff6ff;border-radius:8px;border-left:3px solid #1d4ed8;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (function () { var md = d.auditPlan?.manDays || d.auditPlan?.man_days || '—'; var method = (d.auditPlan?.auditMethod || '').toLowerCase(); var suffix = method === 'remote' ? ' (Remote Audit)' : (method === 'hybrid' ? ' (Hybrid)' : (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '')); return md + ' Man-Days' + suffix; })() + '</div></div>'
                 + '<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;border-left:3px solid #475569;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + auditMethodLabel(d.auditPlan) + '</div></div></div>'
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
-                + '<div style="padding:16px;background:#ecfdf5;border-radius:10px;margin-top:14px;border-left:4px solid #475569;"><strong style="color:#475569;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + fmtRemark(editedOpeningNotes) + '</td></tr>' : '') + '</table></div>'
+                + '<div style="padding:16px;background:#ecfdf5;border-radius:10px;margin-top:14px;border-left:4px solid #475569;"><strong style="color:#475569;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + htmlEsc(d.report.openingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return htmlEsc(att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'); return htmlEsc(String(att)); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + htmlEsc(fmtRemark(editedOpeningNotes)) + '</td></tr>' : '') + '</table></div>'
                 + (editedPositiveObs ? '<div style="margin-top:20px;padding:14px 16px;background:#ecfdf5;border-radius:10px;border-left:4px solid #15803d;break-inside:avoid;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><h4 style="margin:0;color:#15803d;font-size:0.95rem;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;">Positive Observations</h4></div><div style="color:#15803d;font-size:0.9rem;line-height:1.6;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION: CONFORMANCE VERIFICATION
@@ -4429,7 +4461,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + (prevFindingsRowsHtml
                     ? '<div style="margin-bottom:12px;padding:10px 14px;background:#eff6ff;border-radius:8px;font-size:0.88rem;color:#1d4ed8;">Nonconformities and observations raised at the previous audit were reviewed for effective closure.</div>'
                         + '<table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:14%;">Ref</th><th style="width:18%;">Clause</th><th style="width:12%;text-align:center;">Type</th><th style="width:56%;">Follow-up Status</th></tr></thead><tbody>' + prevFindingsRowsHtml + '</tbody></table>'
-                    : '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedPrevFindings || _derivePreviousFindingsStatus(d)) + '</div>')
+                    : '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + htmlEsc(editedPrevFindings || _derivePreviousFindingsStatus(d)) + '</div>')
                 + '</div>' : '')
             // SECTION: OBSERVATIONS
             + (secMap['obs'] ? '<div id="sec-obs" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('obs') + 'OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:10%;">Criterion</th><th style="width:30%;">Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
@@ -4441,7 +4473,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: FINDING DETAILS
             + (secMap['findings'] ? '<div id="sec-findings" class="sh" style="border-left-color:#b91c1c;">' + sBadge('findings') + 'FINDING DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Criterion</th><th style="width:30%;">Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No findings recorded.</td></tr>') + '</tbody></table></div>' : '')
             // SECTION: NCR REGISTER
-            + (secMap['ncrs'] ? '<div id="sec-ncrs" class="sh" style="border-left-color:#b91c1c;">' + sBadge('ncrs') + 'NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#b91c1c' : '#b45309') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div style="font-size:0.95rem;"><strong>' + (ncr.type || '') + '</strong> — ' + formalCriterionCell(ncr, standard) + '</div><span style="color:#64748b;font-size:0.82rem;white-space:nowrap;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + (ncr.evidenceImageThumb || ncr.evidenceImage) + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
+            + (secMap['ncrs'] ? '<div id="sec-ncrs" class="sh" style="border-left-color:#b91c1c;">' + sBadge('ncrs') + 'NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#b91c1c' : '#b45309') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div style="font-size:0.95rem;"><strong>' + htmlEsc(ncr.type || '') + '</strong> — ' + formalCriterionCell(ncr, standard) + '</div><span style="color:#64748b;font-size:0.82rem;white-space:nowrap;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + htmlEsc(fmtRemark(ncr.description)) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + htmlEsc(ncr.evidenceImageThumb || ncr.evidenceImage) + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
 
             // SECTION: CORRECTIVE ACTION REQUIREMENTS
             + (secMap['corrective'] ? '<div id="sec-corrective" class="sh" style="border-left-color:#be185d;">' + sBadge('corrective') + 'CORRECTIVE ACTION REQUIREMENTS</div><div class="sb">'
@@ -4452,22 +4484,22 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     // here so regenerating the PDF does not shift due dates. Fall back to computing
                     // from today only for legacy records that predate persistence.
                     var fallbackDue = function (typ) { var due = new Date(); due.setDate(due.getDate() + ((typ || '').toLowerCase() === 'major' ? 30 : 90)); return due.toISOString().split('T')[0]; };
-                    var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typRaw = (item.ncrType || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : typRaw === 'minor' ? 'Minor' : 'Minor †'; var dueStr = item.caDueDate || fallbackDue(item.ncrType); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + formalCriterionCell({ clause: item.clauseRef || item.clause || '', criterionRef: item.criterionRef || null, criterionSource: item.criterionSource || null }, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typRaw = (ncr.type || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : (ncr.type || 'Minor'); var dueStr = ncr.caDueDate || fallbackDue(ncr.type); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + formalCriterionCell(ncr, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
+                    var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typRaw = (item.ncrType || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : typRaw === 'minor' ? 'Minor' : 'Minor †'; var dueStr = item.caDueDate || fallbackDue(item.ncrType); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + formalCriterionCell({ clause: item.clauseRef || item.clause || '', criterionRef: item.criterionRef || null, criterionSource: item.criterionSource || null }, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + htmlEsc(typ) + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typRaw = (ncr.type || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : (ncr.type || 'Minor'); var dueStr = ncr.caDueDate || fallbackDue(ncr.type); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + formalCriterionCell(ncr, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + htmlEsc(typ) + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
                 + '</tbody></table>'
                 + '<div style="margin-top:12px;padding:10px;background:#f1f5f9;border-radius:8px;font-size:0.82rem;color:#475569;">' + capaTimeframesInnerHtml(d) + '</div>'
                 + '</div>' : '')
             // SECTION: CHANGES SINCE LAST AUDIT
             + (secMap['changes'] ? '<div id="sec-changes" class="sh" style="border-left-color:#78716c;">' + sBadge('changes') + 'CHANGES SINCE LAST AUDIT</div><div class="sb">'
-                + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedChanges || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.') + '</div>'
+                + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + htmlEsc(editedChanges || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.') + '</div>'
                 + '</div>' : '')
             // SECTION: MANAGEMENT SYSTEM EFFECTIVENESS
             + (secMap['mgmt-effectiveness'] ? '<div id="sec-mgmt-effectiveness" class="sh" style="border-left-color:#475569;">' + sBadge('mgmt-effectiveness') + 'MANAGEMENT SYSTEM EFFECTIVENESS</div><div class="sb" style="padding:0;">'
                 + '<table class="f-tbl"><thead><tr style="background:#f1f5f9;"><th style="width:38%;">Process</th><th style="width:62%;">Effectiveness Status</th></tr></thead><tbody>'
-                + '<tr><td style="font-weight:500;">Internal Audit Programme</td><td>' + editedEffInternalAudit + '</td></tr>'
-                + '<tr><td style="font-weight:500;">Management Review</td><td>' + editedEffMgmtReview + '</td></tr>'
-                + '<tr><td style="font-weight:500;">Handling of Complaints</td><td>' + editedEffComplaints + '</td></tr>'
-                + '<tr><td style="font-weight:500;">Use of Certification Marks / Logo</td><td>' + editedEffMarks + '</td></tr>'
-                + '<tr><td style="font-weight:500;">Legal &amp; Regulatory Compliance</td><td>' + editedEffLegal + '</td></tr>'
+                + '<tr><td style="font-weight:500;">Internal Audit Programme</td><td>' + htmlEsc(editedEffInternalAudit) + '</td></tr>'
+                + '<tr><td style="font-weight:500;">Management Review</td><td>' + htmlEsc(editedEffMgmtReview) + '</td></tr>'
+                + '<tr><td style="font-weight:500;">Handling of Complaints</td><td>' + htmlEsc(editedEffComplaints) + '</td></tr>'
+                + '<tr><td style="font-weight:500;">Use of Certification Marks / Logo</td><td>' + htmlEsc(editedEffMarks) + '</td></tr>'
+                + '<tr><td style="font-weight:500;">Legal &amp; Regulatory Compliance</td><td>' + htmlEsc(editedEffLegal) + '</td></tr>'
                 + '</tbody></table></div>' : '')
             // SECTION: AUDIT CONCLUSION & RECOMMENDATION
             + (secMap['conclusion'] ? '<div id="sec-conclusion" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('conclusion') + 'AUDIT CONCLUSION &amp; RECOMMENDATION</div><div class="sb">'
@@ -4479,7 +4511,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     return '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (rec.primary === 'Recommended' ? 'background:#ecfdf5;color:#15803d;' : rec.primary === 'Not Recommended' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + rec.primary + '</span></div>';
                 })()
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + formatRichText(editedConclusion) + '</div>'
-                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1d4ed8;"><strong style="color:#1d4ed8;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr><tr><td>Unresolved Issues / Diverging Opinions</td><td>' + editedUnresolved + '</td></tr></table></div>'
+                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1d4ed8;"><strong style="color:#1d4ed8;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + htmlEsc(d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return htmlEsc(att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'); return htmlEsc(String(att)); })() + '</td></tr><tr><td>Summary</td><td>' + (htmlEsc(fmtRemark(editedClosingSummary)) || '—') + '</td></tr><tr><td>Unresolved Issues / Diverging Opinions</td><td>' + htmlEsc(editedUnresolved) + '</td></tr></table></div>'
                 + '<p style="font-style:italic;font-size:0.8rem;color:#64748b;margin-top:16px;">This audit was conducted through a sampling process of the available information. Consequently, nonconformities may exist which have not been identified within this report.</p>'
                 + (function () {
                     // Client-rep signature line only when the CB's own scheme actually requires
@@ -4488,7 +4520,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     // above already evidence acknowledgement — an unconditional blank line here
                     // misrepresented an unrequired signature as required.
                     const showClientSig = !!(d.cbSettings && d.cbSettings.requireClientSignature);
-                    const leadBox = '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:500;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>';
+                    const leadBox = '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:500;margin-top:4px;">' + htmlEsc(d.report.leadAuditor || '') + '</div></div>';
                     const clientBox = showClientSig ? '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div>' : '';
                     return '<div style="display:grid;grid-template-columns:' + (showClientSig ? '1fr 1fr' : '1fr') + ';gap:40px;margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;">' + leadBox + clientBox + '</div>';
                 })()
@@ -4496,8 +4528,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: SIGNATURE & ATTESTATION
             + (secMap['signature'] ? '<div id="sec-signature" class="sh" style="border-left-color:#1e293b;">' + sBadge('signature') + 'SIGNATURE &amp; ATTESTATION</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">'
-                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Prepared: ' + (editedSigDate || d.today) + '</div></div>'
-                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (editedReviewerName || (technicalReview.isLegacy && !editedReviewerName ? 'Not recorded' : '____________________')) + '</div>' + (technicalReview.outcome ? '<div style="font-size:0.82rem;font-weight:700;margin-bottom:6px;color:' + (technicalReview.outcome === 'Approved' ? '#15803d' : '#b91c1c') + ';">Outcome: ' + technicalReview.outcome + '</div>' : '') + (technicalReview.notes ? '<div style="font-size:0.78rem;color:#64748b;margin-bottom:6px;">' + window.UTILS.escapeHtml(technicalReview.notes) + '</div>' : '') + '<div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Reviewed: ' + (editedReviewerDate || '____________________') + '</div></div>'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + htmlEsc(d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Prepared: ' + htmlEsc(editedSigDate || d.today) + '</div></div>'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + htmlEsc(editedReviewerName || (technicalReview.isLegacy && !editedReviewerName ? 'Not recorded' : '____________________')) + '</div>' + (technicalReview.outcome ? '<div style="font-size:0.82rem;font-weight:700;margin-bottom:6px;color:' + (technicalReview.outcome === 'Approved' ? '#15803d' : '#b91c1c') + ';">Outcome: ' + htmlEsc(technicalReview.outcome) + '</div>' : '') + (technicalReview.notes ? '<div style="font-size:0.78rem;color:#64748b;margin-bottom:6px;">' + window.UTILS.escapeHtml(technicalReview.notes) + '</div>' : '') + '<div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Reviewed: ' + htmlEsc(editedReviewerDate || '____________________') + '</div></div>'
                 + '</div>'
                 + '<div style="margin-top:20px;padding:12px;background:#eff6ff;border-radius:8px;font-size:0.82rem;color:#475569;text-align:center;">This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
                 + '</div>' : '')
@@ -4527,7 +4559,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div class="stat-box" style="background:#ecfdf5;border-color:#059669;"><div class="stat-val" style="color:#059669;">' + (d.stats.coveragePct === null || d.stats.coveragePct === undefined ? '—' : d.stats.coveragePct + '%') + '</div><div class="stat-lbl">Audit Coverage %</div></div>'
                 + '<div class="stat-box" style="background:#eef2ff;border-color:#4338ca;"><div class="stat-val" style="color:#4338ca;">' + (d.stats.conformityPct === null || d.stats.conformityPct === undefined ? '—' : d.stats.conformityPct + '%') + '</div><div class="stat-lbl">Conformity %</div></div></div>'
                 + '<div style="font-size:0.76rem;color:#64748b;line-height:1.5;margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:6px;">' + (d.stats.rs?.methodologyNote || 'Coverage = items assessed (conform + NC + advisories) ÷ applicable items (excludes N/A). Conformity = conform ÷ (conform + NC); observations and OFIs are advisories and do not reduce conformity.') + '</div>'
-                + (d.stats.rs?.reconciliation?.length ? '<div class="b4-card b4-callout b4-callout--warn" style="margin-bottom:16px;"><strong style="display:block;margin-bottom:4px;">Data Quality Notes</strong><ul style="margin:0;padding-left:18px;">' + d.stats.rs.reconciliation.map(function (r) { return '<li>' + (r.message || r.code || '') + '</li>'; }).join('') + '</ul></div>' : '')
+                + (d.stats.rs?.reconciliation?.length ? '<div class="b4-card b4-callout b4-callout--warn" style="margin-bottom:16px;"><strong style="display:block;margin-bottom:4px;">Data Quality Notes</strong><ul style="margin:0;padding-left:18px;">' + d.stats.rs.reconciliation.map(function (r) { return '<li>' + htmlEsc(r.message || r.code || '') + '</li>'; }).join('') + '</ul></div>' : '')
                 + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Findings Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div></div>'
                 + '<div class="chart-grid" style="grid-template-columns:1fr;margin-top:16px;"><div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
@@ -4542,7 +4574,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="line-height:1.55;color:#334155;">'
                 + '<div style="font-weight:700;margin-bottom:6px;">Annexure A — Audit Plan Reference</div>'
                 + '<div style="margin-bottom:4px;">• Plan Reference: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A') + '</div>'
-                + '<div style="margin-bottom:12px;">• Standard: ' + standard + '</div>'
+                + '<div style="margin-bottom:12px;">• Standard: ' + htmlEsc(standard) + '</div>'
                 + '<div style="font-weight:700;margin-bottom:6px;">Annexure B — Checklist Summary</div>'
                 + '<div style="margin-bottom:4px;">• Total Items Audited: ' + d.stats.totalItems + '</div>'
                 + '<div style="margin-bottom:4px;">• Conforming: ' + d.stats.conformCount + ' | NC: ' + (d.stats.ncCount) + ' | Observations: ' + d.stats.observationCount + ' | OFI: ' + d.stats.ofiCount + '</div>'
@@ -4625,13 +4657,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     return 'To be scheduled in accordance with the certification programme';
                 })();
                 const row = function (label, value) {
-                    return value ? '<tr><td style="padding:9px 14px;color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;font-weight:500;width:40%;">' + label + '</td><td style="padding:9px 14px;color:#0f2a43;font-weight:500;font-size:0.9rem;">' + value + '</td></tr>' : '';
+                    return value ? '<tr><td style="padding:9px 14px;color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;font-weight:500;width:40%;">' + label + '</td><td style="padding:9px 14px;color:#0f2a43;font-weight:500;font-size:0.9rem;">' + htmlEsc(value) + '</td></tr>' : '';
                 };
                 return '<div class="page-break" style="min-height:88vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 40px;">'
                     + '<div style="width:64px;height:3px;background:#0f2a43;margin-bottom:34px;"></div>'
                     + '<div style="font-size:0.78rem;letter-spacing:0.18em;color:#64748b;text-transform:uppercase;font-weight:500;margin-bottom:10px;">Audit Completed</div>'
-                    + '<div style="font-size:1.5rem;font-weight:700;color:#0f2a43;margin-bottom:6px;">' + d.report.client + '</div>'
-                    + '<div style="font-size:0.9rem;color:#475569;margin-bottom:30px;">' + standard + '</div>'
+                    + '<div style="font-size:1.5rem;font-weight:700;color:#0f2a43;margin-bottom:6px;">' + htmlEsc(d.report.client) + '</div>'
+                    + '<div style="font-size:0.9rem;color:#475569;margin-bottom:30px;">' + htmlEsc(standard) + '</div>'
                     + (function () {
                         const rec = resolveRecommendation(d.report, d.stats);
                         const color = rec.isManual ? (rec.primary === 'Recommended' ? '#15803d' : rec.primary === 'Not Recommended' ? '#b91c1c' : '#b45309') : d.stats.recColor;
@@ -4650,7 +4682,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     // Verification QR removed from the closing page (client-facing surface) —
                     // qrCodeUrl/cardUrl/qrFallback computation is untouched, so this is a
                     // presentation-only removal, reversible without rebuilding the data.
-                    + '<div style="font-size:0.85rem;color:#475569;max-width:440px;line-height:1.6;">Thank you for the professional cooperation extended to the audit team. This report has been prepared in accordance with ' + standard + ' requirements; distribution is limited to authorized recipients listed herein.</div>'
+                    + '<div style="font-size:0.85rem;color:#475569;max-width:440px;line-height:1.6;">Thank you for the professional cooperation extended to the audit team. This report has been prepared in accordance with ' + htmlEsc(standard) + ' requirements; distribution is limited to authorized recipients listed herein.</div>'
                     // d.today is the moment this PDF was generated, not when the report was
                     // formally issued — printing it as "Issue Date" implied issuance on every
                     // reprint. Source from the real issue event (resolveIssueDate) and omit the

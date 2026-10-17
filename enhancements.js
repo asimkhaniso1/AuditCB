@@ -429,7 +429,7 @@
                 itemsHtml += `
                     <div class="pdf-item-row">
                         <div class="pdf-item-num">${i + 1}</div>
-                        <div class="pdf-item-ref">${item.category || ''}</div>
+                        <div class="pdf-item-ref">${window.UTILS.escapeHtml(item.category || '')}</div>
                         <div class="pdf-item-question">${window.UTILS?.escapeHtml(item.requirement || item.question || '') || ''}</div>
                         <div class="pdf-item-status">☐ C &nbsp; ☐ NC &nbsp; ☐ OFI</div>
                         <div class="pdf-item-notes"></div>
@@ -445,7 +445,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>${checklist.name || 'Audit Checklist'} - Export</title>
+    <title>${window.UTILS.escapeHtml(checklist.name || 'Audit Checklist')} - Export</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         

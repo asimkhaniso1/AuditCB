@@ -26,6 +26,18 @@ window.NCRSyncUtils = window.NCRSyncUtils || {};
 window.NCRSyncUtils.buildSourceKey = buildChecklistSourceKey;
 window.NCRSyncUtils.buildStableIdentity = buildChecklistStableIdentity;
 
+// Escape stored text (auditor remarks, AI-drafted summary, client/KB names)
+// for an HTML string. Several of these fields were written through
+// Sanitizer.sanitizeText (escaped on WRITE), so decode first: the value is
+// escaped exactly once and an AI reply containing "</textarea><img …>" can
+// no longer break out of the textarea it is seeded into.
+function _execEscText(v) {
+    const U = window.UTILS || {};
+    const raw = String(v ?? '');
+    return U.escapeHtml(U.decodeEntities ? U.decodeEntities(raw) : raw);
+}
+window._execEscText = _execEscText;
+
 // ---------- Report Integrity "Set criterion" fix action — pure helpers ----------
 // Same reasoning as buildChecklistSourceKey/buildChecklistStableIdentity above:
 // top-level (not nested inside renderExecutionTab/saveChecklist) so they're
@@ -711,7 +723,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         return `
                             <div style="margin-bottom: 2rem;">
                                 <h4 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-                                    <i class="fa-solid fa-clipboard-list" style="color: var(--primary-color); -webkit-text-fill-color: #667eea;"></i> ${checklist.name}
+                                    <i class="fa-solid fa-clipboard-list" style="color: var(--primary-color); -webkit-text-fill-color: #667eea;"></i> ${_execEscText(checklist.name)}
                                 </h4>
                                 ${orderedClauses.map((clause, clauseIdx) => {
                             const allowedIds = selectionMap[checklist.id];
@@ -745,8 +757,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
                                                     <span class="clause-drag-handle" style="cursor: grab; color: #94a3b8; padding: 0 4px; font-size: 1rem;" title="Drag to reorder section"><i class="fa-solid fa-grip-vertical"></i></span>
                                                     <input type="checkbox" class="section-checkbox" data-section-id="${sectionId}" style="width: 18px; height: 18px; cursor: pointer;" title="Select all items in this section">
-                                                    <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;" data-action="toggleAccordion" data-id="${sectionId}">${clause.mainClause}</span>
-                                                    <span style="font-weight: 600; color: #1e293b; cursor: pointer; flex: 1;" data-action="toggleAccordion" data-id="${sectionId}">${clause.title}</span>
+                                                    <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;" data-action="toggleAccordion" data-id="${sectionId}">${_execEscText(clause.mainClause)}</span>
+                                                    <span style="font-weight: 600; color: #1e293b; cursor: pointer; flex: 1;" data-action="toggleAccordion" data-id="${sectionId}">${_execEscText(clause.title)}</span>
                                                     <span style="color: var(--text-secondary); font-size: 0.85rem;">(${total} items)</span>
                                                 </div>
                                                 <div style="display: flex; align-items: center; gap: 1rem;">
@@ -767,7 +779,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         return `
                             <div style="margin-bottom: 2rem;">
                                 <h4 style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; color: var(--primary-color);">
-                                    ${checklist.name}
+                                    ${_execEscText(checklist.name)}
                                 </h4>
                                 ${(checklist.items || []).map((item, idx) => renderRow(item, checklist.id, idx, false)).join('')}
                             </div>
@@ -1103,10 +1115,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 ${capas.length > 0 ? capas.map((capa, idx) => `
                                     <tr>
                                         <td>CAPA-${String(idx + 1).padStart(3, '0')}</td>
-                                        <td>${capa.linkedNCR || '-'}</td>
-                                        <td>${capa.rootCause || '-'}</td>
-                                        <td>${capa.actionPlan || '-'}</td>
-                                        <td>${capa.dueDate || '-'}</td>
+                                        <td>${_execEscText(capa.linkedNCR || '-')}</td>
+                                        <td>${_execEscText(capa.rootCause || '-')}</td>
+                                        <td>${_execEscText(capa.actionPlan || '-')}</td>
+                                        <td>${_execEscText(capa.dueDate || '-')}</td>
                                         <td><span style="background: ${capa.status === window.CONSTANTS.STATUS.COMPLETED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${capa.status || window.CONSTANTS.STATUS.IN_PROGRESS}</span></td>
                                     </tr>
                                 `).join('') : `
@@ -1320,27 +1332,27 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <!-- Finding Details Column -->
                                         <div>
                                             <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
-                                                <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${f.source}</span>
+                                                <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${_execEscText(f.source)}</span>
                                                 <span style="font-weight: 700; color: #1e293b;">#${idx + 1}</span>
                                                 ${f.hasEvidence ? `<span data-action="viewEvidenceImageDirect" data-id="${f.id}" style="cursor: pointer; color: var(--primary-color); font-size: 0.85rem; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-image"></i> View Evidence</span>` : ''}
                                             </div>
                                             ${f.clause || f.requirement ? `
                                                 <div style="font-size: 0.85rem; padding: 0.5rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 0.75rem;">
-                                                    <strong style="color: var(--primary-color);">${f.clause ? `${f.clause}` : 'Requirement'}:</strong> 
-                                                    <span style="color: #334155;">${f.requirement || ''}</span>
+                                                    <strong style="color: var(--primary-color);">${f.clause ? `${_execEscText(f.clause)}` : 'Requirement'}:</strong> 
+                                                    <span style="color: #334155;">${_execEscText(f.requirement || '')}</span>
                                                 </div>
                                             ` : ''}
                                             ${f.kbMatch ? `
                                                 <div style="font-size: 0.8rem; padding: 0.5rem 0.75rem; background: linear-gradient(135deg, #eff6ff, #f0f9ff); border-radius: 6px; border-left: 3px solid #3b82f6; margin-bottom: 0.75rem; color: #1e40af;">
-                                                    <strong><i class="fa-solid fa-book" style="margin-right: 4px;"></i>${f.kbMatch.standardName || 'ISO Standard'} — Clause ${f.kbMatch.clause}${f.kbMatch.title ? ': ' + f.kbMatch.title : ''}</strong>
-                                                    <div style="margin-top: 4px; color: #334155; font-style: italic; line-height: 1.5;">${f.kbMatch.requirement}</div>
+                                                    <strong><i class="fa-solid fa-book" style="margin-right: 4px;"></i>${_execEscText(f.kbMatch.standardName || 'ISO Standard')} — Clause ${_execEscText(f.kbMatch.clause)}${f.kbMatch.title ? ': ' + _execEscText(f.kbMatch.title) : ''}</strong>
+                                                    <div style="margin-top: 4px; color: #334155; font-style: italic; line-height: 1.5;">${_execEscText(f.kbMatch.requirement)}</div>
                                                 </div>
                                             ` : ''}
-                                            <div style="font-weight: 500; color: #334155; line-height: 1.5; margin-bottom: 0.5rem;">${f.description}</div>
+                                            <div style="font-weight: 500; color: #334155; line-height: 1.5; margin-bottom: 0.5rem;">${_execEscText(f.description)}</div>
                                             ${f.designation || f.department ? `
                                                 <div style="font-size: 0.8rem; color: #64748b; display: flex; gap: 1rem;">
-                                                    <span><i class="fa-solid fa-user" style="width: 14px;"></i> ${f.designation || '-'}</span> 
-                                                    <span><i class="fa-solid fa-building" style="width: 14px;"></i> ${f.department || '-'}</span>
+                                                    <span><i class="fa-solid fa-user" style="width: 14px;"></i> ${_execEscText(f.designation || '-')}</span> 
+                                                    <span><i class="fa-solid fa-building" style="width: 14px;"></i> ${_execEscText(f.department || '-')}</span>
                                                 </div>
                                             ` : ''}
                                         </div>
@@ -1357,7 +1369,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <!--Remarks Column-->
             <div>
                 <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Auditor Remarks / Notes</label>
-                <textarea class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Justification or internal notes..." rows="3" style="font-size: 0.85rem;">${f.remarks || ''}</textarea>
+                <textarea class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Justification or internal notes..." rows="3" style="font-size: 0.85rem;">${_execEscText(f.remarks || '')}</textarea>
             </div>
 
                                     </div >
@@ -1390,18 +1402,18 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                              <!-- Executive Summary -->
                              <div>
                                 <label style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; display: block;">Executive Summary</label>
-                                <textarea id="exec-summary-${report.id}" class="form-control" rows="5" placeholder="Overall conclusion on the effectiveness of the management system...">${report.executiveSummary || ''}</textarea>
+                                <textarea id="exec-summary-${report.id}" class="form-control" rows="5" placeholder="Overall conclusion on the effectiveness of the management system...">${_execEscText(report.executiveSummary || '')}</textarea>
                              </div>
                         </div>
 
                          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
                             <div>
                                 <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Positive Observations</h4>
-                                <textarea id="positive-observations" class="form-control" rows="4" placeholder="Document good practices and positive findings...">${report.positiveObservations || ''}</textarea>
+                                <textarea id="positive-observations" class="form-control" rows="4" placeholder="Document good practices and positive findings...">${_execEscText(report.positiveObservations || '')}</textarea>
                             </div>
                             <div>
                                 <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Opportunities for Improvement</h4>
-                                <textarea id="ofi" class="form-control" rows="4" placeholder="Suggestions for improvement (not non-conformities)...">${report.ofi || ''}</textarea>
+                                <textarea id="ofi" class="form-control" rows="4" placeholder="Suggestions for improvement (not non-conformities)...">${_execEscText(report.ofi || '')}</textarea>
                             </div>
                         </div>
                         
@@ -1417,13 +1429,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                                 <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
                                     <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #2563eb;"><i class="fa-solid fa-door-open" style="margin-right: 0.25rem;"></i>Opening Meeting</label>
-                                    ${report.openingMeeting?.date ? `<div style="font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Date:</strong> ${report.openingMeeting.date} ${report.openingMeeting.time || ''}</div>` : '<div style="font-size: 0.85rem; color: #94a3b8;">Not recorded yet</div>'}
-                                    ${(() => { const att = report.openingMeeting?.attendees; if (!att) return ''; if (Array.isArray(att)) return '<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong></div>' + att.map(a => typeof a === 'object' ? `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${a.name}${a.role ? ' - ' + a.role : ''}${a.organization ? ' (' + a.organization + ')' : ''}</div>` : `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${a}</div>`).join(''); return `<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong> ${att}</div>`; })()}
+                                    ${report.openingMeeting?.date ? `<div style="font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Date:</strong> ${_execEscText(report.openingMeeting.date)} ${_execEscText(report.openingMeeting.time || '')}</div>` : '<div style="font-size: 0.85rem; color: #94a3b8;">Not recorded yet</div>'}
+                                    ${(() => { const att = report.openingMeeting?.attendees; if (!att) return ''; if (Array.isArray(att)) return '<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong></div>' + att.map(a => typeof a === 'object' ? `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${_execEscText(a.name)}${a.role ? ' - ' + _execEscText(a.role) : ''}${a.organization ? ' (' + _execEscText(a.organization) + ')' : ''}</div>` : `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${_execEscText(a)}</div>`).join(''); return `<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong> ${_execEscText(att)}</div>`; })()}
                                 </div>
                                 <div style="background: #fff7ed; padding: 1rem; border-radius: 8px; border: 1px dashed #fdba74;">
                                     <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #ea580c;"><i class="fa-solid fa-door-closed" style="margin-right: 0.25rem;"></i>Closing Meeting</label>
-                                    ${report.closingMeeting?.date ? `<div style="font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Date:</strong> ${report.closingMeeting.date} ${report.closingMeeting.time || ''}</div>` : '<div style="font-size: 0.85rem; color: #94a3b8;">Not recorded yet</div>'}
-                                    ${(() => { const att = report.closingMeeting?.attendees; if (!att) return ''; if (Array.isArray(att)) return '<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong></div>' + att.map(a => typeof a === 'object' ? `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${a.name}${a.role ? ' - ' + a.role : ''}${a.organization ? ' (' + a.organization + ')' : ''}</div>` : `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${a}</div>`).join(''); return `<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong> ${att}</div>`; })()}
+                                    ${report.closingMeeting?.date ? `<div style="font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Date:</strong> ${_execEscText(report.closingMeeting.date)} ${_execEscText(report.closingMeeting.time || '')}</div>` : '<div style="font-size: 0.85rem; color: #94a3b8;">Not recorded yet</div>'}
+                                    ${(() => { const att = report.closingMeeting?.attendees; if (!att) return ''; if (Array.isArray(att)) return '<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong></div>' + att.map(a => typeof a === 'object' ? `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${_execEscText(a.name)}${a.role ? ' - ' + _execEscText(a.role) : ''}${a.organization ? ' (' + _execEscText(a.organization) + ')' : ''}</div>` : `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${_execEscText(a)}</div>`).join(''); return `<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong> ${_execEscText(att)}</div>`; })()}
                                 </div>
                             </div>
                         </div>
@@ -1567,7 +1579,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         const checked = existingNames.includes(a.name) ? 'checked' : '';
                         html += `<label style="display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0; cursor: pointer; font-size: 0.82rem;">`;
                         html += `<input type="checkbox" class="${prefix}-attendee-cb" data-name="${(a.name || '').replace(/"/g, '&quot;')}" data-role="${(a.role || '').replace(/"/g, '&quot;')}" data-org="${cbName.replace(/"/g, '&quot;')}" ${checked} style="width: 15px; height: 15px; flex-shrink: 0;">`;
-                        html += `<span style="font-weight: 500;">${a.name}</span><span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">– ${a.role}</span>`;
+                        html += `<span style="font-weight: 500;">${_execEscText(a.name)}</span><span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">– ${_execEscText(a.role)}</span>`;
                         html += '</label>';
                     });
                     html += '</div>';
@@ -1579,7 +1591,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         const checked = existingNames.includes(p.name) ? 'checked' : '';
                         html += `<label style="display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0; cursor: pointer; font-size: 0.82rem;">`;
                         html += `<input type="checkbox" class="${prefix}-attendee-cb" data-name="${(p.name || '').replace(/"/g, '&quot;')}" data-role="${(p.role || '').replace(/"/g, '&quot;')}" data-org="${clientOrgName.replace(/"/g, '&quot;')}" ${checked} style="width: 15px; height: 15px; flex-shrink: 0;">`;
-                        html += `<span style="font-weight: 500;">${p.name}</span>${p.role ? `<span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">– ${p.role}</span>` : ''}`;
+                        html += `<span style="font-weight: 500;">${_execEscText(p.name)}</span>${p.role ? `<span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">– ${_execEscText(p.role)}</span>` : ''}`;
                         html += '</label>';
                     });
                     html += '</div>';
@@ -1620,7 +1632,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         </div>
                         <div class="form-group">
                             <label>Meeting Notes</label>
-                            <textarea id="opening-notes" class="form-control" rows="3" placeholder="Key points discussed, scope confirmed, agenda presented...">${openingMeeting.notes || ''}</textarea>
+                            <textarea id="opening-notes" class="form-control" rows="3" placeholder="Key points discussed, scope confirmed, agenda presented...">${_execEscText(openingMeeting.notes || '')}</textarea>
                         </div>
                         <div style="margin-top: 0.75rem; padding: 0.75rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; overflow: hidden;">
                             <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.5rem;" data-action="toggleNextHidden">
@@ -1664,11 +1676,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         </div>
                         <div class="form-group">
                             <label>Findings Summary Presented</label>
-                            <textarea id="closing-summary" class="form-control" rows="2" placeholder="Summary of findings as presented to client...">${closingMeeting.summary || ''}</textarea>
+                            <textarea id="closing-summary" class="form-control" rows="2" placeholder="Summary of findings as presented to client...">${_execEscText(closingMeeting.summary || '')}</textarea>
                         </div>
                         <div class="form-group">
                             <label>Client Response/Agreement</label>
-                            <textarea id="closing-response" class="form-control" rows="2" placeholder="Client's response to findings...">${closingMeeting.response || ''}</textarea>
+                            <textarea id="closing-response" class="form-control" rows="2" placeholder="Client's response to findings...">${_execEscText(closingMeeting.response || '')}</textarea>
                         </div>
                         <div style="margin-top: 0.75rem; padding: 0.75rem; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca; overflow: hidden;">
                             <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.5rem;" data-action="toggleNextHidden">

@@ -1694,7 +1694,7 @@ window.openNewNCRModal = function () {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
                     <label>Raised By</label>
-                    <input type="text" class="form-control" id="ncr-raised-by" value="${window.state.currentUser?.name || 'Auditor'}">
+                    <input type="text" class="form-control" id="ncr-raised-by" value="${window.UTILS.escapeHtml(window.state.currentUser?.name || 'Auditor')}">
                 </div>
                 <div class="form-group">
                     <label>Due Date <span style="color: var(--danger-color);">*</span></label>
@@ -2000,13 +2000,13 @@ window.printNCRRegister = function () {
                     ${ncrs.map(n => `
                         <tr>
                             <td>NCR-${String(n.id).padStart(3, '0')}</td>
-                            <td>${n.clientName || '-'}</td>
-                            <td>${n.standard || '-'}</td>
-                            <td>${resolveClauseDisplay(n).text}</td>
-                            <td>${n.severity}</td>
-                            <td>${n.description}</td>
-                            <td>${n.status}</td>
-                            <td>${n.dueDate || '-'}</td>
+                            <td>${window.UTILS.escapeHtml(n.clientName || '-')}</td>
+                            <td>${window.UTILS.escapeHtml(n.standard || '-')}</td>
+                            <td>${window.UTILS.escapeHtml(resolveClauseDisplay(n).text)}</td>
+                            <td>${window.UTILS.escapeHtml(n.severity)}</td>
+                            <td>${window.UTILS.escapeText(n.description)}</td>
+                            <td>${window.UTILS.escapeHtml(n.status)}</td>
+                            <td>${window.UTILS.escapeHtml(n.dueDate || '-')}</td>
                         </tr>
                     `).join('')}
                 </tbody>

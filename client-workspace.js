@@ -678,7 +678,7 @@ function renderClientOverview(client) {
                     + '<div style="width: 36px; height: 36px; border-radius: 50%; background: ' + (isLead ? 'linear-gradient(135deg,#0284c7,#0369a1)' : 'linear-gradient(135deg,#64748b,#475569)') + '; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;">'
                     + a.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() + '</div>'
                     + '<div style="flex: 1;"><div style="font-weight: 500; font-size: 0.85rem;">' + window.UTILS.escapeHtml(a.name) + '</div>'
-                    + '<div style="font-size: 0.75rem; color: var(--text-secondary);">' + a.role + ' • ' + a.audits + ' audit' + (a.audits !== 1 ? 's' : '') + '</div></div>'
+                    + '<div style="font-size: 0.75rem; color: var(--text-secondary);">' + window.UTILS.escapeHtml(a.role) + ' • ' + a.audits + ' audit' + (a.audits !== 1 ? 's' : '') + '</div></div>'
                     + (isLead ? '<i class="fa-solid fa-star" style="color: #fbbf24; font-size: 0.85rem;" title="Lead Auditor"></i>' : '')
                     + '</div>';
             }).join('') + '</div>';
@@ -699,12 +699,12 @@ function renderClientOverview(client) {
                     <div class="card">
                          <h3 style="margin: 0 0 1rem 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">Company Details</h3>
                         <div style="display: grid; gap: 1rem;">
-                            <div style="display: flex; justify-content: space-between;"><strong>Name:</strong> <span>${client.name}</span></div>
-                            <div style="display: flex; justify-content: space-between;"><strong>Standard:</strong> <span>${client.standard || '-'}</span></div>
-                            <div style="display: flex; justify-content: space-between;"><strong>Industry:</strong> <span>${client.industry || '-'}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><strong>Name:</strong> <span>${window.UTILS.escapeHtml(client.name)}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><strong>Standard:</strong> <span>${window.UTILS.escapeHtml(client.standard || '-')}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><strong>Industry:</strong> <span>${window.UTILS.escapeHtml(client.industry || '-')}</span></div>
                             <div style="display: flex; justify-content: space-between;"><strong>Employees:</strong> <span>${totalEmployees}</span></div>
-                            <div style="display: flex; justify-content: space-between;"><strong>Website:</strong> <a href="${client.website || '#'}" target="_blank">${client.website || '-'}</a></div>
-                            <div style="display: flex; justify-content: space-between;"><strong>Address:</strong> <span style="text-align: right; max-width: 50%;">${client.address || '-'}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><strong>Website:</strong> <a href="${window.UTILS.escapeHtml(/^\s*(javascript|data|vbscript):/i.test(client.website || '') ? '#' : (client.website || '#'))}" target="_blank" rel="noopener noreferrer">${window.UTILS.escapeHtml(client.website || '-')}</a></div>
+                            <div style="display: flex; justify-content: space-between;"><strong>Address:</strong> <span style="text-align: right; max-width: 50%;">${window.UTILS.escapeHtml(client.address || '-')}</span></div>
                         </div>
                     </div>
 
@@ -723,9 +723,9 @@ function renderClientOverview(client) {
                             <tbody>
                                 ${client.sites.map(site => `
                                 <tr>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f8fafc;">${site.name}</td>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f8fafc;">${site.city || '-'}</td>
-                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f8fafc;">${site.shift || 'No'}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f8fafc;">${window.UTILS.escapeHtml(site.name)}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f8fafc;">${window.UTILS.escapeHtml(site.city || '-')}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f8fafc;">${window.UTILS.escapeHtml(site.shift || 'No')}</td>
                                 </tr>
                                 `).join('')}
                             </tbody>
@@ -756,11 +756,11 @@ function renderClientOverview(client) {
                             <tbody>
                                 ${(client.contacts || []).map(contact => `
                                 <tr>
-                                    <td style="font-weight: 500;">${contact.name}</td>
-                                    <td>${contact.designation || '-'}</td>
-                                    <td><a href="mailto:${contact.email}" style="color: var(--primary-color);">${contact.email}</a></td>
-                                    <td>${contact.phone || '-'}</td>
-                                    <td>${contact.department || '-'}</td>
+                                    <td style="font-weight: 500;">${window.UTILS.escapeHtml(contact.name)}</td>
+                                    <td>${window.UTILS.escapeHtml(contact.designation || '-')}</td>
+                                    <td><a href="mailto:${window.UTILS.escapeHtml(contact.email)}" style="color: var(--primary-color);">${window.UTILS.escapeHtml(contact.email)}</a></td>
+                                    <td>${window.UTILS.escapeHtml(contact.phone || '-')}</td>
+                                    <td>${window.UTILS.escapeHtml(contact.department || '-')}</td>
                                 </tr>
                                 `).join('') || '<tr><td colspan="5" style="text-align: center;">No contacts found.</td></tr>'}
                             </tbody>
@@ -780,7 +780,7 @@ function renderClientOverview(client) {
                         <ul style="list-style: none; padding: 0;">
                             ${departments.map(dept => `
                             <li style="padding: 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
-                                <span>${typeof dept === 'object' ? (dept.name || 'Unnamed') : dept}</span>
+                                <span>${window.UTILS.escapeHtml(typeof dept === 'object' ? (dept.name || 'Unnamed') : dept)}</span>
                                 <span style="font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-pen"></i></span>
                             </li>
                             `).join('')}
@@ -1430,7 +1430,7 @@ function renderAuditCycleTimeline(client) {
 
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                    <h3 style="margin: 0;"><i class="fa-solid fa-certificate" style="margin-right: 0.5rem; color: var(--primary-color);"></i>${latestCert.standard || 'ISO'}</h3>
+                    <h3 style="margin: 0;"><i class="fa-solid fa-certificate" style="margin-right: 0.5rem; color: var(--primary-color);"></i>${window.UTILS.escapeHtml(latestCert.standard || 'ISO')}</h3>
                     <div style="text-align: right;">
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Cert #: <strong>${latestCert.certificateNo || 'Not assigned'}</strong></div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Rev: <strong>${latestCert.revision || '00'}</strong></div>
@@ -1496,7 +1496,7 @@ function renderClientPlans(client) {
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-clipboard-list" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No audit plans for this client yet.</p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" data-action="renderCreateAuditPlanForm" data-id="${client.name}">
+                <button class="btn btn-primary" style="margin-top: 1rem;" data-action="renderCreateAuditPlanForm" data-id="${window.UTILS.escapeHtml(client.name)}">
                     Create First Audit Plan
                 </button>
             </div>
@@ -1532,7 +1532,7 @@ function renderClientPlans(client) {
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Audit Plans</h3>
-                    <button class="btn btn-sm btn-primary" data-action="renderCreateAuditPlanForm" data-id="${client.name}" aria-label="Add">
+                    <button class="btn btn-sm btn-primary" data-action="renderCreateAuditPlanForm" data-id="${window.UTILS.escapeHtml(client.name)}" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Plan
                     </button>
                 </div>
@@ -1552,10 +1552,10 @@ function renderClientPlans(client) {
                             ${plans.sort((a, b) => new Date(b.date) - new Date(a.date)).map(p => `
                                 <tr>
                                     <td><a href="#" data-action="viewAuditPlan" data-id="${p.id}" style="color: var(--primary-color); text-decoration: none; font-weight: 500;">${p.date || '-'}</a></td>
-                                    <td>${p.type || 'Audit'}</td>
-                                    <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${p.standard || 'ISO'}</span></td>
+                                    <td>${window.UTILS.escapeHtml(p.type || 'Audit')}</td>
+                                    <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(p.standard || 'ISO')}</span></td>
                                     <td><span class="status-badge status-${(p.status || 'planned').toLowerCase().replace(' ', '-')}">${p.status || 'Planned'}</span></td>
-                                    <td>${(p.team && p.team[0]) || p.lead || '-'}</td>
+                                    <td>${window.UTILS.escapeHtml((p.team && p.team[0]) || p.lead || '-')}</td>
                                     <td>
                                         <button class="btn btn-sm btn-icon" data-action="viewAuditPlan" data-id="${p.id}" aria-label="View"><i class="fa-solid fa-eye"></i></button>
                                     </td>
@@ -1583,7 +1583,7 @@ function renderClientExecution(client) {
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-tasks" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No audit execution records for this client yet.</p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" data-action="renderCreateAuditPlanForm" data-id="${client.name}">
+                <button class="btn btn-primary" style="margin-top: 1rem;" data-action="renderCreateAuditPlanForm" data-id="${window.UTILS.escapeHtml(client.name)}">
                     Start First Audit
                 </button>
             </div>
@@ -1619,7 +1619,7 @@ function renderClientExecution(client) {
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Audit Execution & Reports</h3>
-                    <button class="btn btn-sm btn-primary" data-action="renderCreateAuditPlanForm" data-id="${client.name}" aria-label="Add">
+                    <button class="btn btn-sm btn-primary" data-action="renderCreateAuditPlanForm" data-id="${window.UTILS.escapeHtml(client.name)}" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Plan New Audit
                     </button>
                 </div>
@@ -1652,8 +1652,8 @@ function renderClientExecution(client) {
                                     <tr>
                                         <td><strong>${window.UTILS.getPlanRef(p)}</strong></td>
                                         <td>${p.date}</td>
-                                        <td>${p.standard}</td>
-                                        <td>${p.type}</td>
+                                        <td>${window.UTILS.escapeHtml(p.standard)}</td>
+                                        <td>${window.UTILS.escapeHtml(p.type)}</td>
                                         <td>
                                             <button class="btn btn-sm btn-success" data-action="navigateToAuditExecution" data-id="${p.id}">
                                                 <i class="fa-solid fa-play" style="margin-right: 0.25rem;"></i> Start Audit
@@ -1695,7 +1695,7 @@ function renderClientExecution(client) {
                                         </span>
                                         ${openNCs > 0 ? `<span class="badge" style="background: #fee2e2; color: #dc2626; margin-left: 0.25rem;">${openNCs} open</span>` : ''}
                                     </td>
-                                    <td>${r.recommendation || '-'}</td>
+                                    <td>${window.UTILS.escapeText(r.recommendation || '-')}</td>
                                     <td>
                                         <button class="btn btn-sm btn-icon" data-action="renderExecutionDetail" data-id="${r.id}" title="View Report" style="color: var(--primary-color); margin-right: 0.5rem;" aria-label="View">
                                             <i class="fa-solid fa-eye"></i>

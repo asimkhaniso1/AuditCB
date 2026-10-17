@@ -1114,9 +1114,9 @@ window.generateEmbedCode = function () {
         embedHTML += `
             <tr style="background: ${bgColor};">
                 <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.id}</td>
-                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.client}</td>
-                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.standard}</td>
-                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${location}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${window.UTILS.escapeHtml(cert.client)}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${window.UTILS.escapeHtml(cert.standard)}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${window.UTILS.escapeHtml(location)}</td>
                 <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.expiryDate}</td>
             </tr>`;
     });

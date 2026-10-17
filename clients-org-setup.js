@@ -123,9 +123,9 @@ window.getClientCertificatesHTML = function (client) {
         <div class="card" style="margin-bottom: 2rem; border-left: 4px solid var(--primary-color);">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
                 <div>
-                    <span class="badge" style="background: var(--primary-color); color: white;">${cert.standard}</span>
+                    <span class="badge" style="background: var(--primary-color); color: white;">${window.UTILS.escapeHtml(cert.standard)}</span>
                     <div style="font-size: 1.1rem; font-weight: 600; margin-top: 0.5rem;">
-                        Cert #: <input type="text" value="${cert.certificateNo || ''}" style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="certificateNo" data-arg4="this.value">
+                        Cert #: <input type="text" value="${window.UTILS.escapeHtml(cert.certificateNo || '')}" style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="certificateNo" data-arg4="this.value">
                     </div>
                 </div>
                 <div style="text-align: right;">
@@ -142,7 +142,7 @@ window.getClientCertificatesHTML = function (client) {
                 </div>
                 ${relevantSites.map(site => {
             const siteScope = (cert.siteScopes && cert.siteScopes[site.name]) ? cert.siteScopes[site.name] : (cert.scope || '');
-            return `<div style="margin-bottom: 0.5rem;"><strong>${site.name}:</strong><br><textarea class="form-control" rows="2" data-action-change="updateSiteScope" data-arg1="${client.id}" data-arg2="${index}" data-arg3="${site.name}" data-arg4="this.value">${siteScope}</textarea></div>`;
+            return `<div style="margin-bottom: 0.5rem;"><strong>${window.UTILS.escapeHtml(site.name)}:</strong><br><textarea class="form-control" rows="2" data-action-change="updateSiteScope" data-arg1="${client.id}" data-arg2="${index}" data-arg3="${window.UTILS.escapeHtml(site.name)}" data-arg4="this.value">${window.UTILS.escapeText(siteScope)}</textarea></div>`;
         }).join('')}
             </div>
             <div style="margin-top: 1rem; display: flex; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
@@ -819,7 +819,7 @@ window.deleteSelectedOrgItems = function (clientId, kind) {
 // View details helper
 window._orgViewItem = function (type, data) {
     const details = Object.entries(data).map(function (e) {
-        return '<div style="padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9;"><span style="font-weight: 600; color: #64748b; font-size: 0.8rem; text-transform: uppercase;">' + e[0] + '</span><div style="color: #1e293b; margin-top: 2px;">' + (e[1] || '-') + '</div></div>';
+        return '<div style="padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9;"><span style="font-weight: 600; color: #64748b; font-size: 0.8rem; text-transform: uppercase;">' + window.UTILS.escapeHtml(e[0]) + '</span><div style="color: #1e293b; margin-top: 2px;">' + window.UTILS.escapeHtml(e[1] || '-') + '</div></div>';
     }).join('');
     window.openModal('View ' + type, '<div style="padding: 0.5rem;">' + details + '</div>');
 };
@@ -828,9 +828,9 @@ window._orgViewItem = function (type, data) {
 window._orgPrintItem = function (type, data) {
     const w = window.open('', '_blank', 'width=600,height=400');
     const rows = Object.entries(data).map(function (e) {
-        return '<tr><td style="font-weight:600;padding:8px;border:1px solid #e2e8f0;background:#f8fafc;width:30%">' + e[0] + '</td><td style="padding:8px;border:1px solid #e2e8f0">' + (e[1] || '-') + '</td></tr>';
+        return '<tr><td style="font-weight:600;padding:8px;border:1px solid #e2e8f0;background:#f8fafc;width:30%">' + window.UTILS.escapeHtml(e[0]) + '</td><td style="padding:8px;border:1px solid #e2e8f0">' + window.UTILS.escapeHtml(e[1] || '-') + '</td></tr>';
     }).join('');
-    w.document.write('<!DOCTYPE html><html><head><title>' + type + '</title><style>body{font-family:Inter,sans-serif;padding:2rem}h2{color:#1e293b}table{width:100%;border-collapse:collapse;margin-top:1rem}</style></head><body><h2>' + type + ' Details</h2><table>' + rows + '</table></body></html>');
+    w.document.write('<!DOCTYPE html><html><head><title>' + window.UTILS.escapeHtml(type) + '</title><style>body{font-family:Inter,sans-serif;padding:2rem}h2{color:#1e293b}table{width:100%;border-collapse:collapse;margin-top:1rem}</style></head><body><h2>' + window.UTILS.escapeHtml(type) + ' Details</h2><table>' + rows + '</table></body></html>');
     w.document.close();
     setTimeout(function () { w.print(); }, 300);
 };
@@ -841,7 +841,7 @@ window.getClientProfileHTML = function (client) {
     const isAdmin = window.AuthManager && window.AuthManager.canPerform('edit', 'client');
     function formatProfileText(text) {
         if (!text) return '';
-        let esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml(text) : text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        let esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml(text) : String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         let lines = esc.split('\n');
         let html = '';
         for (var i = 0; i < lines.length; i++) {
@@ -1319,8 +1319,8 @@ window.bulkUploadDepartments = function (clientId) {
 window.addContactPerson = function (clientId) {
     const client = window.DataService.findClient(clientId);
     if (!client) return;
-    const depts = (client.departments || []).map(d => '<option value="' + (d.name || '').replace(/"/g, '&quot;') + '">' + (d.name || '') + '</option>').join('');
-    const desigs = (client.designations || []).map(d => '<option value="' + (d.title || d.name || '').replace(/"/g, '&quot;') + '">' + (d.title || d.name || '') + '</option>').join('');
+    const depts = (client.departments || []).map(d => '<option value="' + (d.name || '').replace(/"/g, '&quot;') + '">' + window.UTILS.escapeHtml(d.name || '') + '</option>').join('');
+    const desigs = (client.designations || []).map(d => '<option value="' + (d.title || d.name || '').replace(/"/g, '&quot;') + '">' + window.UTILS.escapeHtml(d.title || d.name || '') + '</option>').join('');
     window.openModal('Add Contact', `
         <form>
             <div class="form-group"><label>Name *</label><input id="contact-name" class="form-control"></div>
@@ -1366,8 +1366,8 @@ window.editContact = function (clientId, index) {
     const client = window.DataService.findClient(clientId);
     if (!client || !client.contacts || !client.contacts[index]) return;
     const ct = client.contacts[index];
-    const depts = (client.departments || []).map(d => '<option value="' + (d.name || '').replace(/"/g, '&quot;') + '"' + ((ct.department === d.name) ? ' selected' : '') + '>' + (d.name || '') + '</option>').join('');
-    const desigs = (client.designations || []).map(d => { const v = d.title || d.name || ''; return '<option value="' + v.replace(/"/g, '&quot;') + '"' + ((ct.designation === v) ? ' selected' : '') + '>' + v + '</option>'; }).join('');
+    const depts = (client.departments || []).map(d => '<option value="' + (d.name || '').replace(/"/g, '&quot;') + '"' + ((ct.department === d.name) ? ' selected' : '') + '>' + window.UTILS.escapeHtml(d.name || '') + '</option>').join('');
+    const desigs = (client.designations || []).map(d => { const v = d.title || d.name || ''; return '<option value="' + v.replace(/"/g, '&quot;') + '"' + ((ct.designation === v) ? ' selected' : '') + '>' + window.UTILS.escapeHtml(v) + '</option>'; }).join('');
     window.openModal('Edit Contact', `
         <form>
             <div class="form-group"><label>Name *</label><input id="contact-name" class="form-control" value="${(ct.name || '').replace(/"/g, '&quot;')}"></div>
@@ -1679,12 +1679,12 @@ window.editSite = function (clientId, siteIndex) {
     }).join('');
     window.DataService.openFormModal('Edit Site Location', '<form id="site-form">' +
         '<div class="form-group"><label>Site Name <span style="color:var(--danger-color)">*</span></label>' +
-        '<input type="text" class="form-control" id="site-name" value="' + (site.name || '') + '" required></div>' +
+        '<input type="text" class="form-control" id="site-name" value="' + window.UTILS.escapeHtml(site.name || '') + '" required></div>' +
         '<div class="form-group"><label>Address</label>' +
-        '<input type="text" class="form-control" id="site-address" value="' + (site.address || '') + '"></div>' +
+        '<input type="text" class="form-control" id="site-address" value="' + window.UTILS.escapeHtml(site.address || '') + '"></div>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">' +
-        '<div class="form-group"><label>City</label><input type="text" class="form-control" id="site-city" value="' + (site.city || '') + '"></div>' +
-        '<div class="form-group"><label>Country</label><input type="text" class="form-control" id="site-country" value="' + (site.country || '') + '"></div>' +
+        '<div class="form-group"><label>City</label><input type="text" class="form-control" id="site-city" value="' + window.UTILS.escapeHtml(site.city || '') + '"></div>' +
+        '<div class="form-group"><label>Country</label><input type="text" class="form-control" id="site-country" value="' + window.UTILS.escapeHtml(site.country || '') + '"></div>' +
         '</div>' +
         '<div style="border-top:1px solid var(--border-color);margin:1rem 0;padding-top:1rem">' +
         '<div class="form-group"><label>Applicable Standards</label>' +

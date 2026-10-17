@@ -2723,7 +2723,7 @@ function getAssignmentsHTML() {
                                         <strong style="font-size: 1.1rem;">${window.UTILS.escapeHtml(auditor.name)}</strong>
                                         <div style="font-size: 0.85rem; color: var(--text-secondary);">
                                             <span class="badge" style="background: ${auditor.role === 'Lead Auditor' ? '#e0f2fe' : '#f1f5f9'}; color: ${auditor.role === 'Lead Auditor' ? '#0284c7' : '#64748b'}; margin-right: 0.5rem;">${window.UTILS.escapeHtml(auditor.role)}</span>
-                                            ${auditor.email || ''}
+                                            ${window.UTILS.escapeHtml(auditor.email || '')}
                                         </div>
                                     </div>
                                 </div>
@@ -2788,7 +2788,7 @@ window.openAddAssignmentModal = function () {
                 <label>Auditor <span style="color: var(--danger-color);">*</span></label>
                 <select id="assign-auditor" class="form-control" required>
                     <option value="">-- Select Auditor --</option>
-                    ${auditors.map(a => `<option value="${a.id}">${window.UTILS.escapeHtml(a.name)} (${a.role})</option>`).join('')}
+                    ${auditors.map(a => `<option value="${a.id}">${window.UTILS.escapeHtml(a.name)} (${window.UTILS.escapeHtml(a.role)})</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
@@ -2829,7 +2829,7 @@ window.openQuickAssignModal = function (auditorId, auditorName) {
                     <label>Select Client to Assign</label>
                     <select id="assign-client" class="form-control" required>
                         <option value="">-- Select Client --</option>
-                        ${unassignedClients.map(c => `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)} (${c.industry || 'N/A'})</option>`).join('')}
+                        ${unassignedClients.map(c => `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)} (${window.UTILS.escapeHtml(c.industry || 'N/A')})</option>`).join('')}
                     </select>
                 </div>
         `;
