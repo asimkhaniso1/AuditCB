@@ -51,7 +51,7 @@ function getDefaultsHTML() {
                     <div class="form-group">
                         <label>Certificate Number Format</label>
                         <input type="text" id="cb-cert-format" class="form-control" 
-                               value="${s.certificateNumberFormat || 'CB-{YEAR}-{SEQ}'}" 
+                               value="${window.UTILS.escapeHtml(s.certificateNumberFormat || 'CB-{YEAR}-{SEQ}')}"
                                placeholder="CB-{YEAR}-{SEQ}">
                         <small class="form-text">Use {YEAR} for year, {SEQ} for sequence number</small>
                     </div>
@@ -102,7 +102,7 @@ async function saveDefaultSettings() {
         // Get values from form
         window.state.cbSettings.dateFormat = document.getElementById('cb-date-format').value;
         window.state.cbSettings.currency = document.getElementById('cb-currency').value;
-        window.state.cbSettings.certificateNumberFormat = document.getElementById('cb-cert-format').value;
+        window.state.cbSettings.certificateNumberFormat = window.Sanitizer.sanitizeText(document.getElementById('cb-cert-format').value);
         window.state.cbSettings.defaultStage1Duration = parseInt(document.getElementById('cb-stage1-duration', 10).value, 10);
         window.state.cbSettings.defaultStage2Duration = parseInt(document.getElementById('cb-stage2-duration', 10).value, 10);
         window.state.cbSettings.manDayCalculationMode = document.getElementById('cb-manday-mode').value;

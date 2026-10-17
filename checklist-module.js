@@ -509,15 +509,24 @@ function getClauseTitleFromNumber(clauseNum) {
 // placeholder/checklist tag rather than a real standard clause. Root-causing
 // that here: checklist authoring now requires a real clause per item.
 
-// Defensive wrapper around window.Validator.isClauseRef — falls back to a
-// local copy of the same pattern if validation.js hasn't loaded yet.
+// The ONE clause-ref check for the app: checklist authoring here and the NCR
+// "Set criterion" dialogs in execution-module-v2.js (via window.isValidClauseRef
+// and window.NCRSyncUtils.isValidClauseRef) both use it. execution-module-v2.js
+// used to declare its own global isValidClauseRef, which this file silently
+// replaced at load. This keeps that copy's stricter behaviour:
+//   - an internal pseudo-tag (FOCUS/SURV/ORG/DOC) is always rejected, even if
+//     a Validator implementation would accept it;
+//   - a throwing Validator falls back to the local pattern instead of
+//     breaking the save handler that called it;
+//   - with no Validator loaded, the same pattern validation.js uses applies.
 function isValidClauseRef(value) {
-    if (window.Validator && typeof window.Validator.isClauseRef === 'function') {
-        return window.Validator.isClauseRef(value);
-    }
     const v = (value === null || value === undefined) ? '' : String(value).trim();
     if (!v) return false;
-    if (/^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i.test(v)) return false;
+    const pseudoPattern = window.NCR_PSEUDO_CLAUSE_PATTERN || /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
+    if (pseudoPattern.test(v)) return false;
+    if (window.Validator && typeof window.Validator.isClauseRef === 'function') {
+        try { return !!window.Validator.isClauseRef(v); } catch (_e) { /* fall through to local pattern */ }
+    }
     return /^[A-Za-z]?\.?\d+(?:\.\d+)*(?:\s*\([a-zA-Z0-9]+\))?$/.test(v);
 }
 window.isValidClauseRef = isValidClauseRef;

@@ -6,6 +6,7 @@
         "start": "http-server -p 8080",
         "build": "node build.js",
         "lint": "eslint . --max-warnings 0",
+        "check:globals": "node tools/check-duplicate-globals.js",
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage"

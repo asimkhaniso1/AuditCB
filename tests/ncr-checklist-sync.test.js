@@ -246,6 +246,11 @@ describe('window.NCRSyncUtils.resolveFindingFromRef', () => {
 describe('window.NCRSyncUtils.isValidClauseRef', () => {
     beforeEach(() => {
         loadModule('./execution-module-v2.js');
+        // NCRSyncUtils.isValidClauseRef delegates to the single implementation,
+        // window.isValidClauseRef in checklist-module.js (loaded after v2 in
+        // index.html, as here).
+        window.Logger = window.Logger || { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+        loadModule('./checklist-module.js');
         // Normally set once renderExecutionTab() has run — set directly here
         // since this suite exercises isValidClauseRef in isolation.
         window.NCR_PSEUDO_CLAUSE_PATTERN = /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;

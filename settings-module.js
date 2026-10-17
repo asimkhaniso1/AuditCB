@@ -1736,74 +1736,8 @@ function getQualityPolicyHTML() {
 // ============================================
 // TAB 7: SYSTEM DEFAULTS
 // ============================================
-
-function getDefaultsHTML() {
-    const settings = window.state.cbSettings;
-    return `
-        <div class="fade-in">
-            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
-                <i class="fa-solid fa-sliders" style="margin-right: 0.5rem;"></i>
-                System Defaults
-            </h3>
-            
-            <form id="defaults-form" data-action-submit="saveDefaults">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                    <div class="form-group">
-                        <label>Certificate Number Format</label>
-                        <input type="text" class="form-control" id="cert-format" value="${window.UTILS.escapeHtml(settings.certificateNumberFormat)}">
-                        <small style="color: var(--text-secondary);">Use {YEAR}, {SEQ}, {STANDARD}</small>
-                    </div>
-                    <div class="form-group">
-                        <label>Date Format</label>
-                        <select class="form-control" id="date-format">
-                            <option value="YYYY-MM-DD" ${settings.dateFormat === 'YYYY-MM-DD' ? 'selected' : ''}>YYYY-MM-DD</option>
-                            <option value="DD/MM/YYYY" ${settings.dateFormat === 'DD/MM/YYYY' ? 'selected' : ''}>DD/MM/YYYY</option>
-                            <option value="MM/DD/YYYY" ${settings.dateFormat === 'MM/DD/YYYY' ? 'selected' : ''}>MM/DD/YYYY</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Default Stage 1 Duration (days)</label>
-                        <input type="number" class="form-control" id="stage1-duration" value="${settings.defaultStage1Duration}" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Default Stage 2 Duration (days)</label>
-                        <input type="number" class="form-control" id="stage2-duration" value="${settings.defaultStage2Duration}" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Notification Lead Time (days)</label>
-                        <input type="number" class="form-control" id="notification-lead" value="${settings.notificationLeadTime}" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Session Timeout (minutes)</label>
-                        <input type="number" class="form-control" id="session-timeout" value="${settings.sessionTimeout}" min="5">
-                    </div>
-                    <div class="form-group">
-                        <label>Currency</label>
-                        <select class="form-control" id="currency">
-                            <option value="USD" ${settings.currency === 'USD' ? 'selected' : ''}>USD ($)</option>
-                            <option value="EUR" ${settings.currency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
-                            <option value="GBP" ${settings.currency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Man-Day Calculation</label>
-                        <select class="form-control" id="manday-mode">
-                            <option value="ISO 17021" ${settings.manDayCalculationMode === 'ISO 17021' ? 'selected' : ''}>ISO 17021</option>
-                            <option value="Custom" ${settings.manDayCalculationMode === 'Custom' ? 'selected' : ''}>Custom</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem;" aria-label="Save">
-                    <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>
-                    Save Defaults
-                </button>
-            </form>
-        </div>
-    `;
-}
-
-// Note: saveDefaults defined in sanitized save functions section (~line 2637)
+// getDefaultsHTML / saveDefaultSettings live in settings-system-defaults.js
+// (it loads after this file, so the copy that used to be here never ran).
 
 // ============================================
 // TAB 8: DATA BACKUP & MANAGEMENT
@@ -2519,21 +2453,6 @@ window.saveQualityPolicy = async function () {
     }
 
     window.showNotification('Quality Policy saved', 'success');
-};
-
-window.saveDefaults = function () {
-    const settings = window.state.cbSettings;
-    settings.certificateNumberFormat = window.Sanitizer.sanitizeText(document.getElementById('cert-format').value);
-    settings.dateFormat = document.getElementById('date-format').value;
-    settings.defaultStage1Duration = parseInt(document.getElementById('stage1-duration', 10).value, 10);
-    settings.defaultStage2Duration = parseInt(document.getElementById('stage2-duration', 10).value, 10);
-    settings.notificationLeadTime = parseInt(document.getElementById('notification-lead', 10).value, 10);
-    settings.sessionTimeout = parseInt(document.getElementById('session-timeout', 10).value, 10);
-    settings.currency = document.getElementById('currency').value;
-    settings.manDayCalculationMode = document.getElementById('manday-mode').value;
-
-    window.saveData();
-    window.showNotification('System defaults saved', 'success');
 };
 
 // ============================================
@@ -3563,5 +3482,5 @@ Logger.info('Settings module extensions loaded');
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { switchSettingsMainTab, switchSettingsSubTab, saveCBProfile, handleLogoUpload, addStandardToMasterlist, deleteStandardFromMasterlist, addGlobalDesignation, editGlobalDesignation, resetPermissions, addCBSite, editCBSite, saveDefaults, cyclePermission, addRetentionPolicy, editRetentionPolicy, deleteRetentionPolicy, editNCRCriteria, editCertDecision, saveCAPATimelines, saveAuditFrequency, renderSettings, switchSettingsTab, backupData, restoreData, openAddAssignmentModal, openQuickAssignModal, resetUsageData };
+    module.exports = { switchSettingsMainTab, switchSettingsSubTab, saveCBProfile, handleLogoUpload, addStandardToMasterlist, deleteStandardFromMasterlist, addGlobalDesignation, editGlobalDesignation, resetPermissions, addCBSite, editCBSite, cyclePermission, addRetentionPolicy, editRetentionPolicy, deleteRetentionPolicy, editNCRCriteria, editCertDecision, saveCAPATimelines, saveAuditFrequency, renderSettings, switchSettingsTab, backupData, restoreData, openAddAssignmentModal, openQuickAssignModal, resetUsageData };
 }

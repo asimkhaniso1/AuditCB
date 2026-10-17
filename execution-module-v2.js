@@ -105,32 +105,15 @@ function resolveFindingFromRef(report, ref) {
 }
 window.NCRSyncUtils.resolveFindingFromRef = resolveFindingFromRef;
 
-// A clause-ref value the auditor typed into "Set criterion" is well-formed —
-// used only as a fallback when window.Validator.isClauseRef isn't available
-// (another agent is adding it to validation.js). Accepts plain numeric refs
-// ('9.2', '8.2.2'), Annex-letter refs ('A.8.13'), and a trailing lettered
-// sub-item ('9.6.2 (a)').
-const CLAUSE_REF_FALLBACK_RE = /^[A-Za-z]?\.?\d{1,2}(\.\d{1,3}){0,3}(\s*\([a-zA-Z0-9]+\))?$/;
-function isValidClauseRefFallback(value) {
-    return CLAUSE_REF_FALLBACK_RE.test(String(value || '').trim());
-}
-function isValidClauseRef(value) {
-    const v = String(value || '').trim();
-    if (!v) return false;
-    // Never accept an internal pseudo-tag, even if a Validator implementation
-    // would — this check exists specifically to keep FOCUS/SURV/ORG/DOC out of
-    // criterionRef. window.NCR_PSEUDO_CLAUSE_PATTERN is set once
-    // renderExecutionTab has run (see ~line 2340 below); the literal here is a
-    // defensive fallback so this stays correct even called before that.
-    const pseudoPattern = window.NCR_PSEUDO_CLAUSE_PATTERN || /^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i;
-    if (pseudoPattern.test(v)) return false;
-    if (window.Validator && typeof window.Validator.isClauseRef === 'function') {
-        try { return !!window.Validator.isClauseRef(v); } catch (_e) { /* fall through to local fallback */ }
-    }
-    return isValidClauseRefFallback(v);
-}
-window.NCRSyncUtils.isValidClauseRef = isValidClauseRef;
-window.NCRSyncUtils.isValidClauseRefFallback = isValidClauseRefFallback;
+// Whether a clause ref the auditor typed into "Set criterion" is well-formed.
+// The one implementation is window.isValidClauseRef in checklist-module.js
+// (loads after this file; it carries the pseudo-tag guard and try/catch this
+// file's own copy had). This file used to declare a second global
+// isValidClauseRef, which checklist-module.js's replaced at load, so the
+// checks below were already running that one. Resolved at call time.
+window.NCRSyncUtils.isValidClauseRef = function (value) {
+    return window.isValidClauseRef(value);
+};
 
 /**
  * Write criterionRef/criterionSource:'auditor-assigned' onto a resolved
@@ -1739,31 +1722,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     }
 
     // Helper functions for execution module
-
-    // Accordion toggle for clause sections
-    // Accepts EITHER a section id (this view: data-action="toggleAccordion"
-    // data-id="<id>") or the clicked header element (checklist-module.js's
-    // Checklist Library, which sets no data-id, so the delegator passes the
-    // element itself). csp-adapters.js defines the same action for that
-    // element-based markup and loads BEFORE this file, so this definition wins
-    // at runtime — meaning it has to understand both shapes or the library's
-    // accordions stop opening. Kept byte-for-byte equivalent to the
-    // csp-adapters.js copy so load order is irrelevant.
-    window.toggleAccordion = function (target) {
-        let content = null;
-        let icon = null;
-        if (typeof target === 'string') {
-            content = document.getElementById(target);
-            icon = document.getElementById('icon-' + target);
-        } else if (target && target.nodeType === 1) {
-            content = target.nextElementSibling;
-            icon = target.querySelector('.accordion-icon');
-        }
-        if (!content) return;
-        const isHidden = content.style.display === 'none';
-        content.style.display = isHidden ? 'block' : 'none';
-        if (icon) icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
-    };
+    // (window.toggleAccordion — section id or header element — is defined
+    // once, in csp-adapters.js.)
 
     // Collapse/Expand ALL accordion sections at once
     window.toggleAllAccordions = function () {
@@ -3718,7 +3678,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (warning) { warning.textContent = 'That looks like an internal checklist reference (FOCUS/SURV/ORG/DOC), not a real standard clause. Enter the actual clause being audited.'; warning.style.display = 'block'; }
                 return;
             }
-            if (!isValidClauseRef(value)) {
+            if (!window.isValidClauseRef(value)) {
                 if (warning) { warning.textContent = 'Enter a valid clause reference, e.g. "8.5.2" or "A.8.13".'; warning.style.display = 'block'; }
                 return;
             }
@@ -3904,7 +3864,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     if (!firstInvalid) firstInvalid = input;
                     return;
                 }
-                if (!isValidClauseRef(value)) {
+                if (!window.isValidClauseRef(value)) {
                     if (warnEl) { warnEl.textContent = 'Not a valid clause reference.'; warnEl.style.display = 'block'; }
                     if (!firstInvalid) firstInvalid = input;
                     return;
@@ -4717,5 +4677,5 @@ function bindExecutionDocumentDelegates() {
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { _autoFillPersonnel, toggleAccordion, toggleAllAccordions, initClauseDragReorder, toggleSectionSelection, setChecklistStatus, updateAccordionCounter, addCustomQuestion, saveChecklist, filterChecklistItems, bulkUpdateStatus, submitToLeadAuditor, startDictation, _collectMeetingAttendees, addCustomMeetingAttendee, saveMeetingRecords, renderAuditExecutionEnhanced, renderAuditExecution, renderExecutionDetail, createNCR, editExecutionNCR, createCAPA, openCreateReportModal, openEditReportModal, updateMeetingData };
+    module.exports = { _autoFillPersonnel, toggleAllAccordions, initClauseDragReorder, toggleSectionSelection, setChecklistStatus, updateAccordionCounter, addCustomQuestion, saveChecklist, filterChecklistItems, bulkUpdateStatus, submitToLeadAuditor, startDictation, _collectMeetingAttendees, addCustomMeetingAttendee, saveMeetingRecords, renderAuditExecutionEnhanced, renderAuditExecution, renderExecutionDetail, createNCR, editExecutionNCR, createCAPA, openCreateReportModal, openEditReportModal, updateMeetingData };
 }

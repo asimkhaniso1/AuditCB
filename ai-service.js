@@ -576,42 +576,6 @@ const AI_SERVICE = {
         return clauseText;
     },
 
-    // 1. Auto-Classify Findings (with KB context)
-    analyzeFindings: async (findings, standardName = null) => {
-        if (!findings || findings.length === 0) return [];
-
-        // Prepare simplified list for AI to save tokens
-        const simplifedFindings = findings.map((f, idx) => ({
-            id: idx,
-            description: f.description,
-            remarks: f.remarks || f.transcript || ''
-        }));
-
-        // Get KB context if standard name provided
-        const kbContext = standardName ? AI_SERVICE.getRelevantKBClauses(standardName) : '';
-
-        const prompt = `
-You are a Lead Auditor. Classify the following audit findings based on ISO 19011 and ISO 17021 principles.
-Determines if each finding is: "Major", "Minor", or "Observation".
-
-${kbContext ? `Standard Requirements (from Knowledge Base):
-${kbContext}
-
-` : ''}Findings:
-${JSON.stringify(simplifedFindings, null, 2)}
-
-Return a raw JSON array of objects with 'id' and 'type' only.
-Example: [{"id": 0, "type": "minor"}, {"id": 1, "type": "observation"}]
-`;
-        try {
-            const apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
-            return AI_SERVICE.parseAgendaResponse(apiResponseText);
-        } catch (error) {
-            console.error("AI Analysis Error:", error);
-            throw error;
-        }
-    },
-
     // 1b. Refine raw auditor notes/transcript into professional audit language
     refineAuditNotes: async (findings, standardName = null) => {
         if (!findings || findings.length === 0) return [];
@@ -2200,92 +2164,10 @@ window.finalizeAndPublish = function (reportId) {
     })();
 };
 
-// 2. AI Auto-Analysis for Findings
-window.runFollowUpAIAnalysis = async function (reportId) {
-    const report = window.DataService.findAuditReport(reportId);
-    if (!report) return;
-
-    const btn = document.querySelector(`button[data-action="runFollowUpAIAnalysis"][data-id="${reportId}"]`);
-    if (!btn) return;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...';
-    btn.disabled = true;
-
-    try {
-        // Gather findings with rich context using shared helper
-        const findings = [];
-        const plan = window.state.auditPlans?.find(p => String(p.id) === String(report.planId)) || {};
-        const checklists = (window.state.checklists || []);
-        const assignedChecklists = (plan.selectedChecklists || []).map(clId => checklists.find(c => String(c.id) === String(clId))).filter(c => c);
-
-        // IMPORTANT: Track original index in checklistProgress array
-        (report.checklistProgress || []).forEach((item, originalIdx) => {
-            if (item.status !== 'nc') return;
-            // Use shared helper for clause/requirement resolution
-            const { clauseText, reqText } = window.KB_HELPERS.resolveChecklistClause(item, assignedChecklists);
-            findings.push({
-                id: findings.length,
-                originalIdx: originalIdx,
-                type: 'checklist',
-                clause: clauseText,
-                requirement: reqText,
-                description: item.ncrDescription || reqText || item.comment || 'Checklist finding',
-                remarks: item.comment || item.transcript || ''
-            });
-        });
-
-        // Resolve standard name using shared helper
-        const standardName = window.KB_HELPERS.resolveStandardName(report);
-
-        // Call AI Service with standard name for KB lookup
-        const suggestions = await window.AI_SERVICE.analyzeFindings(findings, standardName);
-
-        // Apply suggestions using originalIdx to update the right item
-        let updateCount = 0;
-        suggestions.forEach(s => {
-            if (s.type && ['major', 'minor', 'observation'].includes(s.type.toLowerCase())) {
-                const finding = findings.find(f => f.id === s.id);
-                if (finding && report.checklistProgress[finding.originalIdx]) {
-                    report.checklistProgress[finding.originalIdx].ncrType = s.type.toLowerCase();
-                    report.checklistProgress[finding.originalIdx]._aiGenerated = true;
-                    report.checklistProgress[finding.originalIdx]._auditorConfirmed = false;
-                    updateCount++;
-                }
-            }
-        });
-
-        if (updateCount > 0) {
-            // IMPORTANT: Do NOT call saveChecklist here — it reads stale DOM values
-            // from Review tab dropdowns and overwrites our AI changes.
-            // Instead, persist directly to localStorage.
-            try {
-                const idx = window.state.auditReports.findIndex(r => String(r.id) === String(reportId));
-                if (idx >= 0) {
-                    localStorage.setItem('auditReports', JSON.stringify(window.state.auditReports));
-                }
-                // Also try Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.db.update('audit_reports', String(reportId), { data: report }).catch(e => console.warn('[AI Classify] Supabase save failed:', e));
-                }
-            } catch (e) { console.warn('[AI Classify] Direct save failed:', e); }
-
-            window.renderExecutionDetail && window.renderExecutionDetail(reportId);
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="review"]')?.click();
-                window.showNotification(`AI classified ${updateCount} findings automatically.`, 'success');
-            }, 300);
-        } else {
-            window.showNotification('AI analysis complete. No classification changes suggested.', 'info');
-        }
-
-    } catch (error) {
-        console.error("AI Analysis Failed:", error);
-        window.showNotification("AI Analysis failed. Please try again.", "error");
-    } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    }
-};
+// 2. AI auto-analysis of findings: window.runFollowUpAIAnalysis lives in
+// execution-reporting.js (it loads after this file, so the copy that used to
+// be here never ran; it also rewrote ncrType, which the live one deliberately
+// leaves to the auditor).
 
 // 3. AI Auto-Summary Generation
 window.runAutoSummary = async function (reportId) {
