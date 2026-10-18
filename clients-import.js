@@ -350,7 +350,20 @@
     }
 
     // Update Import Logic for Simplified Bulk Clients (supports CSV and Excel)
-    window.importClientsFromExcel = function (file) {
+    // SheetJS loads on first use (lib-loader.js), not on every page view.
+    // Resolves false (after telling the user) when it can't be loaded.
+    async function ensureXlsx() {
+        try {
+            await window.LibLoader.load('xlsx');
+            return true;
+        } catch (err) {
+            console.error('SheetJS load failed:', err);
+            window.showNotification(err.message, 'error');
+            return false;
+        }
+    }
+
+    window.importClientsFromExcel = async function (file) {
         window.showNotification('Reading file...', 'info');
 
         // JSON = CCI registry export (companies + nested certificates)
@@ -368,10 +381,11 @@
             return;
         }
 
-        const reader = new FileReader();
-
         // Check if it's a CSV file
         const isCSV = file.name.toLowerCase().endsWith('.csv');
+        if (!isCSV && !(await ensureXlsx())) return;
+
+        const reader = new FileReader();
 
         reader.onload = function (e) {
             try {
@@ -850,7 +864,8 @@
         document.getElementById('modal-save').style.display = 'none';
     };
 
-    window.downloadAccountSetupTemplate = function (clientName) {
+    window.downloadAccountSetupTemplate = async function (clientName) {
+        if (!(await ensureXlsx())) return;
         const wb = XLSX.utils.book_new();
 
         // 1. Sites Sheet
@@ -908,7 +923,7 @@
         XLSX.writeFile(wb, fileName);
     };
 
-    window.processAccountSetupImport = function (clientId, input) {
+    window.processAccountSetupImport = async function (clientId, input) {
         // RBAC Check
         if (!window.AuthManager || !window.AuthManager.canPerform('create', 'client')) {
             window.showNotification('Access Denied: Only Certification Managers or Admins can perform this action.', 'error');
@@ -920,6 +935,7 @@
 
         window.closeModal(); // Close modal immediately to show notification
         window.showNotification(`Reading ${file.name}...`, 'info');
+        if (!(await ensureXlsx())) return;
 
         const reader = new FileReader();
         reader.onload = function (e) {

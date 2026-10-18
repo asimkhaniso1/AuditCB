@@ -90,13 +90,11 @@
     }
 })();
 
-// ─── 3. PDF.js Worker Configuration + CDN Fallbacks ──────────────
-// Check after DOM loads whether CDN scripts loaded; inject fallbacks if not
+// ─── 3. CDN Fallbacks ────────────────────────────────────────────
+// Check after DOM loads whether CDN scripts loaded; inject fallbacks if not.
+// (PDF.js now loads on first use via lib-loader.js; settings-kb.js's
+// ensurePdfWorker sets up its worker then.)
 document.addEventListener('DOMContentLoaded', function () {
-    // PDF.js worker config
-    if (typeof pdfjsLib !== 'undefined') {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
 
     // DOMPurify CDN fallback: if cdnjs failed, try unpkg
     if (typeof DOMPurify === 'undefined' || window.DOMPurify.isEmergency) {

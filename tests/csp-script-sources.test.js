@@ -65,7 +65,9 @@ describe('index.html CDN scripts', () => {
     const tags = [...html.matchAll(/<script\s[^>]*src="(https:[^"]+)"[^>]*>/g)];
 
     it('pin an exact version and carry SRI', () => {
-        expect(tags.length).toBeGreaterThan(5);
+        // DOMPurify, supabase-js, Sentry, Chart.js (the document libraries load
+        // on demand through lib-loader.js, which the CSP test above covers).
+        expect(tags.length).toBeGreaterThanOrEqual(4);
         for (const [tag, src] of tags) {
             expect(src, 'unversioned CDN URL').toMatch(/\d+\.\d+\.\d+/);
             expect(tag, src).toMatch(/integrity="sha384-[A-Za-z0-9+/=]+"/);

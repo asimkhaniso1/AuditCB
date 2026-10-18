@@ -10,7 +10,7 @@
     <!-- Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' blob: https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/ https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/ https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/ https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/ https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/ https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/ https://cdn.jsdelivr.net/npm/chart.js@4.5.1/ https://unpkg.com/dompurify@3.0.6/ https://browser.sentry-cdn.com/8.34.0/ https://static.cloudflareinsights.com;
+        script-src 'self' blob: https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/ https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/ https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/ https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/ https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/ https://cdn.jsdelivr.net/npm/chart.js@4.5.1/ https://unpkg.com/dompurify@3.0.6/ https://browser.sentry-cdn.com/8.34.0/ https://static.cloudflareinsights.com;
         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
         font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
         img-src 'self' data: https: blob:;
@@ -38,15 +38,13 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" integrity="sha384-nFoSjZIoH3CCp8W639jJyQkuPHinJ2NHe7on1xvlUA7SuGfJAfvMldrsoAVm6ECz" crossorigin="anonymous" defer></script>
+    <!-- Libraries. SheetJS, PDF.js and mammoth load on first use (lib-loader.js). -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js" integrity="sha384-cwS6YdhLI7XS60eoDiC+egV0qHp8zI+Cms46R0nbn8JrmoAzV9uFL60etMZhAnSu" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 
-    <!-- CSP-compliant boot: fallbacks + cache purge + PDF.js config -->
+    <!-- CSP-compliant boot: fallbacks + one-time cache cleanup -->
     <script src="./csp-boot.js?v=21.1_CSP"></script>
+    <script src="./lib-loader.js"></script>
     <!-- Public Report Card (QR landing): paints over app when #verify=... is in URL -->
     <script src="./report-card.js?v=3_URLSAFE"></script>
     <!-- Icons -->
@@ -234,12 +232,6 @@
         </div>
     </div>
 
-    <!-- PDF & Data Processing -->
-
-
-    <!-- PDF Generation Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
-    <!-- SheetJS loads once, deferred with SRI, in <head>. -->
 
     <!-- New Security & Utility Modules (Load BEFORE core script) -->
     <!-- Core Utilities (Load BEFORE everything else) -->
