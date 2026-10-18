@@ -1903,10 +1903,19 @@ window.ensurePdfWorker = async function () {
 };
 
 window.extractTextFromFile = async function (file) {
-    // Check if PDF.js is loaded
-    if (file.type === 'application/pdf' && (typeof pdfjsLib === 'undefined')) {
-        console.warn('PDF.js library not loaded. Skipping text extraction.');
-        return null; // Graceful degradation
+    // PDF.js and mammoth load on first use (lib-loader.js), not on every page view.
+    if (file.type === 'application/pdf' && typeof pdfjsLib === 'undefined') {
+        try {
+            await window.LibLoader.load('pdfjs');
+        } catch (e) {
+            console.warn('PDF.js could not be loaded. Skipping text extraction.', e);
+            return null; // Graceful degradation
+        }
+    }
+    const isDocx = file.name.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (isDocx && typeof mammoth === 'undefined') {
+        // Without mammoth the manual ZIP parser below still extracts the text.
+        await window.LibLoader.load('mammoth').catch(e => console.warn('mammoth could not be loaded; using the built-in DOCX parser.', e));
     }
 
     // Set up the PDF.js worker (CSP-safe blob URL) before extraction so parsing
