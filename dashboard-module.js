@@ -127,10 +127,19 @@ function renderDashboardEnhanced() {
 
     // Destructure for use in the template below
     const { totalClients, activeClients, inactiveClients: _inactiveClients, totalAuditors, leadAuditors: _leadAuditors,
-        leadAuditorCount, supportAuditorCount, upcomingAudits, completedAudits,
+        leadAuditorCount, supportAuditorCount, upcomingAudits: _upcomingAudits, completedAudits,
         draftPlans, completionRate, totalNCRs: _totalNCRs, majorNCRs, minorNCRs, openNCRs,
         closedNCRs, overdueNCRs, complianceScoreSum: _complianceScoreSum, complianceCount: _complianceCount,
         avgComplianceScore, certificatesIssued } = stats;
+
+    // Upcoming Audits panel + KPI tile share one model (open = not completed,
+    // not cancelled), built from the same role-scoped plans as every other tile.
+    // Not cached: it depends on today's date and on plan dates, which the
+    // stats fingerprint does not track.
+    const upcoming = window.UpcomingAudits.build(auditPlans, {
+        auditors,
+        isCompleted: window.DataService.isPlanCompleted
+    });
 
     // Industry Distribution
     const industryStats = {};
@@ -204,19 +213,19 @@ function renderDashboardEnhanced() {
                     <div style="font-size: 0.75rem; opacity: 0.8;">${totalClients} total clients</div>
                 </div>
 
-                <!-- Upcoming Audits -->
-                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(240, 147, 251, 0.3);">
+                <!-- Upcoming Audits (jumps to the panel below; same count) -->
+                <button type="button" class="dashboard-kpi-link" data-action="UpcomingAudits_scrollToPanel" aria-label="Upcoming audits: ${upcoming.count}. Show the upcoming audits panel" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(240, 147, 251, 0.3);">
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
                         <div>
                             <div style="font-size: 0.85rem; opacity: 0.9;">Upcoming Audits</div>
-                            <div style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;">${upcomingAudits}</div>
+                            <div style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;">${upcoming.count}</div>
                         </div>
                         <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                             <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem;"></i>
                         </div>
                     </div>
-                    <div style="font-size: 0.75rem; opacity: 0.8;">${completedAudits} completed</div>
-                </div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">${completedAudits} completed${upcoming.counts.overdue ? ` · ${upcoming.counts.overdue} past date` : ''} · View calendar <i class="fa-solid fa-arrow-down" aria-hidden="true"></i></div>
+                </button>
 
                 <!-- Open NCRs -->
                 <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(250, 112, 154, 0.3);">
@@ -305,6 +314,9 @@ function renderDashboardEnhanced() {
                     <div style="font-size: 0.75rem; opacity: 0.8;">Total issued to date</div>
                 </div>
             </div>
+
+            <!-- Upcoming Audits: list / month calendar (upcoming-audits.js) -->
+            ${window.UpcomingAudits.panelHtml(upcoming)}
 
             <!-- Quick Actions (Simplified) -->
             <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); border: none;">
