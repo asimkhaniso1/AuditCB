@@ -70,11 +70,15 @@
 
     // ── client-facing plan ───────────────────────────────────────────
 
-    function agendaTable(plan, ctx) {
+    function agendaTable(plan, ctx, scopeSchemes) {
         const df = DF();
         const rows = arr(plan.agenda);
         const findingClause = {};
         arr(ctx.findings).forEach(function (f) { findingClause[String(f.id)] = f; });
+        // Rows saved before schemes travelled with the row recover them from the
+        // session's traceability record, else (a topic session) from its title.
+        const traced = {};
+        arr(plan.traceability && plan.traceability.sessions).forEach(function (s) { if (s && s.sessionId) traced[s.sessionId] = arr(s.schemes); });
         const body = rows.map(function (r) {
             const d = df.parseDateParts(r.date);
             const dayText = d ? df.weekdayName(r.date).slice(0, 3) + ' ' + d.d + ' ' + df.MONTHS[d.m - 1].slice(0, 3) : '';
@@ -85,6 +89,11 @@
             }
             const desc = API_().describeStandards(r.standards, {});
             let req = desc.map(function (x) { return '<div class="req"><b>' + t(x.standards.join(' · ')) + '</b> ' + t(x.text) + '</div>'; }).join('');
+            // A standard with no clause registry is audited against its own
+            // requirements; no clause number is invented for it.
+            const schemes = arr(r.schemes).length ? arr(r.schemes) : arr(traced[r.sessionId]).length ? arr(traced[r.sessionId])
+                : arr(scopeSchemes).filter(function (n) { return plain(r.item).replace(/^\[(?:Remote|On-site)\]\s*/, '').indexOf(n + ':') === 0; });
+            if (schemes.length) req += '<div class="req"><b>' + t(schemes.join(' · ')) + '</b> ' + t((schemes.length > 1 ? 'the standards’' : 'the standard’s') + ' own requirements (no clause numbers cited)') + '</div>';
             const fc = arr(r.findingIds).map(function (id) { return findingClause[String(id)]; }).filter(Boolean);
             if (fc.length) req += '<div class="req"><b>Previous findings</b> ' + t(fc.map(function (f) { return f.clause; }).join(', ')) + '</div>';
             if (!req) req = '<div class="req">Integrated — all standards in scope</div>';
@@ -107,7 +116,9 @@
         const p = plan || {};
         const df = DF(); const shell = PS(); const ipi = API_();
         const ids = arr(c.standards);
-        const stdLabels = ids.map(function (id) { return ipi.stdLabel(id); });
+        // Every standard in scope, including those the clause registry does not hold.
+        const schemes = Array.isArray(c.schemes) ? c.schemes : ipi.schemesOf(p);
+        const stdLabels = ipi.scopeLabels(ids, schemes);
         const assigned = arr(c.assigned);
         const lead = assigned[0];
         const ref = planRef(p, c);
@@ -137,7 +148,7 @@
                 meta('Impartiality risk', t((p.impartialityAssessment && p.impartialityAssessment.risk) || 'None identified')))
             + '</table>'
             + (dur.effectivePersonnel ? '<p class="note">Duration basis: ' + t((p.auditType || p.type) + ' · ' + dur.effectivePersonnel.value + ' effective personnel · ' + dur.sites + ' site' + (dur.sites === 1 ? '' : 's')
-                + (ids.length > 1 ? ' · integrated audit of ' + ids.length + ' standards (IMS adjustment ' + (dur.imsIntegration ? dur.imsIntegration.adjustmentPercent : 0) + '%)' : '')) + '. The full calculation is held in the certification record.</p>' : '');
+                + (stdLabels.length > 1 ? ' · integrated audit of ' + stdLabels.length + ' standards (IMS adjustment ' + (dur.imsIntegration ? dur.imsIntegration.adjustmentPercent : 0) + '%)' : '')) + '. The full calculation is held in the certification record.</p>' : '');
 
         const certLine = arr(c.scope && c.scope.certificateNumbers).length
             ? '<p class="scope-meta">Certificate' + (c.scope.certificateNumbers.length > 1 ? 's' : '') + ': ' + t(c.scope.certificateNumbers.join(', ')) + (cyc.certificateExpiry ? ' · valid to ' + t(df.formatDate(cyc.certificateExpiry)) : '') + '</p>' : '';
@@ -160,7 +171,7 @@
             ? (mappedAll ? '<p class="note"><b>Previous findings requiring follow-up: ' + need.length + '</b> — all ' + need.length + ' are scheduled in the sessions below.</p>'
                 : '<p class="note bad"><b>Previous findings requiring follow-up: ' + need.length + '</b> — not every finding is scheduled; the plan cannot be approved until they are.</p>')
             : '<p class="note">No previous findings require follow-up.</p>';
-        const agenda = '<div class="pd-section-title">AUDIT AGENDA / ITINERARY</div>' + tzStatement + key + findingLine + agendaTable(p, c);
+        const agenda = '<div class="pd-section-title">AUDIT AGENDA / ITINERARY</div>' + tzStatement + key + findingLine + agendaTable(p, c, schemes);
 
         const list = function (field, title) {
             const items = lines(p[field] || p['audit' + field.charAt(0).toUpperCase() + field.slice(1)]);

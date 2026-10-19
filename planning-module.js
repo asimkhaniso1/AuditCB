@@ -726,6 +726,7 @@ function generatePlanNarratives() {
     if (window.AuditPlanIntegrity) {
         n = window.AuditPlanIntegrity.buildNarratives({
             auditType: cycle.auditType, standards: window.AuditPlanIntegrity.standardIdsOf({ standard: cycle.standards.join(', ') }),
+            schemes: window.AuditPlanIntegrity.schemesOf({ standard: cycle.standards.join(', ') }),
             scope, sites, method
         });
     } else {
@@ -1475,11 +1476,11 @@ function viewAuditPlan(id) {
                     </div>
                     <div>
                         <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Criteria</div>
-                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.criteria || plan.auditCriteria || 'Not recorded'}</div>
+                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${window.UTILS.escapeText(plan.criteria || plan.auditCriteria || 'Not recorded')}</div>
                     </div>
                     <div>
                         <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Methodology</div>
-                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.methodology || plan.auditMethodology || 'Not recorded'}</div>
+                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${window.UTILS.escapeText(plan.methodology || plan.auditMethodology || 'Not recorded')}</div>
                     </div>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1rem;padding-top:1rem;border-top:1px solid #e2e8f0;">
@@ -2706,7 +2707,7 @@ function addAgendaRow(data = {}) {
     // standard, clauses, checklist questions, findings and auditor ID it stands for.
     row.dataset.meta = JSON.stringify({
         kind: data.kind || (isBreak ? 'lunch' : 'custom'), sessionId: data.sessionId || null, date: data.date || '', start: data.start || '', end: data.end || '',
-        standards: data.standards || [], findingIds: data.findingIds || [], processes: data.processes || [], subject: data.subject || ''
+        standards: data.standards || [], schemes: data.schemes || [], findingIds: data.findingIds || [], processes: data.processes || [], subject: data.subject || ''
     });
 
     tbody.appendChild(row);
@@ -2739,14 +2740,14 @@ function buildPlanDocumentContext(plan) {
     const client = window.state.clients.find(c => c.name === plan.client) || {};
     const gctx = gateContext(plan, {});
     const team = IPI.resolveAuditors(plan, window.state.auditors || []);
-    const scope = IPI.checkScope({ plan, client, standards: gctx.standards, processes: [...new Set((plan.agenda || []).flatMap(r => r.processes || []))] });
+    const scope = IPI.checkScope({ plan, client, standards: gctx.standards, schemes: gctx.schemes, processes: [...new Set((plan.agenda || []).flatMap(r => r.processes || []))] });
     const site = (client.sites || []).find(s => (plan.selectedSites || [])[0] && s.name === plan.selectedSites[0].name);
     const timeZone = window.DocFormat.resolveTimeZone({ plan, client, site });
     const cb = window.state.cbSettings || {};
     const logoUrl = cb.logoUrl && (cb.logoUrl.startsWith('data:') || cb.logoUrl.startsWith('http')) ? cb.logoUrl : '';
     const durationRecord = plan.durationRecord || IPI.buildDurationRecord(plan, { standards: gctx.standards, settings: cb, domain: window.AuditPlanningDomain });
     const ctx = {
-        client, assigned: team.assigned, standards: gctx.standards, timeZone, scope, scopeCheck: scope, findings: gctx.findings, durationRecord,
+        client, assigned: team.assigned, standards: gctx.standards, schemes: gctx.schemes, timeZone, scope, scopeCheck: scope, findings: gctx.findings, durationRecord,
         brand: { name: cb.cbName || 'ISOXPERT Audit360', logoUrl }, planRef: window.UTILS.getPlanRef(plan),
         // The QR carries a verification URL only; no client name leaves the app.
         qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://audit.companycertification.com/#/verify/plan/${plan.id}`)}`,
@@ -3130,7 +3131,7 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
             auditor: auditorName,
             auditorId: rec ? String(rec.id) : null,
             kind: meta.kind || 'custom', sessionId: meta.sessionId || null,
-            standards: meta.standards || [], findingIds: meta.findingIds || [], processes: meta.processes || [], subject: meta.subject || ''
+            standards: meta.standards || [], schemes: meta.schemes || [], findingIds: meta.findingIds || [], processes: meta.processes || [], subject: meta.subject || ''
         });
     }
 
@@ -3545,6 +3546,8 @@ function derivePlanRecords(planData) {
 function gateContext(plan, extra) {
     const client = window.state.clients.find(c => c.name === plan.client) || {};
     const standards = window.AuditPlanIntegrity.standardIdsOf(plan);
+    // Standards the clause registry does not hold are still in scope.
+    const schemes = window.AuditPlanIntegrity.schemesOf(plan);
     const checklists = (plan.selectedChecklists || []).map(id => (window.state.checklists || []).find(c => String(c.id) === String(id))).filter(Boolean)
         .map(ck => {
             const cov = typeof window.runChecklistCoverage === 'function' ? window.runChecklistCoverage(ck) : null;
@@ -3552,7 +3555,7 @@ function gateContext(plan, extra) {
         });
     const findings = window.AuditPlanIntegrity.collectPreviousFindings({ state: window.state, client, plan, standards });
     return Object.assign({
-        client, auditors: window.state.auditors || [], standards, state: window.state, checklists, findings,
+        client, auditors: window.state.auditors || [], standards, schemes, state: window.state, checklists, findings,
         hoursPerDay: (window.state.cbSettings?.auditPlanningPolicy?.workingHoursPerDay) || 8, cbCountry: window.state.cbSettings?.country || ''
     }, extra || {});
 }

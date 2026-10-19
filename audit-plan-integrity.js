@@ -40,7 +40,7 @@
 //   agenda        buildAgenda
 //   duration      buildDurationRecord, reconcileDuration
 //   scope         checkScope
-//   narratives    buildNarratives, checkNarratives
+//   narratives    scopeLabels, buildNarratives, checkNarratives
 //   gate          validate, STATUSES, canTransition, contentHash
 
 (function (global) {
@@ -823,7 +823,7 @@
                 return {
                     sessionId: s.sessionId, blockId: s.blockId, kind: s.kind, title: s.title, spans: s.spans, hours: s.hours,
                     standards: s.standards.map(function (e) { return { stdId: e.stdId, label: stdLabel(e.stdId), refs: e.refs, titles: e.refs.map(function (r) { return { ref: r, title: refTitle(e.stdId, r) }; }) }; }),
-                    processes: s.processes, findingIds: s.findingIds, auditee: s.auditee, auditorId: s.auditor && s.auditor.id, auditorName: s.auditor && s.auditor.name,
+                    schemes: arr(s.schemes).slice(), processes: s.processes, findingIds: s.findingIds, auditee: s.auditee, auditorId: s.auditor && s.auditor.id, auditorName: s.auditor && s.auditor.name,
                     priorities: s.priorities,
                     checklistQuestions: questions.filter(function (q) { return q.sessionIds.indexOf(s.sessionId) !== -1; }).map(function (q) { return { clause: q.clause, title: q.title }; })
                 };
@@ -1049,14 +1049,32 @@
     // 7. OBJECTIVES, CRITERIA, METHODOLOGY
     // ═════════════════════════════════════════════════════════════════
     /**
-     * @param {Object} o { auditType, standards:[ids], scope, sites:[names], method, previousCount }
+     * Every standard in scope, by its certified label: registry standards first,
+     * then the schemes the registry does not hold (ISO 17100, ISO 18587, Halal...)
+     * by the name the certificate or plan gives them. A scheme is never dropped
+     * for lacking a clause registry — it is audited all the same.
+     */
+    function scopeLabels(ids, schemes) {
+        const out = [];
+        arr(ids).map(stdLabel).concat(arr(schemes).map(str)).forEach(function (l) {
+            if (l && !out.some(function (x) { return lower(x) === lower(l); })) out.push(l);
+        });
+        return out;
+    }
+    function joinAnd(labels) {
+        return labels.length > 1 ? labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1] : (labels[0] || '');
+    }
+
+    /**
+     * @param {Object} o { auditType, standards:[ids], schemes:[names outside the registry], scope, sites:[names], method, previousCount }
      * @returns {{objectives, criteria, methodology}} bullet lists as strings
      */
     function buildNarratives(o) {
         const c = o || {};
         const ids = arr(c.standards);
-        const labels = ids.map(stdLabel).filter(Boolean);
-        const list = labels.length > 1 ? labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1] : (labels[0] || '');
+        const labels = scopeLabels(ids, c.schemes);
+        const schemeLabels = labels.slice(ids.map(stdLabel).filter(Boolean).length);
+        const list = joinAnd(labels);
         const method = lower(c.method || 'remote');
         const remote = method === 'remote';
         const hybrid = method === 'hybrid';
@@ -1070,13 +1088,19 @@
             'Provide the audit conclusions that support the ' + lower(c.auditType || 'recertification') + ' decision'
         ]);
         const criteria = b([
-            'Standards, at the editions certified: ' + list,
+            'Standards, at the editions certified: ' + list
+        ].concat(schemeLabels.length ? [
+            // No clause registry is held for these: they are audited against the
+            // standard's own requirements, and the plan cites no clause numbers
+            // for them rather than inventing any.
+            joinAnd(schemeLabels) + ': audited against the requirements of the standard' + (schemeLabels.length > 1 ? 's themselves' : ' itself') + '; this plan cites no clause numbers for ' + (schemeLabels.length > 1 ? 'them' : 'it')
+        ] : []).concat([
             'The approved certification scope, exactly as stated on the certificate' + (c.scope ? ' (see the certified scope above)' : ''),
             'The organization’s documented management system',
             'Applicable legal, statutory, regulatory and contractual requirements',
             'The certification-programme requirements of the certification body',
             'Applicable site(s): ' + (arr(c.sites).join('; ') || 'as scheduled')
-        ]);
+        ]));
         const methodology = b([
             remote ? 'Remote audit: all activities are performed remotely; no physical site activity is planned'
                 : (hybrid ? 'Hybrid audit: activities are labelled remote or on-site in the agenda' : 'On-site audit at the applicable site(s)'),
@@ -1102,9 +1126,10 @@
             ['previous-finding follow-up', /previous finding/i], ['significant-change review', /significant change/i], ['the limitation that sampling does not remove mandatory activities', /sampling does not remove|mandatory/i]]
     };
 
-    function checkNarratives(plan, standards) {
+    function checkNarratives(plan, standards, schemes) {
         const p = plan || {};
         const problems = [];
+        const schemeLabels = scopeLabels([], schemes);
         ['objectives', 'criteria', 'methodology'].forEach(function (field) {
             const text = str(p[field] || p['audit' + field.charAt(0).toUpperCase() + field.slice(1)]);
             if (!text) { problems.push({ code: 'NARRATIVE_MISSING', field: field, message: 'The plan has no audit ' + field + '.' }); return; }
@@ -1116,6 +1141,13 @@
                 if (field === 'methodology' && /secure communication/.test(rule[0]) && !remoteOrHybrid) return;
                 if (rule[1] && !rule[1].test(text)) problems.push({ code: 'NARRATIVE_INCOMPLETE', field: field, message: 'Audit ' + field + ' do not state ' + rule[0] + '.' });
             });
+            // A standard outside the clause registry is still in scope: the
+            // objectives and criteria have to name it (the builder used to drop it).
+            if (field === 'objectives' || field === 'criteria') {
+                schemeLabels.forEach(function (label) {
+                    if (lower(text).indexOf(lower(label)) === -1) problems.push({ code: 'STANDARD_NOT_CITED', field: field, message: 'Audit ' + field + ' do not name ' + label + ', which is in the audit scope. Refresh the objectives and criteria.' });
+                });
+            }
             if (field === 'criteria') {
                 arr(standards).forEach(function (id) {
                     const label = stdLabel(id); const std = CS().byId(id);
@@ -1191,6 +1223,7 @@
         const B = function (code, msg, extra) { blockers.push(issue(code, msg, extra)); };
         const W = function (code, msg, extra) { warnings.push(Object.assign({ code: code, message: msg, severity: 'warning' }, extra || {})); };
         const scopeIds = arr(c.standards);
+        const scopeSchemes = Array.isArray(c.schemes) ? c.schemes : schemesOf(p);
         const rows = arr(p.agenda);
 
         // ── dates, window, expiry ────────────────────────────────────
@@ -1263,7 +1296,7 @@
                 if (/^management system clauses|^\s*$/.test(lower(r.item)) && !toMin(r.start || r.time)) B('UNTIMED_ROW', 'Agenda row ' + (i + 1) + ' is an untimed catch-all row.', { row: i + 1 });
             }
         });
-        checkNarratives(p, scopeIds).filter(function (x) { return x.code === 'EDITION_MISMATCH'; }).forEach(function (x) { B('EDITION_MISMATCH', x.message, { field: x.field }); });
+        checkNarratives(p, scopeIds, scopeSchemes).filter(function (x) { return x.code === 'EDITION_MISMATCH'; }).forEach(function (x) { B('EDITION_MISMATCH', x.message, { field: x.field }); });
         const stdText = str(p.standard);
         if (stdText && scopeIds.length) {
             const named = CS().resolve(stdText).standards.map(function (s) { return s.id; });
@@ -1275,7 +1308,7 @@
         }
 
         // ── narratives ───────────────────────────────────────────────
-        checkNarratives(p, scopeIds).filter(function (x) { return x.code !== 'EDITION_MISMATCH'; }).forEach(function (x) { B(x.code, x.message, { field: x.field }); });
+        checkNarratives(p, scopeIds, scopeSchemes).filter(function (x) { return x.code !== 'EDITION_MISMATCH'; }).forEach(function (x) { B(x.code, x.message, { field: x.field }); });
 
         // ── duration ─────────────────────────────────────────────────
         const dur = p.durationCalculation || {};
@@ -1389,7 +1422,7 @@
         const scope = checkScope({ plan: plan, client: c.client, standards: ids, schemes: schemesOf(plan), processes: uniq(built.rows.flatMap(function (r) { return arr(r.processes); })) });
         const site = arr(c.client && c.client.sites).find(function (s) { return arr(plan.selectedSites)[0] && lower(s.name) === lower(arr(plan.selectedSites)[0].name); });
         const tz = df.resolveTimeZone({ plan: plan, client: c.client, site: site });
-        const narratives = buildNarratives({ auditType: plan.auditType || plan.type, standards: ids, scope: scope.certificateScope, sites: arr(plan.selectedSites).map(function (s) { return s.name; }), method: plan.auditMethod });
+        const narratives = buildNarratives({ auditType: plan.auditType || plan.type, standards: ids, schemes: schemesOf(plan), scope: scope.certificateScope, sites: arr(plan.selectedSites).map(function (s) { return s.name; }), method: plan.auditMethod });
         const effective = arr(plan.selectedSites).reduce(function (n, s) { const r = arr(c.client && c.client.sites).find(function (x) { return lower(x.name) === lower(s.name); }); return n + (Number(r && r.employees) || 0); }, 0);
         const durationRecord = buildDurationRecord(plan, { standards: ids, settings: c.settings, effectivePersonnel: effective, effectivePersonnelSource: 'employees at the audited site(s)',
             organisationTotal: c.client && (c.client.totalEmployees || null), scopeSummary: scope.certificateScope, competenceValid: c.competenceValid, domain: c.domain });
@@ -1409,7 +1442,7 @@
         collectPreviousFindings, mapFindings,
         buildAgenda, buildTraceability, flattenChecklist,
         buildDurationRecord, reconcileDuration,
-        checkScope, buildNarratives, checkNarratives,
+        checkScope, buildNarratives, checkNarratives, scopeLabels,
         validate, canTransition, contentHash, assemble, standardIdsOf, schemesOf, SCHEME_TOPICS
     };
     global.AuditPlanIntegrity = API;
