@@ -2964,10 +2964,16 @@ function validateAuditPlanForSave(planData) {
     if (planData.auditMethod === 'Hybrid' && planData.agenda.some(item => !/^\[(remote|on-site)\]/i.test(String(item.item || '')))) errors.push('Every Hybrid agenda activity must be labelled Remote or On-site.');
     const previousFindings = getPreviousPlanFindings(planData.client, cycle.standards);
     if (previousFindings.length && !/previous|finding|nonconform/.test(agendaText)) errors.push('Agenda must include follow-up of previous findings.');
+    // The approved auditor-days may be spread over MORE scheduled dates as
+    // shorter days (2 auditor-days over four dates = four half days); the
+    // hours themselves are reconciled with the duration by the plan gate. So
+    // the agenda may run to the last scheduled date, not only to ceil(days).
+    const scheduledDates = window.DocFormat ? window.DocFormat.eachDay(planData.date, planData.endDate).length : 0;
+    const agendaDayLimit = Math.max(Math.ceil(duration.finalDays), scheduledDates);
+    const agendaMaxDay = planData.agenda.length ? Math.max(...planData.agenda.map(item => parseInt(String(item.day).match(/\d+/)?.[0] || '1', 10))) : 0;
     if (planData.agenda.length && duration.finalDays > 0) {
-        const maxDay = Math.max(...planData.agenda.map(item => parseInt(String(item.day).match(/\d+/)?.[0] || '1', 10)));
-        if (maxDay > Math.ceil(duration.finalDays)) errors.push('Agenda extends beyond the calculated audit duration.');
-        if (maxDay < Math.ceil(duration.finalDays)) warnings.push('Agenda does not yet allocate activities across the full calculated duration.');
+        if (agendaMaxDay > agendaDayLimit) errors.push(scheduledDates ? 'Agenda runs past the last scheduled audit date.' : 'Agenda extends beyond the calculated audit duration.');
+        if (agendaMaxDay < Math.ceil(duration.finalDays)) warnings.push('Agenda does not yet allocate activities across the full calculated duration.');
     }
     if (window.AuditPlanningDomain && planData.agenda.length && duration.finalDays > 0) {
         const reconciliation = window.AuditPlanningDomain.reconcileAgenda({
@@ -2994,7 +3000,7 @@ function validateAuditPlanForSave(planData) {
         && !(previousFindings.length && !/previous|finding|nonconform/.test(agendaText))
         && !(planData.auditMethod === 'Remote' && /(facility tour|site tour|physical presence|on-site review|onsite review)/i.test(agendaText))
         && !(planData.auditMethod === 'Hybrid' && planData.agenda.some(item => !/^\[(remote|on-site)\]/i.test(String(item.item || ''))))
-        && (!planData.agenda.length || Math.max(...planData.agenda.map(item => parseInt(String(item.day).match(/\d+/)?.[0] || '1', 10))) <= Math.ceil(duration.finalDays));
+        && (!planData.agenda.length || agendaMaxDay <= agendaDayLimit);
     const checks = [
         { label: 'Certification cycle is established and internally consistent', passed: cycle.valid && !cycle.conflict },
         { label: 'Cycle stage, standards and editions are auditor-confirmed', passed: Boolean(document.getElementById('plan-cycle-confirmed')?.checked) },
