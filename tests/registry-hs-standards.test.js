@@ -152,8 +152,16 @@ describe('agenda for the new registry standards', () => {
         expect(a.rows.some(r => r.kind === 'lunch' && r.day === 'Day 1')).toBe(true);
     });
 
-    it('says why when a scope genuinely cannot fit the duration', () => {
+    it('combines topics when a half day cannot hold one session per topic', () => {
         const a = build('ISO 9001:2015, ISO 14001:2015, ISO 45001:2018', 0.5);
+        expect(a.errors).toEqual([]);
+        expect(a.rows.length).toBeGreaterThan(0);
+        expect(a.warnings.join(' ')).toMatch(/topics are combined into \d+ sessions/);
+    });
+
+    it('says why when a scope genuinely cannot fit the duration', () => {
+        // One hour cannot hold even the opening, consolidation and closing meetings.
+        const a = build('ISO 9001:2015, ISO 14001:2015, ISO 45001:2018', 0.125);
         expect(a.rows).toEqual([]);
         expect(a.errors.join(' ')).toMatch(/too short for this scope: it needs \d+ sessions/);
     });

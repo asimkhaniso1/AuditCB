@@ -506,6 +506,35 @@
         return out;
     }
 
+    /**
+     * Combine consecutive agenda blocks into `count` sessions, in template
+     * order. A combined session names every topic, auditee and requirement of
+     * the blocks it holds, and lists their ids in `blockIds`.
+     */
+    function combineBlocks(list, count) {
+        const n = Math.max(1, Math.min(list.length, count));
+        const out = [];
+        for (let g = 0; g < n; g++) {
+            const part = list.slice(Math.floor(g * list.length / n), Math.floor((g + 1) * list.length / n));
+            if (part.length === 1) { out.push(part[0]); continue; }
+            const refs = {};
+            part.forEach(function (b) { arr(b.standards).forEach(function (e) { refs[e.stdId] = uniq((refs[e.stdId] || []).concat(e.refs)); }); });
+            out.push({
+                id: part[0].id, blockIds: uniq(part.flatMap(function (b) { return arr(b.blockIds).length ? b.blockIds : [b.id]; })),
+                title: part.map(function (b) { return b.title; }).join('; '),
+                hours: part.reduce(function (t, b) { return t + b.hours; }, 0),
+                auditee: uniq(part.map(function (b) { return b.auditee; }).filter(Boolean)).join(' / '),
+                standards: Object.keys(refs).map(function (id) { return { stdId: id, refs: refs[id].sort(compareRefs) }; }),
+                schemes: uniq(part.flatMap(function (b) { return arr(b.schemes); })),
+                processes: uniq(part.flatMap(function (b) { return arr(b.processes); })),
+                priorities: uniq(part.flatMap(function (b) { return arr(b.priorities); })),
+                subject: part.map(function (b) { return b.subject; }).filter(Boolean).join(' ')
+            });
+        }
+        return out;
+    }
+    function hasBlock(session, id) { return !!session && (session.blockId === id || arr(session.blockIds).indexOf(id) !== -1); }
+
     function hhmm(min) { const h = Math.floor(min / 60); const m = min % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
     function toMin(hhmmStr) { const m = String(hhmmStr).match(/(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : null; }
 
@@ -576,14 +605,23 @@
 
         // 2. Scale the variable blocks to the approved duration, 15-minute steps.
         const fixed = blocks.filter(function (b) { return b.kind; });
-        const variable = blocks.filter(function (b) { return !b.kind; });
+        let variable = blocks.filter(function (b) { return !b.kind; });
         // A short audit (half a day, or a day at a short working day) keeps
         // the mandatory meetings but tightens them, and lets sessions drop to
         // 15 minutes, rather than refusing to build at all.
         if (total <= 4) fixed.forEach(function (b) { b.hours = b.fixed === 'start' ? 0.25 : 0.5; });
         const fixedHours = fixed.reduce(function (t, b) { return t + b.hours; }, 0);
-        const baseVar = variable.reduce(function (t, b) { return t + b.hours; }, 0);
         const avail = total - fixedHours;
+        // Still too many topics for 15-minute sessions (a half-day surveillance
+        // of ISO/IEC 27001, or of more than one standard): neighbouring topics
+        // share a session of at least 30 minutes instead of the build failing.
+        // Every topic, requirement and finding target is kept.
+        if (avail >= 0.5 && avail < variable.length * 0.25) {
+            const before = variable.length;
+            variable = combineBlocks(variable, Math.floor(avail / 0.5));
+            warnings.push('The approved duration (' + total + ' h) is short for this scope: its ' + before + ' topics are combined into ' + variable.length + ' sessions.');
+        }
+        const baseVar = variable.reduce(function (t, b) { return t + b.hours; }, 0);
         const minBlock = avail >= variable.length * 0.5 ? 0.5 : 0.25;
         if (avail < variable.length * minBlock) {
             return { rows: [], sessions: [], traceability: null, findingMap: [], errors: errors.concat(['The approved duration (' + total + ' h) is too short for this scope: it needs ' + variable.length + ' sessions of at least 15 minutes plus the opening, consolidation and closing meetings (' + (fixedHours + variable.length * 0.25) + ' h). Increase the duration, or split the standards into separate plans.']), warnings: warnings };
@@ -693,7 +731,7 @@
             const auditor = pick(b, b.hours);
             if (auditor && left[auditor.name] !== Infinity) left[auditor.name] -= b.hours;
             const s = {
-                sessionId: 'S' + String(n).padStart(2, '0'), blockId: b.id, kind: b.kind || 'session', title: b.title, subject: b.subject || '',
+                sessionId: 'S' + String(n).padStart(2, '0'), blockId: b.id, blockIds: arr(b.blockIds).length ? b.blockIds.slice() : [b.id], kind: b.kind || 'session', title: b.title, subject: b.subject || '',
                 spans: [{ day: p.day, start: p.start, end: p.end }], hours: b.hours,
                 standards: b.standards.map(function (e) { return { stdId: e.stdId, refs: e.refs.slice() }; }),
                 schemes: arr(b.schemes).slice(),
@@ -767,14 +805,14 @@
                 // A finding against a scheme with no clause registry cannot be
                 // matched by clause; it is followed up in the session that covers
                 // previous findings and corrective action.
-                const followUpSession = sessions.find(function (s) { return s.blockId === 'improvement'; });
+                const followUpSession = sessions.find(function (s) { return hasBlock(s, 'improvement'); });
                 const schemeOnly = sessions.every(function (s) { return !s.standards.length; });
                 if (followUpSession && schemeOnly) { target = [followUpSession]; via = 'scheme-follow-up'; }
             }
             if (!target.length && clause) {
                 const stdId = /^A\./.test(clause) ? 'iso27001' : (arr(f.standards)[0] || '');
-                const fallback = /^A\./.test(clause) ? sessions.find(function (s) { return s.blockId === 'isms-risk-soa'; })
-                    : sessions.find(function (s) { return s.blockId === 'improvement'; });
+                const fallback = /^A\./.test(clause) ? sessions.find(function (s) { return hasBlock(s, 'isms-risk-soa'); })
+                    : sessions.find(function (s) { return hasBlock(s, 'improvement'); });
                 if (fallback && stdId && CS().isKnownRef(stdId, clause)) {
                     let entry = fallback.standards.find(function (e) { return e.stdId === stdId; });
                     if (!entry) { entry = { stdId: stdId, refs: [] }; fallback.standards.push(entry); }
@@ -821,7 +859,7 @@
             version: 'plan-traceability-v1', generatedAt: new Date().toISOString(), planId: o.planId || null, standards: arr(o.scopeIds),
             sessions: sessions.map(function (s) {
                 return {
-                    sessionId: s.sessionId, blockId: s.blockId, kind: s.kind, title: s.title, spans: s.spans, hours: s.hours,
+                    sessionId: s.sessionId, blockId: s.blockId, blockIds: arr(s.blockIds).slice(), kind: s.kind, title: s.title, spans: s.spans, hours: s.hours,
                     standards: s.standards.map(function (e) { return { stdId: e.stdId, label: stdLabel(e.stdId), refs: e.refs, titles: e.refs.map(function (r) { return { ref: r, title: refTitle(e.stdId, r) }; }) }; }),
                     schemes: arr(s.schemes).slice(), processes: s.processes, findingIds: s.findingIds, auditee: s.auditee, auditorId: s.auditor && s.auditor.id, auditorName: s.auditor && s.auditor.name,
                     priorities: s.priorities,
@@ -1371,7 +1409,7 @@
 
         // ── coverage of the recertification priorities ───────────────
         if (rows.length && /recert/i.test(str(p.auditType || p.type))) {
-            const blockIds = new Set(rows.map(function (r) { const s = arr(p.traceability && p.traceability.sessions).find(function (x) { return x.sessionId === r.sessionId; }); return s ? s.blockId : r.blockId; }).filter(Boolean));
+            const blockIds = new Set(rows.flatMap(function (r) { const s = arr(p.traceability && p.traceability.sessions).find(function (x) { return x.sessionId === r.sessionId; }); return s ? [s.blockId].concat(arr(s.blockIds)) : [r.blockId]; }).filter(Boolean));
             const havePlanBlocks = arr(p.traceability && p.traceability.sessions).length > 0;
             if (havePlanBlocks) {
                 const titles = rows.map(function (r) { return lower(r.item); }).join(' | ');
