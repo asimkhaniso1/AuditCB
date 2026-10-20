@@ -48,6 +48,8 @@
         'table.grid th{background:#f1f5f9;text-align:left;padding:5px 7px;border-bottom:2px solid #cbd5e1;font-size:8pt;text-transform:uppercase;letter-spacing:.04em;color:#334155}',
         'table.grid td{padding:5px 7px;border-bottom:1px solid #e2e8f0;vertical-align:top;font-size:8.5pt}',
         'table.grid td.num,table.grid th.num{text-align:right;font-variant-numeric:tabular-nums}',
+        'table.scope-table{table-layout:fixed;margin:2px 0 3px}',
+        'table.scope-table td{font-size:8.4pt;line-height:1.4;padding:4px 7px;overflow-wrap:break-word}',
         // Agenda: one table per day so each day carries its own heading band,
         // repeated with the column headings when the day runs onto a new page.
         'table.agenda{table-layout:fixed;margin:0 0 8px}',
@@ -261,9 +263,18 @@
 
         const certLine = arr(c.scope && c.scope.certificateNumbers).length
             ? '<p class="scope-meta">Certificate' + (c.scope.certificateNumbers.length > 1 ? 's' : '') + ': ' + t(c.scope.certificateNumbers.join(', ')) + (cyc.certificateExpiry ? ' · valid to ' + t(df.formatDate(cyc.certificateExpiry)) : '') + '</p>' : '';
+        // A client holding one certificate per standard has one scope per
+        // certificate: each is reproduced exactly, beside its standard.
+        const scopeList = arr(c.scope && c.scope.scopes);
+        const scopeBody = scopeList.length > 1
+            ? '<table class="grid scope-table"><colgroup><col style="width:24%"><col style="width:14%"><col style="width:62%"></colgroup>'
+                + '<thead><tr><th>Standard</th><th>Certificate</th><th>Certified scope</th></tr></thead><tbody>'
+                + scopeList.map(function (x) { return '<tr><td>' + x.standards.map(t).join('<br>') + '</td><td>' + (x.certificateNumbers.map(t).join('<br>') || '—') + '</td><td>' + t(x.text) + '</td></tr>'; }).join('')
+                + '</tbody></table>'
+                + (cyc.certificateExpiry ? '<p class="scope-meta">Certificates valid to ' + t(df.formatDate(cyc.certificateExpiry)) + '</p>' : '')
+            : '<p class="scope-box">' + t((c.scope && c.scope.certificateScope) || p.scope || 'Not recorded') + '</p>' + certLine;
         const scopeSection = section('AUDIT SCOPE &amp; CRITERIA')
-            + '<div class="pd-subhead">Certified scope</div>'
-            + '<p class="scope-box">' + t((c.scope && c.scope.certificateScope) || p.scope || 'Not recorded') + '</p>' + certLine
+            + '<div class="pd-subhead">Certified scope</div>' + scopeBody
             + '<div class="pd-subhead">Audit criteria</div>' + bullets('criteria');
 
         const allocRows = arr(p.selectedSites).map(function (s) {
@@ -371,7 +382,7 @@
 
         const sc = c.scopeCheck || {};
         const scopeRows = '<table class="grid"><tbody>'
-            + fld('Certificate wording (authoritative)', t(sc.certificateScope || 'not found'))
+            + fld('Certificate wording (authoritative)', sc.certificateScope ? t(sc.certificateScope).replace(/\n/g, '<br>') : 'not found')
             + fld('Plan scope', t(sc.planScope || 'not stated'))
             + fld('Exact match', sc.exact ? '<b class="ok">YES — reproduced exactly</b>' : '<b class="bad">NO</b>')
             + fld('Certificates', t(arr(sc.certificateNumbers).join(', ') || 'none'))
