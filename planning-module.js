@@ -2933,13 +2933,18 @@ function validateAuditPlanForSave(planData) {
     }
     if (!planData.selectedSites.length) errors.push('Select at least one site for audit coverage.');
 
+    // Competence gaps (a standard or technical sector the recorded competence
+    // does not cover) are NOTIFIED, not blocking: the CB decides. Still
+    // blocking: no Lead Auditor, a lead without the Lead Auditor role, and an
+    // auditor unavailable on the audit date.
+    const competenceGap = (message) => /lacks|does not collectively cover/i.test(message);
     const assignedAuditors = planData.team.map(name => window.state.auditors.find(a => a.name === name)).filter(Boolean);
     const covered = new Set(assignedAuditors.flatMap(a => (a.standards || []).map(normalizeStandardFamily)));
-    cycle.standards.forEach(std => { if (!covered.has(normalizeStandardFamily(std))) errors.push(`Audit team lacks recorded competence for ${std}.`); });
+    cycle.standards.forEach(std => { if (!covered.has(normalizeStandardFamily(std))) warnings.push(`Audit team lacks recorded competence for ${std}.`); });
     const lead = assignedAuditors[0];
     if (!lead || lead.role !== 'Lead Auditor') errors.push('The assigned lead must have the Lead Auditor role.');
     if (lead) cycle.standards.forEach(std => {
-        if (!(lead.standards || []).some(c => normalizeStandardFamily(c) === normalizeStandardFamily(std))) errors.push(`Lead Auditor lacks recorded competence for ${std}.`);
+        if (!(lead.standards || []).some(c => normalizeStandardFamily(c) === normalizeStandardFamily(std))) warnings.push(`Lead Auditor lacks recorded competence for ${std}.`);
     });
     if (window.AuditPlanningDomain) {
         const client = window.state.clients.find(item => item.name === planData.client) || {};
@@ -2947,7 +2952,7 @@ function validateAuditPlanForSave(planData) {
             auditors: assignedAuditors, leadAuditor: planData.team[0], standards: cycle.standards,
             requiredTechnicalSectors: client.technicalSectors || [], auditDate: planData.date
         });
-        errors.push(...competence.errors);
+        competence.errors.forEach(message => (competenceGap(message) ? warnings : errors).push(message));
         warnings.push(...competence.warnings);
     }
     const allocatedDays = planData.teamAllocations.reduce((sum, item) => sum + item.days, 0);
