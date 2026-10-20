@@ -1053,10 +1053,30 @@
             });
         const texts = uniq(certs.map(function (x) { return squash(x.scope); }).filter(Boolean));
         const issues = [];
+        // Each certificate carries the scope of ITS standard, so an integrated
+        // client holding one certificate per standard legitimately has as many
+        // wordings as standards. Only two active certificates for the SAME
+        // standard that disagree are a conflict needing a decision.
+        const certLabel = function (x) { const r = CS().resolve(x.standard); return r.standards.length ? r.standards[0].label : str(x.standard); };
+        const certNo = function (x) { return x.certificateNo || x.certificateNumber || ''; };
+        const byStandard = {};
+        certs.forEach(function (x) { const k = certLabel(x); (byStandard[k] = byStandard[k] || []).push(squash(x.scope)); });
+        const conflicting = Object.keys(byStandard).filter(function (k) { return uniq(byStandard[k].filter(Boolean)).length > 1; });
         if (!certs.length) issues.push({ code: 'SCOPE_NO_CERTIFICATE', message: 'No active certificate is on file for the standards in scope, so the plan scope cannot be verified.' });
         else if (!texts.length) issues.push({ code: 'SCOPE_NO_CERTIFICATE', message: 'The active certificate(s) carry no scope wording.' });
-        else if (texts.length > 1) issues.push({ code: 'SCOPE_CERTIFICATES_DIFFER', message: 'The active certificates carry different scope wording (' + texts.length + ' variants); the authoritative wording needs certification-manager confirmation.' });
-        const certificateScope = texts[0] || '';
+        conflicting.forEach(function (k) {
+            issues.push({ code: 'SCOPE_CERTIFICATES_DIFFER', message: 'The active ' + k + ' certificates carry different scope wording (' + uniq(byStandard[k].filter(Boolean)).length + ' variants); the authoritative wording needs certification-manager confirmation.' });
+        });
+        // One entry per distinct wording, with the standards and certificates that carry it.
+        const scopes = texts.map(function (text) {
+            const holders = certs.filter(function (x) { return squash(x.scope) === text; });
+            return { text: text, standards: uniq(holders.map(certLabel)), certificateNumbers: uniq(holders.map(certNo).filter(Boolean)) };
+        });
+        // One wording: that wording. Several: each, labelled with its standards
+        // and certificates, so the stored plan scope reproduces all of them.
+        const certificateScope = scopes.length > 1
+            ? scopes.map(function (s) { return s.standards.join(', ') + (s.certificateNumbers.length ? ' (' + s.certificateNumbers.join(', ') + ')' : '') + ': ' + s.text; }).join('\n')
+            : (texts[0] || '');
 
         // The plan's own scope statement: the field, else (legacy) the text embedded in Audit Criteria.
         let planScope = squash(plan.scope || plan.certifiedScope && plan.certifiedScope.text);
@@ -1065,7 +1085,11 @@
             const m = String(plan.criteria).match(/approved certification scope\s*\(([\s\S]*?)\)\s*;\s*the organi[sz]ation/i);
             if (m) { planScope = squash(m[1]); embedded = true; }
         }
-        const exact = !!planScope && !!certificateScope && planScope === certificateScope;
+        // plan.scope is never typed: every save copies it from the certificates.
+        // Plans saved before multi-certificate scopes stored the first wording
+        // only; that exact copy is accepted until the next save refreshes it.
+        const exact = !!planScope && !!certificateScope && (planScope === squash(certificateScope)
+            || (scopes.length > 1 && texts.indexOf(planScope) !== -1));
         if (certificateScope && !planScope) issues.push({ code: 'SCOPE_MISSING', message: 'The plan does not state the certified scope.' });
         else if (certificateScope && !exact) issues.push({ code: 'SCOPE_MISMATCH', message: 'The plan scope does not match the active certificate.', planScope: planScope, certificateScope: certificateScope });
 
@@ -1105,7 +1129,7 @@
         const outside = uniq(arr(c.processes).filter(function (p) { return !known.some(function (k) { return k.indexOf(norm(p)) === 0 || norm(p).indexOf(k) === 0; }); }));
         outside.forEach(function (p) { issues.push({ code: 'PROCESS_OUTSIDE_BOUNDARY', message: 'Process "' + p + '" scheduled for audit is not one of the client’s recorded processes.' }); });
 
-        return { ok: !issues.some(function (i) { return i.severity !== 'warning'; }), exact: exact, embedded: embedded, certificateScope: certificateScope, planScope: planScope,
+        return { ok: !issues.some(function (i) { return i.severity !== 'warning'; }), exact: exact, embedded: embedded, certificateScope: certificateScope, scopes: scopes, planScope: planScope,
             certificateNumbers: certs.map(function (x) { return x.certificateNo || x.certificateNumber; }).filter(Boolean),
             activities: { listed: activities.filter(function (a) { return unlisted.indexOf(a) === -1; }), unlisted: unlisted, platformsNotCertified: platformsNotCertified, platformsNotEvidenced: platformsNotEvidenced,
                 requiresCertificationReview: differs && !!certificateScope }, issues: issues };

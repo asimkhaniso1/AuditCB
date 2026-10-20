@@ -573,9 +573,16 @@ describe('certified scope', () => {
     it('blocks when the plan states no scope', () => {
         expect(codes(gateWith(base, p => { p.scope = ''; p.criteria = ''; }))).toContain('SCOPE_MISSING');
     });
-    it('blocks when the certificates carry different wording, rather than choosing one', () => {
-        const v = gateWith(base, () => { }, ctx => { ctx.client = clone(base.client); ctx.client.certificates[1].scope += ' Also managed services.'; });
+    it('blocks when two certificates for the same standard carry different wording, rather than choosing one', () => {
+        const v = gateWith(base, () => { }, ctx => {
+            ctx.client = clone(base.client);
+            ctx.client.certificates.push(Object.assign(clone(ctx.client.certificates[1]), { id: 'dup', certificateNo: 'DUP-1', scope: ctx.client.certificates[1].scope + ' Also managed services.' }));
+        });
         expect(codes(v)).toContain('SCOPE_CERTIFICATES_DIFFER');
+    });
+    it('does not block when certificates for different standards carry their own wording', () => {
+        const v = gateWith(base, () => { }, ctx => { ctx.client = clone(base.client); ctx.client.certificates[1].scope += ' Also managed services.'; });
+        expect(codes(v)).not.toContain('SCOPE_CERTIFICATES_DIFFER');
     });
     it('reads the scope embedded in legacy audit criteria', () => {
         const legacy = { criteria: `ISO 27001:2022; the approved certification scope (${CERT_SCOPE}); the organization's documented management system; and more.` };
