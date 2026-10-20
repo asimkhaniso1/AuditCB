@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Deleting a certification scope removed it from the browser's copy only. The
 // certificate lives in the cloud copy of the client (data.certificates) and in
@@ -13,12 +14,8 @@ window.renderClientDetail = () => { };
 if (!globalThis.crypto || typeof globalThis.crypto.randomUUID !== 'function') {
     globalThis.crypto = { randomUUID: () => 'uuid-' + Math.random().toString(16).slice(2) };
 }
-
-const fs = await import('fs');
-const path = await import('path');
-eval(fs.readFileSync(path.resolve('./utils.js'), 'utf8'));
-eval(fs.readFileSync(path.resolve('./clients-import.js'), 'utf8')
-    .replace(/\nif \(typeof module !== 'undefined' && module\.exports\) \{[\s\S]*$/, ''));
+loadScript('./utils.js', { params: { module: undefined } });
+loadScript('./clients-import.js', { params: { module: undefined } });
 
 const flush = () => new Promise(r => setTimeout(r, 0));
 

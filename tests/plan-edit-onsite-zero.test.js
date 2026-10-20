@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import fs from 'fs';
 import path from 'path';
 import { M } from '../tools/pcc-scenario.mjs';
@@ -7,8 +8,6 @@ import { M } from '../tools/pcc-scenario.mjs';
 // (`plan.onsiteDays || ''`), and the save refused the blank with "Onsite Days
 // must be a valid number" behind a bare "Please fix the form errors" — Pre-save
 // QA never ran, so it showed nothing.
-const SRC = fs.readFileSync(path.resolve('./planning-module.js'), 'utf8');
-const VALIDATOR = fs.readFileSync(path.resolve('./validation.js'), 'utf8');
 
 const client = { id: 'lsuk', name: 'Language Services UK Limited', sites: [{ name: 'Head Office', employees: 10 }], contacts: [], keyProcesses: [], certificates: [] };
 const remotePlan = {
@@ -23,8 +22,8 @@ beforeAll(() => {
     window.UTILS = M.UTILS;
     window.Sanitizer = { sanitizeText: (v) => v };
     window.Logger = window.Logger || { debug() { }, info() { }, warn() { }, error() { } };
-    if (!window.Validator) (0, eval)(VALIDATOR);
-    (0, eval)(SRC);
+    if (!window.Validator) loadScript('./validation.js', { global: true });
+    loadScript('./planning-module.js', { global: true });
 });
 
 async function openForEdit(plan) {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.Logger = {
@@ -12,7 +13,7 @@ window.location = window.location || { hash: '' };
 const fs = await import('fs');
 const path = await import('path');
 const source = fs.readFileSync(path.resolve('./supabase-client.js'), 'utf8');
-const loadClient = new Function(`${source}; return SupabaseClient;`);
+const loadClient = () => loadScript('./supabase-client.js', { append: '\n; return SupabaseClient;' });
 const SupabaseClient = loadClient();
 
 describe('Knowledge Base cloud persistence', () => {

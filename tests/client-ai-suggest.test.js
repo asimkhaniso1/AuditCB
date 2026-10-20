@@ -1,12 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./client-ai-suggest.js'), 'utf8');
-eval(src);
+loadScript('./client-ai-suggest.js', { params: { module: undefined } });
 
 const S = window.ClientAISuggest;
 

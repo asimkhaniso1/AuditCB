@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = { ncrs: [] };
@@ -6,7 +7,7 @@ window.state = { ncrs: [] };
 const fs = await import('fs');
 const path = await import('path');
 const src = fs.readFileSync(path.resolve('./ncr-capa-module.js'), 'utf8');
-eval(src);
+loadScript('./ncr-capa-module.js', { params: { module: undefined } });
 
 describe('NCRModule lifecycle rules', () => {
     it('CAR_STATUSES has 13 entries including Ineffective, Reopened, Withdrawn', () => {

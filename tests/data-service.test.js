@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Setup window globals
 globalThis.window = globalThis.window || globalThis;
@@ -33,11 +34,7 @@ window.SupabaseClient = {
     syncAuditorAssignmentsToSupabase: vi.fn().mockResolvedValue(true),
     deleteAuditorAssignment: vi.fn().mockResolvedValue(true)
 };
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./data-service.js'), 'utf8');
-eval(src);
+loadScript('./data-service.js', { params: { module: undefined } });
 
 describe('DataService', () => {
     beforeEach(() => {

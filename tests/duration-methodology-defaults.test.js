@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -36,7 +37,7 @@ describe('duration methodology starter defaults', () => {
                 }
             }
         };
-        new Function(source)();
+        loadScript('./settings-module.js');
     });
 
     it('fills every supported standard with editable starter bands without overwriting entered rules', () => {

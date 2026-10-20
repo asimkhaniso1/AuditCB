@@ -1,11 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Load constants module
 globalThis.window = globalThis.window || globalThis;
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./constants.js'), 'utf8');
-eval(src);
+loadScript('./constants.js', { params: { module: undefined } });
 
 describe('CONSTANTS', () => {
     it('should be defined on window', () => {

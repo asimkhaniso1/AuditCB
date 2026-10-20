@@ -1,16 +1,12 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // The Create Checklist form had no Audit Type (the field had been removed,
 // though the library still filters and badges by it), and a checklist created
 // for a client did not keep the client either.
 globalThis.window = globalThis.window || globalThis;
-const fs = await import('fs');
-const path = await import('path');
 function loadModule(file) {
-    const src = fs.readFileSync(path.resolve(file), 'utf8');
-    // eslint-disable-next-line no-unused-vars
-    const module = undefined;
-    eval(src);
+    loadScript(file, { params: { module: undefined } });
 }
 
 let realRenderLibrary;

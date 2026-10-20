@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // DataMigration.healClientText repairs records written by older builds: text that
 // was HTML-escaped before being stored, and certification-registry standard
@@ -6,12 +7,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 globalThis.window = globalThis.window || globalThis;
 globalThis.Logger = window.Logger = { debug() { }, info() { }, warn() { }, error() { } };
 
-const fs = await import('fs');
-const path = await import('path');
-eval(fs.readFileSync(path.resolve('./utils.js'), 'utf8'));
-const dataMigrationSrc = fs.readFileSync(path.resolve('./data-migration.js'), 'utf8')
-    .replace(/\nif \(typeof module !== 'undefined' && module\.exports\) \{[\s\S]*$/, '');
-eval(dataMigrationSrc);
+loadScript('./utils.js', { params: { module: undefined } });
+loadScript('./data-migration.js', { params: { module: undefined } });
 
 const DM = window.DataMigration;
 

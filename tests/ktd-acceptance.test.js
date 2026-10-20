@@ -4,6 +4,7 @@
 // "General" departments, wrong recommendation wording, address drift) and
 // asserts the corrected pipeline rejects or fixes each one.
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = { auditReports: [], ncrs: [], clients: [], auditPlans: [] };
@@ -12,8 +13,7 @@ window.CONSTANTS = { STATUS: { FINALIZED: 'Finalized' } };
 const fs = await import('fs');
 const path = await import('path');
 function loadModule(file) {
-    const src = fs.readFileSync(path.resolve(file), 'utf8');
-    eval(src);
+    loadScript(file, { params: { module: undefined } });
 }
 loadModule('./report-stats.js');
 loadModule('./data-service.js');

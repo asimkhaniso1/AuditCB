@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // clients-import.js is a browser script: give it the globals it touches at load
 // time and inside importFromCCIJson, then eval it like the other module tests.
@@ -17,16 +18,13 @@ if (!globalThis.crypto || typeof globalThis.crypto.randomUUID !== 'function') {
     globalThis.crypto = { randomUUID: () => 'uuid-' + Math.random().toString(16).slice(2) };
 }
 
-const fs = await import('fs');
-const path = await import('path');
 // utils.js first: it owns canonicalStandard, the single standard-label table the
 // importer and every standards picker share.
-eval(fs.readFileSync(path.resolve('./utils.js'), 'utf8'));
-// The trailing CommonJS export block names functions that live in sibling files (openNewClientModal, ...),
-// so it is stripped before eval; only the window.* surface is exercised here.
-const clientsImportSrc = fs.readFileSync(path.resolve('./clients-import.js'), 'utf8')
-    .replace(/\nif \(typeof module !== 'undefined' && module\.exports\) \{[\s\S]*$/, '');
-eval(clientsImportSrc);
+loadScript('./utils.js', { params: { module: undefined } });
+// The trailing CommonJS export block names functions that live in sibling files
+// (openNewClientModal, ...); `module: undefined` keeps it from running, so only
+// the window.* surface is exercised here.
+loadScript('./clients-import.js', { params: { module: undefined } });
 
 const CCI = window.CCIImport;
 const NOW = new Date('2026-08-21T00:00:00Z');

@@ -1,15 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 window.ErrorHandler = { log: vi.fn(), handle: vi.fn() };
 window.showNotification = vi.fn();
 window.state = { currentUser: null };
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./auth-manager.js'), 'utf8');
-eval(src);
+loadScript('./auth-manager.js', { params: { module: undefined } });
 
 describe('AuthManager', () => {
     beforeEach(() => {

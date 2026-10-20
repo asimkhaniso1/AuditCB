@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Public signup is turned off in Supabase, so Settings → Users must create
 // accounts through the invite-user edge function, never auth.signUp() or a
@@ -9,11 +10,7 @@ window.state = { users: [] };
 window.saveData = () => { };
 window.closeModal = () => { };
 window.UTILS = { escapeHtml: s => String(s ?? '') };
-
-const fs = await import('fs');
-const path = await import('path');
-eval(fs.readFileSync(path.resolve('./settings-users.js'), 'utf8')
-    .replace(/\n\/\/ Support CommonJS[\s\S]*$/, ''));
+loadScript('./settings-users.js', { params: { module: undefined } });
 
 function httpError(status, body) {
     // Shape of supabase-js FunctionsHttpError: generic message, Response on context

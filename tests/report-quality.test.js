@@ -1,15 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = { ncrs: [] };
 window.ReportExecutive = { icon: () => '', bigFourCss: () => '' };
 
-const fs = await import('fs');
-const path = await import('path');
 
 function loadModule(file) {
-    const src = fs.readFileSync(path.resolve(file), 'utf8');
-    eval(src);
+    loadScript(file, { params: { module: undefined } });
 }
 
 loadModule('./report-stats.js');

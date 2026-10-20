@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 
 // SG 1888 on 30/09/2026. The Halal certificate (Initial Date 14/09/2024) had
@@ -109,8 +110,7 @@ describe('SG 1888 overview card', () => {
         window.Logger = { debug() {}, info() {}, warn() {}, error() {} };
         window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s), formatDate: (d) => { const x = d instanceof Date ? d : new Date(d); return `${String(x.getDate()).padStart(2, '0')}/${String(x.getMonth() + 1).padStart(2, '0')}/${x.getFullYear()}`; } };
         window.state = { auditPlans: [], auditReports: [], cbSettings: {} };
-        const src = fs.readFileSync(path.resolve('./client-workspace.js'), 'utf8');
-        render = new Function('module', src + '\nreturn renderCertificationCycleWidget;')(undefined);
+        render = loadScript('./client-workspace.js', { params: { module: undefined }, append: '\nreturn renderCertificationCycleWidget;' });
     });
     afterAll(() => vi.useRealTimers());
 

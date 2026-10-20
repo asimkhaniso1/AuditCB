@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import fs from 'fs';
 import path from 'path';
 import { M } from '../tools/pcc-scenario.mjs';
@@ -9,7 +10,6 @@ import { M } from '../tools/pcc-scenario.mjs';
 // ceil(auditor-days) and refused it: "Agenda extends beyond the calculated
 // audit duration".
 const { IPI } = M;
-const SRC = fs.readFileSync(path.resolve('./planning-module.js'), 'utf8');
 
 const SIX = ['ISO 27001:2022', 'ISO 14001:2015', 'ISO 9001:2015', 'ISO 18841:2018', 'ISO 18587:2017', 'ISO 17100:2015'];
 const cert = (id, standard) => ({ id, standard, status: 'Active', initialDate: '2025-11-07', currentIssue: '2025-11-07', scope: 'Provision of translation and interpreting services.' });
@@ -22,7 +22,7 @@ beforeAll(() => {
     window.Sanitizer = { sanitizeText: (v) => v };
     window.Validator = {};
     window.UTILS = M.UTILS;
-    (0, eval)(SRC);
+    loadScript('./planning-module.js', { global: true });
 });
 
 function planOver(date, endDate, finalDays) {

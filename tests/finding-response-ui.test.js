@@ -2,18 +2,17 @@
 // action: recording an observation's evaluation/disposition and an OFI's
 // decision, and the controlled escalation of an observation to a nonconformity.
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
 globalThis.window = globalThis.window || globalThis;
 window.Logger = { debug() { }, info() { }, warn() { }, error() { } };
-const fs = await import('fs');
-const path = await import('path');
 window.UTILS = require('../utils.js');
 window.FindingWorkflow = require('../finding-workflow.js');
 window.state = { ncrs: [], auditPlans: [] };
 // eslint-disable-next-line no-eval
-(0, eval)(fs.readFileSync(path.resolve('./ncr-capa-module.js'), 'utf8'));
+loadScript('./ncr-capa-module.js', { global: true });
 
 let report;
 beforeEach(() => {

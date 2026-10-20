@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // The client list (clients-list-v16.js overrides the clients-module.js version)
 // sorts the whole filtered set before paging, so page 1 really is the first page
@@ -10,11 +11,7 @@ window.AuthManager = { canPerform: () => true };
 window.DataService = { findClient: id => window.state.clients.find(c => String(c.id) === String(id)) };
 window.showNotification = () => { };
 window.saveData = () => { };
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./clients-list-v16.js'), 'utf8');
-eval(src);
+loadScript('./clients-list-v16.js', { params: { module: undefined } });
 
 // The module renders into window.contentArea; jsdom supplies the rest.
 window.contentArea = document.createElement('div');

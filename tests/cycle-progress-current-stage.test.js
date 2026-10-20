@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 
 // The progress bar and the Cert / S1 / S2 / Re dots follow the CURRENT stage,
@@ -33,8 +34,7 @@ beforeAll(() => {
     window.Logger = { debug() {}, info() {}, warn() {}, error() {} };
     window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s), formatDate: (d) => { const x = d instanceof Date ? d : new Date(d); return `${String(x.getDate()).padStart(2, '0')}/${String(x.getMonth() + 1).padStart(2, '0')}/${x.getFullYear()}`; } };
     window.state = { auditPlans: [], auditReports: [], cbSettings: {} };
-    const src = fs.readFileSync(path.resolve('./client-workspace.js'), 'utf8');
-    const api = new Function('module', src + '\nreturn { render: renderCertificationCycleWidget, view: cycleLifecycleView, timeline: renderAuditCycleTimeline };')(undefined);
+    const api = loadScript('./client-workspace.js', { params: { module: undefined }, append: '\nreturn { render: renderCertificationCycleWidget, view: cycleLifecycleView, timeline: renderAuditCycleTimeline };' });
     render = api.render; view = api.view;
     window._timeline = api.timeline;
 });

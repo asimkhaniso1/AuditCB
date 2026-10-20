@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const Domain = require('../audit-planning-domain.js');
 const fs = require('fs');
 const path = require('path');
-const ADVANCED_JS = fs.readFileSync(path.resolve('./advanced-modules.js'), 'utf8');
 
 // The planning form's "Multi-Site Sampling" button opens a modal whose
 // Calculate button called calculateMultiSiteSample() after the function had
@@ -47,7 +47,7 @@ describe('multi-site sampling modal', () => {
         };
         // Evaluated as the browser does: a plain script, no CommonJS module.
         // eslint-disable-next-line no-new-func
-        new Function('module', ADVANCED_JS)(undefined);
+        loadScript('./advanced-modules.js', { params: { module: undefined } });
     });
 
     afterEach(() => {

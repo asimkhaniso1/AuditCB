@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Creating a checklist — from the Checklists page or from a standard's
 // analysis view — goes through the same Configure Analysis screen as the
@@ -10,11 +11,9 @@ window.state = window.state || {};
 window.state.knowledgeBase = { standards: [], sops: [], policies: [], marketing: [] };
 window.switchSettingsSubTab = () => {};
 
-const fs = await import('fs');
-const path = await import('path');
 const utils = await import('../utils.js');
 window.UTILS = window.UTILS || utils.default || utils;
-new Function(fs.readFileSync(path.resolve('./settings-kb.js'), 'utf8'))();
+loadScript('./settings-kb.js');
 window.Logger = window.Logger || { debug() { }, info() { }, warn() { }, error() { } };
 globalThis.Logger = window.Logger;
 const { createRequire } = await import('module');

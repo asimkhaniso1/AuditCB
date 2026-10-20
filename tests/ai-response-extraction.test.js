@@ -12,21 +12,14 @@
 // a plain string unchanged (extractTextFromResponse has several other
 // callers — see ai-service.js callProxyAPI).
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
 
-const fs = await import('fs');
-const path = await import('path');
 
 function loadModule(file) {
-    const src = fs.readFileSync(path.resolve(file), 'utf8');
-    // Shadow Vite/vitest's CJS-interop `module` binding so the eval'd file's
-    // own `if (typeof module !== 'undefined' && module.exports) {...}` tail
-    // guard is false here, exactly as it is in the browser.
-    // eslint-disable-next-line no-unused-vars
-    const module = undefined;
-    eval(src);
+    loadScript(file, { params: { module: undefined } });
 }
 
 loadModule('./ai-service.js');

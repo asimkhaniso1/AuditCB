@@ -1,16 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
-
-const fs = await import('fs');
-const path = await import('path');
 // report-stats.js first: the criterion tests assert how the REPORT layer
 // classifies what the checklist builder produced, so both halves of that
 // contract are exercised together rather than assumed.
-eval(fs.readFileSync(path.resolve('./report-stats.js'), 'utf8'));
-const src = fs.readFileSync(path.resolve('./client-docs-bulk.js'), 'utf8');
-eval(src);
+loadScript('./report-stats.js', { params: { module: undefined } });
+loadScript('./client-docs-bulk.js', { params: { module: undefined } });
 
 const B = window.ClientDocsBulk;
 
