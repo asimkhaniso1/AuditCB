@@ -807,11 +807,14 @@ function editAuditPlan(id) {
 
         // Critical Fix: Load ManDays from various possible sources
         const savedManDays = plan.manDays || plan.man_days || '';
-        const savedOnsiteDays = plan.onsiteDays || plan.onsite_days || '';
+        const duration = plan.durationCalculation || {};
+        // 0 is a real allocation (every Remote plan has 0 on-site days). The old
+        // `|| ''` turned it into a blank field, which the save then refused as
+        // "Onsite Days must be a valid number".
+        const savedOnsiteDays = [duration.onsiteDays, plan.onsiteDays, plan.onsite_days].find(v => v !== undefined && v !== null && v !== '') ?? 0;
 
         if (document.getElementById('plan-mandays')) document.getElementById('plan-mandays').value = savedManDays;
         if (document.getElementById('plan-onsite-days')) document.getElementById('plan-onsite-days').value = savedOnsiteDays;
-        const duration = plan.durationCalculation || {};
         if (document.getElementById('plan-baseline-days')) document.getElementById('plan-baseline-days').value = duration.baselineDays || savedManDays;
         if (document.getElementById('plan-ims-adjustment')) document.getElementById('plan-ims-adjustment').value = duration.imsAdjustmentPercent || 0;
         if (document.getElementById('plan-remote-days')) document.getElementById('plan-remote-days').value = duration.remoteDays || 0;
@@ -3063,10 +3066,19 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
     };
 
     // 3. Validate Step 1
+    // A blank allocation means none: a Remote plan has 0 on-site days.
+    ['plan-onsite-days', 'plan-remote-days'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && String(el.value).trim() === '') el.value = '0';
+    });
     const result = Validator.validateFormElements(fieldIds, rules);
     if (!result.valid) {
         Validator.displayErrors(result.errors, fieldIds);
-        window.showNotification('Please fix the form errors', 'error');
+        // Name the field: "Please fix the form errors" alone left Pre-save QA
+        // empty with nothing saying what was wrong.
+        window.showNotification(`Please fix: ${Object.values(result.errors).join('; ')}`, 'error');
+        const firstId = fieldIds[Object.keys(result.errors)[0]];
+        document.getElementById(firstId)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
         return;
     }
     Validator.clearErrors(fieldIds);
