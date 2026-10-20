@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 
 // Record Completed Audit used three browser prompts. It is now a form in the
@@ -16,12 +17,9 @@ window.state = { clients: [] };
 window.saveData = () => { };
 window.renderClientDetail = () => { };
 
-const fs = await import('fs');
-const path = await import('path');
-eval(fs.readFileSync(path.resolve('./utils.js'), 'utf8'));
+loadScript('./utils.js', { params: { module: undefined } });
 // Indirect eval: loaded as a global script, so its helpers are reachable.
-(0, eval)(fs.readFileSync(path.resolve('./clients-org-setup.js'), 'utf8')
-    .replace(/\nif \(typeof module !== 'undefined' && module\.exports\) \{[\s\S]*$/, ''));
+loadScript('./clients-org-setup.js', { global: true });
 
 const HALAL = { id: 'C-HALAL', standard: 'Halal', certificateNo: 'CR/IHC/SG/09/24/HC', status: 'Active', initialDate: '2024-09-14', currentIssue: '2025-09-14', expiryDate: '2026-09-13' };
 

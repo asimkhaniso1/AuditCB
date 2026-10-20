@@ -7,14 +7,13 @@
 // one definition, and tests/duplicate-globals.test.js keeps a second
 // definition from coming back.
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 
-const fs = await import('fs');
-const path = await import('path');
 
 function loadCspAdapters() {
-    eval(fs.readFileSync(path.resolve('./csp-adapters.js'), 'utf8'));
+    loadScript('./csp-adapters.js', { params: { module: undefined } });
 }
 
 /** Checklist Library shape: header element, panel is the next sibling. */

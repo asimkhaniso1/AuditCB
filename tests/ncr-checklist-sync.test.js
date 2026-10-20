@@ -17,24 +17,12 @@
 // read-only duplicate finder (window.NCRModule.findDuplicateNCRs), and the
 // fetchNCRs() preservation fix directly.
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 
-const fs = await import('fs');
-const path = await import('path');
 function loadModule(file) {
-    const src = fs.readFileSync(path.resolve(file), 'utf8');
-    // Shadow Vite/vitest's CJS-interop `module` binding so the eval'd file's
-    // own `if (typeof module !== 'undefined' && module.exports) {...}` tail
-    // guard is false here, exactly as it is in the browser (no `module`
-    // global there). execution-module-v2.js's export list references
-    // `_autoFillPersonnel`, a name that's only ever assigned as
-    // `window._autoFillPersonnel = ...` inside a nested function — not a
-    // hoisted top-level declaration — so letting that guard's branch execute
-    // during eval throws a ReferenceError unrelated to anything under test.
-    // eslint-disable-next-line no-unused-vars
-    const module = undefined;
-    eval(src);
+    loadScript(file, { params: { module: undefined } });
 }
 
 // window.saveChecklist (which contains the checklist->NCR sync closure) only

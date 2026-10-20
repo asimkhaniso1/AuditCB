@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 import { CLIENT, DOCS } from './fixtures/pcc-connection.mjs';
 const require = createRequire(import.meta.url);
@@ -10,10 +11,7 @@ const SD = require('../supporting-docs.js');
 const CS = require('../checklist-standards.js');
 window.ChecklistStandards = CS;
 window.SupportingDocs = SD;
-
-const fs = await import('fs');
-const path = await import('path');
-eval(fs.readFileSync(path.resolve('./client-docs-bulk.js'), 'utf8'));
+loadScript('./client-docs-bulk.js', { params: { module: undefined } });
 const B = window.ClientDocsBulk;
 
 const ref = (stdId, r) => ({ stdId, ref: r });

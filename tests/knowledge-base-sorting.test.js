@@ -1,14 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = window.state || {};
 window.state.knowledgeBase = { standards: [], sops: [], policies: [], marketing: [] };
 window.switchSettingsSubTab = () => {};
-
-const fs = await import('fs');
-const path = await import('path');
-const source = fs.readFileSync(path.resolve('./settings-kb.js'), 'utf8');
-const loadSorting = new Function(`${source}; return { sorted: _sortedKnowledgeDocs, header: _kbSortableHeader };`);
+const loadSorting = () => loadScript('./settings-kb.js', { append: '\n; return { sorted: _sortedKnowledgeDocs, header: _kbSortableHeader };' });
 const sorting = loadSorting();
 
 describe('Knowledge Base table sorting', () => {

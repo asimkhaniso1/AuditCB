@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Language Services: every key-process walkthrough was the same sentence with
 // the process name swapped in ("Walk the X process end to end — its inputs,
@@ -12,13 +13,10 @@ import { describe, it, expect } from 'vitest';
 globalThis.window = globalThis.window || globalThis;
 window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
 window.state = window.state || {};
-
-const fs = await import('fs');
-const path = await import('path');
 window.ChecklistStandards = (await import('../checklist-standards.js')).default || window.ChecklistStandards;
 window.ChecklistQA = (await import('../checklist-qa.js')).default || window.ChecklistQA;
 window.SupportingDocs = (await import('../supporting-docs.js')).default || window.SupportingDocs;
-eval(fs.readFileSync(path.resolve('./client-docs-bulk.js'), 'utf8'));
+loadScript('./client-docs-bulk.js', { params: { module: undefined } });
 const B = window.ClientDocsBulk;
 const QA = window.ChecklistQA;
 

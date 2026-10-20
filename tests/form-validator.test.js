@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Setup window globals
 globalThis.window = globalThis.window || globalThis;
@@ -11,14 +12,10 @@ window.Sanitizer = {
 };
 
 // Load Validator first (dependency of FormValidator)
-const fs = await import('fs');
-const path = await import('path');
-const validatorSrc = fs.readFileSync(path.resolve('./validation.js'), 'utf8');
-eval(validatorSrc);
+loadScript('./validation.js', { params: { module: undefined } });
 
 // Load FormValidator
-const src = fs.readFileSync(path.resolve('./form-validator.js'), 'utf8');
-eval(src);
+loadScript('./form-validator.js', { params: { module: undefined } });
 
 describe('FormValidator', () => {
     beforeEach(() => {

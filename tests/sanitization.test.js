@@ -1,14 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 window.UTILS = { escapeHtml: (s) => s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;') : '' };
 // No DOMPurify in test environment — tests the fallback path
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./sanitization.js'), 'utf8');
-eval(src);
+loadScript('./sanitization.js', { params: { module: undefined } });
 
 describe('Sanitizer', () => {
     it('should be defined on window', () => {

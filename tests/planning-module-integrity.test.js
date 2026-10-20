@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import fs from 'fs';
 import path from 'path';
 import { buildScenario, M } from '../tools/pcc-scenario.mjs';
@@ -14,7 +15,7 @@ beforeAll(async () => {
     window.showNotification = () => { };
     window.Sanitizer = { sanitizeText: (v) => v };
     window.Validator = {};
-    (0, eval)(SRC);
+    loadScript('./planning-module.js', { global: true });
 });
 
 function mountForm(team) {

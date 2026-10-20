@@ -1,12 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = { ncrs: [], auditPlans: [] };
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./ncr-capa-module.js'), 'utf8');
-eval(src);
+loadScript('./ncr-capa-module.js', { params: { module: undefined } });
 
 function futureDate(days) {
     const d = new Date();

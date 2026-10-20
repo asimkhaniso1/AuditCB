@@ -3,15 +3,11 @@
 // could not examine read as READY. The gate must fail closed: a rule that
 // cannot run is a blocker naming the rule, and finalize refuses to issue.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-const fs = await import('fs');
-const path = await import('path');
-const INTEGRITY_JS = fs.readFileSync(path.resolve('./report-integrity.js'), 'utf8');
-const AI_SERVICE_JS = fs.readFileSync(path.resolve('./ai-service.js'), 'utf8');
+import { loadScript } from './helpers/load-script.js';
 
 function loadIntegrity() {
     // eslint-disable-next-line no-new-func
-    new Function('module', INTEGRITY_JS)(undefined);
+    loadScript('./report-integrity.js', { params: { module: undefined } });
     return window.ReportIntegrity;
 }
 
@@ -76,7 +72,7 @@ describe('ReportIntegrity fails closed', () => {
         const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => true);
 
         // eslint-disable-next-line no-new-func
-        new Function('module', AI_SERVICE_JS)(undefined);
+        loadScript('./ai-service.js', { params: { module: undefined } });
         window.finalizeAndPublish('r1');
 
         expect(alertSpy).toHaveBeenCalledTimes(1);
@@ -94,7 +90,7 @@ describe('ReportIntegrity fails closed', () => {
         window.state.auditReports = [report];
         window.DataService = { findAuditReport: (id) => window.state.auditReports.find(r => r.id === id) };
         // eslint-disable-next-line no-new-func
-        new Function('module', AI_SERVICE_JS)(undefined);
+        loadScript('./ai-service.js', { params: { module: undefined } });
         const gate = window.computeIssuanceGate('r2');
         expect(gate.gateBlockers.some(m => /integrity validator is not loaded/.test(m))).toBe(true);
     });

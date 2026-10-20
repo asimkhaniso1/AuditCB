@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Setup window globals
 globalThis.window = globalThis.window || globalThis;
@@ -27,10 +28,7 @@ describe('Logger (production mode)', () => {
     });
 
     async function loadLogger() {
-        const fs = await import('fs');
-        const path = await import('path');
-        const src = fs.readFileSync(path.resolve('./logger.js'), 'utf8');
-        eval(src);
+        loadScript('./logger.js', { params: { module: undefined } });
         return window.Logger;
     }
 
@@ -144,10 +142,7 @@ describe('Logger (debug mode)', () => {
     });
 
     async function loadLogger() {
-        const fs = await import('fs');
-        const path = await import('path');
-        const src = fs.readFileSync(path.resolve('./logger.js'), 'utf8');
-        eval(src);
+        loadScript('./logger.js', { params: { module: undefined } });
         return window.Logger;
     }
 

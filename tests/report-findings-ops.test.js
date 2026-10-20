@@ -1,14 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = { ncrs: [], auditReports: [] };
 window.ReportExecutive = { icon: () => '', bigFourCss: () => '' };
 window.ReportStats = { formatCriterion: (f) => ({ label: (f && f.criterionRef) || (f && f.clause) || '', isInternal: false, real: null, internalRef: null }) };
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./report-findings-ops.js'), 'utf8');
-eval(src);
+loadScript('./report-findings-ops.js', { params: { module: undefined } });
 
 function fopsSection(key, d) {
     const secs = window.ReportFindingsOps.sections(d);

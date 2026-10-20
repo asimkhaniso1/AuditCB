@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 import { CLIENT, CLIENT_ID, DOCS, NCRS, PLAN_ID, STANDARDS } from './fixtures/pcc-connection.mjs';
 const require = createRequire(import.meta.url);
@@ -11,9 +12,7 @@ const SD = require('../supporting-docs.js');
 window.ChecklistStandards = CS; window.ChecklistQA = QA; window.SupportingDocs = SD;
 const CC = require('../checklist-coverage.js');
 window.ChecklistCoverage = CC;
-const fs = await import('fs');
-const path = await import('path');
-eval(fs.readFileSync(path.resolve('./client-docs-bulk.js'), 'utf8'));
+loadScript('./client-docs-bulk.js', { params: { module: undefined } });
 const B = window.ClientDocsBulk;
 
 const SCOPE = STANDARDS.join(', ');

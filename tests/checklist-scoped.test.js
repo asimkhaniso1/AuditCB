@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // The scope-driven checklist engine, its clause/control registry and the QA
 // pass that gates PDF generation. The regression these cover is the PC
@@ -12,9 +13,6 @@ globalThis.window = globalThis.window || globalThis;
 window.Logger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
 window.state = window.state || {};
 
-const fs = await import('fs');
-const path = await import('path');
-
 const CS = (await import('../checklist-standards.js')).default || window.ChecklistStandards;
 const QA = (await import('../checklist-qa.js')).default || window.ChecklistQA;
 window.ChecklistStandards = CS;
@@ -23,8 +21,7 @@ window.ChecklistQA = QA;
 // client-docs-bulk.js, so the harness must too.
 window.SupportingDocs = (await import('../supporting-docs.js')).default || window.SupportingDocs;
 
-const src = fs.readFileSync(path.resolve('./client-docs-bulk.js'), 'utf8');
-eval(src);
+loadScript('./client-docs-bulk.js', { params: { module: undefined } });
 const B = window.ClientDocsBulk;
 
 const IMS_SCOPE = 'ISO 27001:2022, ISO 22301:2019, ISO/IEC 20000-1:2018';

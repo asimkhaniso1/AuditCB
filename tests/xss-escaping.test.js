@@ -5,6 +5,7 @@
 // arrives as text: no <img> element is created and the payload shows up as
 // the literal characters the user typed.
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 const fs = await import('fs');
 const path = await import('path');
@@ -16,7 +17,7 @@ globalThis.window = globalThis.window || globalThis;
 window.Logger = { debug() { }, info() { }, warn() { }, error() { } };
 
 // Real UTILS — the point is to exercise the shipped escapeHtml, not a stub.
-(0, eval)(read('./utils.js'));
+loadScript('./utils.js', { global: true });
 const REAL_UTILS = window.UTILS;
 
 // No live <img> made it into the markup, and the payload text is visible.
@@ -55,7 +56,7 @@ describe('plan header (planning-module.js viewAuditPlan)', () => {
         window.showNotification = () => { };
         window.Sanitizer = { sanitizeText: (v) => v };
         window.Validator = {};
-        (0, eval)(read('./planning-module.js'));
+        loadScript('./planning-module.js', { global: true });
     });
 
     it('escapes a hostile client name in the plan header', () => {
@@ -79,7 +80,7 @@ describe('execution list row (execution-list.js renderAuditExecutionEnhanced)', 
     let render;
     beforeAll(() => {
         // eslint-disable-next-line no-new-func
-        render = new Function('module', read('./execution-list.js') + '\nreturn renderAuditExecutionEnhanced;')(undefined);
+        render = loadScript('./execution-list.js', { params: { module: undefined }, append: '\nreturn renderAuditExecutionEnhanced;' });
     });
 
     beforeEach(() => {
@@ -111,8 +112,8 @@ describe('AI narrative in the report preview (execution-reporting.js)', () => {
         window.UTILS = REAL_UTILS;
         // execution-reporting.js re-exports execution-list.js's modal opener.
         globalThis.openCreateReportModal = () => { };
-        (0, eval)(read('./report-stats.js'));
-        (0, eval)(read('./execution-reporting.js'));
+        loadScript('./report-stats.js', { global: true });
+        loadScript('./execution-reporting.js', { global: true });
     });
 
     function previewData(report) {
@@ -169,7 +170,7 @@ describe('AI narrative in the report preview (execution-reporting.js)', () => {
 describe('AI executive summary textarea (execution-module-v2.js review tab)', () => {
     it('cannot break out of the textarea it is seeded into', () => {
         window.UTILS = REAL_UTILS;
-        (0, eval)(read('./execution-module-v2.js'));
+        loadScript('./execution-module-v2.js', { global: true });
         const html = '<textarea id="t">' + window._execEscText('</textarea>' + PAYLOAD) + '</textarea>';
         const host = document.createElement('div');
         host.innerHTML = html;
@@ -183,8 +184,8 @@ describe('document gap analysis (client-docs-bulk.js)', () => {
     let client;
     beforeAll(() => {
         window.UTILS = REAL_UTILS;
-        (0, eval)(read('./report-stats.js'));
-        (0, eval)(read('./client-docs-bulk.js'));
+        loadScript('./report-stats.js', { global: true });
+        loadScript('./client-docs-bulk.js', { global: true });
     });
 
     beforeEach(() => {

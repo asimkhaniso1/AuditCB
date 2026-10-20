@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import fs from 'fs';
 import path from 'path';
 import { M } from '../tools/pcc-scenario.mjs';
@@ -64,7 +65,7 @@ describe('Configure Checklists on an SG 1888 plan', () => {
         window.showNotification = () => { };
         window.Sanitizer = { sanitizeText: (v) => v };
         window.Validator = {};
-        (0, eval)(fs.readFileSync(path.resolve('./planning-module.js'), 'utf8'));
+        loadScript('./planning-module.js', { global: true });
     });
     beforeEach(() => {
         document.body.innerHTML = '<div id="content-area"></div>';
@@ -216,10 +217,7 @@ describe('client Checklists page for SG 1888', () => {
     beforeAll(() => {
         window.Logger = { debug() { }, info() { }, warn() { }, error() { } };
         window.UTILS = M.UTILS;
-        const src = fs.readFileSync(path.resolve('./checklist-module.js'), 'utf8');
-        // eslint-disable-next-line no-unused-vars
-        const module = undefined;
-        (0, eval)(src);
+        loadScript('./checklist-module.js', { global: true });
     });
     it('lists global checklists for ISO 9001:2015, Halal and cGMP — not GMP, ISO 9001:2026 or other standards', () => {
         document.body.innerHTML = '<div id="content-area"></div>';

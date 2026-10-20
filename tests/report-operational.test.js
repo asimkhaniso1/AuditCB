@@ -1,18 +1,15 @@
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = { ncrs: [], auditReports: [] };
 window.ReportExecutive = { icon: () => '', bigFourCss: () => '' };
-
-const fs = await import('fs');
-const path = await import('path');
 // report-stats.js loaded first — report-operational.js's canonicalStats()
 // prefers window.ReportStats.build() (the canonical single source) the same
 // way report-executive.js's getStats() does, falling back to legacy d.stats
 // only if ReportStats never loaded.
-eval(fs.readFileSync(path.resolve('./report-stats.js'), 'utf8'));
-const src = fs.readFileSync(path.resolve('./report-operational.js'), 'utf8');
-eval(src);
+loadScript('./report-stats.js', { params: { module: undefined } });
+loadScript('./report-operational.js', { params: { module: undefined } });
 
 function opsSection(key, d) {
     const secs = window.ReportOperational.sections(d);

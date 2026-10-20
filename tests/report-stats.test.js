@@ -1,12 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = { ncrs: [] };
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./report-stats.js'), 'utf8');
-eval(src);
+loadScript('./report-stats.js', { params: { module: undefined } });
 
 function item(overrides) {
     return Object.assign({ status: 'conform', clause: '8.5', department: 'Production' }, overrides);

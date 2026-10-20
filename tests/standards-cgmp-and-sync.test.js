@@ -1,17 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 globalThis.Logger = window.Logger = { debug() { }, info() { }, warn() { }, error() { } };
 window.state = { clients: [] };
 window.saveData = () => { };
 window.renderClientDetail = () => { };
-
-const fs = await import('fs');
-const path = await import('path');
-eval(fs.readFileSync(path.resolve('./utils.js'), 'utf8'));
+loadScript('./utils.js', { params: { module: undefined } });
 const U = window.UTILS;
-eval(fs.readFileSync(path.resolve('./clients-org-setup.js'), 'utf8')
-    .replace(/\nif \(typeof module !== 'undefined' && module\.exports\) \{[\s\S]*$/, ''));
+loadScript('./clients-org-setup.js', { params: { module: undefined } });
 
 describe('cGMP is its own standard', () => {
     it('does not fold cGMP into GMP', () => {

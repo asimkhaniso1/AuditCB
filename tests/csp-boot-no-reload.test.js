@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -7,7 +8,6 @@ import path from 'path';
 // the whole app twice, and it wiped the Cache API on every load. Assets are
 // content-hashed by build.js and index.html is served no-cache, so the reload
 // is gone; the stale-URL clean-up and a one-time SW/cache cleanup remain.
-const SRC = fs.readFileSync(path.resolve('./csp-boot.js'), 'utf8');
 
 function boot({ search = '', hash = '', storage = {} } = {}) {
     const navigations = [];
@@ -39,9 +39,7 @@ function boot({ search = '', hash = '', storage = {} } = {}) {
     const history = { replaceState: vi.fn() };
     const win = { location, history, caches, DOMPurify: { sanitize: s => s } };
     const document = { addEventListener: () => { }, createElement: () => ({}), head: { appendChild() { } } };
-    new Function('window', 'localStorage', 'navigator', 'caches', 'document', 'module', 'DOMPurify', SRC)(
-        win, localStorage, navigator, caches, document, undefined, win.DOMPurify
-    );
+    loadScript('./csp-boot.js', { params: { window: win, localStorage, navigator, caches, document, module: undefined, DOMPurify: win.DOMPurify } });
     return { navigations, location, history, caches, navigator, unregister, store, cacheDeletes };
 }
 
@@ -86,9 +84,7 @@ describe('csp-boot.js — no forced reload', () => {
         expect(() => {
             const win = { location: { pathname: '/', search: '', hash: '' }, history: { replaceState() { } } };
             const throwing = { getItem() { throw new Error('SecurityError'); }, setItem() { throw new Error('SecurityError'); } };
-            new Function('window', 'localStorage', 'navigator', 'caches', 'document', 'module', 'DOMPurify', SRC)(
-                win, throwing, {}, undefined, { addEventListener() { } }, undefined, undefined
-            );
+            loadScript('./csp-boot.js', { params: { window: win, localStorage: throwing, navigator: {}, caches: undefined, document: { addEventListener() { } }, module: undefined, DOMPurify: undefined } });
         }).not.toThrow();
     });
 });

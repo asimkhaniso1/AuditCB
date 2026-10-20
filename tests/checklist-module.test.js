@@ -31,20 +31,13 @@ const modalOpen = () => !document.getElementById('modal-overlay').classList.cont
 // window.validateChecklistRows) at SAVE and IMPORT time for both the manual
 // builder and both CSV import paths.
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 
-const fs = await import('fs');
-const path = await import('path');
 
 function loadModule(file) {
-    const src = fs.readFileSync(path.resolve(file), 'utf8');
-    // Shadow Vite/vitest's CJS-interop `module` binding so the eval'd file's
-    // own `if (typeof module !== 'undefined' && module.exports) {...}` tail
-    // guard is false here, exactly as it is in the browser.
-    // eslint-disable-next-line no-unused-vars
-    const module = undefined;
-    eval(src);
+    loadScript(file, { params: { module: undefined } });
 }
 
 describe('validation.js Validator.isClauseRef (loaded standalone, used by checklist-module.js)', () => {

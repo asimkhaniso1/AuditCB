@@ -1,13 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = { ncrs: [], auditReports: [] };
 window.ReportExecutive = { icon: () => '', bigFourCss: () => '' };
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./report-risk.js'), 'utf8');
-eval(src);
+loadScript('./report-risk.js', { params: { module: undefined } });
 
 describe('ReportRisk theme classification', () => {
     it('classifies an internal-audit finding to an internal-audit/monitoring theme, not resource-and-competence, even when its clause id falls under the "7.x" bucket', () => {

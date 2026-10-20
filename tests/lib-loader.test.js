@@ -4,15 +4,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
+import { loadScript } from './helpers/load-script.js';
 
 const read = (f) => fs.readFileSync(path.resolve(f), 'utf8');
-const LOADER = read('./lib-loader.js');
 
 function freshLoader() {
     delete window.LibLoader;
     for (const g of ['XLSX', 'pdfjsLib', 'mammoth']) delete window[g];
     document.head.querySelectorAll('script').forEach(s => s.remove());
-    new Function(LOADER)();
+    loadScript('./lib-loader.js');
     return window.LibLoader;
 }
 
@@ -97,7 +97,7 @@ describe('call sites load on demand', () => {
     });
 
     it('client Excel import tells the user when SheetJS cannot load', async () => {
-        new Function(read('./clients-import.js'))();
+        loadScript('./clients-import.js');
         window.LibLoader.load = vi.fn(() => Promise.reject(new Error('Could not load the xlsx library.')));
         await window.importClientsFromExcel(new File(['x'], 'clients.xlsx'));
         expect(window.LibLoader.load).toHaveBeenCalledWith('xlsx');
@@ -105,14 +105,14 @@ describe('call sites load on demand', () => {
     });
 
     it('CSV import does not load SheetJS', async () => {
-        new Function(read('./clients-import.js'))();
+        loadScript('./clients-import.js');
         window.LibLoader.load = vi.fn();
         await window.importClientsFromExcel(new File(['Name\nAcme'], 'clients.csv'));
         expect(window.LibLoader.load).not.toHaveBeenCalled();
     });
 
     it('setup template download and setup import load SheetJS first', async () => {
-        new Function(read('./clients-import.js'))();
+        loadScript('./clients-import.js');
         window.LibLoader.load = vi.fn(() => Promise.reject(new Error('offline')));
         await window.downloadAccountSetupTemplate('Acme');
         await window.processAccountSetupImport('c1', { files: [new File(['x'], 'setup.xlsx')] });
@@ -120,7 +120,7 @@ describe('call sites load on demand', () => {
     });
 
     it('knowledge-base PDF extraction loads PDF.js and degrades to null if it cannot', async () => {
-        new Function(read('./settings-kb.js'))();
+        loadScript('./settings-kb.js');
         window.LibLoader.load = vi.fn(() => Promise.reject(new Error('offline')));
         const text = await window.extractTextFromFile(new File(['%PDF'], 'std.pdf', { type: 'application/pdf' }));
         expect(window.LibLoader.load).toHaveBeenCalledWith('pdfjs');

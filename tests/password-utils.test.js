@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Mock Logger globally (password-utils.js references window.Logger)
 globalThis.window = globalThis.window || globalThis;
@@ -6,10 +7,7 @@ window.Logger = { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() }
 
 // Load PasswordUtils module
 // Since it's a vanilla JS file that assigns to window, we eval it
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./password-utils.js'), 'utf8');
-eval(src);
+loadScript('./password-utils.js', { params: { module: undefined } });
 
 describe('PasswordUtils', () => {
     beforeEach(() => {

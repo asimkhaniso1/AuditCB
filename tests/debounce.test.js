@@ -1,12 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Load debounce module
 globalThis.window = globalThis.window || globalThis;
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./debounce.js'), 'utf8');
-eval(src);
+loadScript('./debounce.js', { params: { module: undefined } });
 
 describe('debounce', () => {
     beforeEach(() => {

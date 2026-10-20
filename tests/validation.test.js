@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Load Validator module
 globalThis.window = globalThis.window || globalThis;
@@ -7,7 +8,7 @@ window.Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 const fs = await import('fs');
 const path = await import('path');
 const src = fs.readFileSync(path.resolve('./validation.js'), 'utf8');
-eval(src);
+loadScript('./validation.js', { params: { module: undefined } });
 
 describe('Validator', () => {
     describe('required', () => {

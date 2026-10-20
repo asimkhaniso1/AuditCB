@@ -1,17 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // theme.js runs as a <head> script: it applies the saved theme the moment it
 // loads, before the page paints. Each test re-evaluates it against a prepared
 // document and storage, the way a fresh page load would.
 const fs = await import('fs');
 const path = await import('path');
-const THEME_JS = fs.readFileSync(path.resolve('./theme.js'), 'utf8');
 const THEME_CSS = fs.readFileSync(path.resolve('./theme.css'), 'utf8');
 const KEY = 'audit360.theme';
 
 function load() {
     // eslint-disable-next-line no-new-func
-    new Function('module', THEME_JS)(undefined);
+    loadScript('./theme.js', { params: { module: undefined } });
     return window.ThemeSwitcher;
 }
 

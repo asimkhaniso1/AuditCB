@@ -1,20 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = { auditReports: [], ncrs: [], clients: [], auditPlans: [] };
 window.CONSTANTS = { STATUS: { FINALIZED: 'Finalized' } };
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./report-integrity.js'), 'utf8');
-eval(src);
+loadScript('./report-integrity.js', { params: { module: undefined } });
 
 // W25 needs real ReportStats.classifyCriterion (internal-ref detection,
 // programme-criterion detection) rather than a hand-rolled stand-in — a
 // mock could drift from the real classification rules and hide a false
 // positive/negative. Loaded the same way report-stats.test.js loads it.
-const reportStatsSrc = fs.readFileSync(path.resolve('./report-stats.js'), 'utf8');
-eval(reportStatsSrc);
+loadScript('./report-stats.js', { params: { module: undefined } });
 
 function baseReport(overrides) {
     return Object.assign({

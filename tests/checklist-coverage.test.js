@@ -13,17 +13,13 @@
 // A checklist that fails either rule must not be markable Ready for Audit,
 // and neither must one carrying duplicate or unmapped questions.
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 
-const fs = await import('fs');
-const path = await import('path');
 
 function loadModule(file) {
-    const src = fs.readFileSync(path.resolve(file), 'utf8');
-    // eslint-disable-next-line no-unused-vars
-    const module = undefined;
-    eval(src);
+    loadScript(file, { params: { module: undefined } });
 }
 
 /** A checklist covering exactly the clause/control refs given. */

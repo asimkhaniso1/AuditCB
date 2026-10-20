@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
 window.state = window.state || {};
@@ -10,7 +11,7 @@ const path = await import('path');
 const utils = await import('../utils.js');
 window.UTILS = window.UTILS || utils.default || utils;
 const source = fs.readFileSync(path.resolve('./settings-kb.js'), 'utf8');
-new Function(source)();
+loadScript('./settings-kb.js');
 
 const STANDARD = {
     id: 1771, name: 'ISO 20000-1:2018', fileName: 'ISO_IEC_20000-1_2018.pdf', uploadDate: '2026-02-17', status: 'ready',

@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Load utils module
 globalThis.window = globalThis.window || globalThis;
 window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./utils.js'), 'utf8');
-eval(src);
+loadScript('./utils.js', { params: { module: undefined } });
 
 describe('UTILS', () => {
     it('should be defined on window', () => {

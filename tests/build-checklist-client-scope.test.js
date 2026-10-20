@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 import { M, B } from '../tools/pcc-scenario.mjs';
@@ -276,7 +277,7 @@ describe('client Checklists area — standard pick-lists follow the client', () 
         window.Logger = { debug() { }, info() { }, warn() { }, error() { } };
         window.UTILS = M.UTILS;
         window.showNotification = () => { };
-        if (!loaded) { (0, eval)(fs.readFileSync(path.resolve('./checklist-module.js'), 'utf8')); loaded = true; }
+        if (!loaded) { loadScript('./checklist-module.js', { global: true }); loaded = true; }
         document.body.innerHTML = '<div id="content-area"></div>';
         window.contentArea = document.getElementById('content-area');
         window.state = {

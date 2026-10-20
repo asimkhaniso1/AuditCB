@@ -1,13 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
 globalThis.window = globalThis.window || globalThis;
 window.Logger = window.Logger || { debug() { }, info() { }, warn() { }, error() { } };
 globalThis.Logger = window.Logger;
-const fs = await import('fs');
-const path = await import('path');
-eval(fs.readFileSync(path.resolve('./utils.js'), 'utf8'));
+loadScript('./utils.js', { params: { module: undefined } });
 const SC = require('../supabase-client.js');
 
 // SG 1888: the client record holds what Settings shows; the register

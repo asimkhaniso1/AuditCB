@@ -3,15 +3,12 @@
 // Its company filter read an undeclared `uniqueClients`, so every click threw
 // a ReferenceError before the modal opened.
 import { describe, it, expect, beforeEach } from 'vitest';
-
-const fs = await import('fs');
-const path = await import('path');
-const SRC = fs.readFileSync(path.resolve('./execution-list.js'), 'utf8');
+import { loadScript } from './helpers/load-script.js';
 
 function loadExecutionList() {
     // Plain-script evaluation, as the browser loads it; expose the declaration.
     // eslint-disable-next-line no-new-func
-    new Function('module', SRC + '\nwindow.__openCreateReportModal = openCreateReportModal;')(undefined);
+    loadScript('./execution-list.js', { params: { module: undefined }, append: '\nwindow.__openCreateReportModal = openCreateReportModal;' });
     return window.__openCreateReportModal;
 }
 

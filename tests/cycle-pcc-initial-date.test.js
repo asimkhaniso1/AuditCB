@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 import { createRequire } from 'module';
 
 // PC CONNECTION on 15/10/2026. Originally certified December 2020, transferred
@@ -117,8 +118,7 @@ describe('PC CONNECTION cycle card and Certification Cycle tab', () => {
         window.Logger = { debug() {}, info() {}, warn() {}, error() {} };
         window.UTILS = { escapeHtml: (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), formatDate: (d) => { const x = d instanceof Date ? d : new Date(d); return `${String(x.getDate()).padStart(2, '0')}/${String(x.getMonth() + 1).padStart(2, '0')}/${x.getFullYear()}`; } };
         window.state = { auditPlans: [febPlan], auditReports: [], cbSettings: {} };
-        const src = fs.readFileSync(path.resolve('./client-workspace.js'), 'utf8');
-        api = new Function('module', src + '\nreturn { card: renderCertificationCycleWidget, tab: renderAuditCycleTimeline };')(undefined);
+        api = loadScript('./client-workspace.js', { params: { module: undefined }, append: '\nreturn { card: renderCertificationCycleWidget, tab: renderAuditCycleTimeline };' });
     });
     afterAll(() => vi.useRealTimers());
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { loadScript } from './helpers/load-script.js';
 
 // Load ErrorHandler module
 globalThis.window = globalThis.window || globalThis;
@@ -7,11 +8,7 @@ window.showNotification = vi.fn();
 window.state = { currentUser: { email: 'test@example.com', role: 'admin' } };
 window.Sentry = { captureException: vi.fn(), setContext: vi.fn() };
 window.location = { href: 'http://localhost:8080' };
-
-const fs = await import('fs');
-const path = await import('path');
-const src = fs.readFileSync(path.resolve('./error-handler.js'), 'utf8');
-eval(src);
+loadScript('./error-handler.js', { params: { module: undefined } });
 
 describe('ErrorHandler', () => {
     beforeEach(() => {
