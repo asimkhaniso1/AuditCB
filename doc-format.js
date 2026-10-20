@@ -217,6 +217,12 @@
         'Africa/Johannesburg': 'SAST', 'Africa/Nairobi': 'EAT', 'Africa/Lagos': 'WAT',
         'Asia/Dhaka': 'BST', 'Asia/Kuala_Lumpur': 'MYT'
     };
+    // [standard, summer] names for zones whose runtime labels are offsets only.
+    const DST_NAMES = {
+        'Europe/London': { standardOffset: 'UTC+00:00', abbr: ['GMT', 'BST'], name: ['Greenwich Mean Time', 'British Summer Time'] },
+        'Europe/Dublin': { standardOffset: 'UTC+00:00', abbr: ['GMT', 'IST'], name: ['Greenwich Mean Time', 'Irish Standard Time'] },
+        'Europe/Lisbon': { standardOffset: 'UTC+00:00', abbr: ['WET', 'WEST'], name: ['Western European Standard Time', 'Western European Summer Time'] }
+    };
 
     function isValidZone(iana) {
         if (!iana || typeof iana !== 'string') return false;
@@ -316,12 +322,21 @@
             return found ? found.value : '';
         };
         let abbr = part('short');
-        const long = part('long');
+        let long = part('long');
         const off = part('longOffset');
         const m = off.match(/GMT([+-])(\d{2}):?(\d{2})?/);
-        const offset = m ? 'UTC' + (m[1] === '-' ? '−' : '+') + m[2] + ':' + (m[3] || '00') : 'UTC';
-        if (/^GMT[+-]/.test(abbr) || /^UTC/.test(abbr)) abbr = ABBREVIATION_FALLBACK[iana] || offset;
-        return { abbr: abbr, name: long, offset: offset, iana: iana, label: long + ' (' + abbr + ', ' + offset + ')' };
+        // Intl writes a zero offset as plain "GMT"; it is still an offset.
+        const offset = m ? 'UTC' + (m[1] === '-' ? '−' : '+') + m[2] + ':' + (m[3] || '00') : 'UTC+00:00';
+        // Zones with daylight saving have a standard and a summer name; which
+        // one applies is decided by the offset on the date, not assumed.
+        const pair = DST_NAMES[iana];
+        const summer = pair ? offset !== pair.standardOffset : false;
+        if (/^GMT[+-]/.test(abbr) || /^UTC/.test(abbr)) abbr = pair ? pair.abbr[summer ? 1 : 0] : (ABBREVIATION_FALLBACK[iana] || offset);
+        // Some runtimes have no long name and return the offset ("GMT+00:00").
+        if (!long || /^(?:GMT|UTC)(?:[+-]|$)/.test(long)) long = pair ? pair.name[summer ? 1 : 0] : '';
+        const label = !long ? (abbr === offset ? offset : abbr + ', ' + offset)
+            : long + ' (' + (abbr === offset ? offset : abbr + ', ' + offset) + ')';
+        return { abbr: abbr, name: long || abbr, offset: offset, iana: iana, label: label };
     }
 
     /**

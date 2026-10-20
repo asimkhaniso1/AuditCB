@@ -138,7 +138,7 @@ describe('reopening a saved plan for editing', () => {
         expect(std.disabled).toBe(false);
         expect(Array.from(std.options).length).toBe(3);
         expect(Array.from(std.selectedOptions).length).toBe(3);
-        const rows = Array.from(document.querySelectorAll('#agenda-tbody tr'));
+        const rows = Array.from(document.querySelectorAll('#agenda-tbody tr:not(.agenda-day-head)'));
         expect(rows.length).toBeGreaterThan(0);
         rows.forEach(row => {
             const sel = row.querySelector('select');

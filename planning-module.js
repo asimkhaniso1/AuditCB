@@ -325,6 +325,8 @@ window.planAuditMethodChanged = function (el) {
 function renderCreateAuditPlanForm(preSelectedClientName = null) {
     window.editingPlanId = null; // Reset edit mode
     window._planCertificateSelection = null; // a new plan starts from all certificates
+    window._agendaHalfDays = new Set(); // the agenda editor's per-day state starts clean
+    window._agendaCollapsed = new Set();
 
     const html = `
         <div class="fade-in">
@@ -469,6 +471,12 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                     </button>
                                     <button type="button" class="btn btn-sm btn-secondary" data-action="addAgendaRow" aria-label="Add">
                                         <i class="fa-solid fa-plus"></i> Add Row
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" data-action="expandAllAgendaDays" aria-label="Expand all days" title="Expand all days">
+                                        <i class="fa-solid fa-angles-down"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" data-action="collapseAllAgendaDays" aria-label="Collapse all days" title="Collapse all days">
+                                        <i class="fa-solid fa-angles-up"></i>
                                     </button>
                                 </div>
                             </div>
@@ -799,6 +807,7 @@ function editAuditPlan(id) {
         document.getElementById('plan-audit-method').value = plan.auditMethod || 'On-site';
         if (document.getElementById('plan-timezone')) document.getElementById('plan-timezone').value = plan.timeZone && plan.timeZone.source === 'plan-agreed' ? plan.timeZone.iana : '';
         window._currentTraceability = plan.traceability || null;
+        window._agendaHalfDays = new Set((plan.halfDays || []).map(Number));
         document.getElementById('plan-impartiality-risk').value = plan.impartialityAssessment?.risk || 'None';
         document.getElementById('plan-impartiality-notes').value = plan.impartialityAssessment?.notes || '';
         document.getElementById('plan-objectives').value = plan.objectives || '';
@@ -2677,6 +2686,9 @@ function addAgendaRow(data = {}) {
         .map(o => ({ name: o.value, id: o.dataset.id || '' }));
 
     const isBreak = data.kind === 'lunch' || /^lunch|^break/i.test(String(data.item || ''));
+    // A row added by hand joins the last day shown, not Day 1.
+    const lastRowDay = agendaDataRows().slice(-1)[0];
+    const lastDay = lastRowDay ? (lastRowDay.querySelector('input')?.value || '') : '';
     const wantedId = data.auditorId != null ? String(data.auditorId) : '';
     const wanted = norm(data.auditor);
     // ID first (immune to name drift), then a normalised name match.
@@ -2695,7 +2707,7 @@ function addAgendaRow(data = {}) {
     ].join('');
 
     row.innerHTML = `
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${esc(plain(data.day || 'Day 1'))}" placeholder="Day"></td>
+        <td><input type="text" class="form-control" style="padding: 4px;" value="${esc(plain(data.day || lastDay || 'Day 1'))}" placeholder="Day" data-action-change="renderAgendaDayGroups"></td>
         <td><input type="text" class="form-control" style="padding: 4px;" value="${esc(plain(data.time || ''))}" placeholder="Time"></td>
         <td><input type="text" class="form-control" style="padding: 4px;" value="${esc(plain(data.item || ''))}" placeholder="Activity/Clause"></td>
         <td><input type="text" class="form-control" style="padding: 4px;" value="${esc(plain(data.dept || ''))}" placeholder="Dept"></td>
@@ -2703,7 +2715,7 @@ function addAgendaRow(data = {}) {
             <select class="form-control" style="padding: 4px;">${options}</select>
         </td>
         <td style="text-align: center;">
-            <button type="button" class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="removeClosestTR" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
+            <button type="button" class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteAgendaRow" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
         </td>
     `;
     // Traceability travels with the row so editing its text never loses which
@@ -2714,12 +2726,112 @@ function addAgendaRow(data = {}) {
     });
 
     tbody.appendChild(row);
+    scheduleAgendaRegroup();
 }
 
 // Delete a row from the agenda table
 function deleteAgendaRow(btn) {
     btn.closest('tr').remove();
+    renderAgendaDayGroups();
 }
+
+// ── Agenda editor: one collapsible group per day ─────────────────────
+// The day headers are presentation only: they sit in the same tbody as the
+// rows (saving reads the data rows and skips them) and are rebuilt from the
+// rows' Day values whenever rows are added, removed or re-dayed. Each header
+// carries a "Half day" switch: that day keeps its morning only and the agenda
+// is rebuilt, the remaining hours rolling on to later days.
+window._agendaCollapsed = window._agendaCollapsed || new Set();
+window._agendaHalfDays = window._agendaHalfDays || new Set();
+
+function agendaDataRows() {
+    const tbody = document.getElementById('agenda-tbody');
+    return tbody ? Array.from(tbody.querySelectorAll('tr:not(.agenda-day-head)')) : [];
+}
+
+function agendaRowDay(row) {
+    return (row.querySelector('input')?.value || '').trim() || 'Day 1';
+}
+
+function agendaDayNumber(label) {
+    const m = String(label || '').match(/\d+/);
+    return m ? parseInt(m[0], 10) : 0;
+}
+
+let agendaRegroupQueued = false;
+function scheduleAgendaRegroup() {
+    if (agendaRegroupQueued) return;
+    agendaRegroupQueued = true;
+    Promise.resolve().then(() => { agendaRegroupQueued = false; renderAgendaDayGroups(); });
+}
+
+function renderAgendaDayGroups() {
+    const tbody = document.getElementById('agenda-tbody');
+    if (!tbody) return;
+    tbody.querySelectorAll('tr.agenda-day-head').forEach(h => h.remove());
+    const esc = window.UTILS.escapeHtml;
+    const df = window.DocFormat;
+    const toMin = (v) => { const [h, mm] = String(v).split(':').map(Number); return h * 60 + mm; };
+    const groups = [];
+    agendaDataRows().forEach(row => {
+        const day = agendaRowDay(row);
+        const last = groups[groups.length - 1];
+        if (last && last.day === day) last.rows.push(row); else groups.push({ day, rows: [row] });
+    });
+    groups.forEach(g => {
+        const metas = g.rows.map(r => { try { return JSON.parse(r.dataset.meta || '{}'); } catch (_e) { return {}; } });
+        const date = (metas.find(m => m.date) || {}).date || '';
+        const when = date && df ? `${df.weekdayName(date).slice(0, 3)} ${df.formatDate(date)}` : '';
+        const sessions = metas.filter(m => m.kind !== 'lunch').length;
+        const minutes = metas.reduce((t, m) => (m.kind === 'lunch' || !m.start || !m.end ? t : t + Math.max(0, toMin(m.end) - toMin(m.start))), 0);
+        const n = agendaDayNumber(g.day);
+        const collapsed = window._agendaCollapsed.has(g.day);
+        const half = window._agendaHalfDays.has(n);
+        const head = document.createElement('tr');
+        head.className = 'agenda-day-head';
+        head.dataset.day = g.day;
+        head.innerHTML = `<td colspan="6" style="padding: 0; background: #eef2f7; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 8px 12px;">
+                <button type="button" data-action="toggleAgendaDay" data-arg1="${esc(g.day)}" aria-expanded="${collapsed ? 'false' : 'true'}"
+                    style="display: flex; align-items: center; gap: 0.5rem; background: none; border: 0; padding: 0; font-weight: 600; color: var(--primary-color); cursor: pointer;">
+                    <i class="fa-solid fa-chevron-${collapsed ? 'right' : 'down'}" style="width: 12px;"></i>
+                    <span>${esc(g.day)}</span>${when ? `<span style="font-weight: 400; color: var(--text-secondary);">${esc(when)}</span>` : ''}
+                </button>
+                <span style="font-size: 0.78rem; color: var(--text-secondary);">${sessions} session${sessions === 1 ? '' : 's'}${minutes ? ` · ${+(minutes / 60).toFixed(2)} h` : ''}${half ? ' · half day' : ''}</span>
+                ${n ? `<label style="margin-left: auto; display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; margin-bottom: 0; white-space: nowrap;" title="Keep this day's morning only; the remaining sessions move to later days">
+                    <input type="checkbox" class="agenda-halfday" data-action-change="toggleAgendaHalfDay" data-arg1="${n}" data-arg2="this.checked" ${half ? 'checked' : ''}> Half day
+                </label>` : ''}
+            </div></td>`;
+        tbody.insertBefore(head, g.rows[0]);
+        g.rows.forEach(r => { r.style.display = collapsed ? 'none' : ''; });
+    });
+}
+
+function toggleAgendaDay(day) {
+    if (window._agendaCollapsed.has(day)) window._agendaCollapsed.delete(day); else window._agendaCollapsed.add(day);
+    renderAgendaDayGroups();
+}
+
+function setAllAgendaDays(collapse) {
+    window._agendaCollapsed = new Set(collapse ? agendaDataRows().map(agendaRowDay) : []);
+    renderAgendaDayGroups();
+}
+
+async function toggleAgendaHalfDay(day, checked) {
+    const n = Number(day);
+    const on = checked === true || checked === 'true';
+    const before = new Set(window._agendaHalfDays);
+    if (on) window._agendaHalfDays.add(n); else window._agendaHalfDays.delete(n);
+    // Rebuilding replaces the rows; if it cannot run, the switch goes back.
+    const ok = await generateAIAgenda();
+    if (!ok) { window._agendaHalfDays = before; renderAgendaDayGroups(); }
+}
+
+window.renderAgendaDayGroups = renderAgendaDayGroups;
+window.toggleAgendaDay = toggleAgendaDay;
+window.toggleAgendaHalfDay = toggleAgendaHalfDay;
+window.expandAllAgendaDays = () => setAllAgendaDays(false);
+window.collapseAllAgendaDays = () => setAllAgendaDays(true);
 
 // Note: saveAuditPlan is defined later in the file (around line 1600) with proper validation and sanitization
 
@@ -3119,7 +3231,7 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
 
     // 5. Collect & Sanitize Agenda (Step 2)
     const agenda = [];
-    const agendaRows = document.querySelectorAll('#agenda-tbody tr');
+    const agendaRows = document.querySelectorAll('#agenda-tbody tr:not(.agenda-day-head)');
 
     for (const row of agendaRows) {
         const inputs = row.querySelectorAll('input, select');
@@ -3180,6 +3292,7 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
         onsiteDays: onsiteDays,
         selectedSites: selectedSites,
         agenda: agenda,
+        halfDays: Array.from(window._agendaHalfDays || []).sort((a, b) => a - b),
         status: saveAsDraft ? 'Draft' : (date && endDate ? 'Scheduled' : 'Validated'),
         // ISO 17021-1 Compliance Fields
         auditType: auditType,
@@ -3509,9 +3622,11 @@ async function generateAIAgenda() {
         window.showNotification(
             `Agenda built: ${asm.agenda.rows.filter(r => r.kind !== 'lunch').length} sessions; ${summary.findingsMapped} of ${summary.findingsRequiringFollowUp} previous finding(s) scheduled.` +
             (asm.agenda.warnings.length ? ' ' + asm.agenda.warnings.join(' ') : ''),
-            summary.findingsUnmapped ? 'warning' : 'success');
+            summary.findingsUnmapped || asm.agenda.warnings.some(w => /Move the End Date/.test(w)) ? 'warning' : 'success');
+        return true;
     } catch (error) {
         window.showNotification(error.message, 'error');
+        return false;
     } finally {
         if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
     }
@@ -3534,7 +3649,8 @@ function planFromForm(cycle, selectedSites, fullTeam, manDays) {
             baselineDays: num('plan-baseline-days'), imsAdjustmentPercent: num('plan-ims-adjustment'), remoteDays: num('plan-remote-days'), onsiteDays: num('plan-onsite-days'),
             justifiedAdjustment: num('plan-justified-adjustment'), justification: document.getElementById('plan-duration-justification')?.value || '', finalDays: manDays
         },
-        timeZone: (document.getElementById('plan-timezone')?.value) ? { iana: document.getElementById('plan-timezone').value, source: 'plan-agreed' } : null
+        timeZone: (document.getElementById('plan-timezone')?.value) ? { iana: document.getElementById('plan-timezone').value, source: 'plan-agreed' } : null,
+        halfDays: Array.from(window._agendaHalfDays || []).sort((a, b) => a - b)
     };
 }
 

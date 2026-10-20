@@ -39,6 +39,8 @@ const docCtx = (asm, extra) => Object.assign({
     client, assigned: asm.team.assigned, standards: asm.standards, schemes: IPI.schemesOf(plan()), timeZone: asm.timeZone, scope: asm.scope,
     findings: asm.findings, durationRecord: asm.durationRecord, brand: { name: 'CB' }, planRef: 'PLN-LSUK'
 }, extra || {});
+const metaStandards = (html) => html.match(/Audit standards<\/span><\/td><td[^>]*>([\s\S]*?)<\/td>/)[1];
+const agendaKey = (html) => html.match(/<div class="agenda-key">([\s\S]*?)<\/div>/)[1];
 const criteriaStandardsLine = (text) => text.split('\n').find(l => /Standards, at the editions certified/.test(l));
 
 describe('standards outside the clause registry stay in the audit plan (LSUK)', () => {
@@ -114,11 +116,15 @@ describe('standards outside the clause registry stay in the audit plan (LSUK)', 
     it('prints all six standards and the uncited ones in the agenda requirements', () => {
         const { plan: p, asm } = assembled();
         const html = PD.build(p, docCtx(asm));
-        const meta = html.match(/Audit standards<\/span>([\s\S]*?)<\/td>/)[1];
+        const meta = metaStandards(html);
         REGISTRY.concat(OUTSIDE).forEach(s => expect(meta).toContain(s));
         expect(html).toContain('integrated audit of 6 standards');
-        expect(html).toContain('<b>ISO 17100:2015</b> the standard’s own requirements (no clause numbers cited)');
-        expect(html).toContain('<b>ISO 18841:2018 · ISO 18587:2017 · ISO 17100:2015</b> the standards’ own requirements (no clause numbers cited)');
+        // Rows cite each uncited standard by its number; the key above the
+        // agenda names it in full and says, once, that no clauses are cited.
+        expect(html).toContain('<b>17100</b> <span class="own">own requirements</span>');
+        expect(html).toContain('<b>18841 · 18587 · 17100</b> <span class="own">own requirements</span>');
+        OUTSIDE.forEach(s => expect(agendaKey(html)).toContain(s.match(/ISO (\d+)/)[1] + ' = ' + s));
+        expect(agendaKey(html)).toContain('audited against the standard’s own requirements; no clause numbers are cited');
         // A topic session is not "all standards in scope".
         const row17100 = html.split('</tr>').find(r => r.indexOf('ISO 17100:2015: ') !== -1);
         expect(row17100).not.toContain('Integrated — all standards in scope');
@@ -134,12 +140,12 @@ describe('standards outside the clause registry stay in the audit plan (LSUK)', 
         const { plan: p, asm } = assembled();
         p.agenda = p.agenda.map(r => Object.assign({}, r, { schemes: undefined }));
         const html = PD.build(p, docCtx(asm, { schemes: undefined }));
-        expect(html).toContain('<b>ISO 18841:2018 · ISO 18587:2017 · ISO 17100:2015</b> the standards’ own requirements');
-        expect(html.match(/Audit standards<\/span>([\s\S]*?)<\/td>/)[1]).toContain('ISO 18587:2017');
+        expect(html).toContain('<b>18841 · 18587 · 17100</b> <span class="own">own requirements</span>');
+        expect(metaStandards(html)).toContain('ISO 18587:2017');
         // A plan saved before traceability carried them: the topic session's title still names its standard.
         p.traceability = null;
         const legacy = PD.build(p, docCtx(asm));
-        expect(legacy).toContain('<b>ISO 17100:2015</b> the standard’s own requirements');
+        expect(legacy).toContain('<b>17100</b> <span class="own">own requirements</span>');
         expect(legacy.split('</tr>').find(r => r.indexOf('ISO 17100:2015: ') !== -1)).not.toContain('Integrated — all standards in scope');
     });
 });
