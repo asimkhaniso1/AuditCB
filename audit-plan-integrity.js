@@ -658,10 +658,33 @@
         const startMin = toMin(c.dayStart || '08:30');
         const half = hoursPerDay / 2;
         const lunchLen = 60;
+        // Days the auditor marked as half days keep their morning only. The
+        // hours they give up are not dropped: they roll on to the following
+        // days, adding a day at the end when needed, so the agenda still
+        // schedules exactly the approved duration.
+        const halfDays = (arr(c.halfDays).length ? arr(c.halfDays) : arr(c.plan && c.plan.halfDays))
+            .map(Number).filter(function (d) { return d >= 1; });
+        const isHalf = function (d) { return halfDays.indexOf(d) !== -1; };
+        // On a spread plan the hours a half day gives up are shared out over
+        // the other scheduled dates first; a day is added only past them.
+        let spreadCap = dayHours;
+        if (spread && halfDays.some(function (d) { return d <= dayCount; })) {
+            const halved = []; const others = [];
+            for (let d = 1; d <= dayCount; d++) (isHalf(d) ? halved : others).push(d);
+            const restQ = Math.max(0, quarters - Math.round(halved.reduce(function (t, d) { return t + Math.min(half, dayHours(d)); }, 0) * 4));
+            spreadCap = function (d) {
+                if (isHalf(d)) return Math.min(half, dayHours(d));
+                const i = others.indexOf(d);
+                const base = Math.floor(restQ / Math.max(1, others.length));
+                return Math.min(hoursPerDay, (base + (i < restQ - base * others.length ? 1 : 0)) / 4);
+            };
+        }
         const slots = [];
         let remaining = total;
-        for (let d = 1; d <= dayCount; d++) {
-            const cap = spread ? dayHours(d) : Math.min(hoursPerDay, remaining);
+        for (let d = 1; remaining > 0.001 && d <= 366; d++) {
+            let cap = spread && d <= dayCount ? spreadCap(d) : hoursPerDay;
+            if (isHalf(d)) cap = Math.min(cap, half);
+            cap = Math.min(cap, remaining);
             remaining = Math.round((remaining - cap) * 4) / 4;
             const am = Math.min(cap, half);
             slots.push({ day: d, half: 'am', start: startMin, cap: am });
@@ -681,7 +704,12 @@
             }
         });
         if (bi < blocks.length) errors.push('The agenda could not be fitted into ' + dayCount + ' day(s) at ' + hoursPerDay + ' productive hours per day.');
-        if (spread) warnings.push('The approved ' + total + ' h are spread over the ' + dayCount + ' scheduled dates (' + uniq(slots.map(function (x) { return x.day; })).map(function (d) { return dayHours(d); }).join(' + ') + ' h), so each day is shorter than a full working day.');
+        const usedDays = uniq(slots.map(function (x) { return x.day; }));
+        const hoursOn = function (d) { return slots.filter(function (x) { return x.day === d; }).reduce(function (t, x) { return t + x.cap; }, 0); };
+        if (spread) warnings.push('The approved ' + total + ' h are spread over the ' + dayCount + ' scheduled dates (' + usedDays.map(hoursOn).join(' + ') + ' h), so each day is shorter than a full working day.');
+        if (halfDays.length && dates.length && usedDays.length > dates.length) {
+            warnings.push('With the half day' + (halfDays.length > 1 ? 's' : '') + ' the agenda runs to Day ' + usedDays.length + ', but the plan is scheduled over ' + dates.length + ' date' + (dates.length > 1 ? 's' : '') + '. Move the End Date to cover Day ' + usedDays.length + '.');
+        }
 
         // 4. Assign auditors. Single stream; opening, consolidation and closing are the Lead's.
         const lead = assigned[0];

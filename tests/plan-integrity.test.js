@@ -71,7 +71,7 @@ describe('auditor assignment', () => {
 
     it('says "Lead Auditor only" for a team of one — never "None"', () => {
         expect(IPI.auditTeamLabel(base.asm.team.assigned)).toBe('Lead Auditor only');
-        expect(base.html).toMatch(/Audit team<\/span>Lead Auditor only/);
+        expect(base.html).toMatch(/Audit team<\/span><\/td><td class="mv">Lead Auditor only/);
     });
 
     it('lists the other members when there is a team', () => {

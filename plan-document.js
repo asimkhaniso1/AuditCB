@@ -26,34 +26,56 @@
     function lines(v) { return String(v == null ? '' : v).split(/\n+/).map(function (x) { return x.replace(/^\s*[•\-*]\s*/, '').trim(); }).filter(Boolean); }
 
     const CSS = [
-        '.status-pill{display:inline-block;padding:2px 10px;border-radius:12px;font-size:8.5pt;font-weight:700;border:1px solid}',
+        '.status-line{margin:0 0 6px;display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px}',
+        '.status-pill{display:inline-block;padding:1px 10px;border-radius:12px;font-size:8.5pt;font-weight:700;border:1px solid}',
         '.status-draft{background:#fffbeb;color:#92400e;border-color:#fcd34d}',
         '.status-approved{background:#f0fdf4;color:#166534;border-color:#86efac}',
-        '.draft-note{margin:6px 0 0;font-size:8.5pt;color:#92400e}',
-        '.meta-table{margin:8px 0 6px}',
-        '.meta-table td{padding:5px 8px;border-bottom:1px solid #e2e8f0;width:50%;vertical-align:top;font-size:9pt}',
-        '.meta-label{display:block;font-weight:700;color:#64748b;font-size:7.5pt;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px}',
-        '.pd-section-title{background:#f1f5f9;padding:6px 10px;font-weight:700;font-size:9.5pt;margin:14px 0 8px;border-left:4px solid #0f2a43;letter-spacing:.02em}',
-        '.scope-box{border:1px solid #cbd5e1;border-left:4px solid #0f2a43;background:#f8fafc;padding:8px 12px;font-size:9.5pt;line-height:1.55;margin:0 0 4px}',
-        '.scope-meta{font-size:8.5pt;color:#475569;margin:0 0 4px}',
+        '.draft-note{margin:0;font-size:8.5pt;color:#92400e}',
+        // Client information: two label/value pairs per row.
+        '.meta-table{margin:2px 0 4px;border-top:1px solid #cbd5e1;border-bottom:1px solid #cbd5e1}',
+        '.meta-table td{padding:4px 8px 4px 0;border-bottom:1px solid #e2e8f0;vertical-align:top;font-size:8.8pt;line-height:1.35}',
+        '.meta-table tr:last-child td{border-bottom:0}',
+        '.meta-table td.mk{width:19%;padding-top:5px}',
+        '.meta-table td.mv{width:31%;padding-right:14px}',
+        '.meta-label{display:block;font-weight:700;color:#64748b;font-size:7.2pt;text-transform:uppercase;letter-spacing:.05em;line-height:1.35}',
+        // Section headings: a rule and a number, not a shaded band.
+        '.pd-section-title{display:flex;align-items:center;gap:7px;color:#0f2a43;font-weight:700;font-size:9.5pt;letter-spacing:.05em;margin:12px 0 5px;padding:0 0 3px;border-bottom:1.2pt solid #0f2a43}',
+        '.pd-section-title .no{display:inline-block;min-width:17px;padding:1px 4px;text-align:center;background:#0f2a43;color:#fff;border-radius:3px;font-size:8pt;letter-spacing:0;line-height:1.3}',
+        '.pd-subhead{font-weight:700;font-size:8.2pt;color:#0f2a43;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 2px;break-after:avoid;page-break-after:avoid}',
+        '.scope-box{border-left:3px solid #0f2a43;background:#f8fafc;padding:6px 10px;font-size:9pt;line-height:1.5;margin:0 0 3px}',
+        '.scope-meta{font-size:8.2pt;color:#475569;margin:0 0 2px}',
         'table.grid{margin:4px 0 10px}',
         'table.grid th{background:#f1f5f9;text-align:left;padding:5px 7px;border-bottom:2px solid #cbd5e1;font-size:8pt;text-transform:uppercase;letter-spacing:.04em;color:#334155}',
         'table.grid td{padding:5px 7px;border-bottom:1px solid #e2e8f0;vertical-align:top;font-size:8.5pt}',
-        'table.grid td.num{text-align:right;font-variant-numeric:tabular-nums}',
-        'table.agenda td{font-size:8.2pt;line-height:1.35}',
-        'table.agenda td.day{white-space:nowrap}',
-        'table.agenda td.day b{display:block}',
-        'table.agenda td.day span{font-size:7.2pt;color:#64748b}',
-        'table.agenda td.time{white-space:nowrap;font-variant-numeric:tabular-nums}',
+        'table.grid td.num,table.grid th.num{text-align:right;font-variant-numeric:tabular-nums}',
+        // Agenda: one table per day so each day carries its own heading band,
+        // repeated with the column headings when the day runs onto a new page.
+        'table.agenda{table-layout:fixed;margin:0 0 8px}',
+        'table.agenda th,table.agenda td{padding:3px 6px;line-height:1.3;overflow-wrap:break-word}',
+        'table.agenda td{font-size:8pt}',
+        'table.agenda th{font-size:7.2pt;padding-top:4px;padding-bottom:4px;white-space:nowrap}',
+        'table.agenda tr.dayband th{background:#0f2a43;color:#fff;font-size:8.6pt;text-transform:none;letter-spacing:.02em;padding:4px 7px;border-bottom:0}',
+        'table.agenda tr.dayband .dd{font-weight:400;margin-left:6px;color:#dbe4ee}',
+        'table.agenda tbody tr:nth-child(even) td{background:#f8fafc}',
+        'table.agenda td.time{white-space:nowrap;font-variant-numeric:tabular-nums;color:#334155}',
+        'table.agenda td.who{text-align:center;font-weight:600;color:#334155}',
         'table.agenda .sub{display:block;color:#64748b;font-size:7.4pt;margin-top:1px}',
+        'table.agenda .req{margin:0}',
         'table.agenda .req b{color:#0f2a43}',
-        'table.agenda tr.lunch td{background:#f8fafc;color:#94a3b8;font-style:italic}',
-        'table.agenda tr.marker td{background:#f1f5f9}',
-        'table.agenda tr.consol td{background:#f8fafc}',
+        'table.agenda .own{color:#64748b;font-style:italic}',
+        'table.agenda tr.marker td{background:#eaf0f6 !important;border-bottom-color:#b8c9db}',
+        'table.agenda tr.marker td:first-child{border-left:3px solid #0f2a43}',
+        'table.agenda tr.consol td{background:#fff !important}',
+        'table.agenda tr.consol td:first-child{border-left:3px dashed #94a3b8}',
+        'table.agenda tr.lunch td{background:#fff !important;color:#94a3b8;font-style:italic;padding-top:2px;padding-bottom:2px}',
+        'table.agenda tr.lunch td:first-child{border-left:3px solid #e2e8f0}',
+        '.tag{display:inline-block;margin-left:5px;padding:0 5px;border:1px solid #cbd5e1;border-radius:3px;font-size:6.6pt;font-weight:700;font-style:normal;letter-spacing:.05em;text-transform:uppercase;color:#475569;vertical-align:1px}',
+        '.agenda-key{margin:0 0 6px;font-size:8pt;color:#475569}',
+        '.agenda-key p{margin:0 0 2px}',
         '.note{font-size:8.5pt;color:#475569;margin:4px 0}',
         '.key{font-size:8pt;color:#475569;margin:2px 0 6px}',
-        'ul.bul{margin:2px 0 8px;padding-left:16px}',
-        'ul.bul li{margin:1px 0;font-size:9pt}',
+        'ul.bul{margin:2px 0 6px;padding-left:16px}',
+        'ul.bul li{margin:0 0 1px;font-size:8.8pt;line-height:1.4}',
         '.ok{color:#166534}.bad{color:#b91c1c}.warn{color:#92400e}',
         '.issue-block td{background:#fef2f2}',
         '.issue-warn td{background:#fffbeb}',
@@ -70,7 +92,58 @@
 
     // ── client-facing plan ───────────────────────────────────────────
 
-    function agendaTable(plan, ctx, scopeSchemes) {
+    /**
+     * The compact code a standard is cited by in the agenda: the registry's
+     * short label ("27001"), or the number of an ISO standard outside the
+     * registry ("ISO 17100:2015" -> "17100"). Anything else keeps its full name.
+     */
+    function schemeCodes(ids, schemes) {
+        const ipi = API_();
+        const taken = arr(ids).map(function (id) { return ipi.shortLabel(id); });
+        const out = {};
+        arr(schemes).forEach(function (s) {
+            const m = plain(s).match(/^ISO(?:\/IEC)?(?:\/TS)?\s+(\d+(?:-\d+)?)\b/i);
+            const code = m ? m[1] : plain(s);
+            out[s] = taken.indexOf(code) === -1 ? code : plain(s);
+            taken.push(out[s]);
+        });
+        return out;
+    }
+
+    /** Short identifiers for the people named in the agenda: "Muhammad Asim Khan" -> "MAK". */
+    function auditorCodes(names) {
+        const out = {}; const used = {};
+        arr(names).forEach(function (n) {
+            const words = plain(n).replace(/[^A-Za-z\s'-]/g, ' ').split(/\s+/).filter(Boolean);
+            let code = words.slice(0, 3).map(function (w) { return w.charAt(0).toUpperCase(); }).join('') || plain(n);
+            if (used[code]) { let i = 2; while (used[code + i]) i++; code += i; }
+            used[code] = true;
+            out[n] = code;
+        });
+        return out;
+    }
+
+    function isGroupAuditor(name) { return /^(?:all(?: team)?|n\/a|—|-)?$/i.test(plain(name).trim()); }
+
+    /**
+     * Who the agenda names, and whether one column is needed for them. When one
+     * person conducts every session the column only repeats that name, so it is
+     * stated once above the agenda instead.
+     */
+    function agendaPeople(rows, assigned) {
+        const names = [];
+        arr(rows).forEach(function (r) {
+            if (r.kind === 'lunch' || isGroupAuditor(r.auditor)) return;
+            if (names.indexOf(r.auditor) === -1) names.push(r.auditor);
+        });
+        const roleOf = function (n) { const a = arr(assigned).find(function (x) { return x.name === n; }); return a && a.role ? a.role : ''; };
+        const ordered = arr(assigned).map(function (a) { return a.name; }).filter(function (n) { return names.indexOf(n) !== -1; })
+            .concat(names.filter(function (n) { return !arr(assigned).some(function (a) { return a.name === n; }); }));
+        const groupRows = arr(rows).some(function (r) { return r.kind !== 'lunch' && isGroupAuditor(r.auditor) && plain(r.auditor).trim(); });
+        return { names: ordered, codes: auditorCodes(ordered), roleOf: roleOf, column: ordered.length > 1 || groupRows };
+    }
+
+    function agendaTable(plan, ctx, scopeSchemes, people, codes) {
         const df = DF();
         const rows = arr(plan.agenda);
         const findingClause = {};
@@ -79,30 +152,56 @@
         // session's traceability record, else (a topic session) from its title.
         const traced = {};
         arr(plan.traceability && plan.traceability.sessions).forEach(function (s) { if (s && s.sessionId) traced[s.sessionId] = arr(s.schemes); });
-        const body = rows.map(function (r) {
-            const d = df.parseDateParts(r.date);
-            const dayText = d ? df.weekdayName(r.date).slice(0, 3) + ' ' + d.d + ' ' + df.MONTHS[d.m - 1].slice(0, 3) : '';
-            const dayCell = '<td class="day"><b>' + t(r.day) + '</b>' + (dayText ? '<span>' + t(dayText) + '</span>' : '') + '</td>';
+        const withAuditor = people.column;
+        const span = withAuditor ? 5 : 4;
+        const cols = withAuditor
+            ? '<colgroup><col style="width:11%"><col style="width:35%"><col style="width:28%"><col style="width:16%"><col style="width:10%"></colgroup>'
+            : '<colgroup><col style="width:11%"><col style="width:39%"><col style="width:31%"><col style="width:19%"></colgroup>';
+        const head = '<tr><th>Time</th><th>Activity / process</th><th>Requirements</th><th>Dept / auditee</th>' + (withAuditor ? '<th style="text-align:center">Auditor</th>' : '') + '</tr>';
+        const whoCell = function (name) {
+            if (!withAuditor) return '';
+            const n = plain(name).trim();
+            const label = !n ? '—' : /^n\/a$/i.test(n) ? 'N/A' : (/^all(?: team)?$/i.test(n) ? 'All' : (people.codes[name] || n));
+            return '<td class="who">' + t(label) + '</td>';
+        };
+
+        const renderRow = function (r) {
             const time = '<td class="time">' + t(r.start || '') + '–' + t(r.end || '') + '</td>';
             if (r.kind === 'lunch') {
-                return '<tr class="lunch">' + dayCell + time + '<td>Lunch break</td><td>—</td><td>' + t(r.dept || 'All') + '</td><td>N/A</td></tr>';
+                return '<tr class="lunch">' + time + '<td colspan="2">Lunch break</td><td>' + t(r.dept || 'All') + '</td>' + whoCell('N/A') + '</tr>';
             }
             const desc = API_().describeStandards(r.standards, {});
             let req = desc.map(function (x) { return '<div class="req"><b>' + t(x.standards.join(' · ')) + '</b> ' + t(x.text) + '</div>'; }).join('');
             // A standard with no clause registry is audited against its own
-            // requirements; no clause number is invented for it.
+            // requirements; no clause number is invented for it. The key above
+            // the agenda says so once, rather than on every row.
             const schemes = arr(r.schemes).length ? arr(r.schemes) : arr(traced[r.sessionId]).length ? arr(traced[r.sessionId])
                 : arr(scopeSchemes).filter(function (n) { return plain(r.item).replace(/^\[(?:Remote|On-site)\]\s*/, '').indexOf(n + ':') === 0; });
-            if (schemes.length) req += '<div class="req"><b>' + t(schemes.join(' · ')) + '</b> ' + t((schemes.length > 1 ? 'the standards’' : 'the standard’s') + ' own requirements (no clause numbers cited)') + '</div>';
+            if (schemes.length) req += '<div class="req"><b>' + t(schemes.map(function (s) { return codes[s] || s; }).join(' · ')) + '</b> <span class="own">own requirements</span></div>';
             const fc = arr(r.findingIds).map(function (id) { return findingClause[String(id)]; }).filter(Boolean);
             if (fc.length) req += '<div class="req"><b>Previous findings</b> ' + t(fc.map(function (f) { return f.clause; }).join(', ')) + '</div>';
             if (!req) req = '<div class="req">Integrated — all standards in scope</div>';
             const proc = arr(r.processes).length ? '<span class="sub">Process: ' + arr(r.processes).map(t).join('; ') + '</span>' : '';
             const sub = r.subject ? '<span class="sub">' + t(r.subject) + '</span>' : '';
             const cls = r.kind === 'opening' || r.kind === 'closing' ? 'marker' : (r.kind === 'consolidation' ? 'consol' : '');
-            return '<tr class="' + cls + '">' + dayCell + time + '<td><b>' + t(r.item) + '</b>' + sub + proc + '</td><td>' + req + '</td><td>' + t(r.dept) + '</td><td>' + t(r.auditor) + '</td></tr>';
+            const tag = r.kind === 'consolidation' ? '<span class="tag">Auditor only</span>' : '';
+            return '<tr' + (cls ? ' class="' + cls + '"' : '') + '>' + time + '<td><b>' + t(r.item) + '</b>' + tag + sub + proc + '</td><td>' + req + '</td><td>' + t(r.dept) + '</td>' + whoCell(r.auditor) + '</tr>';
+        };
+
+        // Rows arrive in schedule order; consecutive rows of one day form a group.
+        const groups = [];
+        rows.forEach(function (r) {
+            const key = String(r.day || '') + '|' + String(r.date || '');
+            const last = groups[groups.length - 1];
+            if (last && last.key === key) last.rows.push(r);
+            else groups.push({ key: key, day: r.day, date: r.date, rows: [r] });
+        });
+        return groups.map(function (g) {
+            const d = df.parseDateParts(g.date);
+            const when = d ? df.weekdayName(g.date) + ' ' + df.formatDate(g.date) : '';
+            const band = '<tr class="dayband"><th colspan="' + span + '">' + t(g.day || 'Agenda') + (when ? '<span class="dd">' + t(when) + '</span>' : '') + '</th></tr>';
+            return '<table class="grid agenda">' + cols + '<thead>' + band + head + '</thead><tbody>' + g.rows.map(renderRow).join('') + '</tbody></table>';
         }).join('');
-        return '<table class="grid agenda"><thead><tr><th style="width:9%">Day</th><th style="width:11%">Time</th><th style="width:28%">Activity / process</th><th style="width:22%">Requirements</th><th style="width:16%">Dept / auditee</th><th style="width:14%">Auditor</th></tr></thead><tbody>' + body + '</tbody></table>';
     }
 
     /**
@@ -133,27 +232,39 @@
         const need = findings.filter(function (f) { return f.requiresFollowUp; });
         const mappedAll = need.length > 0 && need.every(function (f) { return arr(p.agenda).some(function (r) { return arr(r.findingIds).map(String).indexOf(String(f.id)) !== -1; }); });
 
-        const meta = function (label, value) { return '<td><span class="meta-label">' + t(label) + '</span>' + value + '</td>'; };
-        const pair = function (a, b) { return '<tr>' + a + (b || '<td></td>') + '</tr>'; };
+        // Two label/value pairs per row; a value that needs the width spans it.
+        const meta = function (label, value) { return '<td class="mk"><span class="meta-label">' + t(label) + '</span></td><td class="mv">' + value + '</td>'; };
+        const wide = function (label, value) { return '<tr><td class="mk"><span class="meta-label">' + t(label) + '</span></td><td class="mv" colspan="3">' + value + '</td></tr>'; };
+        const pair = function (a, b) { return '<tr>' + a + (b || '<td class="mk"></td><td class="mv"></td>') + '</tr>'; };
         const teamLabel = ipi.auditTeamLabel(assigned);
 
         const metaTable = '<table class="meta-table">'
-            + pair(meta('Client', t(c.client && c.client.name || p.client)), meta('Audit standards', stdLabels.map(t).join('<br>')))
-            + pair(meta('Scheduled audit', t(scheduled)), meta('Audit type', t(p.auditType || p.type)))
+            + pair(meta('Client', t(c.client && c.client.name || p.client)), meta('Audit type', t(p.auditType || p.type)))
+            + wide('Audit standards', stdLabels.map(t).join(' · '))
+            + pair(meta('Scheduled audit', t(scheduled)), meta('Audit method', t(p.auditMethod || 'Not recorded')))
             + pair(meta('Recommended audit window', cyc.recommendedWindowStart ? t(df.formatDateRange(cyc.recommendedWindowStart, cyc.recommendedWindowEnd)) + ' (planning guidance)' : 'Not recorded'),
                 meta('Certificate expiry', cyc.certificateExpiry ? t(df.formatDate(cyc.certificateExpiry)) : 'Not recorded'))
-            + pair(meta('Audit method', t(p.auditMethod || 'Not recorded')), meta('Time zone', tzInfo ? t(tzInfo.label) : '<span class="bad">Not agreed</span>'))
             + pair(meta('Lead Auditor', t(lead ? lead.name : 'Not assigned')), meta('Audit team', t(teamLabel)))
             + pair(meta('Approved audit duration', finalDays ? t(finalDays.toFixed(1) + ' auditor-days' + (p.auditMethod ? ' (' + String(p.auditMethod).toLowerCase() + ')' : '')) : 'Not approved'),
-                meta('Impartiality risk', t((p.impartialityAssessment && p.impartialityAssessment.risk) || 'None identified')))
-            + '</table>'
-            + (dur.effectivePersonnel ? '<p class="note">Duration basis: ' + t((p.auditType || p.type) + ' · ' + dur.effectivePersonnel.value + ' effective personnel · ' + dur.sites + ' site' + (dur.sites === 1 ? '' : 's')
-                + (stdLabels.length > 1 ? ' · integrated audit of ' + stdLabels.length + ' standards (IMS adjustment ' + (dur.imsIntegration ? dur.imsIntegration.adjustmentPercent : 0) + '%)' : '')) + '. The full calculation is held in the certification record.</p>' : '');
+                meta('Time zone', tzInfo ? t(tzInfo.label) : '<span class="bad">Not agreed</span>'))
+            + wide('Impartiality risk', t((p.impartialityAssessment && p.impartialityAssessment.risk) || 'None identified'))
+            + '</table>';
+
+        let n = 0;
+        const section = function (title) { n += 1; return '<div class="pd-section-title"><span class="no">' + n + '</span>' + title + '</div>'; };
+        const bullets = function (field) {
+            const items = lines(p[field] || p['audit' + field.charAt(0).toUpperCase() + field.slice(1)]);
+            return items.length ? '<ul class="bul">' + items.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ul>' : '<p class="note bad">Not recorded.</p>';
+        };
+
+        const objectives = section('AUDIT OBJECTIVES') + bullets('objectives');
 
         const certLine = arr(c.scope && c.scope.certificateNumbers).length
             ? '<p class="scope-meta">Certificate' + (c.scope.certificateNumbers.length > 1 ? 's' : '') + ': ' + t(c.scope.certificateNumbers.join(', ')) + (cyc.certificateExpiry ? ' · valid to ' + t(df.formatDate(cyc.certificateExpiry)) : '') + '</p>' : '';
-        const scopeSection = '<div class="pd-section-title">CERTIFIED SCOPE</div>'
-            + '<p class="scope-box">' + t((c.scope && c.scope.certificateScope) || p.scope || 'Not recorded') + '</p>' + certLine;
+        const scopeSection = section('AUDIT SCOPE &amp; CRITERIA')
+            + '<div class="pd-subhead">Certified scope</div>'
+            + '<p class="scope-box">' + t((c.scope && c.scope.certificateScope) || p.scope || 'Not recorded') + '</p>' + certLine
+            + '<div class="pd-subhead">Audit criteria</div>' + bullets('criteria');
 
         const allocRows = arr(p.selectedSites).map(function (s) {
             const r = arr(c.client && c.client.sites).find(function (x) { return x.name === s.name; }) || {};
@@ -161,28 +272,39 @@
             const days = total > 0 ? emps / total * finalDays : finalDays / Math.max(1, arr(p.selectedSites).length);
             return '<tr><td>' + t(s.name) + '</td><td>' + t(r.address || '—') + '</td><td class="num">' + emps + '</td><td>' + t(assigned.map(function (a) { return a.name; }).join(', ') || '—') + '</td><td class="num"><b>' + days.toFixed(2) + '</b></td></tr>';
         }).join('');
-        const allocation = '<div class="pd-section-title">AUDIT SCOPE, EFFORT &amp; ALLOCATION</div>'
-            + '<table class="grid"><thead><tr><th>Site</th><th>Address</th><th style="text-align:right">Personnel</th><th>Auditor(s)</th><th style="text-align:right">Auditor-days</th></tr></thead><tbody>' + allocRows
-            + '<tr><td colspan="2"><b>TOTAL</b></td><td class="num"><b>' + total + '</b></td><td></td><td class="num"><b>' + finalDays.toFixed(2) + '</b></td></tr></tbody></table>';
+        const allocation = section('AUDIT TEAM, SITES &amp; DURATION')
+            + '<table class="grid"><colgroup><col style="width:15%"><col style="width:36%"><col style="width:12%"><col style="width:21%"><col style="width:16%"></colgroup>'
+            + '<thead><tr><th>Site</th><th>Address</th><th class="num">Personnel</th><th>Auditor(s)</th><th class="num">Auditor-days</th></tr></thead><tbody>' + allocRows
+            + '<tr><td colspan="2"><b>TOTAL</b></td><td class="num"><b>' + total + '</b></td><td></td><td class="num"><b>' + finalDays.toFixed(2) + '</b></td></tr></tbody></table>'
+            + (dur.effectivePersonnel ? '<p class="note">Duration basis: ' + t((p.auditType || p.type) + ' · ' + dur.effectivePersonnel.value + ' effective personnel · ' + dur.sites + ' site' + (dur.sites === 1 ? '' : 's')
+                + (stdLabels.length > 1 ? ' · integrated audit of ' + stdLabels.length + ' standards (IMS adjustment ' + (dur.imsIntegration ? dur.imsIntegration.adjustmentPercent : 0) + '%)' : '')) + '. The full calculation is held in the certification record.</p>' : '');
 
-        const tzStatement = tzInfo ? '<p class="note">' + t(df.timeZoneStatement(c.timeZone.iana, p.date, p.endDate)) + '</p>' : '<p class="note bad">The agreed time zone has not been recorded.</p>';
-        const key = '<p class="key"><b>Standards key:</b> ' + ids.map(function (id) { return t(ipi.shortLabel(id)) + ' = ' + t(ipi.stdLabel(id)); }).join(' · ') + '</p>';
+        const methodology = section('AUDIT METHODOLOGY') + bullets('methodology');
+
+        // Agenda key: everything the rows would otherwise repeat, said once.
+        const codes = schemeCodes(ids, schemes);
+        const people = agendaPeople(p.agenda, assigned);
+        const tzStatement = tzInfo ? '<p>' + t(df.timeZoneStatement(c.timeZone.iana, p.date, p.endDate)) + '</p>' : '<p class="bad">The agreed time zone has not been recorded.</p>';
+        const keyItems = ids.map(function (id) { return t(ipi.shortLabel(id)) + ' = ' + t(ipi.stdLabel(id)); })
+            .concat(schemes.map(function (s) { return codes[s] === plain(s) ? t(s) : t(codes[s]) + ' = ' + t(s); }));
+        const key = '<p><b>Standards key:</b> ' + keyItems.join(' · ')
+            + (schemes.length ? '. <span class="own">Own requirements</span>: audited against the standard’s own requirements; no clause numbers are cited.' : '') + '</p>';
+        const roleSuffix = function (nm) { const r = people.roleOf(nm); return r ? ' (' + r + ')' : ''; };
+        const auditorLine = people.column
+            ? '<p><b>Auditors:</b> ' + people.names.map(function (nm) { return t(people.codes[nm]) + ' = ' + t(nm + roleSuffix(nm)); }).join(' · ') + '</p>'
+            : (people.names.length === 1 ? '<p><b>Auditor:</b> every session is conducted by ' + t(people.names[0] + roleSuffix(people.names[0])) + '.</p>' : '');
         const findingLine = need.length
-            ? (mappedAll ? '<p class="note"><b>Previous findings requiring follow-up: ' + need.length + '</b> — all ' + need.length + ' are scheduled in the sessions below.</p>'
-                : '<p class="note bad"><b>Previous findings requiring follow-up: ' + need.length + '</b> — not every finding is scheduled; the plan cannot be approved until they are.</p>')
-            : '<p class="note">No previous findings require follow-up.</p>';
-        const agenda = '<div class="pd-section-title">AUDIT AGENDA / ITINERARY</div>' + tzStatement + key + findingLine + agendaTable(p, c, schemes);
-
-        const list = function (field, title) {
-            const items = lines(p[field] || p['audit' + field.charAt(0).toUpperCase() + field.slice(1)]);
-            return '<div class="pd-section-title">' + title + '</div>' + (items.length ? '<ul class="bul">' + items.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ul>' : '<p class="note bad">Not recorded.</p>');
-        };
+            ? (mappedAll ? '<p><b>Previous findings requiring follow-up: ' + need.length + '</b> — all ' + need.length + ' are scheduled in the sessions below.</p>'
+                : '<p class="bad"><b>Previous findings requiring follow-up: ' + need.length + '</b> — not every finding is scheduled; the plan cannot be approved until they are.</p>')
+            : '<p>No previous findings require follow-up.</p>';
+        const agenda = section('AUDIT AGENDA / ITINERARY')
+            + '<div class="agenda-key">' + tzStatement + key + auditorLine + findingLine + '</div>'
+            + agendaTable(p, c, schemes, people, codes);
 
         const body = shell.masthead({ brandName: c.brand && c.brand.name, logoUrl: c.brand && c.brand.logoUrl, title: 'Audit Plan', subtitle: 'Ref: ' + ref + ' · ' + plain(c.client && c.client.name || p.client), qrUrl: c.qrUrl })
-            + '<p style="margin:0 0 4px"><span class="status-pill ' + statusClass(status) + '">' + t(status) + '</span></p>'
-            + (/^draft/i.test(status) ? '<p class="draft-note">This plan has not been approved for client issue.</p>' : '')
-            + metaTable + scopeSection + allocation + agenda
-            + list('objectives', 'AUDIT OBJECTIVES') + list('criteria', 'AUDIT CRITERIA') + list('methodology', 'AUDIT METHODOLOGY');
+            + '<p class="status-line"><span class="status-pill ' + statusClass(status) + '">' + t(status) + '</span>'
+            + (/^draft/i.test(status) ? '<span class="draft-note">This plan has not been approved for client issue.</span>' : '') + '</p>'
+            + metaTable + objectives + scopeSection + allocation + methodology + agenda;
 
         return shell.buildDocument({
             title: 'Audit Plan - ' + plain(c.client && c.client.name || p.client),
