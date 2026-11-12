@@ -123,6 +123,30 @@ describe('window.NCRModule.findDuplicateNCRs', () => {
 
         expect(window.NCRModule.findDuplicateNCRs()).toEqual([]);
     });
+
+    it('groups audit-less records only when their wording is identical', () => {
+        window.state.ncrs = [
+            { id: 21, clientId: 'pcc', auditId: null, clause: '7.5', severity: 'minor', status: 'Open', description: 'Document change control gap.' },
+            { id: 25, clientId: 'pcc', auditId: null, clause: '7.5', severity: 'Minor', status: 'Open', description: 'Document  change control gap.' }
+        ];
+        const groups = window.NCRModule.findDuplicateNCRs();
+        expect(groups.length).toBe(1);
+        expect(groups[0].auditId).toBeNull();
+        expect(groups[0].records.map(r => r.id)).toEqual([21, 25]);
+    });
+
+    it('groups the screenshot case: one audit, clause 7.5, reworded descriptions, mixed-case severity', () => {
+        const base = { clientId: 'pcc', auditId: 'plan-1', clause: '7.5', status: 'Open' };
+        window.state.ncrs = [
+            { ...base, id: 21, severity: 'minor', description: 'An opportunity exists to enhance system awareness...' },
+            { ...base, id: 38, severity: 'Minor', description: 'An opportunity exists to enhance system awareness...' },
+            { ...base, id: 51, severity: 'minor', description: 'A minor non-conformity was identified. An opportunity exists...' },
+            { ...base, id: 60, severity: 'Observation', description: 'Advisory only' }
+        ];
+        const groups = window.NCRModule.findDuplicateNCRs();
+        expect(groups.length).toBe(1);
+        expect(groups[0].records.map(r => r.id)).toEqual([21, 38, 51]);
+    });
 });
 
 describe('fetchNCRs preserves checklist-sync identity fields across a refetch', () => {

@@ -287,6 +287,27 @@ function capaDisplayStatus(rec) {
 window.NCRModule.capaDisplayStatus = capaDisplayStatus;
 window.capaDisplayStatus = capaDisplayStatus;
 
+// How much real work a record carries — when duplicates are merged the
+// survivor should be the one the auditee/auditor has already progressed, not
+// simply the oldest.
+function ncrWorkWeight(n) {
+    return (n.correctiveAction ? 4 : 0) + (n.rootCause ? 3 : 0)
+        + (n.correction ? 2 : 0) + (n.verifiedDate ? 5 : 0)
+        + (String(n.status || '').toLowerCase() === 'closed' ? 6 : 0)
+        + ((n.evidence || []).length ? 1 : 0);
+}
+
+// Withdraw `dupe` in favour of `survivor`. Never deletes: the record stays in
+// the register (visible under Status → Withdrawn) pointing at the one kept.
+function supersedeNCR(dupe, survivor, why) {
+    const ref = survivor.ncrNumber || (survivor.id != null ? `NCR-${String(survivor.id).padStart(3, '0')}` : 'the retained record');
+    dupe.status = 'Withdrawn';
+    dupe.carStatus = 'Withdrawn';
+    dupe._supersededBy = survivor.ncrNumber || survivor.id || null;
+    dupe.withdrawnReason = 'Duplicate of ' + ref + ' — ' + why + '. Retained for the audit trail.';
+    dupe.withdrawnDate = new Date().toISOString().split('T')[0];
+}
+
 /**
  * Reconcile duplicate NCR/CAPA records without destroying any of them.
  *
@@ -339,11 +360,7 @@ window.reconcileDuplicateNCRs = function (opts) {
         return null;
     };
 
-    // How much real work a record carries — the survivor should be the one an
-    // auditor has already progressed, not simply the oldest.
-    const weight = (n) => (n.correctiveAction ? 4 : 0) + (n.rootCause ? 3 : 0)
-        + (n.correction ? 2 : 0) + (n.verifiedDate ? 5 : 0)
-        + (norm(n.status) === 'closed' ? 6 : 0) + ((n.evidence || []).length ? 1 : 0);
+    const weight = ncrWorkWeight;
 
     const groups = new Map();
     all.forEach((n) => {
@@ -374,12 +391,7 @@ window.reconcileDuplicateNCRs = function (opts) {
         recs.slice(1).forEach((dupe) => {
             details.push({ supersededRef: dupe.ncrNumber || dupe.id, byRef: survivor.ncrNumber || survivor.id, clause: dupe.clause });
             if (dryRun) return;
-            dupe.status = 'Withdrawn';
-            dupe.carStatus = 'Withdrawn';
-            dupe._supersededBy = survivor.ncrNumber || survivor.id || null;
-            dupe.withdrawnReason = 'Duplicate of ' + (survivor.ncrNumber || survivor.id || 'the retained record')
-                + ' — same finding recorded twice when the checklist was rebuilt. Retained for the audit trail.';
-            dupe.withdrawnDate = new Date().toISOString().split('T')[0];
+            supersedeNCR(dupe, survivor, 'same finding recorded twice when the checklist was rebuilt');
             superseded++;
             if (typeof persistNCR === 'function') persistNCR(dupe).catch(() => { });
         });
@@ -402,6 +414,10 @@ window.reconcileDuplicateNCRs = function (opts) {
  * supersede convention: set status/carStatus to 'Withdrawn' and optionally
  * point _supersededBy at the record being kept).
  *
+ * Only Major/Minor records are grouped. A record with no auditId groups only
+ * with records whose wording is identical, since without an audit link two
+ * engagements' findings can't otherwise be told apart.
+ *
  * Grouped by clientId + auditId + clause + severity — a narrower key than
  * reconcileDuplicateNCRs' client+clause+description (which is scoped to
  * assume same-audit dupes are already merged at mint time). This finder
@@ -418,20 +434,24 @@ function findDuplicateNCRs() {
 
     const groups = new Map();
     all.forEach((n) => {
-        if (!n || isWithdrawnNCR(n) || n._supersededBy) return;
-        if (n.clientId == null || n.auditId == null || !n.clause) return; // nothing reliable to group on
-        const key = [String(n.clientId), String(n.auditId), norm(n.clause), norm(n.severity)].join('||');
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(n);
+        if (!n || isWithdrawnNCR(n) || n._supersededBy || !isMajorMinorNCR(n)) return;
+        if (n.clientId == null || n.clientId === '' || !n.clause) return; // nothing reliable to group on
+        // Without an audit link, records from different engagements can't be
+        // told apart — only identical wording is then evidence of a duplicate.
+        const hasAudit = n.auditId != null && n.auditId !== '';
+        if (!hasAudit && !norm(n.description)) return;
+        const auditKey = hasAudit ? String(n.auditId) : '~' + norm(n.description).slice(0, 180);
+        const key = JSON.stringify([String(n.clientId), auditKey, norm(n.clause), normalizedNCRSeverity(n)]);
+        if (!groups.has(key)) {
+            groups.set(key, {
+                clientId: String(n.clientId), auditId: hasAudit ? String(n.auditId) : null,
+                clause: norm(n.clause), severity: normalizedNCRSeverity(n), records: []
+            });
+        }
+        groups.get(key).records.push(n);
     });
 
-    const result = [];
-    groups.forEach((records, key) => {
-        if (records.length < 2) return;
-        const [clientId, auditId, clause, severity] = key.split('||');
-        result.push({ clientId, auditId, clause, severity, records });
-    });
-    return result;
+    return Array.from(groups.values()).filter(g => g.records.length > 1);
 }
 window.NCRModule.findDuplicateNCRs = findDuplicateNCRs;
 window.findDuplicateNCRs = findDuplicateNCRs;
@@ -441,8 +461,16 @@ window.findDuplicateNCRs = findDuplicateNCRs;
 // --------------------------------------------
 
 // Fetch NCRs from Supabase
+//
+// Every persistNCR() ends in a fetchNCRs(), and the checklist sync persists
+// each finding without awaiting, so several fetches routinely overlap. Only
+// the most recently STARTED fetch may replace the register — an older one
+// resolving last would roll state back to a snapshot that predates inserts
+// made since.
+let _ncrFetchSeq = 0;
 window.fetchNCRs = async function () {
     if (!window.SupabaseClient) return;
+    const seq = ++_ncrFetchSeq;
 
     try {
         const { data, error } = await window.SupabaseClient
@@ -451,12 +479,14 @@ window.fetchNCRs = async function () {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
+        if (seq !== _ncrFetchSeq) return; // a newer fetch is already on its way
 
         // criterionRef/criterionSource/riskLikelihood/riskImpact columns exist since
         // migrations/ADD_NCR_CRITERION_AND_RISK_FIELDS.sql. Records written before
         // that mapping have NULLs in the DB but may hold real values locally, so the
         // local value still wins whenever the row comes back empty.
-        const prevById = new Map((window.state.ncrs || []).map(n => [String(n.id), n]));
+        const prevList = window.state.ncrs || [];
+        const prevById = new Map(prevList.map(n => [String(n.id), n]));
 
         // Map DB snake_case to app camelCase
         window.state.ncrs = (data || []).map(row => {
@@ -521,8 +551,22 @@ window.fetchNCRs = async function () {
                 // fresh duplicate NCR. Preserving it locally the same way as the
                 // fields above closes that hole.
                 if (prev._sourceKey) mapped._sourceKey = prev._sourceKey;
+                // Supersede trail from the duplicate review (no DB column yet;
+                // the Withdrawn status itself is persisted).
+                ['_supersededBy', 'withdrawnReason', 'withdrawnDate'].forEach(k => {
+                    if (prev[k] != null && mapped.status === 'Withdrawn') mapped[k] = prev[k];
+                });
             }
             return mapped;
+        });
+
+        // Keep local records that have no database id yet — their insert is
+        // still in flight (or failed and will be retried by the next save).
+        // Rebuilding the register purely from the DB rows dropped them, so the
+        // very next checklist save could not see the record it had just
+        // created and inserted the same finding a second time.
+        prevList.forEach((prev) => {
+            if (prev && (prev.id === undefined || prev.id === null || prev.id === '')) window.state.ncrs.push(prev);
         });
 
         updateNCRAnalytics();
@@ -538,9 +582,25 @@ window.fetchNCRs = async function () {
     }
 };
 
+// Inserts still in flight, by record object. A second persist of the same
+// record (the checklist is saved again, or Finalize / AI summary / confirm
+// each call saveChecklist back to back) used to arrive while the first
+// INSERT had not yet returned an id, so it inserted the finding again —
+// one more NCR number per save.
+const _pendingNCRInserts = new WeakMap();
+
 // Persist Insert or Update to Supabase
 async function persistNCR(ncr) {
     if (!window.SupabaseClient) return;
+
+    // Wait for this record's own insert to land, so this call updates that
+    // row instead of creating another one.
+    // Loop: if that insert failed, the first waiter to resume retries it and
+    // the others wait on the retry rather than each inserting a copy.
+    let pendingInsert;
+    while ((pendingInsert = _pendingNCRInserts.get(ncr))) {
+        try { await pendingInsert; } catch (_e) { /* retried below as an insert */ }
+    }
 
     // Helper: coerce empty/falsy to null for DATE and FK columns
     const toNullable = (v) => (v === '' || v === undefined || v === null) ? null : v;
@@ -595,13 +655,18 @@ async function persistNCR(ncr) {
                 .eq('id', ncr.id);
             if (error) throw error;
         } else {
-            // Insert
-            const { data, error } = await window.SupabaseClient
-                .from('audit_ncrs')
-                .insert(dbPayload)
-                .select();
-            if (error) throw error;
-            if (data && data[0]) ncr.id = data[0].id; // Assign the new DB ID
+            // Insert. Registered synchronously (before the first await) so a
+            // persist issued in the same tick already sees it.
+            const insert = (async () => {
+                const { data, error } = await window.SupabaseClient
+                    .from('audit_ncrs')
+                    .insert(dbPayload)
+                    .select();
+                if (error) throw error;
+                if (data && data[0]) ncr.id = data[0].id; // Assign the new DB ID
+            })();
+            _pendingNCRInserts.set(ncr, insert);
+            try { await insert; } finally { _pendingNCRInserts.delete(ncr); }
         }
 
         // Refresh local state, and the UI only if the NCR module is what is on
@@ -845,6 +910,8 @@ function getNCRRegisterHTML() {
                     </button>
                 </div>
             </div>
+
+            ${ncrDuplicateBannerHTML()}
 
             <!-- Filters -->
             <div class="card" style="background: #f8fafc; padding: 1rem; margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
@@ -1955,6 +2022,122 @@ window.deleteNCR = async function (id) {
     }
 };
 
+// --- DUPLICATE REVIEW ---
+// The register can hold several records for one finding (minted by older
+// checklist-sync code on every save or rebuild). findDuplicateNCRs() groups
+// them read-only; this lets the auditor pick the record to keep in each group
+// and withdraws the rest — status Withdrawn with a pointer to the survivor,
+// never deleted. Groups the auditor marks "not duplicates" stay hidden until
+// another record joins them.
+const NCR_DUP_DISMISS_KEY = 'auditcb.ncrDuplicateGroupsDismissed';
+function ncrDupGroupSignature(g) {
+    return g.records.map(r => String(r.id)).sort().join(',');
+}
+function readDismissedDupGroups() {
+    try { return new Set(JSON.parse(window.localStorage.getItem(NCR_DUP_DISMISS_KEY) || '[]')); } catch (_e) { return new Set(); }
+}
+function writeDismissedDupGroups(set) {
+    try { window.localStorage.setItem(NCR_DUP_DISMISS_KEY, JSON.stringify(Array.from(set))); } catch (_e) { /* per-browser convenience only */ }
+}
+// Duplicate groups visible in the current client scope, minus dismissed ones.
+function activeDuplicateGroups() {
+    const dismissed = readDismissedDupGroups();
+    return findDuplicateNCRs()
+        .filter(g => g.records.every(matchesActiveNCRClient))
+        .filter(g => !dismissed.has(ncrDupGroupSignature(g)));
+}
+window.NCRModule.activeDuplicateGroups = activeDuplicateGroups;
+
+function ncrDuplicateBannerHTML() {
+    const groups = activeDuplicateGroups();
+    if (!groups.length) return '';
+    const extra = groups.reduce((s, g) => s + g.records.length - 1, 0);
+    return `
+        <div class="card" style="background: #fffbeb; border: 1px solid #f59e0b; padding: 0.85rem 1rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            <div style="font-size: 0.9rem; color: #92400e;">
+                <i class="fa-solid fa-clone" style="margin-right: 0.4rem;"></i>
+                <strong>${extra} possible duplicate record${extra === 1 ? '' : 's'}</strong> in ${groups.length} group${groups.length === 1 ? '' : 's'}:
+                same client, audit, clause and severity recorded more than once.
+            </div>
+            <button class="btn btn-sm btn-secondary" data-action="openNCRDuplicateReview" aria-label="Review duplicates">Review duplicates</button>
+        </div>`;
+}
+
+window.openNCRDuplicateReview = function () {
+    const groups = activeDuplicateGroups();
+    if (!groups.length) { window.showNotification('No duplicate NCRs found.', 'info'); return; }
+    const esc = window.UTILS.escapeHtml;
+    const num = (n) => `NCR-${String(n.id).padStart(3, '0')}`;
+    const work = (n) => [n.correction && 'correction', n.rootCause && 'root cause', n.correctiveAction && 'corrective action', n.verifiedDate && 'verified']
+        .filter(Boolean).join(', ');
+
+    const groupHTML = groups.map((g, gi) => {
+        const sorted = g.records.slice().sort((a, b) => ncrWorkWeight(b) - ncrWorkWeight(a)
+            || String(a.raisedDate || '').localeCompare(String(b.raisedDate || ''))
+            || (Number(a.id) || 0) - (Number(b.id) || 0));
+        const first = sorted[0];
+        const rows = sorted.map(n => `
+            <label style="display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; padding: 0.5rem; border-top: 1px solid var(--border-color); cursor: pointer;">
+                <input type="radio" name="ncr-dup-keep-${gi}" value="${esc(String(n.id))}" ${n === first ? 'checked' : ''}>
+                <span style="font-size: 0.85rem;">
+                    <strong>${esc(num(n))}</strong>
+                    &middot; ${esc(resolveAuditRef(n))}
+                    &middot; ${esc(n.status || 'Open')}
+                    ${work(n) ? `&middot; <span style="color: #166534;">has ${esc(work(n))}</span>` : ''}
+                    <br><span style="color: var(--text-secondary);">${esc(String(n.description || '').slice(0, 260))}</span>
+                </span>
+            </label>`).join('');
+        return `
+            <div class="ncr-dup-group" data-group="${gi}" style="border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 0.9rem;">
+                <div style="padding: 0.5rem; background: #f8fafc; font-size: 0.85rem;">
+                    <strong>${esc(first.clientName || '')}</strong> &middot; Clause ${esc(resolveClauseDisplay(first).text)} &middot; ${esc(normalizedNCRSeverity(first) === 'major' ? 'Major' : 'Minor')}
+                    &middot; ${g.records.length} records
+                </div>
+                ${rows}
+                <label style="display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; padding: 0.5rem; border-top: 1px solid var(--border-color); cursor: pointer; font-size: 0.85rem; color: var(--text-secondary);">
+                    <input type="radio" name="ncr-dup-keep-${gi}" value="">
+                    <span>These are separate findings &mdash; keep them all</span>
+                </label>
+            </div>`;
+    }).join('');
+
+    document.getElementById('modal-title').textContent = 'Review duplicate NCRs';
+    document.getElementById('modal-body').innerHTML = `
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0;">
+            In each group, choose the record to keep. The others are set to <strong>Withdrawn</strong> with a note
+            pointing at the kept record. Nothing is deleted, and withdrawn records stay available under Status &rarr; Withdrawn.
+            The record with CAPA work recorded is preselected.
+        </p>
+        ${groupHTML}`;
+    const saveBtn = document.getElementById('modal-save');
+    saveBtn.style.display = 'block';
+    saveBtn.onclick = async () => {
+        const plan = [];
+        const dismissed = readDismissedDupGroups();
+        groups.forEach((g, gi) => {
+            const picked = document.querySelector(`input[name="ncr-dup-keep-${gi}"]:checked`);
+            const keepId = picked ? picked.value : '';
+            if (!keepId) { dismissed.add(ncrDupGroupSignature(g)); return; }
+            const survivor = g.records.find(r => String(r.id) === keepId);
+            if (!survivor) return;
+            g.records.forEach(r => { if (r !== survivor) plan.push({ dupe: r, survivor }); });
+        });
+        writeDismissedDupGroups(dismissed);
+        if (plan.length && !confirm(`Withdraw ${plan.length} duplicate record(s)? They stay in the register as Withdrawn, each pointing at the record kept.`)) return;
+
+        // Mark every record first: each persistNCR() refetches and replaces the
+        // register objects, so marking after the first persist would only
+        // touch detached copies.
+        plan.forEach(({ dupe, survivor }) => supersedeNCR(dupe, survivor, 'the same finding was recorded more than once'));
+        if (window.saveData) window.saveData();
+        for (const { dupe } of plan) await persistNCR(dupe); // reports its own sync errors
+        window.closeModal();
+        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+        if (plan.length) window.showNotification(`${plan.length} duplicate record(s) withdrawn.`, 'success');
+    };
+    window.openModal();
+};
+
 // --- PRINT NCR REGISTER ---
 window.printNCRRegister = function () {
     // Printed register must match what's on screen — scope it the same way
@@ -1988,6 +2171,7 @@ window.printNCRRegister = function () {
                     <tr>
                         <th>NCR#</th>
                         <th>Client</th>
+                        <th>Audit</th>
                         <th>Standard</th>
                         <th>Clause</th>
                         <th>Severity</th>
@@ -2001,6 +2185,7 @@ window.printNCRRegister = function () {
                         <tr>
                             <td>NCR-${String(n.id).padStart(3, '0')}</td>
                             <td>${window.UTILS.escapeHtml(n.clientName || '-')}</td>
+                            <td>${window.UTILS.escapeHtml(resolveAuditRef(n))}</td>
                             <td>${window.UTILS.escapeHtml(n.standard || '-')}</td>
                             <td>${window.UTILS.escapeHtml(resolveClauseDisplay(n).text)}</td>
                             <td>${window.UTILS.escapeHtml(n.severity)}</td>
