@@ -94,12 +94,38 @@ describe('escalating an observation to a nonconformity', () => {
         expect(window.state.ncrs).toEqual([]);
     });
     it('raises a linked NCR on evidence, in the named person’s name, and leaves the observation as it was', async () => {
+        delete window.SupabaseClient; // offline: persistNCR is a no-op
         answer('No restore test record for 2025', 'A.8.13', 'Major');
         await window.escalateObservationToNCR('r1', 'checklistProgress', '0');
         expect(window.state.ncrs).toHaveLength(1);
         const ncr = window.state.ncrs[0];
         expect(ncr).toMatchObject({ clause: 'A.8.13', severity: 'Major', escalatedBy: 'Lead Auditor', status: 'Open', auditId: 'plan-1', objectiveEvidence: 'No restore test record for 2025' });
-        expect(report.checklistProgress[0].escalatedToNcr).toBe(ncr.id);
+        // A client-built id would send persistNCR down its UPDATE path; the DB assigns it instead.
+        expect(ncr.id).toBeUndefined();
+        expect(ncr.level).toBe('client');
+        expect(ncr.dueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(ncr.description).toContain('Objective evidence: No restore test record for 2025');
+        expect(report.checklistProgress[0].escalatedToNcr).toBe(ncr.localRef);
         expect(report.checklistProgress[0].ncrType).toBe('observation'); // not silently converted
+    });
+
+    it('INSERTs the NCR and links the observation to the database id', async () => {
+        const calls = { insert: 0, update: 0 };
+        window.SupabaseClient = {
+            from: () => ({
+                insert: (payload) => { calls.insert++; return { select: () => Promise.resolve({ data: [Object.assign({ id: 42 }, payload)], error: null }) }; },
+                update: () => { calls.update++; return { eq: () => Promise.resolve({ error: null }) }; },
+                select: () => ({ order: () => Promise.resolve({ data: [{ id: 42, client_id: 'c1', severity: 'Minor', status: 'Open', level: 'client', clause: 'A.8.13' }], error: null }) })
+            })
+        };
+        window.contentArea = document.createElement('div');
+        answer('No restore test record for 2025', 'A.8.13', 'Minor');
+        await window.escalateObservationToNCR('r1', 'checklistProgress', '0');
+        delete window.SupabaseClient;
+
+        expect(calls).toEqual({ insert: 1, update: 0 });
+        expect(report.checklistProgress[0].escalatedToNcr).toBe('42');
+        expect(window.__last).toContain('NCR-042');
+        expect(window.state.ncrs.map(n => n.id)).toEqual([42]);
     });
 });

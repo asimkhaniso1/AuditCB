@@ -173,7 +173,11 @@
         if (type !== TYPES.NC && !formal) {
             notes.push('Corrective action, root-cause analysis and effectiveness verification are not required for this finding type.');
         }
-        if (type === TYPES.OBS && f.escalatedToNcr) notes.push('Escalated to nonconformity ' + f.escalatedToNcr + '.');
+        if (type === TYPES.OBS && f.escalatedToNcr) {
+            // Database ids read as the register shows them (NCR-021).
+            const ref = String(f.escalatedToNcr);
+            notes.push('Escalated to nonconformity ' + (/^\d+$/.test(ref) ? 'NCR-' + ref.padStart(3, '0') : ref) + '.');
+        }
         const complete = missing.length === 0;
         // An NC may be closed only when every mandatory step is evidenced AND an
         // authorised person has recorded the decision.

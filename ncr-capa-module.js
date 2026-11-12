@@ -1256,7 +1256,7 @@ function findingResponseCellHTML(f) {
         <div style="margin-top:0.25rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
             <button class="btn btn-sm btn-secondary" data-action="openFindingResponse" ${arg}>${ev.complete ? 'Edit' : 'Record'} response</button>
             ${f.type === 'OBS' && !rec.escalatedToNcr ? `<button class="btn btn-sm btn-secondary" data-action="escalateObservationToNCR" ${arg} title="Only on objective evidence that a requirement was not fulfilled">Escalate to NCR</button>` : ''}
-            ${rec.escalatedToNcr ? `<span style="font-size:0.75rem;color:#7c3aed;">Escalated &rarr; ${esc(String(rec.escalatedToNcr))}</span>` : ''}
+            ${rec.escalatedToNcr ? `<span style="font-size:0.75rem;color:#7c3aed;">Escalated &rarr; ${esc(ncrRefLabel(rec.escalatedToNcr))}</span>` : ''}
         </div>`;
 }
 
@@ -1315,20 +1315,44 @@ window.escalateObservationToNCR = async function (reportId, list, index) {
             { objectiveEvidence: evidence, requirementRef: requirement, escalatedBy: user, severity });
     } catch (e) { window.showNotification(e.message, 'error'); return; }
     const client = (window.state.clients || []).find(c => String(c.id) === String(report.clientId) || c.name === report.client);
-    const raised = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const raised = now.toISOString().split('T')[0];
+    const due = new Date(now);
+    due.setDate(now.getDate() + (severity === 'Major' ? 90 : 30)); // same defaults as a new NCR
+    // No id here: the database assigns it on insert. A client-made id
+    // ('NCR-<timestamp>') sent persistNCR down its UPDATE path, which matched
+    // no row, so the NCR was never saved and vanished on the next refresh.
+    // localRef links the observation to it until the real id comes back.
+    const localRef = `ESC-${now.getTime()}`;
     const full = Object.assign({}, ncr, {
-        id: `NCR-${Date.now()}`, clientId: client ? client.id : report.clientId, clientName: report.client, standard: report.standard, severity, level: severity,
-        raisedBy: user, raisedDate: raised, status: 'Open', source: 'Escalated from observation'
+        clientId: client ? client.id : report.clientId, clientName: report.client, standard: report.standard,
+        severity, level: 'client', // level is client/internal, not severity — 'Major' showed as "Internal"
+        raisedBy: user, raisedDate: raised, dueDate: due.toISOString().split('T')[0],
+        status: 'Open', source: 'Escalated from observation', localRef,
+        // audit_ncrs has no objective-evidence column; the statement carries it
+        // so it survives a reload.
+        description: [ncr.description, 'Objective evidence: ' + ncr.objectiveEvidence].filter(Boolean).join('\n')
     });
     window.state.ncrs = window.state.ncrs || [];
     window.state.ncrs.push(full);
     // The observation stays what it is, linked to the NCR raised from it.
-    record.escalatedToNcr = full.id;
+    record.escalatedToNcr = localRef;
     window.saveData();
     if (typeof persistNCR === 'function') { try { await persistNCR(full); } catch (_e) { /* local record kept; sync retried on next save */ } }
-    window.showNotification(`Nonconformity ${full.id} raised from the observation, on your evidence.`, 'success');
+    if (full.id != null) {
+        record.escalatedToNcr = String(full.id);
+        window.saveData();
+    }
+    window.showNotification(`Nonconformity ${ncrRefLabel(record.escalatedToNcr)} raised from the observation, on your evidence.`, 'success');
     if (typeof window.switchNCRTab === 'function') window.switchNCRTab('ofi-obs');
 };
+
+// Display label for an NCR reference: database ids render as NCR-021, the
+// same as the register; anything else (a pending local ref) as stored.
+function ncrRefLabel(ref) {
+    const s = String(ref == null ? '' : ref);
+    return /^\d+$/.test(s) ? `NCR-${s.padStart(3, '0')}` : s;
+}
 
 // --------------------------------------------
 // TAB 3: CAPA TRACKER
