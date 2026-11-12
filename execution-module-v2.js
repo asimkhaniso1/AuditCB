@@ -2264,6 +2264,27 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // Track which sourceKeys are still active major/minor NC
             const activeSourceKeys = new Set();
 
+            // Register records already tied to one of this save's NC items by
+            // exact key or stable identity. The clause-level fallback below
+            // may only adopt records NOT in this set, so it can never steal
+            // another item's record.
+            const claimed = new Set();
+            ncItems.forEach(item => {
+                const sk = buildChecklistSourceKey(reportId, item);
+                const ident = buildChecklistStableIdentity(item);
+                window.state.ncrs.forEach(n => {
+                    if (!n) return;
+                    if (n._sourceKey === sk) { claimed.add(n); return; }
+                    if (String(n.auditId || '') === String(report.planId || '')
+                        && n.sourceChecklistId != null
+                        && String(n.sourceChecklistId) === String(ident.sourceChecklistId)
+                        && String(n.sourceItemIdx) === String(ident.sourceItemIdx)) claimed.add(n);
+                });
+            });
+            const normClause = (c) => String(c || '').trim().toLowerCase();
+            const capaWork = (n) => (n.verifiedDate ? 5 : 0) + (n.correctiveAction ? 4 : 0)
+                + (n.rootCause ? 3 : 0) + (n.correction ? 2 : 0);
+
             ncItems.forEach(item => {
                 // Build stable key to prevent duplicates
                 const sourceKey = buildChecklistSourceKey(reportId, item);
@@ -2346,6 +2367,30 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         existing = adopted;
                     }
                 }
+                //  4. Clause fallback — the checklist was rebuilt (new item ids)
+                //     AND the wording changed, so none of the tiers above can
+                //     match. If this audit has exactly ONE NC item on this clause,
+                //     any open checklist-raised record on the same clause for the
+                //     same audit is that finding. With two NC items on one clause
+                //     there is no safe way to pair them, so nothing is adopted.
+                if (!existing && report.planId != null && report.planId !== '') {
+                    const itemsOnClause = ncItems.filter(p => normClause(p.clause) === normClause(item.clause)).length;
+                    if (itemsOnClause === 1) {
+                        const candidates = window.state.ncrs.filter(n => n && !claimed.has(n)
+                            && String(n.auditId || '') === String(report.planId)
+                            && String(n.source || '').toLowerCase() === 'checklist'
+                            && String(n.status || '').toLowerCase() !== 'withdrawn'
+                            && normClause(n.clause) === normClause(clauseText));
+                        if (candidates.length) {
+                            // Keep the one the auditee has already worked on; any
+                            // others are surfaced by the register's duplicate review.
+                            candidates.sort((a, b) => capaWork(b) - capaWork(a)
+                                || String(a.raisedDate || '').localeCompare(String(b.raisedDate || '')));
+                            existing = candidates[0];
+                        }
+                    }
+                }
+                if (existing) claimed.add(existing);
                 if (existing) {
                     // Backfill/refresh stable identity on every match so future
                     // re-syncs — including after further AI-polish edits — can match
