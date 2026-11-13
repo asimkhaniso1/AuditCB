@@ -1902,7 +1902,50 @@ window.ensurePdfWorker = async function () {
     }
 };
 
-window.extractTextFromFile = async function (file) {
+/**
+ * Join one PDF page's text items, keeping its line structure.
+ *
+ * PDF.js returns a page as positioned runs of text. Joining them all with a
+ * space turns the page into one long line, and anything that reads a
+ * document line by line — the client-document importer's heading and
+ * table-of-contents reader — then finds no headings at all. A run ends a
+ * line when PDF.js flags it (hasEOL) or when the next run sits on a
+ * different baseline.
+ *
+ * @param {Array<{str: string, hasEOL?: boolean, transform?: number[]}>} items
+ * @returns {string} the page text, one visual line per line
+ */
+window.pdfTextFromItems = function (items) {
+    const lines = [];
+    let line = '';
+    let lastY = null;
+    const flush = () => {
+        const t = line.replace(/[ \t]+/g, ' ').trim();
+        if (t) lines.push(t);
+        line = '';
+    };
+    for (const item of items || []) {
+        if (!item || typeof item.str !== 'string') continue;
+        const y = Array.isArray(item.transform) && typeof item.transform[5] === 'number' ? item.transform[5] : null;
+        // Superscripts and kerned runs move the baseline by a point or two;
+        // a new line moves it by roughly the font size.
+        if (y !== null && lastY !== null && Math.abs(y - lastY) > 2) flush();
+        if (item.str) line += (line && !/\s$/.test(line) && !/^\s/.test(item.str) ? ' ' : '') + item.str;
+        if (y !== null) lastY = y;
+        if (item.hasEOL) flush();
+    }
+    flush();
+    return lines.join('\n');
+};
+
+/**
+ * @param {File} file
+ * @param {{preserveLines?: boolean}} [opts] - preserveLines keeps a PDF's
+ *   line breaks (see pdfTextFromItems). Off by default so the Knowledge Base
+ *   analysis keeps reading the text it was written against.
+ */
+window.extractTextFromFile = async function (file, opts) {
+    const preserveLines = !!(opts && opts.preserveLines);
     // PDF.js and mammoth load on first use (lib-loader.js), not on every page view.
     if (file.type === 'application/pdf' && typeof pdfjsLib === 'undefined') {
         try {
@@ -1942,7 +1985,9 @@ window.extractTextFromFile = async function (file) {
                 for (let i = 1; i <= maxPages; i++) {
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    const pageText = preserveLines
+                        ? window.pdfTextFromItems(textContent.items)
+                        : textContent.items.map(item => item.str).join(' ');
                     fullText += pageText + '\n';
                 }
                 return fullText;
