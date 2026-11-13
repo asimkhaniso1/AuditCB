@@ -814,10 +814,23 @@
      * session that owns its topic and the clause is ADDED to that session so
      * the agenda shows it — mapped with a stated reason, never silently lost.
      */
+    /**
+     * The clause reference a finding is raised against, without the label text
+     * recorders add to it: "7.5 (Integrated)", "8.4 - Control of externally
+     * provided processes", "A.5.15 Access control". Matching compares clause
+     * numbers exactly, so the label stopped "7.5 (Integrated)" ever meeting a
+     * session that covers 7.5 and left the finding unscheduled.
+     */
+    function clauseToken(v) {
+        const s = str(v);
+        const m = s.match(/^(A\.\d{1,2}\.\d{1,2}|\d{1,2}(?:\.\d{1,2}){0,3})(?![\d.]*\d)/);
+        return m ? m[1] : s;
+    }
+
     function mapFindings(findings, sessions) {
         const map = [];
         arr(findings).forEach(function (f) {
-            const clause = str(f.clause);
+            const clause = clauseToken(f.clause);
             const hits = [];
             sessions.forEach(function (s) {
                 if (s.kind !== 'session') return;
