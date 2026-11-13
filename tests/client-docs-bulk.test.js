@@ -1135,3 +1135,76 @@ describe('ClientDocsBulk.parseContentMeta — a Statement of Applicability', () 
         expect(parsed.clauseRefs).toEqual(['A.5.1', 'A.8.13']);
     });
 });
+
+// LSUK's procedures number their own sections (1 Scope, 2 Purpose,
+// 3 Responsibilities, 4 Procedure, 4.1 ...). Those numbers were read as ISO
+// clauses, so the document-control procedure was linked to 4.1-4.7 and the
+// gap analysis showed 7.5 as "No documented information supplied".
+describe('ClientDocsBulk — procedure section numbers are not ISO clauses', () => {
+    const procedure = (title, steps) => [
+        'Language Services UK Limited', title, 'Document No: PRO-0x', 'Revision: 1.0', '',
+        '1 Scope', '2 Purpose', '3 Responsibilities', '4 Procedure',
+        ...steps.map((s, i) => `4.${i + 1} ${s}`)
+    ].join('\n');
+    const docControl = ['Document Identification', 'Document Creation & Approval', 'Distribution & Access',
+        'Revision & Change Control', 'Retention & Disposal of Records', 'Obsolete Documents', 'External Documents'];
+    const cases = [
+        ['Document and Data Control Procedure', docControl, '7.5'],
+        ['Risk Management Procedure', ['Risk Identification', 'Risk Assessment Method', 'Risk Treatment and Opportunity Action', 'Communication and Escalation'], '6.1'],
+        ['Internal Audit Procedure', ['Audit Planning', 'Auditor Selection & Competence', 'Audit Preparation', 'Audit Execution', 'Audit Reporting'], '9.2'],
+        ['Corrective Action Procedure', ['Identification of Non-Conformities', 'Immediate Correction', 'Root-Cause Analysis', 'Corrective Action Planning'], '10.2'],
+        ['Recruitment and Competence Procedure', ['Recruitment and Selection', 'Verification / Vetting of Linguists and Staff', 'Competence Determination', 'Induction'], '7.2'],
+    ];
+
+    it.each(cases)('maps "%s" to its subject, not 4.x', (title, steps, expected) => {
+        const meta = B.parseContentMeta(procedure(title, steps));
+        expect(meta.numbering).toBe('internal');
+        const clauses = B.mapClauses(B.parseDocumentName('PRO-01.docx'), meta);
+        expect(clauses).toContain(expected);
+        expect(clauses.filter(c => c.startsWith('4.'))).toEqual([]);
+    });
+
+    it('still finds the subject when the title block is only a code', () => {
+        const text = ['PRO-01', 'Rev 1.0', '', '1 Scope', '2 Purpose', '3 Responsibilities', '4 Procedure', ...docControl.map((s, i) => `4.${i + 1} ${s}`)].join('\n');
+        expect(B.mapClauses(B.parseDocumentName('PRO-01.docx'), B.parseContentMeta(text))).toEqual(['7.5']);
+    });
+
+    it('keeps heading numbers of an ISO-structured manual', () => {
+        const text = ['Quality Manual', '4.1 Understanding the organization and its context', '5.2 Quality policy',
+            '7.5 Documented information', '9.2 Internal audit', '9.3 Management review'].join('\n');
+        const meta = B.parseContentMeta(text);
+        expect(meta.numbering).toBe('iso');
+        expect(B.mapClauses(B.parseDocumentName('Quality Manual.docx'), meta)).toEqual(expect.arrayContaining(['4.1', '5.2', '7.5', '9.2', '9.3']));
+    });
+
+    it('honours an explicit "clause 7.5" reference in a procedure body', () => {
+        const text = procedure('Records Procedure', ['Filing', 'Backup']) + '\nThis procedure meets ISO 9001:2015 clause 7.5.3.';
+        expect(B.mapClauses(B.parseDocumentName('PRO-09.docx'), B.parseContentMeta(text))).toContain('7.5.3');
+    });
+
+    it('re-links a stored document from the headings saved in its notes', () => {
+        const doc = {
+            name: 'PRO-01', category: 'Other', linkedClauses: '4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7',
+            notes: 'Sections in document: 1 Scope; 2 Purpose; 3 Responsibilities; 4 Procedure; 4.1 Document Identification; 4.2 Document Creation & Approval; 4.3 Distribution & Access; 4.4 Revision & Change Control; 4.5 Retention & Disposal of Records…'
+        };
+        const r = B.relinkDocumentClauses(doc);
+        expect(r.numbering).toBe('internal');
+        expect(r.changed).toBe(true);
+        expect(r.proposed).toEqual(['7.5']);
+    });
+
+    it('leaves an ISO-numbered manual and a heading-less document alone', () => {
+        const manual = { name: 'QMS Manual', category: 'System Manual', linkedClauses: '4.1, 7.5',
+            headings: [{ clause: '4.1', text: 'Context of the organization' }, { clause: '7.5', text: 'Documented information' }] };
+        expect(B.relinkDocumentClauses(manual).changed).toBe(false);
+        expect(B.relinkDocumentClauses({ name: 'Scope statement', linkedClauses: '4.3' }).changed).toBe(false);
+    });
+
+    it('lets a gap analysis count the re-linked procedure for 7.5', () => {
+        const doc = { name: 'PRO-01', linkedClauses: B.relinkDocumentClauses({
+            name: 'PRO-01', notes: 'Sections in document: 1 Scope; 4 Procedure; 4.1 Document Identification; 4.2 Document Creation & Approval; 4.3 Obsolete Documents'
+        }).proposed.join(', ') };
+        const a = B.analyseDocumentGaps([{ clause: '7.5.1', title: 'General' }, { clause: '4.1', title: 'Context' }], [doc], 'iso9001');
+        expect(a.rows.map(r => [r.clause, r.covered])).toEqual([['7.5.1', true], ['4.1', false]]);
+    });
+});

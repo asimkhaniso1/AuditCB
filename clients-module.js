@@ -430,6 +430,9 @@ function getClientDocumentsHTML(client) {
                     <button class="btn btn-secondary btn-sm" data-action="openDocumentGapAnalysis" data-id="${client.id}" aria-label="Document gap analysis">
                         <i class="fa-solid fa-chart-pie" style="margin-right: 0.5rem;"></i> Gap Analysis
                     </button>
+                    <button class="btn btn-secondary btn-sm" data-action="openRelinkDocumentClauses" data-id="${client.id}" aria-label="Re-link clauses from document contents" title="Recompute each document's linked clauses from its headings">
+                        <i class="fa-solid fa-link" style="margin-right: 0.5rem;"></i> Re-link Clauses
+                    </button>
                     <button class="btn btn-secondary btn-sm" data-action="extractOrgSetupFromDocs" data-id="${client.id}" aria-label="Extract account setup from documents">
                         <i class="fa-solid fa-diagram-project" style="margin-right: 0.5rem;"></i> Extract Setup
                     </button>

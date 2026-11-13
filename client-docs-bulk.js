@@ -72,7 +72,7 @@
         { re: /\b(competenc|training|skills? matrix|induction|qualification|certification of (operator|personnel))/i, clauses: ['7.2'] },
         { re: /\b(awareness)/i, clauses: ['7.3'] },
         { re: /\b(communicat)/i, clauses: ['7.4'] },
-        { re: /\b(document(ed|ation)?[\s-]*(control|information)|documentation|control of (document|record)|record (control|retention)|master list)/i, clauses: ['7.5'] },
+        { re: /\b(document(ed|ation|s)?[\s-]*(control|information)|documentation|control of (document|record)|record (control|retention)|master list|documents?\s*(?:and|&)\s*data|data control)/i, clauses: ['7.5'] },
         { re: /\b(operation(al)?[\s-]*(planning|control)|production (control|planning)|manufactur|process control|work order|routing|assembly)/i, clauses: ['8.1'] },
         { re: /\b(customer (requirement|communication|order|contract|enquiry)|contract review|tender|quotation|order review)/i, clauses: ['8.2'] },
         { re: /\b(design(?!ation)|development)/i, clauses: ['8.3'] },
@@ -318,6 +318,7 @@
         // Annex A control rows: "A.5.1 Policies for information security".
         const seen = new Set();
         const refRows = [];
+        const allHeadings = [];
         for (const line of lines) {
             const hm = line.match(/^(A\.\d{1,2}\.\d{1,2}|\d{1,2}(?:\.\d{1,2}){0,2})[\s.):-]+([A-Za-z][^\n]{3,80})$/);
             if (!hm) continue;
@@ -325,11 +326,19 @@
             if (seen.has(key)) continue;
             seen.add(key);
             refRows.push(hm[1]);
-            if (out.headings.length < MAX_HEADINGS) {
-                out.headings.push({ clause: hm[1], text: hm[2].trim().replace(/\s+/g, ' ') });
-            }
+            const heading = { clause: hm[1], text: hm[2].trim().replace(/\s+/g, ' ') };
+            allHeadings.push(heading);
+            if (out.headings.length < MAX_HEADINGS) out.headings.push(heading);
         }
         out.clauseRefs = Array.from(new Set(refRows.flatMap(findClauseRefs))).slice(0, MAX_CLAUSE_REFS);
+        // Whether those heading numbers ARE ISO clause numbers, or just the
+        // document's own section numbering (see headingNumbering).
+        out.numbering = headingNumbering(allHeadings);
+        out.explicitRefs = findExplicitClauseRefs(text);
+        // Title-like lines from the title block ("Document & Data Control
+        // Procedure"): the file name is often just a code like "PRO-01".
+        out.titleLines = lines.slice(0, 12)
+            .filter(l => l.length <= 120 && /\b(procedure|policy|manual|plan|process|instruction|programme|program|register|guideline)s?\b/i.test(l));
         // Standards named in the opening pages — scope, purpose and normative
         // reference sections are where a document declares which system it
         // belongs to. Used only when the file name itself is silent.
@@ -351,19 +360,111 @@
         return list.slice().sort(compareClause);
     }
 
+    // ── Heading numbers: ISO clauses, or the document's own sections? ──
+    // A procedure laid out "1 Scope / 2 Purpose / 3 Responsibilities /
+    // 4 Procedure / 4.1 Document Identification ..." numbers its OWN sections.
+    // Reading those numbers as ISO clauses linked a document-control procedure
+    // to 4.1-4.7 (context of the organisation) and left 7.5 showing as a gap.
+    // A heading number is trusted as a clause only when the document's
+    // headings agree with ISO numbering; otherwise the headings' wording says
+    // what the document covers.
+
+    /** Clauses a piece of heading/title wording points to (keyword rules). */
+    function keywordClauses(text) {
+        const out = new Set();
+        for (const rule of CLAUSE_KEYWORDS) if (rule.re.test(text)) rule.clauses.forEach(c => out.add(c));
+        for (const rule of HEADING_TOPICS) if (rule.re.test(text)) rule.clauses.forEach(c => out.add(c));
+        return out;
+    }
+
+    // Looser topic words that are safe on a heading but too broad for a file
+    // name: a procedure's step headings name its subject over and over.
+    const HEADING_TOPICS = [
+        { re: /\bdocument|\brecords? (retention|keeping|management|control)|\bobsolete\b/i, clauses: ['7.5'] },
+        { re: /\baudit(s|or|ing)?\b/i, clauses: ['9.2'] },
+        { re: /\bnon[\s-]?conform|\bcorrect(ive|ion)\b|root[\s-]?cause/i, clauses: ['10.2'] },
+        { re: /\bcompeten|\brecruit|\binduction\b|\bvetting\b|\bonboarding\b/i, clauses: ['7.2'] },
+        { re: /\bcomplain/i, clauses: ['9.1.2'] }
+    ];
+
+    // Template sections every procedure has; they say nothing about its subject.
+    const GENERIC_HEADING = /^(scope|purpose|objectives?|aim|responsibilit(y|ies)|procedure|process|method|definitions?|terms|abbreviations?|references?|related documents|records?|forms?|appendix|annex|revision history|change history|distribution|approval|introduction|general|overview|policy)\b/i;
+
+    /**
+     * 'iso' when a document's numbered headings follow ISO clause numbering
+     * (an ISO-structured manual: "7.5 Documented information"), 'internal' when
+     * they are the document's own section numbers, 'none' without headings.
+     * Decided by agreement: a heading whose wording maps to the same main
+     * clause as its number agrees; one that maps elsewhere disagrees.
+     */
+    function headingNumbering(headings) {
+        let agree = 0, disagree = 0, numbered = 0;
+        for (const h of headings || []) {
+            const main = parseInt(String(h.clause).split('.')[0], 10);
+            if (!(main >= 4 && main <= 10)) continue;
+            numbered++;
+            const mains = new Set(Array.from(keywordClauses(h.text)).map(c => parseInt(c.split('.')[0], 10)));
+            if (!mains.size) continue;
+            if (mains.has(main)) agree++;
+            else disagree++;
+        }
+        if (!numbered) return 'none';
+        return agree >= 1 && agree > disagree ? 'iso' : 'internal';
+    }
+
+    /**
+     * What a document covers, read from its headings' wording. A system
+     * manual covers every topic it has a section for; a procedure covers the
+     * topic its step headings keep returning to, not every word one mentions
+     * ("4.4 Communication and Escalation" in a risk procedure is not 7.4).
+     */
+    function headingTopicClauses(headings, category) {
+        const topical = (headings || []).map(h => String(h.text || '')).filter(t => t && !GENERIC_HEADING.test(t.trim()));
+        const counts = new Map();
+        for (const t of topical) keywordClauses(t).forEach(c => counts.set(c, (counts.get(c) || 0) + 1));
+        if (!counts.size) return [];
+        if (category === 'System Manual') return Array.from(counts.keys());
+        const threshold = topical.length <= 2 ? 1 : Math.max(2, Math.ceil(topical.length * 0.4));
+        return Array.from(counts.entries()).filter(([, n]) => n >= threshold).map(([c]) => c);
+    }
+
+    /** "clause 7.5", "§ 8.4.1", "ISO 9001:2015 7.5.3" written anywhere in the body. */
+    function findExplicitClauseRefs(text) {
+        const out = new Set();
+        const re = /\b(?:clause|cl\.)\s*(\d{1,2}(?:\.\d{1,2}){0,2})\b|§\s*(\d{1,2}(?:\.\d{1,2}){0,2})\b|\bISO(?:\/IEC)?\s*\d{4,5}(?:-\d)?(?::\d{4})?,?\s+(?:clause\s+)?(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\b/gi;
+        let m;
+        while ((m = re.exec(String(text || '').slice(0, 60000))) !== null) {
+            const ref = m[1] || m[2] || m[3];
+            const main = parseInt(ref.split('.')[0], 10);
+            if (main >= 4 && main <= 10) out.add(ref);
+        }
+        return Array.from(out).slice(0, MAX_CLAUSE_REFS);
+    }
+
     /**
      * Map a parsed document to the ISO clauses it supports.
      * Explicit clause numbers beat keywords, keywords beat the bare section number.
+     * Heading numbers count as clauses only when the document follows ISO
+     * numbering; otherwise the headings' wording is used (headingNumbering).
      * @returns {string[]} sorted, de-duplicated clause references
      */
     function mapClauses(parsed, contentMeta) {
         const found = new Set();
         const title = parsed.title || '';
-        const searchText = `${title} ${parsed.folder || ''}`;
+        const meta = contentMeta || {};
+        const searchText = [title, parsed.folder || ''].concat(meta.titleLines || []).join(' ');
 
         findClauseRefs(title).forEach(c => found.add(c));
         findClauseRefs(parsed.docNumber || '').forEach(c => found.add(c));
-        (contentMeta && contentMeta.clauseRefs || []).forEach(c => found.add(c));
+        (meta.explicitRefs || []).forEach(c => found.add(c));
+        if (meta.numbering === 'internal') {
+            // Section numbers are the document's own; Annex A control rows
+            // ("A.5.1 ...") are still real references.
+            (meta.clauseRefs || []).filter(c => /^A\./.test(c)).forEach(c => found.add(c));
+            headingTopicClauses(meta.headings, parsed.category).forEach(c => found.add(c));
+        } else {
+            (meta.clauseRefs || []).forEach(c => found.add(c));
+        }
 
         for (const rule of CLAUSE_KEYWORDS) {
             if (rule.re.test(searchText)) rule.clauses.forEach(c => found.add(c));
@@ -2458,6 +2559,129 @@
         window.openDocumentGapAnalysis(clientId, standardName);
     };
 
+    // ── Re-link clauses on documents already on file ───────────────────
+    // Documents imported before headingNumbering existed carry the procedure's
+    // own section numbers as clauses (PRO-01 "Document Control" -> 4.1-4.7).
+    // Their headings were stored, so the links can be recomputed without the
+    // file being uploaded again.
+
+    /** Headings stored on a document: the headings array, else read back out of the notes. */
+    function storedHeadings(doc) {
+        if (doc && Array.isArray(doc.headings) && doc.headings.length) return doc.headings;
+        const m = String((doc && doc.notes) || '').match(/Sections in document:\s*([^\n]*)/);
+        if (!m) return [];
+        return m[1].split(/;\s*/)
+            .map(s => s.match(/^(A\.\d{1,2}\.\d{1,2}|\d{1,2}(?:\.\d{1,2}){0,2})\s+(.+)$/))
+            .filter(Boolean)
+            .map(x => ({ clause: x[1], text: x[2].replace(/\.{3}$|…$/, '').trim() }));
+    }
+
+    const splitClauses = v => String(v || '').split(',').map(s => s.trim()).filter(Boolean);
+
+    /**
+     * The clause links a stored document should have, recomputed from its
+     * title, number, category and stored headings. `changed` is true only when
+     * the headings are the document's own numbering AND the links differ —
+     * an ISO-numbered manual or a hand-linked document without headings is
+     * left as it is.
+     */
+    function relinkDocumentClauses(doc) {
+        const headings = storedHeadings(doc);
+        const meta = {
+            headings,
+            clauseRefs: Array.from(new Set(headings.map(h => h.clause).flatMap(findClauseRefs))),
+            numbering: headingNumbering(headings),
+            explicitRefs: [],
+            titleLines: []
+        };
+        const parsed = {
+            title: (doc && doc.name) || '',
+            folder: '',
+            docNumber: (doc && doc.docNumber) || '',
+            sectionRef: (doc && doc.sectionRef) || '',
+            category: (doc && doc.category) || ''
+        };
+        const proposed = mapClauses(parsed, meta);
+        const current = sortClauses(splitClauses(doc && doc.linkedClauses));
+        return {
+            current,
+            proposed,
+            numbering: meta.numbering,
+            changed: meta.numbering === 'internal' && proposed.join(', ') !== current.join(', ')
+        };
+    }
+
+    let _relink = null;
+
+    window.openRelinkDocumentClauses = function (clientId) {
+        const client = window.DataService.findClient(clientId);
+        if (!client) return;
+        const rows = (client.documents || [])
+            .map((doc, index) => ({ doc, index, ...relinkDocumentClauses(doc) }))
+            .filter(r => r.changed);
+        if (!rows.length) {
+            notify('Every document\'s clause links already match its contents.', 'success');
+            return;
+        }
+        _relink = { clientId, rows };
+        const fmt = list => list.length ? esc(list.join(', ')) : '<em style="color:#9ca3af;">none</em>';
+        const body = `
+        <p style="margin:0 0 0.75rem; font-size:0.88rem; color:var(--text-secondary);">
+            These documents number their own sections (1 Scope, 2 Purpose, 3 Responsibilities, 4 Procedure, 4.1 ...).
+            Those numbers were linked as ISO clauses when the files were imported. The proposed links come from what
+            the headings are about. Untick any document you linked by hand.
+        </p>
+        <div class="table-container"><table>
+            <thead><tr><th style="width:2rem;"></th><th>Document</th><th>Linked now</th><th>Proposed</th></tr></thead>
+            <tbody>${rows.map((r, i) => `
+                <tr>
+                    <td><input type="checkbox" class="relink-pick" data-row="${i}" ${r.proposed.length ? 'checked' : ''} aria-label="Re-link ${esc(r.doc.name || '')}"></td>
+                    <td><strong>${esc(r.doc.name || '')}</strong>${r.doc.docNumber ? `<div style="font-size:0.78rem;color:#6b7280;">${esc(r.doc.docNumber)}</div>` : ''}</td>
+                    <td style="font-size:0.82rem;color:#991b1b;">${fmt(r.current)}</td>
+                    <td style="font-size:0.82rem;color:#166534;">${fmt(r.proposed)}${r.proposed.length ? '' : '<div style="color:#92400e;">No topic found in the headings — link it by hand.</div>'}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table></div>`;
+        window.DataService.openFormModal(`Re-link clauses — ${client.name}`, body, () => window.applyRelinkDocumentClauses());
+        const saveBtn = document.getElementById('modal-save');
+        if (saveBtn) saveBtn.textContent = 'Apply selected';
+        setWideModal(true);
+    };
+
+    window.applyRelinkDocumentClauses = function () {
+        if (!_relink) return;
+        const client = window.DataService.findClient(_relink.clientId);
+        if (!client) return;
+        const picked = Array.from(document.querySelectorAll('.relink-pick:checked')).map(el => _relink.rows[+el.dataset.row]).filter(Boolean);
+        const now = new Date().toISOString();
+        picked.forEach(r => {
+            const doc = client.documents[r.index];
+            if (!doc) return;
+            doc.linkedClauses = r.proposed.join(', ');
+            doc.clausesRelinkedAt = now;
+        });
+        const clientId = _relink.clientId;
+        _relink = null;
+        if (picked.length) {
+            window.saveData();
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => {
+                    if (window.Logger) window.Logger.error('ClientDocsBulk', 'Cloud sync failed: ' + err.message);
+                });
+            }
+        }
+        setWideModal(false);
+        window.closeModal();
+        notify(picked.length ? `Re-linked clauses on ${picked.length} document(s).` : 'No documents changed.', 'success');
+        if (typeof window.renderClientDetail === 'function') {
+            window.renderClientDetail(clientId);
+            setTimeout(() => {
+                const tab = document.querySelector('.tab-btn[data-tab="documents"]');
+                if (tab) tab.click();
+            }, 100);
+        }
+    };
+
     /** Tick/untick a standard in the multi-standard gap analysis. */
     window.toggleGapStandard = function (name, checked) {
         if (!_gap) return;
@@ -3943,6 +4167,12 @@
         parseContentMeta,
         inferCategory,
         mapClauses,
+        // Section numbers vs ISO clause numbers, and re-linking stored documents.
+        headingNumbering,
+        headingTopicClauses,
+        findExplicitClauseRefs,
+        storedHeadings,
+        relinkDocumentClauses,
         // Standard attribution — what makes a clause number traceable in an IMS.
         detectStandards,
         mapStandards,
