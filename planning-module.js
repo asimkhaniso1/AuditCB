@@ -324,6 +324,7 @@ window.planAuditMethodChanged = function (el) {
 
 function renderCreateAuditPlanForm(preSelectedClientName = null) {
     window.editingPlanId = null; // Reset edit mode
+    window._planOverrideState = { planId: null, overrides: [], history: [] }; // gate overrides being edited on this form
     window._planCertificateSelection = null; // a new plan starts from all certificates
     window._agendaHalfDays = new Set(); // the agenda editor's per-day state starts clean
     window._agendaCollapsed = new Set();
@@ -622,6 +623,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                         <div class="card" style="margin:0;padding:1.5rem;">
                             <h3 style="margin:0 0 1rem;font-size:1.1rem;color:var(--primary-color);">Pre-save QA</h3>
                             <div id="plan-qa-panel" style="font-size:.85rem;color:var(--text-secondary);">Validation results will appear here before finalization.</div>
+                            <div id="plan-override-panel" style="font-size:.85rem;margin-top:.5rem;"></div>
                         </div>
 
                         <!-- Main Actions -->
@@ -665,6 +667,8 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
         document.getElementById(id)?.addEventListener('input', recalculateDurationAllocation);
     });
     ['plan-lead-auditor', 'plan-team'].forEach(id => document.getElementById(id)?.addEventListener('change', renderTeamCompetence));
+    // The override control follows the dates: it appears when they leave the window.
+    ['plan-date', 'plan-end-date', 'plan-client'].forEach(id => document.getElementById(id)?.addEventListener('change', () => renderPlanOverridePanel()));
 
     // Auto-trigger client details if activeClientId needed or pre-selected
     if (preSelectedClientName) {
@@ -789,6 +793,7 @@ function editAuditPlan(id) {
 
     renderCreateAuditPlanForm();
     window.editingPlanId = id; // Set global edit ID
+    window._planOverrideState = { planId: String(id), overrides: (plan.overrides || []).slice(), history: (plan.overrideHistory || []).slice() };
 
     // Fill data
     setTimeout(() => {
@@ -898,6 +903,7 @@ function editAuditPlan(id) {
             } else {
                 addAgendaRow({ day: 'Day 1', time: '09:00 - 09:30', item: 'Opening Meeting', dept: 'Top Management', auditor: 'All' });
             }
+            renderPlanOverridePanel();
         }, 300);
 
         // Fill Audit Objectives, Criteria & Methodology
@@ -1173,6 +1179,152 @@ window.openDurationMethodologySetup = function () {
 
 // Note: The definitive saveAuditPlan function is defined below (around line 1660) with proper validation and sanitization
 
+// ── Gate overrides ──────────────────────────────────────────────────
+// An authorised person (AuditPlanIntegrity.APPROVER_ROLES) may accept an
+// overridable blocker (today: the audit falls outside the recommended window)
+// on the record, with a reason. plan.overrides holds those in force;
+// plan.overrideHistory keeps withdrawn ones. The editor works on a copy
+// (window._planOverrideState) that Save and Save draft write to the plan.
+
+function overrideRangeText(r) {
+    if (!r || (!r.start && !r.end)) return 'not recorded';
+    return window.DocFormat ? window.DocFormat.formatDateRange(r.start, r.end) : `${r.start || ''} – ${r.end || ''}`;
+}
+function overrideDateText(at) {
+    if (!at) return 'date not recorded';
+    return window.DocFormat ? window.DocFormat.formatDate(at) : String(at).slice(0, 10);
+}
+
+/**
+ * The overrides in force and the withdrawn ones, as HTML. Every value a user
+ * typed (name, role, reason) is escaped here.
+ * @param {Object} o { overrides, history, plan (for the stale check), canWithdraw, withdrawAction, withdrawArgs(index) -> attrs }
+ */
+function planOverridesListHTML(o) {
+    const IPI = window.AuditPlanIntegrity;
+    const esc = window.UTILS.escapeHtml;
+    const label = (x) => (IPI.OVERRIDE_LABELS && IPI.OVERRIDE_LABELS[x.category]) || x.category;
+    const active = (o.overrides || []).map((x, i) => {
+        const stale = IPI.overrideIsStale(o.plan, x);
+        return `<div class="plan-override-entry" style="padding:.6rem .75rem;border:1px solid #fde68a;background:#fffbeb;border-radius:6px;margin:.5rem 0;">
+            <div style="font-weight:600;color:#92400e;"><i class="fa-solid fa-user-shield" style="margin-right:.4rem;"></i>Override in force: ${esc(label(x))}</div>
+            <div style="margin-top:.25rem;color:#334155;">Recorded by <strong>${esc(x.user)}</strong> (${esc(x.role)}) on ${esc(overrideDateText(x.at))}.</div>
+            <div style="margin-top:.25rem;color:#334155;">Reason: <span class="plan-override-reason">${esc(x.reason)}</span></div>
+            ${x.window || x.scheduled ? `<div style="margin-top:.25rem;font-size:.78rem;color:#64748b;">Recommended window: ${esc(overrideRangeText(x.window))} · Scheduled when recorded: ${esc(overrideRangeText(x.scheduled))}</div>` : ''}
+            ${stale ? '<div style="margin-top:.25rem;font-size:.78rem;color:#b45309;"><i class="fa-solid fa-triangle-exclamation"></i> The audit dates have changed since this override was recorded.</div>' : ''}
+            ${o.canWithdraw ? `<button type="button" class="btn btn-sm btn-outline-secondary" style="margin-top:.45rem;" data-action="${o.withdrawAction}" ${o.withdrawArgs(i)}>Withdraw override</button>` : ''}
+        </div>`;
+    }).join('');
+    const history = (o.history || []).map(x => `<li style="margin:.3rem 0;">${esc(label(x))}: recorded by ${esc(x.user)} (${esc(x.role)}) on ${esc(overrideDateText(x.at))} — “${esc(x.reason)}”. Withdrawn by ${esc(x.withdrawnBy)} (${esc(x.withdrawnRole)}) on ${esc(overrideDateText(x.withdrawnAt))} — “${esc(x.withdrawalReason)}”.</li>`).join('');
+    return active + (history ? `<details style="margin-top:.5rem;"><summary style="cursor:pointer;font-size:.8rem;color:#64748b;">Withdrawn overrides (${(o.history || []).length})</summary><ul style="margin:.4rem 0 0 1.1rem;font-size:.8rem;color:#475569;">${history}</ul></details>` : '');
+}
+
+/** The plan as the editor currently describes it, for the window check. */
+function editorOverridePlan(planData) {
+    const st = window._planOverrideState || { overrides: [], history: [] };
+    if (planData) return Object.assign({}, planData, { overrides: st.overrides, overrideHistory: st.history });
+    let cycle;
+    try { cycle = getCurrentFormCycleContext() || {}; } catch (_e) { cycle = {}; }
+    return {
+        date: document.getElementById('plan-date')?.value || '', endDate: document.getElementById('plan-end-date')?.value || '',
+        certificationCycle: { recommendedWindowStart: cycle.recommendedWindowStart, recommendedWindowEnd: cycle.recommendedWindowEnd },
+        overrides: st.overrides, overrideHistory: st.history
+    };
+}
+
+/** Editor: the overrides on this plan, and the control to record one when the gate needs it. */
+function renderPlanOverridePanel(planData) {
+    const panel = document.getElementById('plan-override-panel');
+    const IPI = window.AuditPlanIntegrity;
+    if (!panel || !IPI) return;
+    const esc = window.UTILS.escapeHtml;
+    const plan = editorOverridePlan(planData);
+    const user = window.state.currentUser || {};
+    const authorised = IPI.isApprover(user.role);
+    const w = IPI.windowCheck(plan);
+    const list = planOverridesListHTML({
+        overrides: plan.overrides, history: plan.overrideHistory, plan, canWithdraw: authorised,
+        withdrawAction: 'withdrawEditorPlanOverride', withdrawArgs: (i) => `data-arg1="${i}"`
+    });
+    let control = '';
+    if (w.outside && !IPI.activeOverride(plan, 'window')) {
+        const intro = `<div style="color:#92400e;"><i class="fa-solid fa-calendar-xmark" style="margin-right:.4rem;"></i>The scheduled audit (${esc(overrideRangeText(w.scheduled))}) is outside the recommended window (${esc(overrideRangeText(w.window))}). This blocks approval for client issue unless an authorised person records an override.</div>`;
+        control = authorised
+            ? `<div class="plan-override-record" style="padding:.75rem;border:1px dashed #f59e0b;border-radius:6px;margin:.5rem 0;">
+                ${intro}
+                <label for="plan-override-reason" style="display:block;font-size:.8rem;font-weight:600;margin:.6rem 0 .25rem;">Reason for accepting the dates (required)</label>
+                <textarea id="plan-override-reason" class="form-control" rows="2" maxlength="1000" placeholder="e.g. Client requested the later date; the certificate remains valid through the audit"></textarea>
+                <div style="font-size:.75rem;color:#64748b;margin-top:.25rem;">Recorded as ${esc(user.name || 'unknown user')} (${esc(user.role)}) with today’s date, the recommended window and the scheduled dates. It is saved with the plan by Save or Save draft.</div>
+                <button type="button" class="btn btn-sm btn-warning" style="margin-top:.5rem;" data-action="recordEditorPlanOverride" data-arg1="window"><i class="fa-solid fa-user-shield" style="margin-right:.4rem;"></i>Record override</button>
+            </div>`
+            : `<div class="plan-override-record" style="padding:.75rem;border:1px dashed #cbd5e1;border-radius:6px;margin:.5rem 0;">
+                ${intro}
+                <div style="margin-top:.4rem;font-size:.8rem;color:#475569;">Only ${esc(IPI.APPROVER_ROLES.join(', '))} can record an override. You are signed in as ${esc(user.role || 'a user with no role')}; ask one of them to record it, or move the audit dates into the window.</div>
+            </div>`;
+    }
+    panel.innerHTML = control + list;
+}
+
+window.recordEditorPlanOverride = function (category) {
+    const IPI = window.AuditPlanIntegrity;
+    if (!IPI) return;
+    const user = window.state.currentUser || {};
+    const reason = (document.getElementById('plan-override-reason')?.value || '').trim();
+    const plan = editorOverridePlan();
+    const res = IPI.recordOverride(plan, { category: category || 'window', user: user.name, role: user.role, reason });
+    if (!res.ok) { window.showNotification(res.reason, 'error'); return; }
+    window._planOverrideState.overrides = res.overrides;
+    renderPlanOverridePanel();
+    window.showNotification('Override recorded. Save or Save draft to keep it on the plan.', 'success');
+};
+
+window.withdrawEditorPlanOverride = function (index) {
+    const IPI = window.AuditPlanIntegrity;
+    const st = window._planOverrideState;
+    if (!IPI || !st) return;
+    const user = window.state.currentUser || {};
+    const reason = window.prompt('Why is this override being withdrawn?');
+    if (reason == null) return;
+    const res = IPI.withdrawOverride({ overrides: st.overrides, overrideHistory: st.history }, index, { user: user.name, role: user.role, reason });
+    if (!res.ok) { window.showNotification(res.reason, 'error'); return; }
+    st.overrides = res.overrides;
+    st.history = res.overrideHistory;
+    renderPlanOverridePanel();
+    window.showNotification('Override withdrawn. Save or Save draft to apply it to the plan.', 'success');
+};
+
+/** Plan view: withdrawing here takes effect at once (the view has no Save). */
+window.withdrawPlanOverride = async function (planId, index) {
+    const IPI = window.AuditPlanIntegrity;
+    const plan = (window.state.auditPlans || []).find(p => String(p.id) === String(planId));
+    if (!IPI || !plan) return;
+    const user = window.state.currentUser || {};
+    const reason = window.prompt('Why is this override being withdrawn?');
+    if (reason == null) return;
+    const res = IPI.withdrawOverride(plan, index, { user: user.name, role: user.role, reason });
+    if (!res.ok) { window.showNotification(res.reason, 'error'); return; }
+    plan.overrides = res.overrides;
+    plan.overrideHistory = res.overrideHistory;
+    await persistPlanRecord(plan);
+    window.showNotification('Override withdrawn.', 'success');
+    window.viewAuditPlan(planId);
+};
+
+/** Plan view: the overrides on the plan, with who, when and why. */
+function planOverridesCardHTML(plan) {
+    const IPI = window.AuditPlanIntegrity;
+    if (!IPI || !IPI.isApprover || (!(plan.overrides || []).length && !(plan.overrideHistory || []).length)) return '';
+    const esc = window.UTILS.escapeHtml;
+    const authorised = IPI.isApprover(window.state.currentUser?.role);
+    return `<div class="card plan-overrides-card" style="margin-bottom:1.5rem;border-left:4px solid #f59e0b;">
+        <h3 style="margin:0 0 .25rem;font-size:1.05rem;"><i class="fa-solid fa-user-shield" style="margin-right:.5rem;"></i>Gate overrides</h3>
+        <div style="font-size:.85rem;">${planOverridesListHTML({
+        overrides: plan.overrides || [], history: plan.overrideHistory || [], plan, canWithdraw: authorised,
+        withdrawAction: 'withdrawPlanOverride', withdrawArgs: (i) => `data-arg1="${esc(String(plan.id))}" data-arg2="${i}"`
+    })}</div>
+    </div>`;
+}
+
 /** Document status, who may move it, and exactly what is blocking it. */
 function planStatusCardHTML(plan) {
     const IPI = window.AuditPlanIntegrity;
@@ -1373,6 +1525,7 @@ function viewAuditPlan(id) {
             </div>
 
             ${planStatusCardHTML(plan)}
+            ${planOverridesCardHTML(plan)}
 
             <!--Stepper-->
                 ${stepperHTML}
@@ -3015,7 +3168,12 @@ function validateAuditPlanForSave(planData) {
     if ((start && !end) || (!start && end)) errors.push('Enter both scheduled audit start and end dates, or leave both blank.');
     if (start && end && end < start) errors.push('Scheduled audit end cannot be before the start.');
     if (end && expiry && end > expiry) errors.push('Scheduled audit dates extend beyond certificate expiry.');
-    if (start && windowStart && windowEnd && (start < windowStart || start > windowEnd)) warnings.push('Scheduled dates are outside the recommended planning window.');
+    const windowOverride = window.AuditPlanIntegrity?.activeOverride ? window.AuditPlanIntegrity.activeOverride(planData, 'window') : null;
+    if (start && windowStart && windowEnd && (start < windowStart || start > windowEnd)) {
+        warnings.push(windowOverride
+            ? `Scheduled dates are outside the recommended planning window; override recorded by ${windowOverride.user} (${windowOverride.role}).`
+            : 'Scheduled dates are outside the recommended planning window.');
+    }
     if (end && windowEnd && end > windowEnd) warnings.push(`Scheduled completion leaves less than the required ${cycle.closureBufferDays}-day NC closure buffer before expiry.`);
     if (end && expiry && cycle.policy) {
         const daysRemaining = Math.ceil((expiry - end) / 86400000);
@@ -3145,6 +3303,7 @@ function validateAuditPlanForSave(planData) {
     }
     const qa = { errors: [...new Set(errors)], warnings: [...new Set(warnings)], checks };
     renderPlanQA(qa);
+    renderPlanOverridePanel(planData);
     return qa;
 }
 
@@ -3379,6 +3538,13 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
     planData.documentStatus = existing?.documentStatus || statuses[0];
     planData.approval = existing?.approval || null;
     planData.statusHistory = existing?.statusHistory || [];
+    // Gate overrides are set EXPLICITLY, never left to the {...existing, ...planData}
+    // merge below: that merge would keep an override withdrawn on this form.
+    // The form's working copy wins when it belongs to this plan.
+    const ovState = window._planOverrideState;
+    const ovMine = ovState && String(ovState.planId || '') === String(window.editingPlanId || '');
+    planData.overrides = (ovMine ? ovState.overrides : (existing?.overrides || [])).slice();
+    planData.overrideHistory = (ovMine ? ovState.history : (existing?.overrideHistory || [])).slice();
     if (existing && existing.approval && existing.approval.contentHash && window.AuditPlanIntegrity
         && existing.approval.contentHash !== window.AuditPlanIntegrity.contentHash(planData)) {
         planData.documentStatus = statuses[0];
@@ -3449,6 +3615,7 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
                 state.auditPlans.push(newPlan);
                 // Temporarily set editingPlanId so we know what to update in DB
                 window.editingPlanId = newPlanId;
+                if (window._planOverrideState && !window._planOverrideState.planId) window._planOverrideState.planId = newPlanId;
             }
 
             // Append lifecycle planning events once the plan has a stable ID.
