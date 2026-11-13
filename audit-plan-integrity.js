@@ -1303,6 +1303,86 @@
     }
 
     // ═════════════════════════════════════════════════════════════════
+    // 8b. GATE OVERRIDES
+    // ═════════════════════════════════════════════════════════════════
+    // A blocker an authorised person may accept on the record, with a reason.
+    // plan.overrides holds the overrides IN FORCE; a withdrawn one moves to
+    // plan.overrideHistory, so the gate (and any older build of the app that
+    // reads plan.overrides) can no longer see it. Entry shape, compatible with
+    // the one written by hand on PC Connection's plan on 2026-11-13:
+    //   { category:'window', user, role, reason, at, window:{start,end}, scheduled:{start,end} }
+    const OVERRIDABLE = { OUTSIDE_WINDOW: 'window' };
+    const OVERRIDE_LABELS = { window: 'Audit outside the recommended window' };
+
+    function isApprover(role) { return APPROVER_ROLES.map(lower).indexOf(lower(role)) !== -1; }
+    function isActiveOverride(o) { return !!(o && o.category && str(o.user) && str(o.role) && str(o.reason) && !o.withdrawnAt); }
+    function activeOverride(plan, category) {
+        return arr(plan && plan.overrides).filter(function (o) { return isActiveOverride(o) && o.category === category; }).pop() || null;
+    }
+
+    /** Is the scheduled audit outside the recommended window? Same test the gate applies. */
+    function windowCheck(plan) {
+        const df = DF(); const p = plan || {}; const cyc = p.certificationCycle || {};
+        const start = df.toIso(p.date); const end = df.toIso(p.endDate);
+        const wStart = df.toIso(cyc.recommendedWindowStart); const wEnd = df.toIso(cyc.recommendedWindowEnd);
+        return {
+            outside: !!(start && wStart && wEnd && (start < wStart || end > wEnd)),
+            window: { start: wStart || '', end: wEnd || '' },
+            scheduled: { start: start || '', end: end || '' }
+        };
+    }
+    function overrideContext(plan, category) {
+        if (category === 'window') { const w = windowCheck(plan); return { window: w.window, scheduled: w.scheduled }; }
+        return {};
+    }
+    /** An override recorded for other dates than the plan now has. */
+    function overrideIsStale(plan, o) {
+        if (!o || o.category !== 'window' || !o.scheduled) return false;
+        const df = DF(); const now = windowCheck(plan).scheduled;
+        return (df.toIso(o.scheduled.start) || '') !== now.start || (df.toIso(o.scheduled.end) || '') !== now.end;
+    }
+
+    /**
+     * Record an override. Never mutates the plan: returns the new overrides array.
+     * @param {Object} plan  the plan as the gate will judge it (dates, cycle)
+     * @param {Object} o     { category, user, role, reason, at? }
+     * @returns {{ok:boolean, reason?:string, entry?:Object, overrides?:Array}}
+     */
+    function recordOverride(plan, o) {
+        const c = o || {};
+        const cats = Object.keys(OVERRIDABLE).map(function (k) { return OVERRIDABLE[k]; });
+        if (cats.indexOf(c.category) === -1) return { ok: false, reason: 'Unknown override category "' + str(c.category) + '".' };
+        if (!isApprover(c.role)) return { ok: false, reason: 'Only ' + APPROVER_ROLES.join(', ') + ' may record a gate override.' };
+        if (!str(c.user)) return { ok: false, reason: 'The person recording the override must be signed in.' };
+        if (!str(c.reason)) return { ok: false, reason: 'A reason is required to record an override.' };
+        if (activeOverride(plan, c.category)) return { ok: false, reason: 'An override for this is already in force; withdraw it before recording another.' };
+        const entry = Object.assign({ category: c.category, user: str(c.user), role: str(c.role), reason: str(c.reason), at: c.at || new Date().toISOString() }, overrideContext(plan, c.category));
+        return { ok: true, entry: entry, overrides: arr(plan && plan.overrides).concat([entry]) };
+    }
+
+    /**
+     * Withdraw the override at `index` of plan.overrides. It leaves
+     * plan.overrides and is kept, with who/when/why it was withdrawn, on
+     * plan.overrideHistory. Never mutates the plan.
+     * @param {Object} o { user, role, reason, at? }
+     */
+    function withdrawOverride(plan, index, o) {
+        const c = o || {};
+        const list = arr(plan && plan.overrides);
+        const i = Number(index);
+        if (!(i >= 0 && i < list.length) || !list[i]) return { ok: false, reason: 'That override is no longer on the plan.' };
+        if (!isApprover(c.role)) return { ok: false, reason: 'Only ' + APPROVER_ROLES.join(', ') + ' may withdraw a gate override.' };
+        if (!str(c.user)) return { ok: false, reason: 'The person withdrawing the override must be signed in.' };
+        if (!str(c.reason)) return { ok: false, reason: 'A reason is required to withdraw an override.' };
+        const withdrawn = Object.assign({}, list[i], { withdrawnAt: c.at || new Date().toISOString(), withdrawnBy: str(c.user), withdrawnRole: str(c.role), withdrawalReason: str(c.reason) });
+        return {
+            ok: true, withdrawn: withdrawn,
+            overrides: list.filter(function (_x, k) { return k !== i; }),
+            overrideHistory: arr(plan && plan.overrideHistory).concat([withdrawn])
+        };
+    }
+
+    // ═════════════════════════════════════════════════════════════════
     // 9. THE GATE
     // ═════════════════════════════════════════════════════════════════
     function issue(code, message, extra) { return Object.assign({ code: code, message: message, severity: 'blocker' }, extra || {}); }
@@ -1335,9 +1415,10 @@
         if (start && end && end < start) B('DATES_INVALID', 'The scheduled audit ends before it starts.', { field: 'endDate' });
         const cyc = p.certificationCycle || {};
         const wStart = df.toIso(cyc.recommendedWindowStart); const wEnd = df.toIso(cyc.recommendedWindowEnd); const exp = df.toIso(cyc.certificateExpiry);
-        const overridden = function (cat) { return arr(p.overrides).some(function (o) { return o && o.category === cat && o.user && o.role && o.reason; }); };
-        if (start && wStart && wEnd && (start < wStart || end > wEnd) && !overridden('window')) {
-            B('OUTSIDE_WINDOW', 'The scheduled audit (' + df.formatDateRange(start, end) + ') is outside the approved window (' + df.formatDateRange(wStart, wEnd) + ').', { field: 'date' });
+        if (start && wStart && wEnd && (start < wStart || end > wEnd)) {
+            const ov = activeOverride(p, 'window');
+            if (!ov) B('OUTSIDE_WINDOW', 'The scheduled audit (' + df.formatDateRange(start, end) + ') is outside the approved window (' + df.formatDateRange(wStart, wEnd) + ').', { field: 'date', overridable: OVERRIDABLE.OUTSIDE_WINDOW });
+            else if (overrideIsStale(p, ov)) W('OVERRIDE_STALE', 'The window override recorded by ' + str(ov.user) + ' was for ' + df.formatDateRange(ov.scheduled.start, ov.scheduled.end) + '; the audit is now scheduled for ' + df.formatDateRange(start, end) + '. Withdraw it and record a new one if the change is accepted.', { field: 'date' });
         }
         if (end && exp && end > exp) B('AFTER_EXPIRY', 'The scheduled audit ends after the certificate expires on ' + df.formatDate(exp) + '.', { field: 'endDate' });
 
@@ -1540,6 +1621,7 @@
 
     const API = {
         STD_SHORT, BLOCKS, REQUIRED_COVERAGE, CORE_PROCESSES, STATUSES, APPROVER_ROLES,
+        OVERRIDABLE, OVERRIDE_LABELS, isApprover, isActiveOverride, activeOverride, windowCheck, overrideIsStale, recordOverride, withdrawOverride,
         clauseLabel, refTitle, compressRefs, describeStandards, scanFreeText, stdLabel, shortLabel,
         resolveAuditors, auditTeamLabel, isPlaceholderAuditor,
         collectPreviousFindings, mapFindings,

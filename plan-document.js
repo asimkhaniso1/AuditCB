@@ -401,6 +401,15 @@
 
         const hist = arr(p.statusHistory).map(function (h) { return '<tr><td>' + t(h.status) + '</td><td>' + t(h.by) + ' (' + t(h.role) + ')</td><td>' + t(df.formatDate(h.at)) + '</td><td>' + t(h.note || '') + '</td></tr>'; }).join('');
 
+        // Gate overrides in force, then withdrawn ones: who accepted which blocker, when and why.
+        const ovLabel = function (o) { return (ipi.OVERRIDE_LABELS && ipi.OVERRIDE_LABELS[o.category]) || o.category; };
+        const ovRange = function (r) { return r && (r.start || r.end) ? t(df.formatDateRange(r.start, r.end)) : ''; };
+        const ovRow = function (o, gone) {
+            return '<tr><td>' + t(ovLabel(o)) + '</td><td>' + t(o.user) + ' (' + t(o.role) + ')</td><td>' + t(df.formatDate(o.at)) + '</td><td>' + t(o.reason) + '</td><td>' + ovRange(o.window) + '</td><td>' + ovRange(o.scheduled) + '</td><td>'
+                + (gone ? 'Withdrawn ' + t(df.formatDate(o.withdrawnAt)) + ' by ' + t(o.withdrawnBy) + ' (' + t(o.withdrawnRole) + '): ' + t(o.withdrawalReason) : '<b>In force</b>') + '</td></tr>';
+        };
+        const ovRows = arr(p.overrides).map(function (o) { return ovRow(o, false); }).join('') + arr(p.overrideHistory).map(function (o) { return ovRow(o, true); }).join('');
+
         const body = shell.masthead({ brandName: c.brand && c.brand.name, logoUrl: c.brand && c.brand.logoUrl, title: 'Audit Plan — Internal Certification Record', subtitle: 'Ref: ' + ref + ' · ' + plain(c.client && c.client.name || p.client) + ' · not for client issue', qrUrl: c.qrUrl })
             + '<p style="margin:0 0 4px"><span class="status-pill ' + statusClass(status) + '">' + t(status) + '</span> &nbsp; <b class="' + (v.blockers.length ? 'bad' : 'ok') + '">' + (v.blockers.length ? v.blockers.length + ' blocking issue(s) — not ready for client issue' : 'All blocking validations pass') + '</b></p>'
             + '<div class="pd-section-title">1. APPROVAL READINESS</div>' + issueTable(v.blockers, 'issue-block', 'Blocking issues') + issueTable(v.warnings, 'issue-warn', 'Warnings')
@@ -409,7 +418,8 @@
             + '<div class="pd-section-title">4. AGENDA TRACEABILITY MATRIX</div>' + traceTable
             + '<div class="pd-section-title">5. CERTIFIED SCOPE VERIFICATION</div>' + scopeRows
             + '<div class="pd-section-title">6. CHECKLIST ASSOCIATION AND COVERAGE</div>' + cov
-            + '<div class="pd-section-title">7. STATUS HISTORY</div>' + (hist ? '<table class="grid"><thead><tr><th>Status</th><th>By</th><th>Date</th><th>Note</th></tr></thead><tbody>' + hist + '</tbody></table>' : '<p class="note">No status changes recorded; the plan is in ' + t(status) + '.</p>');
+            + '<div class="pd-section-title">7. STATUS HISTORY</div>' + (hist ? '<table class="grid"><thead><tr><th>Status</th><th>By</th><th>Date</th><th>Note</th></tr></thead><tbody>' + hist + '</tbody></table>' : '<p class="note">No status changes recorded; the plan is in ' + t(status) + '.</p>')
+            + (ovRows ? '<div class="pd-section-title">8. GATE OVERRIDES</div><table class="grid"><thead><tr><th>Override</th><th>Recorded by</th><th>Date</th><th>Reason</th><th>Recommended window</th><th>Scheduled</th><th>Status</th></tr></thead><tbody>' + ovRows + '</tbody></table>' : '');
 
         return shell.buildDocument({
             title: 'Audit Plan Internal Record - ' + plain(c.client && c.client.name || p.client),
