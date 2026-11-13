@@ -58,37 +58,181 @@
     // These are word stems, so there is no trailing \b — "traceab" has to be
     // allowed to match "traceability".
     const CLAUSE_KEYWORDS = [
-        { re: /\b(context|interested part|stakeholder|internal and external issue|company (profile|overview)|organi[sz]ation profile)/i, clauses: ['4.1', '4.2'] },
-        { re: /\b(scope of the|scope statement|(qms|ems|osh|isms) scope|boundaries and applicability)/i, clauses: ['4.3'] },
-        { re: /\b(process (map|interaction|approach)|turtle|sipoc|(management|quality) system documentation)/i, clauses: ['4.4'] },
-        { re: /\b(leadership|customer focus|commitment)/i, clauses: ['5.1'] },
-        { re: /\b(polic(y|ies))/i, clauses: ['5.2'] },
-        { re: /\b(org(?:ani[sz]ation(?:al)?)?[\s-]*chart|organogram|roles|responsibilit|authorit|job description)/i, clauses: ['5.3'] },
-        { re: /\b(risk|opportunit|fmea|swot|hira|aspect)/i, clauses: ['6.1'] },
-        { re: /\b(objective|\bkpi\b|target|improvement programme|improvement program)/i, clauses: ['6.2'] },
-        { re: /\b(change (management|control)|management of change|\bmoc\b)/i, clauses: ['6.3'] },
-        { re: /\b(resource|infrastructure|facilit|maintenance|work environment|housekeeping)/i, clauses: ['7.1'] },
-        { re: /\b(calibrat|measuring (and monitoring )?equipment|\bmsa\b|gauge|instrument control)/i, clauses: ['7.1.5'] },
-        { re: /\b(competenc|training|skills? matrix|induction|qualification|certification of (operator|personnel))/i, clauses: ['7.2'] },
-        { re: /\b(awareness)/i, clauses: ['7.3'] },
-        { re: /\b(communicat)/i, clauses: ['7.4'] },
-        { re: /\b(document(ed|ation|s)?[\s-]*(control|information)|documentation|control of (document|record)|record (control|retention)|master list|documents?\s*(?:and|&)\s*data|data control)/i, clauses: ['7.5'] },
-        { re: /\b(operation(al)?[\s-]*(planning|control)|production (control|planning)|manufactur|process control|work order|routing|assembly)/i, clauses: ['8.1'] },
-        { re: /\b(customer (requirement|communication|order|contract|enquiry)|contract review|tender|quotation|order review)/i, clauses: ['8.2'] },
-        { re: /\b(design(?!ation)|development)/i, clauses: ['8.3'] },
-        { re: /\b(purchas|procure|supplier|vendor|subcontract|external(ly)?[\s-]*provid|outsourc|counterfeit|incoming (inspection|material))/i, clauses: ['8.4'] },
-        { re: /\b(production and service provision|traceab|preservation|packag|handling|storage|customer propert|post[\s-]?delivery|warehous|shipping|\besd\b)/i, clauses: ['8.5'] },
-        { re: /\b(release of (product|service)|final inspection|in[\s-]?process inspection|first article|\bfai\b|acceptance criteria|workmanship)/i, clauses: ['8.6'] },
-        { re: /\b(nonconforming (output|product|material)|rework|repair|scrap|quarantine|\bmrb\b|concession|deviation)/i, clauses: ['8.7'] },
-        { re: /\b(monitoring and measurement|analysis and evaluation|statistic|\bspc\b|performance evaluation|data analysis)/i, clauses: ['9.1'] },
-        { re: /\b(customer satisfaction|complaint|feedback survey)/i, clauses: ['9.1.2'] },
-        { re: /\b(internal audit)/i, clauses: ['9.2'] },
-        { re: /\b(management review|\bmrm\b)/i, clauses: ['9.3'] },
-        { re: /\b(improvement|continual|kaizen)/i, clauses: ['10.1', '10.3'] },
-        { re: /\b(nonconformity and corrective|corrective action|\bcapa\b|\bcar\b|root cause)/i, clauses: ['10.2'] },
-        { re: /\b(emergency|preparedness and response|incident|accident)/i, clauses: ['8.2'] },
-        { re: /\b(legal|compliance obligation|export[\s-]?(control|compliance)|trade compliance|dual[\s-]?use|\bitar\b|\bear\b|regulator|statutory|sanction)/i, clauses: ['4.2', '6.1'] }
+        { topic: 'context', re: /\b(context|interested part|stakeholder|internal and external issue|company (profile|overview)|organi[sz]ation profile)/i, clauses: ['4.1', '4.2'] },
+        { topic: 'scope', re: /\b(scope of the|scope statement|(qms|ems|osh|isms) scope|boundaries and applicability)/i, clauses: ['4.3'] },
+        { topic: 'system', re: /\b(process (map|interaction|approach)|turtle|sipoc|(management|quality) system documentation)/i, clauses: ['4.4'] },
+        { topic: 'leadership', re: /\b(leadership|customer focus|commitment)/i, clauses: ['5.1'] },
+        { topic: 'policy', re: /\b(polic(y|ies))/i, clauses: ['5.2'] },
+        { topic: 'roles', re: /\b(org(?:ani[sz]ation(?:al)?)?[\s-]*chart|organogram|roles|responsibilit|authorit|job description)/i, clauses: ['5.3'] },
+        { topic: 'risk', re: /\b(risk|opportunit|fmea|swot|hira|aspect)/i, clauses: ['6.1'] },
+        { topic: 'objectives', re: /\b(objective|\bkpi\b|target|improvement programme|improvement program)/i, clauses: ['6.2'] },
+        { topic: 'change', re: /\b(change (management|control)|management of change|\bmoc\b)/i, clauses: ['6.3'] },
+        { topic: 'resources', re: /\b(resource|infrastructure|facilit|maintenance|work environment|housekeeping)/i, clauses: ['7.1'] },
+        { topic: 'calibration', re: /\b(calibrat|measuring (and monitoring )?equipment|\bmsa\b|gauge|instrument control)/i, clauses: ['7.1.5'] },
+        { topic: 'competence', re: /\b(competenc|training|skills? matrix|induction|qualification|certification of (operator|personnel))/i, clauses: ['7.2'] },
+        { topic: 'awareness', re: /\b(awareness)/i, clauses: ['7.3'] },
+        { topic: 'communication', re: /\b(communicat)/i, clauses: ['7.4'] },
+        { topic: 'docinfo', re: /\b(document(ed|ation|s)?[\s-]*(control|information)|documentation|control of (document|record)|record (control|retention)|master list|documents?\s*(?:and|&)\s*data|data control)/i, clauses: ['7.5'] },
+        { topic: 'opsplanning', re: /\b(operation(al)?[\s-]*(planning|control)|production (control|planning)|manufactur|process control|work order|routing|assembly)/i, clauses: ['8.1'] },
+        { topic: 'customer-req', re: /\b(customer (requirement|communication|order|contract|enquiry)|contract review|tender|quotation|order review)/i, clauses: ['8.2'] },
+        { topic: 'design', re: /\b(design(?!ation)|development)/i, clauses: ['8.3'] },
+        { topic: 'supplier', re: /\b(purchas|procure|supplier|vendor|subcontract|external(ly)?[\s-]*provid|outsourc|counterfeit|incoming (inspection|material))/i, clauses: ['8.4'] },
+        { topic: 'provision', re: /\b(production and service provision|traceab|preservation|packag|handling|storage|customer propert|post[\s-]?delivery|warehous|shipping|\besd\b)/i, clauses: ['8.5'] },
+        { topic: 'release', re: /\b(release of (product|service)|final inspection|in[\s-]?process inspection|first article|\bfai\b|acceptance criteria|workmanship)/i, clauses: ['8.6'] },
+        { topic: 'nc-output', re: /\b(nonconforming (output|product|material)|rework|repair|scrap|quarantine|\bmrb\b|concession|deviation)/i, clauses: ['8.7'] },
+        { topic: 'monitoring', re: /\b(monitoring and measurement|analysis and evaluation|statistic|\bspc\b|performance evaluation|data analysis)/i, clauses: ['9.1'] },
+        { topic: 'satisfaction', re: /\b(customer satisfaction|complaint|feedback survey)/i, clauses: ['9.1.2'] },
+        { topic: 'internal-audit', re: /\b(internal audit)/i, clauses: ['9.2'] },
+        { topic: 'mgmt-review', re: /\b(management review|\bmrm\b)/i, clauses: ['9.3'] },
+        { topic: 'improvement', re: /\b(improvement|continual|kaizen)/i, clauses: ['10.1', '10.3'] },
+        { topic: 'corrective', re: /\b(nonconformity and corrective|corrective action|\bcapa\b|\bcar\b|root cause)/i, clauses: ['10.2'] },
+        { topic: 'emergency', re: /\b(emergency|preparedness and response|incident|accident)/i, clauses: ['8.2'] },
+        { topic: 'legal', re: /\b(legal|compliance obligation|export[\s-]?(control|compliance)|trade compliance|dual[\s-]?use|\bitar\b|\bear\b|regulator|statutory|sanction)/i, clauses: ['4.2', '6.1'] }
     ];
+
+    // ── Clause numbers differ between standards outside the Annex SL core ──
+    // The clauses in CLAUSE_KEYWORDS are ISO 9001 / 14001 / 45001 numbers.
+    // Clauses 4-7 and 9 read the same in every Annex SL standard, but clause 8
+    // and clause 10 do not: "incident" is 8.2 in ISO 14001/45001, 8.6.1 in
+    // ISO/IEC 20000-1 and has no clause 8 home in ISO/IEC 27001, where 8.2 is
+    // information security risk assessment. Continual improvement is 10.3 in
+    // ISO 9001, 10.1 in ISO/IEC 27001:2022 and 10.2 in ISO 22301 and
+    // ISO/IEC 20000-1. Applying 9001 numbers to those standards produced both
+    // false gaps and false coverage in the gap analysis.
+    //
+    // For the standards below, a document's wording is first read as topics
+    // and each topic is then numbered for that standard. A topic missing from
+    // a standard's table has no clause in it (Annex A material such as access
+    // control lives outside clauses 4-10). Every other standard keeps the
+    // CLAUSE_KEYWORDS numbers.
+
+    // Topics only these standards have, or wording only they use.
+    // `strong`: wording specific enough that one section heading on it shows
+    // the document covers it ("3.2 Business Continuity Strategy" in a 40-section
+    // BC/DR process). Broad words ("incident", "availability") still have to
+    // dominate a procedure's headings, as the Annex SL topics do.
+    const IMS_TOPIC_RULES = [
+        { topic: 'system', re: /\b(management system manual|integrated management system|\bims manual)/i },
+        { topic: 'change', re: /\bplanning of changes\b/i },
+        { topic: 'risk-assessment', re: /\brisk (assessment|analysis)/i },
+        { topic: 'risk-treatment', re: /\brisk treatment|statement of applicability|\bsoa\b/i, strong: true },
+        { topic: 'bia', re: /\bbusiness impact|\bbia\b/i, strong: true },
+        { topic: 'bc-strategy', re: /\b(continuity|recovery) (strateg|solution)/i, strong: true },
+        { topic: 'bc-plans', re: /\b(continuity|recovery) plan|disaster recovery|\bdr plan|incident response|crisis (management|response)|emergency response/i },
+        { topic: 'exercise', re: /\bexercis|\b(plan|continuity|recovery|dr) test|\btesting (and|&) (exercis|maintain)|\btest(ing)? (of )?(the )?(business |service )?continuity/i, strong: true },
+        { topic: 'bc-evaluation', re: /\bevaluation of (business )?continuity|\breassess/i, strong: true },
+        { topic: 'knowledge', re: /\bknowledge\b/i },
+        { topic: 'sms-plan', re: /\bservice management system (\(sms\) )?plan|\bsms plan/i, strong: true },
+        { topic: 'service-plan', re: /\bservice (management |delivery )?plan\b/i },
+        { topic: 'service-catalogue', re: /\bservice (catalog|offering|portfolio)/i, strong: true },
+        { topic: 'parties', re: /\bexternal services?\b|\bother part(y|ies) involved|\boutsourc/i },
+        { topic: 'asset', re: /\basset (management|register|inventory)/i, strong: true },
+        { topic: 'configuration', re: /\bconfiguration (and change )?(management|item)|\bcmdb\b/i, strong: true },
+        { topic: 'relationship', re: /\bbusiness relationship|\bcustomer satisfaction|\bcomplain/i },
+        { topic: 'service-level', re: /\bservice level|\bsla\b/i, strong: true },
+        { topic: 'budget', re: /\bbudgeting|accounting for services/i },
+        { topic: 'demand', re: /\bdemand management/i, strong: true },
+        { topic: 'capacity', re: /\bcapacity (management|plan)/i },
+        { topic: 'service-design', re: /\bservice design|design and transition|\bservice transition/i, strong: true },
+        { topic: 'release-deploy', re: /\brelease (and|&) deployment|\brelease management|\bdeployment management|\bpatch management/i, strong: true },
+        { topic: 'incident', re: /\bincident/i },
+        { topic: 'service-request', re: /\bservice requests?\b|\brequest fulfil/i, strong: true },
+        { topic: 'problem', re: /\bproblem management|\bproblem\b|\broot cause analysis|\brca\b/i },
+        { topic: 'availability', re: /\bavailability/i },
+        { topic: 'service-continuity', re: /\bcontinuity/i },
+        { topic: 'infosec', re: /\binformation security|\bwisp\b/i },
+        { topic: 'service-reporting', re: /\bservice report/i, strong: true }
+    ];
+    const STRONG_TOPICS = new Set(IMS_TOPIC_RULES.filter(r => r.strong).map(r => r.topic));
+
+    // Topic -> clause, the same in all three: the Annex SL core.
+    const IMS_COMMON_CLAUSES = {
+        context: ['4.1', '4.2'], scope: ['4.3'], system: ['4.4'],
+        leadership: ['5.1'], policy: ['5.2'], roles: ['5.3'],
+        risk: ['6.1'], objectives: ['6.2'],
+        resources: ['7.1'], competence: ['7.2'], awareness: ['7.3'], communication: ['7.4'], docinfo: ['7.5'],
+        opsplanning: ['8.1'],
+        monitoring: ['9.1'], 'internal-audit': ['9.2'], 'mgmt-review': ['9.3'],
+        legal: ['4.2', '6.1']
+    };
+
+    const IMS_TOPIC_CLAUSES = {
+        // ISO/IEC 27001:2022 — 8.2 assessment, 8.3 treatment; 10.1 improvement, 10.2 NC.
+        iso27001: Object.assign({}, IMS_COMMON_CLAUSES, {
+            change: ['6.3'],
+            'risk-assessment': ['6.1.2', '8.2'],
+            'risk-treatment': ['6.1.3', '8.3'],
+            improvement: ['10.1'], corrective: ['10.2']
+        }),
+        // ISO 22301:2019 — 8.2 BIA and risk assessment ... 8.6 evaluation; 10.1 NC, 10.2 improvement.
+        iso22301: Object.assign({}, IMS_COMMON_CLAUSES, {
+            change: ['6.3'],
+            bia: ['8.2.2'],
+            'risk-assessment': ['8.2.3'],
+            'bc-strategy': ['8.3'],
+            // "Incident" alone is IT incident management, not BC response;
+            // only "incident response" (bc-plans) maps to 8.4 here.
+            'bc-plans': ['8.4'],
+            exercise: ['8.5'],
+            'bc-evaluation': ['8.6'],
+            improvement: ['10.2'], corrective: ['10.1']
+        }),
+        // ISO/IEC 20000-1:2018 — clause 8 is the service management processes;
+        // change management is 8.5.1, not 6.3 (which is "plan the SMS").
+        iso20000: Object.assign({}, IMS_COMMON_CLAUSES, {
+            knowledge: ['7.6'],
+            'sms-plan': ['4.4', '6.3'],
+            'service-plan': ['8.2.2'],
+            parties: ['8.2.3'],
+            'service-catalogue': ['8.2.4'],
+            asset: ['8.2.5'],
+            configuration: ['8.2.6'],
+            relationship: ['8.3.2'],
+            satisfaction: ['8.3.2'],
+            'service-level': ['8.3.3'],
+            supplier: ['8.3.4'],
+            budget: ['8.4.1'],
+            demand: ['8.4.2'],
+            capacity: ['8.4.3'],
+            change: ['8.5.1'],
+            'service-design': ['8.5.2'],
+            'release-deploy': ['8.5.3'],
+            incident: ['8.6.1'],
+            'service-request': ['8.6.2'],
+            problem: ['8.6.3'],
+            availability: ['8.7.1'],
+            'service-continuity': ['8.7.2'],
+            infosec: ['8.7.3'],
+            'service-reporting': ['9.4'],
+            improvement: ['10.2'], corrective: ['10.1']
+        })
+    };
+
+    const STD_SHORT = { iso27001: '27001', iso22301: '22301', iso20000: '20000-1', iso9001: '9001', iso14001: '14001', iso45001: '45001' };
+
+    /** True when `stdId` numbers its clauses through IMS_TOPIC_CLAUSES. */
+    function hasOwnNumbering(stdId) {
+        return !!(stdId && IMS_TOPIC_CLAUSES[stdId]);
+    }
+
+    /**
+     * Topics a piece of wording points to, for a standard with its own
+     * numbering. `withHeadingTopics` adds the looser HEADING_TOPICS words.
+     */
+    function textTopics(text, withHeadingTopics) {
+        const out = new Set();
+        const s = String(text || '');
+        for (const rule of CLAUSE_KEYWORDS) if (rule.re.test(s)) out.add(rule.topic);
+        for (const rule of IMS_TOPIC_RULES) if (rule.re.test(s)) out.add(rule.topic);
+        if (withHeadingTopics) for (const rule of HEADING_TOPICS) if (rule.re.test(s)) out.add(rule.topic);
+        return out;
+    }
+
+    /** The clauses a topic means in `stdId` (empty when it has none there). */
+    function topicClauses(topic, stdId) {
+        const table = IMS_TOPIC_CLAUSES[stdId];
+        return (table && table[topic]) || [];
+    }
 
     // ISO/IEC 17021-1 §9.6.2.1.2 — the elements every surveillance audit must cover.
     const SURVEILLANCE_MANDATORY = [
@@ -319,7 +463,27 @@
         const seen = new Set();
         const refRows = [];
         const allHeadings = [];
+        // Table-of-contents entries, numbered or not: "Leadership and
+        // Commitment ........ 10". A manual whose section titles carry no
+        // numbers is only readable through its contents page.
+        const tocHeadings = [];
         for (const line of lines) {
+            const tm = line.match(/^(?:(A\.\d{1,2}\.\d{1,2}|\d{1,2}(?:\.\d{1,2}){0,2})[.)]?\s+)?([A-Za-z][^\n]{2,110}?)\s*(?:\.\s?){4,}\s*\d{1,3}$/);
+            if (!tm) continue;
+            const text = tm[2].replace(/\s+/g, ' ').replace(/[\s:–—-]+$/, '').trim();
+            const key = (tm[1] || '') + '|' + text.toLowerCase();
+            if (!text || seen.has(key)) continue;
+            seen.add(key);
+            const heading = { clause: tm[1] || '', text };
+            tocHeadings.push(heading);
+            if (tm[1]) {
+                refRows.push(tm[1]);
+                allHeadings.push(heading);
+                if (out.headings.length < MAX_HEADINGS) out.headings.push(heading);
+            }
+        }
+        for (const line of lines) {
+            if (/(?:\.\s?){4,}\s*\d{1,3}$/.test(line)) continue; // contents-page line, read above
             const hm = line.match(/^(A\.\d{1,2}\.\d{1,2}|\d{1,2}(?:\.\d{1,2}){0,2})[\s.):-]+([A-Za-z][^\n]{3,80})$/);
             if (!hm) continue;
             const key = hm[1] + '|' + hm[2].toLowerCase();
@@ -334,11 +498,27 @@
         // Whether those heading numbers ARE ISO clause numbers, or just the
         // document's own section numbering (see headingNumbering).
         out.numbering = headingNumbering(allHeadings);
+        // Every heading whose wording can say what the document covers —
+        // numbered ones and unnumbered contents entries, uncapped by
+        // MAX_HEADINGS (a manual's clause 8-10 sections sit past the first 30).
+        const topicSeen = new Set();
+        out.topicHeadings = allHeadings.concat(tocHeadings.filter(h => !h.clause)).filter(h => {
+            const k = h.text.toLowerCase();
+            if (topicSeen.has(k)) return false;
+            topicSeen.add(k);
+            return true;
+        }).slice(0, 200);
+        // Unnumbered contents entries are kept for display when the document
+        // has no numbered headings to show.
+        if (!out.headings.length) out.headings = tocHeadings.slice(0, MAX_HEADINGS);
         out.explicitRefs = findExplicitClauseRefs(text);
         // Title-like lines from the title block ("Document & Data Control
         // Procedure"): the file name is often just a code like "PRO-01".
         out.titleLines = lines.slice(0, 12)
-            .filter(l => l.length <= 120 && /\b(procedure|policy|manual|plan|process|instruction|programme|program|register|guideline)s?\b/i.test(l));
+            .filter(l => l.length <= 120 && /\b(procedure|policy|manual|plan|process|instruction|programme|program|register|guideline)s?\b/i.test(l))
+            // Title-block fields ("Policy Owner: Legal Department") name who
+            // holds the document, not what it covers.
+            .filter(l => !/\b(owner|author|approv(ed|er)|prepared|reviewed|custodian|department|classification)\b\s*(by)?\s*:/i.test(l));
         // Standards named in the opening pages — scope, purpose and normative
         // reference sections are where a document declares which system it
         // belongs to. Used only when the file name itself is silent.
@@ -380,15 +560,17 @@
     // Looser topic words that are safe on a heading but too broad for a file
     // name: a procedure's step headings name its subject over and over.
     const HEADING_TOPICS = [
-        { re: /\bdocument|\brecords? (retention|keeping|management|control)|\bobsolete\b/i, clauses: ['7.5'] },
-        { re: /\baudit(s|or|ing)?\b/i, clauses: ['9.2'] },
-        { re: /\bnon[\s-]?conform|\bcorrect(ive|ion)\b|root[\s-]?cause/i, clauses: ['10.2'] },
-        { re: /\bcompeten|\brecruit|\binduction\b|\bvetting\b|\bonboarding\b/i, clauses: ['7.2'] },
-        { re: /\bcomplain/i, clauses: ['9.1.2'] }
+        { topic: 'docinfo', re: /\bdocument|\brecords? (retention|keeping|management|control)|\bobsolete\b/i, clauses: ['7.5'] },
+        { topic: 'internal-audit', re: /\baudit(s|or|ing)?\b/i, clauses: ['9.2'] },
+        { topic: 'corrective', re: /\bnon[\s-]?conform|\bcorrect(ive|ion)\b|root[\s-]?cause/i, clauses: ['10.2'] },
+        { topic: 'competence', re: /\bcompeten|\brecruit|\binduction\b|\bvetting\b|\bonboarding\b/i, clauses: ['7.2'] },
+        { topic: 'satisfaction', re: /\bcomplain/i, clauses: ['9.1.2'] }
     ];
 
     // Template sections every procedure has; they say nothing about its subject.
-    const GENERIC_HEADING = /^(scope|purpose|objectives?|aim|responsibilit(y|ies)|procedure|process|method|definitions?|terms|abbreviations?|references?|related documents|records?|forms?|appendix|annex|revision history|change history|distribution|approval|introduction|general|overview|policy)\b/i;
+    // "Roles and Responsibilities" is one of them: nearly every procedure has
+    // it, and reading it as clause 5.3 would credit every procedure with 5.3.
+    const GENERIC_HEADING = /^(scope|purpose|objectives?|aim|responsibilit(y|ies)|roles( and|,|\s*&)\s*responsibilit(y|ies)|procedure|process|method|definitions?|terms|abbreviations?|references?|related documents|records?|forms?|appendix|annex|revision history|change history|document history|version history|table of contents|contents|distribution|approval|introduction|general|overview|policy)\b/i;
 
     /**
      * 'iso' when a document's numbered headings follow ISO clause numbering
@@ -418,13 +600,26 @@
      * topic its step headings keep returning to, not every word one mentions
      * ("4.4 Communication and Escalation" in a risk procedure is not 7.4).
      */
-    function headingTopicClauses(headings, category) {
+    function headingTopicClauses(headings, category, stdId) {
         const topical = (headings || []).map(h => String(h.text || '')).filter(t => t && !GENERIC_HEADING.test(t.trim()));
+        const threshold = topical.length <= 2 ? 1 : Math.max(2, Math.ceil(topical.length * 0.4));
+        if (hasOwnNumbering(stdId)) {
+            // Counted per topic, then numbered for this standard.
+            const counts = new Map();
+            for (const t of topical) {
+                textTopics(t, true).forEach(tp => {
+                    if (topicClauses(tp, stdId).length) counts.set(tp, (counts.get(tp) || 0) + 1);
+                });
+            }
+            const picked = category === 'System Manual'
+                ? Array.from(counts.keys())
+                : Array.from(counts.entries()).filter(([tp, n]) => n >= threshold || STRONG_TOPICS.has(tp)).map(([tp]) => tp);
+            return Array.from(new Set(picked.flatMap(tp => topicClauses(tp, stdId))));
+        }
         const counts = new Map();
         for (const t of topical) keywordClauses(t).forEach(c => counts.set(c, (counts.get(c) || 0) + 1));
         if (!counts.size) return [];
         if (category === 'System Manual') return Array.from(counts.keys());
-        const threshold = topical.length <= 2 ? 1 : Math.max(2, Math.ceil(topical.length * 0.4));
         return Array.from(counts.entries()).filter(([, n]) => n >= threshold).map(([c]) => c);
     }
 
@@ -436,7 +631,11 @@
         while ((m = re.exec(String(text || '').slice(0, 60000))) !== null) {
             const ref = m[1] || m[2] || m[3];
             const main = parseInt(ref.split('.')[0], 10);
-            if (main >= 4 && main <= 10) out.add(ref);
+            // A bare main clause ("clause 8", "§ 9") names a chapter, not a
+            // requirement; taken as a link it would cover every sub-clause of
+            // it (clauseSatisfies), so an objectives register citing "clause 8"
+            // closed all of ISO/IEC 20000-1's service management processes.
+            if (main >= 4 && main <= 10 && ref.indexOf('.') !== -1) out.add(ref);
         }
         return Array.from(out).slice(0, MAX_CLAUSE_REFS);
     }
@@ -448,26 +647,33 @@
      * numbering; otherwise the headings' wording is used (headingNumbering).
      * @returns {string[]} sorted, de-duplicated clause references
      */
-    function mapClauses(parsed, contentMeta) {
+    function mapClauses(parsed, contentMeta, stdId) {
         const found = new Set();
         const title = parsed.title || '';
         const meta = contentMeta || {};
         const searchText = [title, parsed.folder || ''].concat(meta.titleLines || []).join(' ');
+        const topicHeadings = meta.topicHeadings || meta.headings;
 
         findClauseRefs(title).forEach(c => found.add(c));
         findClauseRefs(parsed.docNumber || '').forEach(c => found.add(c));
         (meta.explicitRefs || []).forEach(c => found.add(c));
-        if (meta.numbering === 'internal') {
-            // Section numbers are the document's own; Annex A control rows
-            // ("A.5.1 ...") are still real references.
-            (meta.clauseRefs || []).filter(c => /^A\./.test(c)).forEach(c => found.add(c));
-            headingTopicClauses(meta.headings, parsed.category).forEach(c => found.add(c));
-        } else {
+        if (meta.numbering !== 'internal' && meta.numbering !== 'none') {
+            // ISO-numbered headings, or numbering not assessed.
             (meta.clauseRefs || []).forEach(c => found.add(c));
+        } else {
+            // Section numbers are the document's own (or there are none);
+            // Annex A control rows ("A.5.1 ...") are still real references,
+            // and the headings' wording says what the document covers.
+            (meta.clauseRefs || []).filter(c => /^A\./.test(c)).forEach(c => found.add(c));
+            headingTopicClauses(topicHeadings, parsed.category, stdId).forEach(c => found.add(c));
         }
 
-        for (const rule of CLAUSE_KEYWORDS) {
-            if (rule.re.test(searchText)) rule.clauses.forEach(c => found.add(c));
+        if (hasOwnNumbering(stdId)) {
+            textTopics(searchText, false).forEach(tp => topicClauses(tp, stdId).forEach(c => found.add(c)));
+        } else {
+            for (const rule of CLAUSE_KEYWORDS) {
+                if (rule.re.test(searchText)) rule.clauses.forEach(c => found.add(c));
+            }
         }
 
         // Annex SL section number — only if nothing more specific was found for it.
@@ -539,9 +745,51 @@
     function docCoversRef(doc, stdId, ref) {
         const linked = String((doc && doc.linkedStandards) || '').split(',').map(s => s.trim()).filter(Boolean);
         if (stdId && linked.length && linked.indexOf(stdId) === -1) return false;
-        return String((doc && doc.linkedClauses) || '')
-            .split(',').map(s => s.trim()).filter(Boolean)
-            .some(dc => clauseSatisfies(String(ref), dc));
+        return docClausesFor(doc, stdId).some(dc => clauseSatisfies(String(ref), dc));
+    }
+
+    /**
+     * The clauses a document supports in one standard. A document that serves
+     * several standards with different clause numbering carries a clauseMap
+     * (see mapClausesByStandard); linkedClauses is then the union, kept for
+     * display and for readers that are not standard-aware.
+     */
+    function docClausesFor(doc, stdId) {
+        const map = doc && doc.clauseMap;
+        if (stdId && map && typeof map === 'object' && Array.isArray(map[stdId])) return map[stdId].slice();
+        return String((doc && doc.linkedClauses) || '').split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    /**
+     * The standards a document's clauses must be numbered for: the ones it
+     * names, else every standard on the client (an unnamed IMS document
+     * serves all of them).
+     * @param {string[]} docStdIds - from mapStandards
+     * @param {string} clientStandard - client.standard, e.g. "ISO 27001:2022, ISO 22301:2019"
+     */
+    function clauseTargets(docStdIds, clientStandard) {
+        if (docStdIds && docStdIds.length) return docStdIds.slice();
+        return detectStandards(clientStandard || '').map(s => s.id);
+    }
+
+    /**
+     * Map a document's clauses for each standard it serves.
+     *
+     * One standard, or none with their own numbering: a plain clause list,
+     * exactly as mapClauses always produced. Several standards whose numbering
+     * differs: `byStandard` holds each one's list and `clauses` their union.
+     *
+     * @returns {{clauses: string[], byStandard: Object<string, string[]>|null}}
+     */
+    function mapClausesByStandard(parsed, contentMeta, targets) {
+        const ids = (targets || []).filter(Boolean);
+        if (!ids.some(hasOwnNumbering)) return { clauses: mapClauses(parsed, contentMeta), byStandard: null };
+        if (ids.length === 1) return { clauses: mapClauses(parsed, contentMeta, ids[0]), byStandard: null };
+        const byStandard = {};
+        ids.forEach(id => { byStandard[id] = mapClauses(parsed, contentMeta, id); });
+        const lists = Object.values(byStandard).map(l => l.join(','));
+        const union = sortClauses(Array.from(new Set(Object.values(byStandard).flat())));
+        return { clauses: union, byStandard: lists.every(l => l === lists[0]) ? null : byStandard };
     }
 
     /** Stable key for spotting the same document twice. */
@@ -2578,16 +2826,30 @@
 
     const splitClauses = v => String(v || '').split(',').map(s => s.trim()).filter(Boolean);
 
+    const sameMap = (a, b) => {
+        const norm = m => (m && typeof m === 'object')
+            ? JSON.stringify(Object.keys(m).sort().map(k => [k, sortClauses(m[k] || [])]))
+            : '';
+        return norm(a) === norm(b);
+    };
+
     /**
      * The clause links a stored document should have, recomputed from its
-     * title, number, category and stored headings. `changed` is true only when
-     * the headings are the document's own numbering AND the links differ —
-     * an ISO-numbered manual or a hand-linked document without headings is
-     * left as it is.
+     * title, number, category and headings — the stored ones, or `opts.meta`
+     * when the stored file has just been read again (rereadStoredDocument).
+     * `opts.clientStandard` numbers an unnamed document for every standard on
+     * the client.
+     *
+     * `changed` is true only when the links differ AND the document gives
+     * something to go on: headings that are its own section numbering, or
+     * unnumbered contents headings. An ISO-numbered manual, or a hand-linked
+     * document with no headings, is left as it is.
      */
-    function relinkDocumentClauses(doc) {
-        const headings = storedHeadings(doc);
-        const meta = {
+    function relinkDocumentClauses(doc, opts) {
+        const o = opts || {};
+        const reread = o.meta || null;
+        const headings = reread ? (reread.headings || []) : storedHeadings(doc);
+        const meta = reread || {
             headings,
             clauseRefs: Array.from(new Set(headings.map(h => h.clause).flatMap(findClauseRefs))),
             numbering: headingNumbering(headings),
@@ -2601,44 +2863,101 @@
             sectionRef: (doc && doc.sectionRef) || '',
             category: (doc && doc.category) || ''
         };
-        const proposed = mapClauses(parsed, meta);
+        const targets = clauseTargets(splitClauses(doc && doc.linkedStandards), o.clientStandard);
+        const mapped = mapClausesByStandard(parsed, meta, targets);
+        const proposed = mapped.clauses;
         const current = sortClauses(splitClauses(doc && doc.linkedClauses));
+        const differs = proposed.join(', ') !== current.join(', ') || !sameMap(mapped.byStandard, doc && doc.clauseMap);
+        const readable = meta.numbering === 'internal' ||
+            (meta.numbering === 'none' && ((meta.topicHeadings || headings).length > 0 || targets.some(hasOwnNumbering)));
         return {
             current,
             proposed,
+            proposedMap: mapped.byStandard,
+            headings: reread ? (reread.headings || []) : null,
             numbering: meta.numbering,
-            changed: meta.numbering === 'internal' && proposed.join(', ') !== current.join(', ')
+            changed: differs && readable
         };
+    }
+
+    const REREAD_EXT = ['pdf', 'docx', 'txt', 'md', 'csv'];
+
+    /**
+     * Read a document's stored file again and parse it, for documents whose
+     * headings were never captured (PDFs imported while the extractor joined
+     * every page into a single line). Null when there is no stored file or it
+     * cannot be read.
+     */
+    async function rereadStoredDocument(doc) {
+        const path = doc && doc.storagePath;
+        if (!path || typeof window.extractTextFromFile !== 'function') return null;
+        const sb = window.SupabaseClient;
+        if (!sb || !sb.isInitialized || !sb.client || !sb.client.storage) return null;
+        const name = String(doc.fileName || path.split('/').pop() || '');
+        const ext = name.slice(name.lastIndexOf('.') + 1).toLowerCase();
+        if (!REREAD_EXT.includes(ext)) return null;
+        try {
+            const { data, error } = await sb.client.storage.from('documents').download(path);
+            if (error || !data) return null;
+            const type = ext === 'pdf' ? 'application/pdf' : (data.type || '');
+            const file = new File([data], name, { type });
+            const text = await window.extractTextFromFile(file, { preserveLines: true });
+            return text ? parseContentMeta(text.slice(0, 20000)) : null;
+        } catch (err) {
+            if (window.Logger) window.Logger.warn('ClientDocsBulk', `Could not re-read ${name}: ${err.message}`);
+            return null;
+        }
     }
 
     let _relink = null;
 
-    window.openRelinkDocumentClauses = function (clientId) {
+    window.openRelinkDocumentClauses = async function (clientId) {
         const client = window.DataService.findClient(clientId);
         if (!client) return;
-        const rows = (client.documents || [])
-            .map((doc, index) => ({ doc, index, ...relinkDocumentClauses(doc) }))
+        const docs = client.documents || [];
+        // Documents with no stored headings are read again from their files.
+        const toRead = docs.filter(d => d && d.storagePath && !storedHeadings(d).length);
+        const metas = new Map();
+        if (toRead.length) {
+            const progress = (i) => `<div style="padding:1.5rem 1rem;text-align:center;">
+                <p style="margin:0 0 0.5rem;">Reading stored files to find each document's headings…</p>
+                <strong>${i} of ${toRead.length}</strong></div>`;
+            window.DataService.openFormModal(`Re-link clauses — ${client.name}`, progress(0), null);
+            const bodyEl = () => document.getElementById('modal-body');
+            for (let i = 0; i < toRead.length; i++) {
+                const meta = await rereadStoredDocument(toRead[i]);
+                if (meta) metas.set(toRead[i], meta);
+                const el = bodyEl();
+                if (el) el.innerHTML = progress(i + 1);
+            }
+        }
+        const rows = docs
+            .map((doc, index) => ({ doc, index, ...relinkDocumentClauses(doc, { meta: metas.get(doc), clientStandard: client.standard }) }))
             .filter(r => r.changed);
         if (!rows.length) {
+            if (window.closeModal && toRead.length) window.closeModal();
             notify('Every document\'s clause links already match its contents.', 'success');
             return;
         }
         _relink = { clientId, rows };
         const fmt = list => list.length ? esc(list.join(', ')) : '<em style="color:#9ca3af;">none</em>';
+        const fmtMap = m => m
+            ? `<div style="margin-top:3px;font-size:0.74rem;color:#475569;">${Object.keys(m).map(k => `${esc(STD_SHORT[k] || k)}: ${m[k].length ? esc(m[k].join(', ')) : '—'}`).join('<br>')}</div>`
+            : '';
         const body = `
         <p style="margin:0 0 0.75rem; font-size:0.88rem; color:var(--text-secondary);">
-            These documents number their own sections (1 Scope, 2 Purpose, 3 Responsibilities, 4 Procedure, 4.1 ...).
-            Those numbers were linked as ISO clauses when the files were imported. The proposed links come from what
-            the headings are about. Untick any document you linked by hand.
+            The proposed links come from what each document's headings and contents page are about, numbered for each
+            standard it serves (clause 8 and 10 numbers differ between ISO/IEC 27001, ISO 22301 and ISO/IEC 20000-1).
+            Documents you added by hand start unticked — tick them only if their links should change.
         </p>
         <div class="table-container"><table>
             <thead><tr><th style="width:2rem;"></th><th>Document</th><th>Linked now</th><th>Proposed</th></tr></thead>
             <tbody>${rows.map((r, i) => `
                 <tr>
-                    <td><input type="checkbox" class="relink-pick" data-row="${i}" ${r.proposed.length ? 'checked' : ''} aria-label="Re-link ${esc(r.doc.name || '')}"></td>
+                    <td><input type="checkbox" class="relink-pick" data-row="${i}" ${r.proposed.length && r.doc.source === 'bulk-import' ? 'checked' : ''} aria-label="Re-link ${esc(r.doc.name || '')}"></td>
                     <td><strong>${esc(r.doc.name || '')}</strong>${r.doc.docNumber ? `<div style="font-size:0.78rem;color:#6b7280;">${esc(r.doc.docNumber)}</div>` : ''}</td>
                     <td style="font-size:0.82rem;color:#991b1b;">${fmt(r.current)}</td>
-                    <td style="font-size:0.82rem;color:#166534;">${fmt(r.proposed)}${r.proposed.length ? '' : '<div style="color:#92400e;">No topic found in the headings — link it by hand.</div>'}</td>
+                    <td style="font-size:0.82rem;color:#166534;">${fmt(r.proposed)}${fmtMap(r.proposedMap)}${r.proposed.length ? '' : '<div style="color:#92400e;">No topic found in the headings — link it by hand.</div>'}</td>
                 </tr>`).join('')}
             </tbody>
         </table></div>`;
@@ -2658,6 +2977,11 @@
             const doc = client.documents[r.index];
             if (!doc) return;
             doc.linkedClauses = r.proposed.join(', ');
+            if (r.proposedMap) doc.clauseMap = r.proposedMap;
+            else delete doc.clauseMap;
+            // Keep the headings read from the stored file, so the next
+            // re-link does not have to download it again.
+            if (r.headings && r.headings.length && !storedHeadings(doc).length) doc.headings = r.headings.slice(0, MAX_HEADINGS);
             doc.clausesRelinkedAt = now;
         });
         const clientId = _relink.clientId;
@@ -3174,7 +3498,8 @@
             return;
         }
 
-        const existing = (window.DataService.findClient(_clientId) || {}).documents || [];
+        const clientRecord = window.DataService.findClient(_clientId) || {};
+        const existing = clientRecord.documents || [];
         const existingKeys = new Set(existing.map(d => docKey({ title: d.name, sectionRef: d.sectionRef || '' })));
         const batchKeys = new Map();
         _batch = [];
@@ -3190,7 +3515,7 @@
             let text = '';
             if (_opts.extract && ['docx', 'pdf', 'txt', 'md', 'csv'].includes(parsed.ext) && typeof window.extractTextFromFile === 'function') {
                 try {
-                    text = (await window.extractTextFromFile(entry.file)) || '';
+                    text = (await window.extractTextFromFile(entry.file, { preserveLines: true })) || '';
                 } catch (_e) {
                     text = '';
                 }
@@ -3198,6 +3523,8 @@
             }
 
             const fileDate = entry.fileDate || (entry.file.lastModified ? new Date(entry.file.lastModified).toISOString().split('T')[0] : '');
+            const stds = mapStandards(parsed, content);
+            const mapped = mapClausesByStandard(parsed, content, clauseTargets(stds.ids, clientRecord.standard));
             const row = {
                 include: true,
                 file: entry.file,
@@ -3211,12 +3538,15 @@
                 date: (content && content.date) || parsed.date || fileDate,
                 fileDate,
                 category: parsed.category,
-                clauses: mapClauses(parsed, content).join(', '),
+                clauses: mapped.clauses.join(', '),
+                // Per-standard clause lists when the numbering differs between
+                // the standards this document serves (mapClausesByStandard).
+                clauseMap: mapped.byStandard,
                 // Captured at upload so a clause number stays traceable in an
                 // integrated system: "6.2" alone is ambiguous across three
                 // standards, "ISO/IEC 20000-1:2018 6.2" is not.
-                standardIds: mapStandards(parsed, content).ids.join(', '),
-                standardLabels: mapStandards(parsed, content).labels.join(', '),
+                standardIds: stds.ids.join(', '),
+                standardLabels: stds.labels.join(', '),
                 headings: (content && content.headings) || [],
                 notes: buildNotes(parsed, content, text),
                 // Kept in memory only (never persisted to the client record) so
@@ -3248,7 +3578,7 @@
     function buildNotes(parsed, content, text) {
         const bits = [];
         if (content && content.headings.length) {
-            bits.push('Sections in document: ' + content.headings.slice(0, 12).map(h => `${h.clause} ${h.text}`).join('; '));
+            bits.push('Sections in document: ' + content.headings.slice(0, 12).map(h => h.clause ? `${h.clause} ${h.text}` : h.text).join('; '));
         } else if (text) {
             bits.push(text.replace(/\s+/g, ' ').trim().slice(0, NOTE_LIMIT));
         }
@@ -3353,6 +3683,8 @@
         const row = _batch[+idx];
         if (!row) return;
         row[field] = value;
+        // Clauses typed by hand replace the per-standard mapping.
+        if (field === 'clauses') row.clauseMap = null;
     };
 
     // ── Import ────────────────────────────────────────────────────────
@@ -3403,6 +3735,7 @@
                 category: r.category,
                 revision: r.revision || '',
                 linkedClauses: r.clauses || '',
+                ...(r.clauseMap ? { clauseMap: r.clauseMap } : {}),
                 // Registry ids for logic, display labels for the auditor. An
                 // empty value means the document names no standard and is
                 // treated as applying to all of them.
@@ -4173,6 +4506,12 @@
         findExplicitClauseRefs,
         storedHeadings,
         relinkDocumentClauses,
+        rereadStoredDocument,
+        // Per-standard clause numbering (ISO/IEC 27001, ISO 22301, ISO/IEC 20000-1).
+        mapClausesByStandard,
+        clauseTargets,
+        docClausesFor,
+        IMS_TOPIC_CLAUSES,
         // Standard attribution — what makes a clause number traceable in an IMS.
         detectStandards,
         mapStandards,
