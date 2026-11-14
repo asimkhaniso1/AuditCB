@@ -446,7 +446,9 @@ function handleRouteChange() {
         const parts = hash.split('/');
         const clientId = parts[1]; // KEEP AS STRING for Snowflake ID robustness
         const subModule = parts[2] || 'overview';
-        if (typeof window.selectClient === 'function') {
+        if (typeof window.openClientRoute === 'function') {
+            window.openClientRoute(clientId, subModule);
+        } else if (typeof window.selectClient === 'function') {
             // If already in client workspace, just switch tab
             if (String(window.state.activeClientId) === String(clientId)) {
                 window.renderClientModule(clientId, subModule);
