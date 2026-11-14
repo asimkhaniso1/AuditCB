@@ -3014,14 +3014,46 @@
         const differs = proposed.join(', ') !== current.join(', ') || !sameMap(mapped.byStandard, doc && doc.clauseMap);
         const readable = meta.numbering === 'internal' ||
             (meta.numbering === 'none' && ((meta.topicHeadings || headings).length > 0 || targets.some(hasOwnNumbering)));
+        const proposedSet = new Set(proposed);
         return {
             current,
             proposed,
             proposedMap: mapped.byStandard,
             headings: reread ? (reread.headings || []) : null,
             numbering: meta.numbering,
+            // 'file': read from the stored file just now. 'headings': only the
+            // saved heading list, which has no contents page, no explicit
+            // "clause x" references and no body text, so links it would remove
+            // may well be evidenced in the document.
+            basis: reread ? 'file' : 'headings',
+            removes: current.filter(c => !proposedSet.has(c)),
             changed: differs && readable
         };
+    }
+
+    /**
+     * Whether a re-link row starts ticked: bulk-imported documents with a
+     * proposal, unless the proposal comes from saved headings alone and would
+     * remove links. Those wait for the auditor to look.
+     */
+    function relinkPreselect(row) {
+        if (!row || !row.proposed || !row.proposed.length) return false;
+        if (!row.doc || row.doc.source !== 'bulk-import') return false;
+        return !(row.basis === 'headings' && row.removes && row.removes.length);
+    }
+
+    /** Run `fn` over `items`, at most `limit` at a time; results in input order. */
+    async function mapLimited(items, limit, fn) {
+        const out = new Array(items.length);
+        let next = 0;
+        const worker = async () => {
+            while (next < items.length) {
+                const i = next++;
+                out[i] = await fn(items[i], i);
+            }
+        };
+        await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+        return out;
     }
 
     const REREAD_EXT = ['pdf', 'docx', 'txt', 'md', 'csv'];
@@ -3059,21 +3091,28 @@
         const client = window.DataService.findClient(clientId);
         if (!client) return;
         const docs = client.documents || [];
-        // Documents with no stored headings are read again from their files.
-        const toRead = docs.filter(d => d && d.storagePath && !storedHeadings(d).length);
+        // Every document with a stored file is read again, including those
+        // with saved headings. The saved list is only headings: re-linking
+        // from it drops links the contents page, an explicit "clause x"
+        // reference or the body text support. For PC Connection it proposed
+        // removing 18 clauses from the IMS Manual that a full read keeps.
+        // Saved headings are the fallback when a file cannot be read.
+        const toRead = docs.filter(d => d && d.storagePath);
         const metas = new Map();
         if (toRead.length) {
             const progress = (i) => `<div style="padding:1.5rem 1rem;text-align:center;">
-                <p style="margin:0 0 0.5rem;">Reading stored files to find each document's headings…</p>
+                <p style="margin:0 0 0.5rem;">Reading each stored file to find what it covers…</p>
                 <strong>${i} of ${toRead.length}</strong></div>`;
             window.DataService.openFormModal(`Re-link clauses — ${client.name}`, progress(0), null);
             const bodyEl = () => document.getElementById('modal-body');
-            for (let i = 0; i < toRead.length; i++) {
-                const meta = await rereadStoredDocument(toRead[i]);
-                if (meta) metas.set(toRead[i], meta);
+            let done = 0;
+            await mapLimited(toRead, 4, async (doc) => {
+                const meta = await rereadStoredDocument(doc);
+                if (meta) metas.set(doc, meta);
+                done++;
                 const el = bodyEl();
-                if (el) el.innerHTML = progress(i + 1);
-            }
+                if (el) el.innerHTML = progress(done);
+            });
         }
         const rows = docs
             .map((doc, index) => ({ doc, index, ...relinkDocumentClauses(doc, { meta: metas.get(doc), clientStandard: client.standard }) }))
@@ -3092,16 +3131,17 @@
         <p style="margin:0 0 0.75rem; font-size:0.88rem; color:var(--text-secondary);">
             The proposed links come from what each document's headings and contents page are about, numbered for each
             standard it serves (clause 8 and 10 numbers differ between ISO/IEC 27001, ISO 22301 and ISO/IEC 20000-1).
-            Documents you added by hand start unticked — tick them only if their links should change.
+            Documents you added by hand start unticked — tick them only if their links should change. So do documents
+            whose file could not be read, where the proposal comes from their saved headings alone and would remove links.
         </p>
         <div class="table-container"><table>
             <thead><tr><th style="width:2rem;"></th><th>Document</th><th>Linked now</th><th>Proposed</th></tr></thead>
             <tbody>${rows.map((r, i) => `
                 <tr>
-                    <td><input type="checkbox" class="relink-pick" data-row="${i}" ${r.proposed.length && r.doc.source === 'bulk-import' ? 'checked' : ''} aria-label="Re-link ${esc(r.doc.name || '')}"></td>
+                    <td><input type="checkbox" class="relink-pick" data-row="${i}" ${relinkPreselect(r) ? 'checked' : ''} aria-label="Re-link ${esc(r.doc.name || '')}"></td>
                     <td><strong>${esc(r.doc.name || '')}</strong>${r.doc.docNumber ? `<div style="font-size:0.78rem;color:#6b7280;">${esc(r.doc.docNumber)}</div>` : ''}</td>
                     <td style="font-size:0.82rem;color:#991b1b;">${fmt(r.current)}</td>
-                    <td style="font-size:0.82rem;color:#166534;">${fmt(r.proposed)}${fmtMap(r.proposedMap)}${r.proposed.length ? '' : '<div style="color:#92400e;">No topic found in the headings — link it by hand.</div>'}</td>
+                    <td style="font-size:0.82rem;color:#166534;">${fmt(r.proposed)}${fmtMap(r.proposedMap)}${r.proposed.length ? '' : '<div style="color:#92400e;">No topic found in the headings — link it by hand.</div>'}${r.basis === 'headings' && r.removes.length ? `<div style="color:#92400e;">From saved headings only${r.doc.storagePath ? ' (the file could not be read)' : ''} — check before removing ${esc(r.removes.join(', '))}.</div>` : ''}</td>
                 </tr>`).join('')}
             </tbody>
         </table></div>`;
@@ -3123,9 +3163,9 @@
             doc.linkedClauses = r.proposed.join(', ');
             if (r.proposedMap) doc.clauseMap = r.proposedMap;
             else delete doc.clauseMap;
-            // Keep the headings read from the stored file, so the next
-            // re-link does not have to download it again.
-            if (r.headings && r.headings.length && !storedHeadings(doc).length) doc.headings = r.headings.slice(0, MAX_HEADINGS);
+            // Keep the headings just read from the stored file, for the notes
+            // and for a re-link when the file cannot be read.
+            if (r.headings && r.headings.length) doc.headings = r.headings.slice(0, MAX_HEADINGS);
             doc.clausesRelinkedAt = now;
         });
         const clientId = _relink.clientId;
@@ -4653,6 +4693,7 @@
         findExplicitClauseRefs,
         storedHeadings,
         relinkDocumentClauses,
+        relinkPreselect,
         rereadStoredDocument,
         // Per-standard clause numbering (ISO/IEC 27001, ISO 22301, ISO/IEC 20000-1).
         mapClausesByStandard,

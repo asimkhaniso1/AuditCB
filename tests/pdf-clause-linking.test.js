@@ -250,3 +250,72 @@ describe('rereadStoredDocument', () => {
         expect(await B.rereadStoredDocument({ storagePath: 'clients/c1/a.xlsx', fileName: 'a.xlsx' })).toBeNull();
     });
 });
+
+// After a first re-link, the IMS Manual carried its links plus the headings
+// read from its file. Its section titles are unnumbered, so the saved list
+// holds only "1 Purpose" and "2 Scope": the clauses came from the contents
+// page. A second re-link worked from that list alone and proposed removing
+// 17 of its 18 clauses, ticked, for PC Connection (2026-11-14).
+describe('re-linking a document that already has saved headings', () => {
+    const base = { name: 'Integrated Management System Manual', category: 'System Manual',
+        linkedStandards: 'iso27001, iso22301, iso20000', source: 'bulk-import', storagePath: 'clients/pcc/ims.pdf', fileName: 'IMS Manual.pdf' };
+    const meta = B.parseContentMeta(IMS_MANUAL_TEXT);
+    const first = B.relinkDocumentClauses(Object.assign({}, base, { linkedClauses: '' }), { meta, clientStandard: IMS });
+    const linked = Object.assign({}, base, { linkedClauses: first.proposed.join(', '), clauseMap: first.proposedMap, headings: meta.headings });
+
+    it('says a proposal from saved headings alone would remove links', () => {
+        const r = B.relinkDocumentClauses(linked, { clientStandard: IMS });
+        expect(r.basis).toBe('headings');
+        expect(r.removes).toEqual(expect.arrayContaining(['4.3', '9.2', '9.3', '10.1']));
+    });
+
+    it('finds nothing to change once the file is read again', () => {
+        const r = B.relinkDocumentClauses(linked, { meta, clientStandard: IMS });
+        expect(r.basis).toBe('file');
+        expect(r.removes).toEqual([]);
+        expect(r.changed).toBe(false);
+    });
+
+    it('does not pre-tick a removal that rests on saved headings alone', () => {
+        const fromHeadings = Object.assign({ doc: linked }, B.relinkDocumentClauses(linked, { clientStandard: IMS }));
+        expect(B.relinkPreselect(fromHeadings)).toBe(false);
+        // Additions from headings, and anything read from the file, still start ticked.
+        expect(B.relinkPreselect({ doc: linked, basis: 'headings', proposed: ['8.4.3'], removes: [] })).toBe(true);
+        expect(B.relinkPreselect({ doc: linked, basis: 'file', proposed: ['7.5'], removes: ['4.1'] })).toBe(true);
+        // Hand-added documents never start ticked.
+        expect(B.relinkPreselect({ doc: { source: 'manual' }, basis: 'file', proposed: ['7.5'], removes: [] })).toBe(false);
+    });
+
+    describe('the Re-link dialog', () => {
+        let modal;
+        beforeEach(() => {
+            modal = null;
+            window.extractTextFromFile = vi.fn(async () => IMS_MANUAL_TEXT);
+            window.showNotification = vi.fn();
+            window.closeModal = vi.fn();
+            document.body.innerHTML = '<div class="modal-content"><div id="modal-body"></div><button id="modal-save"></button></div>';
+            window.DataService = {
+                findClient: () => ({ id: 'pcc', name: 'PC CONNECTION, INC.', standard: IMS, documents: [Object.assign({}, linked)] }),
+                openFormModal: vi.fn((title, body) => { modal = body; document.getElementById('modal-body').innerHTML = body; })
+            };
+        });
+
+        it('reads the stored file even when headings are saved, and leaves the manual alone', async () => {
+            const download = vi.fn(async () => ({ data: new Blob(['%PDF']), error: null }));
+            window.SupabaseClient = { isInitialized: true, client: { storage: { from: () => ({ download }) } } };
+            await window.openRelinkDocumentClauses('pcc');
+            expect(download).toHaveBeenCalledWith('clients/pcc/ims.pdf');
+            expect(document.querySelectorAll('.relink-pick').length).toBe(0);
+            expect(window.showNotification).toHaveBeenCalledWith(expect.stringMatching(/already match/), 'success');
+        });
+
+        it('falls back to saved headings when the file cannot be read, unticked and flagged', async () => {
+            window.SupabaseClient = { isInitialized: true, client: { storage: { from: () => ({ download: async () => ({ data: null, error: new Error('offline') }) }) } } };
+            await window.openRelinkDocumentClauses('pcc');
+            const box = document.querySelector('.relink-pick');
+            expect(box).not.toBeNull();
+            expect(box.checked).toBe(false);
+            expect(modal).toMatch(/From saved headings only \(the file could not be read\) — check before removing 4\.1/);
+        });
+    });
+});
