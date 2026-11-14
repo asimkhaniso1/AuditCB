@@ -2676,7 +2676,7 @@ function brandPalette() {
     };
 }
 
-function printChecklist(id) {
+function printChecklist(id, planId) {
     const checklist = state.checklists.find(c => String(c.id) === String(id));
     if (!checklist) return;
     if (!window.ChecklistDocument || !window.PrintShell) {
@@ -2708,7 +2708,10 @@ function printChecklist(id) {
         ? window.ChecklistCoverage.combine(qa, coverage)
         : { outcome: 'blocked', label: 'Blocked \u2014 coverage could not be assessed', reasons: ['The coverage module is not loaded.'] };
 
-    const plan = planForChecklist(checklist);
+    // The plan page passes its own plan, so the document carries THAT audit's
+    // dates and reference even when the checklist is linked to another plan.
+    const plan = (planId != null && (state.auditPlans || []).find(p => String(p.id) === String(planId)))
+        || planForChecklist(checklist);
     const report = plan ? (state.auditReports || []).find(r => String(r.planId) === String(plan.id)) : null;
     const client = (state.clients || []).find(c => String(c.id) === String(checklist.clientId))
         || (state.clients || []).find(c => c.name === checklist.clientName) || null;

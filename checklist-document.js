@@ -390,8 +390,28 @@
         });
     }
 
+    /** Questions on the printed checklist (section headings not counted). */
+    function itemCount(checklist) {
+        return printItems(checklist).filter(function (i) { return !i.isHeader; }).length;
+    }
+
+    /**
+     * A short fingerprint of what the printed checklist asks (clause +
+     * requirement of every row, in order). Recorded when a checklist is sent
+     * to a client so a later edit shows as "changed since sent". djb2, not
+     * cryptographic: it detects edits, it does not prove anything.
+     */
+    function fingerprint(checklist) {
+        const text = printItems(checklist).map(function (i) {
+            return (i.isHeader ? '#' : '') + String(i.clause == null ? '' : i.clause) + '\u0001' + String(i.requirement == null ? '' : i.requirement);
+        }).join('\u0002');
+        let h = 5381;
+        for (let k = 0; k < text.length; k++) h = ((h << 5) + h + text.charCodeAt(k)) | 0;
+        return (h >>> 0).toString(16).padStart(8, '0');
+    }
+
     const API = { displayClause, ITEM_STATUSES, DEFAULT_ITEM_STATUS, LIFECYCLE_PREPARED, validateItemStatus, lifecycle, reference, printItems,
-        qaPanel, coveragePanel, validationBanner, build };
+        itemCount, fingerprint, qaPanel, coveragePanel, validationBanner, build };
     global.ChecklistDocument = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
     if (global.Logger && global.Logger.debug) global.Logger.debug('Modules', 'checklist-document.js loaded successfully.');
