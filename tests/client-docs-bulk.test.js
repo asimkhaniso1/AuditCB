@@ -511,15 +511,17 @@ describe('ClientDocsBulk', () => {
 
         it('ignores clauses 1-3, which carry no auditable requirement', () => {
             const a = B.analyseDocumentGaps(clauses, docs);
-            expect(a.total).toBe(4);
+            // 7.5 is a heading over 7.5.1 here, so it is not counted twice.
+            expect(a.total).toBe(3);
             expect(a.rows.map(r => r.clause)).not.toContain('1');
+            expect(a.rows.map(r => r.clause)).toEqual(['4.1', '7.5.1', '9.2']);
         });
 
         it('counts coverage and gaps', () => {
             const a = B.analyseDocumentGaps(clauses, docs);
-            expect(a.covered).toBe(3);
+            expect(a.covered).toBe(2);
             expect(a.gaps).toBe(1);
-            expect(a.percent).toBe(75);
+            expect(a.percent).toBe(67);
         });
 
         it('lets a document on the parent clause cover its sub-clause', () => {
@@ -537,7 +539,7 @@ describe('ClientDocsBulk', () => {
         });
 
         it('names the documents that cover each clause', () => {
-            const row = B.analyseDocumentGaps(clauses, docs).rows.find(r => r.clause === '7.5');
+            const row = B.analyseDocumentGaps(clauses, docs).rows.find(r => r.clause === '7.5.1');
             expect(row.docs[0].name).toBe('Control of Documented Information');
         });
 
