@@ -2649,9 +2649,19 @@
         const list = (docs || []).filter(d => d && d.name);
         // Clauses 1-3 of an Annex SL standard are scope, references and terms —
         // they carry no auditable requirement, so they are not gaps.
-        const auditable = (clauses || []).filter(c => {
+        const numbered = (clauses || []).filter(c => {
             const main = parseInt(String(c.clause).split('.')[0], 10);
             return !isNaN(main) && main >= 4;
+        });
+        // A heading clause whose sub-clauses are also listed ("8.4 Supply and
+        // demand" over 8.4.1-8.4.3) is not a requirement of its own: counting it
+        // as well reported one missing topic as two gaps. Coverage is measured
+        // on the sub-clauses, which a document linked to the heading still
+        // covers (clauseSatisfies).
+        const refs = numbered.map(c => String(c.clause).trim());
+        const auditable = numbered.filter(c => {
+            const ref = String(c.clause).trim();
+            return !refs.some(r => r !== ref && r.indexOf(ref + '.') === 0);
         });
 
         const rows = auditable.map(c => {
@@ -2663,6 +2673,24 @@
                 docs: matches,
                 covered: matches.length > 0
             };
+        });
+
+        // A "General" sub-clause introduces the requirements beside it (ISO
+        // 22301 8.2.1 over 8.2.2 business impact analysis and 8.2.3 risk
+        // assessment). No document is written "for" it; it is evidenced when
+        // every requirement it introduces is. Credited only then, and marked so
+        // the auditor sees it was inferred.
+        const parentOf = ref => ref.split('.').slice(0, -1).join('.');
+        rows.forEach(row => {
+            if (row.covered || !/^general$/i.test(String(row.title).trim())) return;
+            const parent = parentOf(row.clause);
+            if (!parent) return;
+            const siblings = rows.filter(r => r !== row && parentOf(r.clause) === parent);
+            if (!siblings.length || !siblings.every(r => r.covered)) return;
+            const seen = new Set();
+            row.docs = siblings.flatMap(r => r.docs).filter(d => !seen.has(d) && seen.add(d));
+            row.covered = true;
+            row.coveredVia = siblings.map(r => r.clause);
         });
 
         const covered = rows.filter(r => r.covered).length;
@@ -2696,8 +2724,39 @@
         return doc ? `Knowledge Base clause set (${esc(doc.name)})` : "scheme, built from the client's documents";
     }
 
-    /** Clause list for a standard: analysed KB first, built-in list otherwise. */
+    /**
+     * Registry clauses an analysed Knowledge Base clause list does not hold.
+     * A KB entry counts for a registry clause when it is that clause or one of
+     * its sub-clauses (KB lists often break 8.4.2 into 8.4.2.1, 8.4.2.2 ...).
+     */
+    function kbMissingRegistryRefs(kbClauses, std) {
+        const have = (kbClauses || []).map(c => String((c && c.clause) || '').trim()).filter(Boolean);
+        return ((std && std.clauses) || []).map(c => c.ref)
+            .filter(ref => !have.some(h => h === ref || h.indexOf(ref + '.') === 0));
+    }
+
+    function registryClauses(std) {
+        return std.clauses.map(c => ({
+            clause: c.ref,
+            title: c.title,
+            requirement: `${std.label} ${c.ref} — ${c.title}.`
+        }));
+    }
+
+    /**
+     * Clause list for a standard: the analysed Knowledge Base list, unless the
+     * clause registry holds the standard and the KB list is missing any of its
+     * clauses. A KB list is read out of the uploaded standard by text
+     * extraction; a copy whose text is font-encoded yields a truncated list
+     * (an ISO/IEC 20000-1 copy that stopped at 8.4.1), and every clause it
+     * dropped was then silently never checked — the analysis read 90% covered
+     * against a standard with 15 clauses missing. The registry is the
+     * controlled, complete list, so it wins whenever the KB one is short.
+     */
     function clausesForStandard(standardName, client) {
+        const CS = window.ChecklistStandards;
+        const resolved = CS ? CS.resolve(standardName || '').standards : [];
+        const std = resolved.length === 1 ? resolved[0] : null;
         const kb = (window.state && window.state.knowledgeBase) || {};
         const normalize = window.KB_HELPERS && window.KB_HELPERS.normalizeStdName;
         if (Array.isArray(kb.standards) && normalize) {
@@ -2706,28 +2765,22 @@
                 s.status === 'ready' && Array.isArray(s.clauses) && s.clauses.length &&
                 wanted && normalize(s.name).includes(wanted)
             );
-            if (doc) return { clauses: doc.clauses, source: `Knowledge Base — ${doc.name}` };
+            if (doc) {
+                const missing = std ? kbMissingRegistryRefs(doc.clauses, std) : [];
+                if (!missing.length) return { clauses: doc.clauses, source: `Knowledge Base — ${doc.name}` };
+                return {
+                    clauses: registryClauses(std),
+                    source: `Clause registry — ${std.label} (the Knowledge Base list for ${doc.name} is missing ${missing.length} clause${missing.length === 1 ? '' : 's'}, e.g. ${missing.slice(0, 4).join(', ')}; re-analyse it from a text-readable copy)`,
+                    kbIncomplete: { name: doc.name, missing }
+                };
+            }
         }
         const schemeDoc = client ? schemeKnowledgeDoc(standardName, client) : null;
         if (schemeDoc) return { clauses: schemeDoc.clauses, source: `Knowledge Base — ${schemeDoc.name}` };
         // The scope-gated registry answers for the standards it holds, without
         // needing settings-kb.js to have been loaded and without the ISO 9001
         // default that used to stand in for every unrecognised standard.
-        const CS = window.ChecklistStandards;
-        if (CS) {
-            const resolved = CS.resolve(standardName || '').standards;
-            if (resolved.length === 1) {
-                const std = resolved[0];
-                return {
-                    clauses: std.clauses.map(c => ({
-                        clause: c.ref,
-                        title: c.title,
-                        requirement: `${std.label} ${c.ref} — ${c.title}.`
-                    })),
-                    source: `Clause registry — ${std.label}`
-                };
-            }
-        }
+        if (std) return { clauses: registryClauses(std), source: `Clause registry — ${std.label}` };
         if (typeof window.getBuiltInClauses === 'function') {
             const clauses = window.getBuiltInClauses(standardName || '');
             if (clauses.length) return { clauses, source: 'Built-in clause set' };
@@ -3070,7 +3123,8 @@
                 ? '<span style="color:#16a34a;font-weight:600;"><i class="fa-solid fa-circle-check"></i> Covered</span>'
                 : '<span style="color:#dc2626;font-weight:600;"><i class="fa-solid fa-triangle-exclamation"></i> Gap</span>'}</td>
                         <td style="vertical-align: top;">${r.covered
-                ? r.docs.map(d => `<span style="background:#eff6ff;color:#1d4ed8;padding:2px 7px;border-radius:4px;font-size:0.75rem;display:inline-block;margin:1px 2px 1px 0;" title="${esc(d.linkedStandardLabels || 'No standard recorded — counts for every standard')}">${esc(docRef(d))}</span>`).join('')
+                ? (r.coveredVia ? `<div style="font-size:0.74rem;color:#475569;margin-bottom:2px;">General clause — evidenced through ${esc(r.coveredVia.join(', '))}</div>` : '')
+                    + r.docs.map(d => `<span style="background:#eff6ff;color:#1d4ed8;padding:2px 7px;border-radius:4px;font-size:0.75rem;display:inline-block;margin:1px 2px 1px 0;" title="${esc(d.linkedStandardLabels || 'No standard recorded — counts for every standard')}">${esc(docRef(d))}</span>`).join('')
                 : '<span style="color:#92400e;font-size:0.8rem;">No documented information supplied — request before Stage 2</span>'}</td>
                     </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;padding:1.2rem;color:#16a34a;">No gaps for ${esc(result.label)} — every applicable clause has a supporting document.</td></tr>`}
                 </tbody>
@@ -3171,7 +3225,7 @@
                     <td>${esc(r.clause)}</td>
                     <td>${esc(r.title || r.requirement.slice(0, 120))}</td>
                     <td class="${r.covered ? 'ok' : 'gap'}">${r.covered ? 'Covered' : 'Gap'}</td>
-                    <td>${r.covered ? esc(r.docs.map(d => docRef(d)).join('; ')) : 'No documented information supplied — request before Stage 2'}</td>
+                    <td>${r.covered ? (r.coveredVia ? `General clause — evidenced through ${esc(r.coveredVia.join(', '))}: ` : '') + esc(r.docs.map(d => docRef(d)).join('; ')) : 'No documented information supplied — request before Stage 2'}</td>
                 </tr>`).join('')}
             </tbody>
         </table>`).join('')}
@@ -4512,6 +4566,7 @@
         clauseTargets,
         docClausesFor,
         IMS_TOPIC_CLAUSES,
+        kbMissingRegistryRefs,
         // Standard attribution — what makes a clause number traceable in an IMS.
         detectStandards,
         mapStandards,

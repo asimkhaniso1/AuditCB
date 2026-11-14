@@ -443,6 +443,8 @@ function renderClientOverview(client) {
     const clientPlans = (window.state.auditPlans || []).filter(p => matchesClient(p, client));
     const clientCerts = (window.state.certifications || []).filter(c => matchesClient(c, client));
     const clientReports = (window.state.auditReports || []).filter(r => matchesClient(r, client));
+    // Every open finding on the client's reports — nonconformities,
+    // observations and OFIs alike — so it is labelled "Audit Findings", not NCs.
     const openNCs = clientReports.reduce((count, r) => count + (getAllFindings(r).filter(f => f.status !== 'Closed' && f.status !== 'closed').length), 0);
 
     // Calculate additional metrics
@@ -530,7 +532,7 @@ function renderClientOverview(client) {
             <div style="margin-bottom: 1.5rem;">
                 ${openNCs > 0 ? `
                 <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                    <div><i class="fa-solid fa-exclamation-triangle" style="color: #f59e0b; margin-right: 0.5rem;"></i><strong>${openNCs} Open NC${openNCs !== 1 ? 's' : ''}</strong> - Action required</div>
+                    <div><i class="fa-solid fa-exclamation-triangle" style="color: #f59e0b; margin-right: 0.5rem;"></i><strong>${openNCs} Open Audit Finding${openNCs !== 1 ? 's' : ''}</strong> - Action required</div>
                     <button class="btn btn-sm" style="background: #f59e0b; color: white; border: none;" data-hash="client/${client.id}/ncr-capa">View</button>
                 </div>` : ''}
                 ${upcomingAudits > 0 ? `
@@ -555,7 +557,7 @@ function renderClientOverview(client) {
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" data-hash="client/${client.id}/ncr-capa">
                     <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.25rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${openNCs}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Open Audit Findings</p>
                 </div>
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6;">
                     <i class="fa-solid fa-users" style="font-size: 1.25rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
