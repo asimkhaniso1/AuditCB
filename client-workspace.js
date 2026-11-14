@@ -143,18 +143,39 @@ function setupClientSearch() {
 // NAVIGATION & SIDEBAR SWITCHING
 // ============================================
 
+// Is the left sidebar showing THIS client's menu right now? The DOM is the
+// truth: state.activeClientId is persisted with the rest of state (IndexedDB)
+// and is also set by screens that never build the menu (renderClientDetail),
+// so it cannot tell whether the client menu is actually there.
+window.isClientMenuShown = function (clientId) {
+    const want = `client/${String(clientId)}/overview`;
+    return Array.from(document.querySelectorAll('.main-nav ul li[data-hash]')).some(li => li.getAttribute('data-hash') === want);
+};
+
+// Route entry for #client/<id>/<module>: switch to the client's workspace
+// (left menu, hidden client list) unless it is already showing, then render
+// the module. Reloading on a client URL used to leave the global menu up,
+// so the client menu (Document Center, Compliance, ...) never appeared.
+window.openClientRoute = function (clientId, subModule) {
+    if (String(window.state.activeClientId) !== String(clientId) || !window.isClientMenuShown(clientId)) {
+        window.selectClient(clientId);
+    }
+    window.renderClientModule(clientId, subModule || 'overview');
+};
+
 // Select a client and switch to their workspace
 window.selectClient = function (clientId) {
-    // Use loose equality to handle string/number ID mismatch
-    const client = window.state.clients.find(c => c.id === clientId);
+    // Compare as strings: the hash gives a string, older records have numeric ids.
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
+    clientId = client.id;
 
     // Update active state
     window.state.activeClientId = clientId;
 
     // Update right sidebar visual state
     document.querySelectorAll('.client-list-item').forEach(item => {
-        item.classList.toggle('active', parseInt(item.dataset.clientId, 10) === clientId);
+        item.classList.toggle('active', String(item.dataset.clientId) === String(clientId));
     });
 
     // Show client settings icon in header
@@ -170,8 +191,7 @@ function renderClientSidebarMenu(clientId) {
     const navList = document.querySelector('.main-nav ul');
     if (!navList) return;
 
-    // Use loose equality to handle string/number ID mismatch
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
 
     // Force left sidebar to be visible
     const sidebar = document.getElementById('sidebar');
@@ -289,8 +309,7 @@ window.backToDashboard = function () {
 
 // Main function to render client modules
 window.renderClientModule = function (clientId, moduleName) {
-    // Use loose equality to handle string/number ID mismatch
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) {
         console.error('Client not found for ID:', clientId, 'Available IDs:', window.state.clients.map(c => c.id));
         window.showNotification('Client not found', 'error');
