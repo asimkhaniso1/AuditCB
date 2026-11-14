@@ -545,6 +545,20 @@ describe('printChecklist — print button and brand colours', () => {
         expect(win.printCount()).toBe(1);
     });
 
+    it('prints for the plan the plan page passes, not whichever plan the checklist names', () => {
+        window.state.checklists[0].planId = 'p-old';
+        window.state.auditPlans = [
+            { id: 'p-old', client: 'X', date: '2025-11-17', endDate: '2025-11-19', selectedChecklists: ['cl-1'] },
+            { id: 'p-new', client: 'X', date: '2026-11-17', endDate: '2026-11-19', selectedChecklists: ['cl-1'] }
+        ];
+        const doc = document.implementation.createHTMLDocument('');
+        window.open = () => ({ document: { write: (h) => { doc.open(); doc.write(h); doc.close(); }, close() {}, querySelector: (s) => doc.querySelector(s) }, addEventListener() {}, focus() {}, print() {} });
+        window.printChecklist('cl-1', 'p-new');
+        expect(doc.body.textContent).toMatch(/17.19 November 2026/);
+        window.printChecklist('cl-1');
+        expect(doc.body.textContent).toMatch(/17.19 November 2025/);
+    });
+
     it('does not throw when the pop-up is blocked', () => {
         window.open = () => null;
         expect(() => window.printChecklist('cl-1')).not.toThrow();

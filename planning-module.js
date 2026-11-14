@@ -1685,9 +1685,11 @@ function viewAuditPlan(id) {
                             <p style="font-size: 0.9rem; color: var(--text-secondary);">Built from what the pre-audit review found.</p>
                             <div style="font-weight: bold; font-size: 1.25rem; margin-top: 0.5rem;">${totalItems} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">Items</span></div>
                             ${(plan.preAudit?.focusPoints || []).length ? `<div style="font-size: 0.75rem; color: #7c3aed; margin-top: 0.4rem;"><i class="fa-solid fa-bullseye"></i> ${plan.preAudit.focusPoints.length} focus point(s) from Stage 1</div>` : ''}
+                            ${checklistIssueSummaryHtml(plan)}
                         </div>
                         <div>
                             <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" data-action="printAuditChecklist" data-id="${plan.id}" aria-label="Print"><i class="fa-solid fa-print"></i> Print</button>
+                            <button class="btn btn-sm btn-outline-secondary" style="width: 100%; margin-bottom: 0.5rem;" data-action="openPlanChecklists" data-id="${plan.id}" aria-label="Sent to client"><i class="fa-solid fa-paper-plane"></i> Sent to client</button>
                             <button class="btn btn-sm btn-secondary" style="width: 100%;" data-action="renderConfigureChecklist" data-id="${plan.id}">Configure</button>
                         </div>
                     </div>
@@ -1770,215 +1772,282 @@ function viewAuditPlan(id) {
 
 // Note: The definitive printAuditPlanDetails function (with team name resolution) is defined below around line 1295
 
-window.printAuditChecklist = function (planId) {
-    try {
-        window.Logger.debug('Planning', 'Printing Plan ID:', planId);
-        const plan = state.auditPlans.find(p => String(p.id) === String(planId));
-        if (!plan) {
-            alert("Error: Audit Plan not found for ID: " + planId);
-            return;
+// ── The plan's checklists: one print format, a sent-to-client record, and a
+// warning when two ticked checklists ask the same standard twice ─────────
+//
+// The plan page used to print its own "Audit Checklist Execution Report":
+// unbranded, no checklist reference, a status that only meant "a report
+// exists". The Checklists library printed the branded ChecklistDocument. The
+// same checklist therefore went out in two formats, and nothing recorded which
+// one the client was given. Both buttons now print ChecklistDocument, and
+// sending a checklist to the client is recorded on the plan.
+
+/** The plan's ticked checklists that exist in the library, in plan order. */
+function planChecklistObjects(plan) {
+    const all = (window.state && window.state.checklists) || [];
+    return ((plan && plan.selectedChecklists) || [])
+        .map(id => all.find(c => String(c.id) === String(id)))
+        .filter(Boolean);
+}
+
+function isClientSpecificChecklist(c) {
+    return !!(c && (String(c.type || '').toLowerCase() !== 'global' || c.clientId || c.clientName));
+}
+
+/**
+ * Ticked checklists that ask the same standard twice: two client-specific
+ * checklists sharing a standard, or any two naming exactly the same
+ * standards. Execution shows every ticked checklist's questions, so such a
+ * pair duplicates questions and splits the findings between them. A global
+ * base checklist beside a client-specific one is a deliberate combination
+ * and is not flagged.
+ * @param {Object[]} checklists
+ * @returns {Array<{a: Object, b: Object, standards: string[]}>}
+ */
+function findOverlappingChecklists(checklists) {
+    const parse = (c) => window.UTILS.parseStandards(c.standard || '');
+    const list = (checklists || []).filter(Boolean);
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+            const a = list[i], b = list[j];
+            const sa = parse(a), sb = parse(b);
+            const shared = sa.filter(s => sb.includes(s));
+            if (!shared.length) continue;
+            const sameStandards = sa.length === sb.length && shared.length === sa.length;
+            if (sameStandards || (isClientSpecificChecklist(a) && isClientSpecificChecklist(b))) out.push({ a, b, standards: shared });
         }
-
-        // Use robust equality
-        const report = (state.auditReports || []).find(r => String(r.planId) === String(planId));
-        const checklists = state.checklists || [];
-        const planChecklists = plan.selectedChecklists || [];
-
-        if (!planChecklists || planChecklists.length === 0) {
-            alert("No checklists are assigned to this audit plan.");
-            return;
-        }
-
-        // Calculate Auditor Names safely
-        let auditorNames = 'Unassigned';
-        if (plan.team && Array.isArray(plan.team)) {
-            auditorNames = plan.team.join(', ');
-        } else if (plan.auditors && Array.isArray(plan.auditors)) {
-            auditorNames = plan.auditors.map(id => {
-                const auditor = (state.auditors || []).find(a => a.id === id);
-                return auditor ? auditor.name : 'Unknown';
-            }).join(', ');
-        }
-
-        // Map progress correctly
-        const progressMap = {};
-        if (report && report.checklistProgress) {
-            report.checklistProgress.forEach(p => {
-                // Normalized key: ID-Idx (String)
-                progressMap[`${p.checklistId}-${p.itemIdx}`] = p;
-            });
-        }
-
-        const statusText = { 'conform': 'Conform', 'minor': 'Minor NC', 'major': 'Major NC', 'na': 'N/A', '': 'Not Checked' };
-        const statusColor = { 'conform': 'green', 'minor': 'orange', 'major': 'red', 'na': 'gray', '': 'black' };
-
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
-
-        let content = `
-            <html>
-            <head>
-                <title>Audit Checklist Report - ${window.UTILS.escapeHtml(plan.client)}</title>
-                <style>
-                    body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; -webkit-print-color-adjust: exact; padding: 20px; }
-                    .header { text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem; position: relative; }
-                    .section { margin-bottom: 2rem; page-break-inside: avoid; }
-                    h2 { background: #f2f2f2; padding: 0.5rem; border-left: 5px solid #333; margin-top: 0; }
-                    h3 { margin-top: 1rem; margin-bottom: 0.5rem; border-bottom: 1px solid #ddd; padding-bottom: 0.25rem; font-size: 1rem; }
-                    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.9rem; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f8f8f8; font-weight: bold; }
-                    .main-clause { background-color: #eef2ff; font-weight: bold; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <div style="position: absolute; top: 0; right: 0;">
-                        <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
-                    </div>
-                    <h1>Audit Checklist Execution Report</h1>
-                    <p><strong>Client:</strong> ${window.UTILS.escapeHtml(plan.client)} | <strong>Standard:</strong> ${window.UTILS.escapeHtml(plan.standard)} | <strong>Date:</strong> ${window.UTILS.formatDate(plan.date)}</p>
-                    <p><strong>Auditor(s):</strong> ${window.UTILS.escapeHtml(auditorNames)} | <strong>Status:</strong> ${report ? 'Finalized' : 'In Progress'}</p>
-                </div>
-        `;
-
-        planChecklists.forEach(clId => {
-            const cl = checklists.find(c => String(c.id) === String(clId));
-            if (!cl) return; // Skip if checklist not found
-
-            content += `
-                <div class="section">
-                    <h2>${window.UTILS.escapeHtml(cl.name)}</h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th width="10%">Clause</th>
-                                <th width="40%">Requirement</th>
-                                <th width="15%">Status</th>
-                                <th width="35%">Auditor Comments / Evidence</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
-
-            if (cl.clauses) {
-                // Hierarchical
-                cl.clauses.forEach(clause => {
-                    content += `<tr class="main-clause"><td colspan="4">${window.UTILS.escapeHtml(clause.mainClause)} ${window.UTILS.escapeHtml(clause.title || '')}</td></tr>`;
-                    (clause.subClauses || []).forEach((sub, subIdx) => {
-                        // Check if this sub-clause has nested items
-                        if (sub.items && sub.items.length > 0) {
-                            sub.items.forEach((item, itemIdx) => {
-                                const key = `${cl.id}-${clause.mainClause}-${subIdx}-${itemIdx}`;
-                                const altKey = `${cl.id}-${item.clause || sub.clause || ''}-${itemIdx}`;
-                                const prog = progressMap[key] || progressMap[altKey] || progressMap[`${cl.id}-${clause.mainClause}-${subIdx}`] || {};
-                                const s = prog.status || '';
-                                const c = prog.comment || '-';
-                                const reqText = item.requirement || item.text || item.title || '';
-
-                                content += `
-                                    <tr>
-                                        <td>${window.UTILS.escapeHtml(item.clause || sub.clause || '')}</td>
-                                        <td>${window.UTILS.escapeText(reqText)}</td>
-                                        <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
-                                        <td>${window.UTILS.escapeText(c)}</td>
-                                    </tr>
-                                 `;
-                            });
-                        } else {
-                            // Flat sub-clause
-                            const key = `${cl.id}-${clause.mainClause}-${subIdx}`;
-                            const prog = progressMap[key] || {};
-                            const s = prog.status || '';
-                            const c = prog.comment || '-';
-                            const reqText = sub.requirement || sub.text || sub.title || sub.requirement_text || '';
-
-                            content += `
-                                <tr>
-                                    <td>${window.UTILS.escapeHtml(sub.clause || '')}</td>
-                                    <td>${window.UTILS.escapeText(reqText)}</td>
-                                    <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
-                                    <td>${window.UTILS.escapeText(c)}</td>
-                                </tr>
-                             `;
-                        }
-                    });
-                });
-            } else if (cl.items) {
-                // Flat
-                cl.items.forEach((item, idx) => {
-                    const key = `${cl.id}-${idx}`;
-                    const prog = progressMap[key] || {};
-                    const s = prog.status || '';
-                    const c = prog.comment || '-';
-
-                    content += `
-                        <tr>
-                            <td>${window.UTILS.escapeHtml(item.clause || '')}</td>
-                            <td>${window.UTILS.escapeText(item.requirement || item.text || item.title || '')}</td>
-                            <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
-                            <td>${window.UTILS.escapeText(c)}</td>
-                        </tr>
-                    `;
-                });
-            }
-
-            content += `</tbody></table></div>`;
-        });
-
-        // Fallback: assigned checklists missing from the library (deleted / cloud
-        // sync gap) — print directly from the report's saved responses so the
-        // execution record is never blank.
-        const resolvedAny = planChecklists.some(clId => checklists.some(c => String(c.id) === String(clId)));
-        if (!resolvedAny && report && Array.isArray(report.checklistProgress) && report.checklistProgress.length > 0) {
-            content += `
-                <div class="section">
-                    <h2>Audit Responses (from saved execution record)</h2>
-                    <p style="font-size:0.8rem;color:#777;">Source checklists are no longer in the library; showing the saved audit responses.</p>
-                    <table>
-                        <thead><tr><th width="10%">Clause</th><th width="40%">Requirement</th><th width="15%">Status</th><th width="35%">Auditor Comments / Evidence</th></tr></thead>
-                        <tbody>
-                            ${report.checklistProgress.map(p => `
-                                <tr>
-                                    <td>${window.UTILS.escapeHtml(p.clause || '')}</td>
-                                    <td>${window.UTILS.escapeText(p.requirement || p.text || '')}</td>
-                                    <td style="color: ${statusColor[p.status || ''] || '#333'}; font-weight: bold;">${statusText[p.status || ''] || 'Not Assessed'}</td>
-                                    <td>${window.UTILS.escapeText(p.comment || '-')}</td>
-                                </tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>`;
-        }
-
-        if (report && report.ncrs && report.ncrs.length > 0) {
-            content += `<div class="section"><h2>Audit Findings (NCRs)</h2><ul>`;
-            report.ncrs.forEach(ncr => {
-                content += `<li><strong>${window.UTILS.escapeText(ncr.type)} (${window.UTILS.escapeText(ncr.clause)}):</strong> ${window.UTILS.escapeText(ncr.description)}</li>`;
-            });
-            content += `</ul></div>`;
-        }
-
-        content += `
-            <div style="margin-top: 3rem; text-align: center; font-size: 0.8rem; color: #777; border-top: 1px solid #ddd; padding-top: 1rem;">
-                Generated by ISOXPERT Audit360 on ${new Date().toLocaleDateString()}
-            </div>
-            </body></html>
-        `;
-
-        // Use specific window name to avoid some blockers
-        const win = window.open('', 'PrintChecklist', 'width=1000,height=800');
-        if (win) {
-            win.document.open();
-            win.document.write(content);
-            win.document.close();
-            win.focus();
-            setTimeout(() => win.print(), 500);
-        } else {
-            alert("Pop-up blocker prevented printing. Please check your browser settings and try again.");
-        }
-    } catch (err) {
-        console.error("Print function error:", err);
-        alert("An error occurred while trying to print: " + err.message);
     }
+    return out;
+}
+window.findOverlappingChecklists = findOverlappingChecklists;
+
+function overlapNames(pairs) {
+    const names = [];
+    pairs.forEach(p => [p.a, p.b].forEach(c => { const n = c.name || String(c.id); if (!names.includes(n)) names.push(n); }));
+    return names;
+}
+
+function overlapStandards(pairs) {
+    const out = [];
+    pairs.forEach(p => p.standards.forEach(s => { if (!out.includes(s)) out.push(s); }));
+    return out;
+}
+
+/** Plain-text warning, for confirm(). */
+function overlapWarningText(pairs) {
+    if (!pairs.length) return '';
+    const names = overlapNames(pairs);
+    return `${names.length} ticked checklists cover the same standards (${overlapStandards(pairs).join(', ')}):\n`
+        + names.map(n => `• ${n}`).join('\n')
+        + '\n\nExecution shows the questions of every ticked checklist, so these are asked twice and the findings are split between them.';
+}
+
+function overlapBannerHtml(pairs) {
+    if (!pairs.length) return '';
+    const esc = window.UTILS.escapeHtml;
+    const names = overlapNames(pairs);
+    return `<div class="alert checklist-overlap-warning" role="alert" style="margin-bottom: 1.5rem; background: #fffbeb; border-left: 4px solid #d97706; color: #78350f; padding: 1rem;">
+            <strong><i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.5rem;"></i>${names.length} ticked checklists cover the same standards (${esc(overlapStandards(pairs).join(', '))}).</strong>
+            <ul style="margin: 0.4rem 0 0.4rem 1.25rem; padding: 0; font-size: 0.85rem;">${names.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+            <div style="font-size: 0.85rem;">Execution shows the questions of every ticked checklist, so these are asked twice and the findings are split between them. Keep one ticked unless both are intended.</div>
+        </div>`;
+}
+
+/** Re-draw the overlap warning on Configure Checklists from what is ticked now. */
+window.refreshChecklistOverlapWarning = function () {
+    const host = document.getElementById('checklist-overlap-warning');
+    if (!host) return;
+    const all = (window.state && window.state.checklists) || [];
+    const ticked = Array.from(document.querySelectorAll('.checklist-select-cb:checked'))
+        .map(cb => all.find(c => String(c.id) === String(cb.getAttribute('data-id'))))
+        .filter(Boolean);
+    host.innerHTML = overlapBannerHtml(findOverlappingChecklists(ticked));
+};
+
+/**
+ * Reference, item count and fingerprint exactly as the printed document
+ * computes them (same plan, client and sibling list), so the record matches
+ * the PDF the client holds.
+ */
+function checklistIssueFacts(checklist, plan) {
+    const CD = window.ChecklistDocument;
+    const clients = (window.state && window.state.clients) || [];
+    const client = clients.find(c => String(c.id) === String(checklist.clientId))
+        || clients.find(c => c.name === checklist.clientName) || null;
+    return {
+        reference: CD ? CD.reference(checklist, { plan, client, siblings: (window.state && window.state.checklists) || [] }) : String(checklist.id),
+        itemCount: CD ? CD.itemCount(checklist) : 0,
+        fingerprint: CD ? CD.fingerprint(checklist) : ''
+    };
+}
+
+/** The most recent sent-to-client record for one checklist on a plan. */
+function latestChecklistIssue(plan, checklistId) {
+    return ((plan && plan.checklistIssues) || [])
+        .filter(e => String(e.checklistId) === String(checklistId))
+        .sort((x, y) => String(y.sentOn || '').localeCompare(String(x.sentOn || ''))
+            || String(y.recordedAt || '').localeCompare(String(x.recordedAt || '')))[0] || null;
+}
+window.latestChecklistIssue = latestChecklistIssue;
+
+/** Has the checklist's content changed since that record was made? */
+function checklistChangedSinceIssue(entry, checklist) {
+    if (!entry || !entry.fingerprint || !window.ChecklistDocument) return false;
+    return window.ChecklistDocument.fingerprint(checklist) !== entry.fingerprint;
+}
+
+function fmtIssueDate(iso) {
+    return (window.UTILS && window.UTILS.formatDate) ? window.UTILS.formatDate(iso) : String(iso || '');
+}
+
+/** The Checklist Config card's sent / not-sent lines and overlap warning. */
+function checklistIssueSummaryHtml(plan) {
+    const esc = window.UTILS.escapeHtml;
+    const lists = planChecklistObjects(plan);
+    if (!lists.length) return '';
+    const lines = lists.map(cl => {
+        const facts = checklistIssueFacts(cl, plan);
+        const last = latestChecklistIssue(plan, cl.id);
+        if (!last) {
+            return `<div style="color: #64748b;" title="${esc(cl.name)}"><i class="fa-regular fa-circle" style="width: 14px;"></i> ${esc(facts.reference)} · not recorded as sent</div>`;
+        }
+        const changed = checklistChangedSinceIssue(last, cl);
+        return `<div style="color: #166534;" title="${esc(cl.name)}"><i class="fa-solid fa-paper-plane" style="width: 14px;"></i> ${esc(last.reference || facts.reference)} · sent ${esc(fmtIssueDate(last.sentOn))}`
+            + (changed ? ' <span style="color: #b45309; font-weight: 600;">· changed since sent</span>' : '') + '</div>';
+    }).join('');
+    const pairs = findOverlappingChecklists(lists);
+    const overlap = pairs.length
+        ? `<div style="color: #b45309; margin-top: 0.35rem;"><i class="fa-solid fa-triangle-exclamation" style="width: 14px;"></i> ${overlapNames(pairs).length} checklists cover the same standards — questions are duplicated</div>`
+        : '';
+    return `<div class="plan-checklist-issues" style="font-size: 0.75rem; margin-top: 0.5rem; line-height: 1.5;">${lines}${overlap}</div>`;
+}
+
+window.printAuditChecklist = function (planId) {
+    const plan = (state.auditPlans || []).find(p => String(p.id) === String(planId));
+    if (!plan) return;
+    const lists = planChecklistObjects(plan);
+    if (!lists.length) {
+        window.showNotification((plan.selectedChecklists || []).length
+            ? 'The checklists assigned to this plan could not be loaded from the library.'
+            : 'No checklists are assigned to this audit plan.', 'warning');
+        return;
+    }
+    // One checklist prints straight away. Several each print as their own
+    // document with their own reference, chosen from the list.
+    if (lists.length === 1) { window.printChecklist(lists[0].id, plan.id); return; }
+    window.openPlanChecklists(planId);
+};
+
+/** Print each checklist, record which one went to the client, see the history. */
+window.openPlanChecklists = function (planId) {
+    const plan = (state.auditPlans || []).find(p => String(p.id) === String(planId));
+    if (!plan) return;
+    const esc = window.UTILS.escapeHtml;
+    const lists = planChecklistObjects(plan);
+    if (!lists.length) {
+        window.showNotification('No checklists are assigned to this audit plan.', 'warning');
+        return;
+    }
+    const rows = lists.map(cl => {
+        const facts = checklistIssueFacts(cl, plan);
+        const last = latestChecklistIssue(plan, cl.id);
+        const sent = last
+            ? `<span style="color: #166534;">${esc(fmtIssueDate(last.sentOn))} to ${esc(last.sentTo || '')}</span>${checklistChangedSinceIssue(last, cl) ? '<div style="color: #b45309; font-size: 0.75rem;">Changed since sent</div>' : ''}`
+            : '<span style="color: #64748b;">Not recorded</span>';
+        return `<tr>
+                <td style="padding: 6px;">${esc(cl.name)}</td>
+                <td style="padding: 6px; white-space: nowrap;">${esc(facts.reference)}</td>
+                <td style="padding: 6px; text-align: right;">${facts.itemCount}</td>
+                <td style="padding: 6px;">${sent}</td>
+                <td style="padding: 6px; white-space: nowrap;">
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="printChecklist" data-arg1="${esc(String(cl.id))}" data-arg2="${esc(String(plan.id))}"><i class="fa-solid fa-print"></i> Print</button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-action="openRecordChecklistSent" data-arg1="${esc(String(plan.id))}" data-arg2="${esc(String(cl.id))}"><i class="fa-solid fa-paper-plane"></i> Record as sent</button>
+                </td>
+            </tr>`;
+    }).join('');
+    const history = (plan.checklistIssues || []).slice()
+        .sort((x, y) => String(y.sentOn || '').localeCompare(String(x.sentOn || '')) || String(y.recordedAt || '').localeCompare(String(x.recordedAt || '')));
+    const historyHtml = history.length ? `
+        <h4 style="margin: 1.25rem 0 0.5rem;">Sent to client</h4>
+        <table class="data-table" style="width: 100%; font-size: 0.85rem;">
+            <thead><tr><th>Date</th><th>Reference</th><th>Checklist</th><th>Items</th><th>To</th><th>How</th><th>Recorded by</th></tr></thead>
+            <tbody>${history.map(e => `<tr>
+                <td>${esc(fmtIssueDate(e.sentOn))}</td><td>${esc(e.reference || '')}</td><td>${esc(e.checklistName || '')}</td>
+                <td>${esc(String(e.itemCount == null ? '' : e.itemCount))}</td><td>${esc(e.sentTo || '')}</td><td>${esc(e.method || '')}${e.note ? `<div style="color: #64748b;">${esc(e.note)}</div>` : ''}</td>
+                <td>${esc(e.recordedBy || '')}</td></tr>`).join('')}</tbody>
+        </table>` : '';
+    const body = `
+        ${overlapBannerHtml(findOverlappingChecklists(lists))}
+        <p style="margin: 0 0 0.75rem; color: var(--text-secondary); font-size: 0.9rem;">Each checklist prints as its own document with its own reference. After you send one to ${esc(plan.client || 'the client')}, record it here so the plan shows which checklist they hold.</p>
+        <table class="data-table" style="width: 100%; font-size: 0.85rem;">
+            <thead><tr><th>Checklist</th><th>Reference</th><th style="text-align: right;">Items</th><th>Sent to client</th><th></th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+        ${historyHtml}`;
+    window.DataService.openFormModal('Checklists for this audit', body);
+};
+
+function localTodayISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+window.openRecordChecklistSent = function (planId, checklistId) {
+    const plan = (state.auditPlans || []).find(p => String(p.id) === String(planId));
+    const checklist = ((window.state && window.state.checklists) || []).find(c => String(c.id) === String(checklistId));
+    if (!plan || !checklist) return;
+    const esc = window.UTILS.escapeHtml;
+    const facts = checklistIssueFacts(checklist, plan);
+    const previous = (plan.checklistIssues || []).slice(-1)[0];
+    const methods = ['Email', 'Client portal', 'Handed over at meeting', 'Other'];
+    const body = `
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.9rem;">
+            <div><strong>${esc(checklist.name)}</strong></div>
+            <div style="color: var(--text-secondary);">Reference ${esc(facts.reference)} · ${facts.itemCount} items · ${esc(checklist.standard || '')}</div>
+        </div>
+        <div class="form-group"><label for="rcs-date">Date sent <span style="color: var(--danger-color);">*</span></label>
+            <input type="date" id="rcs-date" class="form-control" value="${localTodayISO()}" max="${localTodayISO()}"></div>
+        <div class="form-group"><label for="rcs-to">Sent to <span style="color: var(--danger-color);">*</span></label>
+            <input type="text" id="rcs-to" class="form-control" placeholder="Name and/or email" value="${esc((previous && previous.sentTo) || '')}"></div>
+        <div class="form-group"><label for="rcs-method">How</label>
+            <select id="rcs-method" class="form-control">${methods.map(m => `<option>${esc(m)}</option>`).join('')}</select></div>
+        <div class="form-group"><label for="rcs-note">Note</label>
+            <input type="text" id="rcs-note" class="form-control" placeholder="Optional, e.g. email subject"></div>`;
+    window.DataService.openFormModal('Record checklist sent to client', body, () => window.saveChecklistSent(planId, checklistId));
+};
+
+window.saveChecklistSent = async function (planId, checklistId) {
+    const plan = (state.auditPlans || []).find(p => String(p.id) === String(planId));
+    const checklist = ((window.state && window.state.checklists) || []).find(c => String(c.id) === String(checklistId));
+    if (!plan || !checklist) return;
+    const val = (id) => String((document.getElementById(id) || {}).value || '').trim();
+    const sentOn = val('rcs-date');
+    const sentTo = val('rcs-to');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(sentOn)) { window.showNotification('Enter the date the checklist was sent.', 'error'); return; }
+    if (sentOn > localTodayISO()) { window.showNotification('The date sent cannot be in the future.', 'error'); return; }
+    if (!sentTo) { window.showNotification('Enter who the checklist was sent to.', 'error'); return; }
+    const facts = checklistIssueFacts(checklist, plan);
+    const user = (window.state && window.state.currentUser) || {};
+    const entry = {
+        id: 'cli-' + Date.now().toString(36),
+        checklistId: String(checklist.id),
+        checklistName: checklist.name || '',
+        reference: facts.reference,
+        itemCount: facts.itemCount,
+        fingerprint: facts.fingerprint,
+        sentOn,
+        sentTo,
+        method: val('rcs-method'),
+        note: val('rcs-note'),
+        recordedBy: user.name || '',
+        recordedAt: new Date().toISOString()
+    };
+    plan.checklistIssues = (plan.checklistIssues || []).concat([entry]);
+    await persistPlanRecord(plan);
+    if (window.closeModal) window.closeModal();
+    window.showNotification(`Recorded: ${facts.reference} sent to ${sentTo}.`, 'success');
+    window.viewAuditPlan(planId);
 };
 
 window.closeAuditPlan = async function (planId) {
@@ -2314,6 +2383,7 @@ window.renderConfigureChecklist = async function (planId) {
             ${headerHtml}
             <div style="max-width: 1200px; margin: 0 auto;">
                 ${missingBanner}
+                <div id="checklist-overlap-warning"></div>
                 ${clientChecklists.length > 0 ? renderGroup(`${plan.client} Checklists`, clientChecklists, 'fa-solid fa-building', '#7c3aed') : `
                     <div style="margin-bottom: 2rem; padding: 1.5rem; background: #faf5ff; border: 2px dashed #c4b5fd; border-radius: 12px; text-align: center;">
                         <i class="fa-solid fa-building" style="font-size: 2rem; color: #7c3aed; margin-bottom: 0.5rem;"></i>
@@ -2382,8 +2452,10 @@ window.renderConfigureChecklist = async function (planId) {
             const all = document.querySelector(`.select-all-items-cb[data-checklist-id="${clId}"]`);
             if (all) all.checked = itemCbs.length > 0 && itemCbs.every(i => i.checked);
             window.configItemSelectionChanged(clId);
+            window.refreshChecklistOverlapWarning();
         });
     });
+    window.refreshChecklistOverlapWarning();
 };
 
 // HELPER ACTIONS FOR CONFIG
@@ -2549,6 +2621,13 @@ window.saveChecklistConfiguration = async function (planId) {
             }
         }
     });
+
+    // Two ticked checklists asking the same standard duplicate every shared
+    // question in execution. Saving that is allowed, but only on purpose.
+    const library = (window.state && window.state.checklists) || [];
+    const overlaps = findOverlappingChecklists(selectedChecklists.map(id => library.find(c => String(c.id) === String(id))));
+    if (overlaps.length && typeof window.confirm === 'function'
+        && !window.confirm(`${overlapWarningText(overlaps)}\n\nSave with all of them ticked?`)) return;
 
     plan.selectedChecklists = selectedChecklists;
     plan.selectedChecklistItems = selectedItemsMap;
