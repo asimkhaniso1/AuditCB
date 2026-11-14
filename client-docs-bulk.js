@@ -132,7 +132,13 @@
         { topic: 'service-level', re: /\bservice level|\bsla\b/i, strong: true },
         { topic: 'budget', re: /\bbudgeting|accounting for services/i },
         { topic: 'demand', re: /\bdemand management/i, strong: true },
-        { topic: 'capacity', re: /\bcapacity (management|plan)/i },
+        // Strong: "Capacity Management" is a 20000-1 process name as specific
+        // as "Demand management". PC Connection's Availability Plan (4.5) and
+        // Continual Improvement SOP (section 5, with business-capacity roles
+        // and capacity reporting) each give it one heading among many, which
+        // the frequency threshold dropped, so 8.4.3 read as a gap. It maps to
+        // no clause in 27001 or 22301 (A.8.6 is an Annex A control).
+        { topic: 'capacity', re: /\bcapacity (management|plan)|\bbusiness capacity\b/i, strong: true },
         { topic: 'service-design', re: /\bservice design|design and transition|\bservice transition/i, strong: true },
         { topic: 'release-deploy', re: /\brelease (and|&) deployment|\brelease management|\bdeployment management|\bpatch management/i, strong: true },
         { topic: 'incident', re: /\bincident/i },
@@ -578,6 +584,14 @@
      * they are the document's own section numbers, 'none' without headings.
      * Decided by agreement: a heading whose wording maps to the same main
      * clause as its number agrees; one that maps elsewhere disagrees.
+     *
+     * "Roles and responsibilities" (5.3) is no evidence either way: nearly
+     * every procedure has that section, and it is often section 5, so it
+     * "agreed" with ISO clause 5. PC Connection's Continual Improvement SOP
+     * ("5 Capacity Management", "5.1.1 Business Capacity Roles and
+     * Responsibilities", "5.2.2 Roles and Responsibilities") was read as
+     * ISO-numbered on that alone, and a re-link proposed its own section
+     * numbers 5.1.1-5.2.8 as clauses.
      */
     function headingNumbering(headings) {
         let agree = 0, disagree = 0, numbered = 0;
@@ -585,7 +599,7 @@
             const main = parseInt(String(h.clause).split('.')[0], 10);
             if (!(main >= 4 && main <= 10)) continue;
             numbered++;
-            const mains = new Set(Array.from(keywordClauses(h.text)).map(c => parseInt(c.split('.')[0], 10)));
+            const mains = new Set(Array.from(keywordClauses(h.text)).filter(c => c !== '5.3').map(c => parseInt(c.split('.')[0], 10)));
             if (!mains.size) continue;
             if (mains.has(main)) agree++;
             else disagree++;
@@ -2788,6 +2802,83 @@
         return { clauses: [], source: 'No clause set available' };
     }
 
+    // ── What a gap asks the client for, and by when ────────────────────
+    // A gap used to read "request before Stage 2" for every client. Stage 2
+    // only exists for an initial certification; for a certified client the
+    // missing document is due before its next surveillance or recertification
+    // audit, and saying "Stage 2" on a recertification report is simply wrong.
+
+    const CLOSED_PLAN_STATUS = /^(completed|closed|cancell?ed|void|withdrawn)$/i;
+    const LAPSED_CERT_STATUS = /^(withdrawn|expired|suspended|cancell?ed)$/i;
+
+    function localISODate(d) {
+        const pad = n => (n < 10 ? '0' : '') + n;
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    function planBelongsTo(plan, client) {
+        if (!plan || !client) return false;
+        if (plan.clientId != null && client.id != null) return String(plan.clientId) === String(client.id);
+        const a = String(plan.client || plan.clientName || '').trim().toLowerCase();
+        return !!a && a === String(client.name || '').trim().toLowerCase();
+    }
+
+    /** "Recertification" -> "the Recertification audit"; Stage 1/2 stay bare. */
+    function auditTypeLabel(raw) {
+        const s = String(raw || '').trim();
+        if (/stage\s*1/i.test(s)) return 'Stage 1';
+        if (/stage\s*2|^initial/i.test(s)) return 'Stage 2';
+        if (/re-?cert|renew/i.test(s)) return 'the Recertification audit';
+        const surv = s.match(/surveillance\s*(\d)/i);
+        if (surv) return `the Surveillance ${surv[1]} audit`;
+        if (/surv/i.test(s)) return 'the Surveillance audit';
+        return s ? `the ${s.replace(/\s*audit$/i, '')} audit` : 'the next audit';
+    }
+
+    /**
+     * The audit a missing document has to be supplied before: the client's
+     * next scheduled audit plan, else (certified client) the stage its
+     * certification cycle is in, else Stage 2.
+     * @returns {{label: string, date: string|null, source: 'plan'|'cycle'|'certified'|'initial'}}
+     */
+    function nextAuditForGaps(client, plans, today) {
+        const ymd = typeof today === 'string' && today.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        const now = ymd ? new Date(+ymd[1], +ymd[2] - 1, +ymd[3]) : (today ? new Date(today) : new Date());
+        const todayISO = localISODate(now);
+        // A plan still running today (3-day audit, day 2) is still the next audit.
+        const upcoming = (plans || [])
+            .filter(p => p && p.date && planBelongsTo(p, client) && !CLOSED_PLAN_STATUS.test(String(p.status || '').trim()))
+            .filter(p => String(p.endDate || p.date).slice(0, 10) >= todayISO)
+            .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        if (upcoming.length) {
+            const p = upcoming[0];
+            return { label: auditTypeLabel(p.auditType || p.type), date: String(p.date).slice(0, 10), source: 'plan' };
+        }
+        const certs = ((client && client.certificates) || []).filter(c => c && !LAPSED_CERT_STATUS.test(String(c.status || '').trim()));
+        if (certs.length) {
+            const RS = window.ReportStats;
+            const cs = RS && typeof RS.cycleState === 'function'
+                ? RS.cycleState({ client, certificate: certs[0], today: now, allReports: [], allPlans: [] })
+                : null;
+            if (cs && /surveillance|recert/i.test(String(cs.stage || ''))) {
+                return { label: auditTypeLabel(cs.stage), date: null, source: 'cycle' };
+            }
+            return { label: 'the next audit', date: null, source: 'certified' };
+        }
+        return { label: 'Stage 2', date: null, source: 'initial' };
+    }
+
+    /** The action a gap row asks for. */
+    function gapRequestText(next) {
+        const n = next || { label: 'Stage 2', date: null };
+        const fmt = window.UTILS && typeof window.UTILS.formatDate === 'function' ? window.UTILS.formatDate : (d => d);
+        return `No documented information supplied — request before ${n.label}${n.date ? ` (${fmt(n.date)})` : ''}`;
+    }
+
+    function gapRequestFor(client) {
+        return gapRequestText(nextAuditForGaps(client, (window.state && window.state.auditPlans) || []));
+    }
+
     let _gap = null;
 
     /**
@@ -3099,7 +3190,7 @@
     }
 
     /** One standard's clause table, with the standard named on every row. */
-    function gapTableHTML(result, onlyGaps) {
+    function gapTableHTML(result, onlyGaps, requestText) {
         const a = result.analysis;
         const shown = onlyGaps ? a.rows.filter(r => !r.covered) : a.rows;
         return `
@@ -3125,7 +3216,7 @@
                         <td style="vertical-align: top;">${r.covered
                 ? (r.coveredVia ? `<div style="font-size:0.74rem;color:#475569;margin-bottom:2px;">General clause — evidenced through ${esc(r.coveredVia.join(', '))}</div>` : '')
                     + r.docs.map(d => `<span style="background:#eff6ff;color:#1d4ed8;padding:2px 7px;border-radius:4px;font-size:0.75rem;display:inline-block;margin:1px 2px 1px 0;" title="${esc(d.linkedStandardLabels || 'No standard recorded — counts for every standard')}">${esc(docRef(d))}</span>`).join('')
-                : '<span style="color:#92400e;font-size:0.8rem;">No documented information supplied — request before Stage 2</span>'}</td>
+                : `<span style="color:#92400e;font-size:0.8rem;">${esc(requestText || gapRequestText())}</span>`}</td>
                     </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;padding:1.2rem;color:#16a34a;">No gaps for ${esc(result.label)} — every applicable clause has a supporting document.</td></tr>`}
                 </tbody>
             </table>
@@ -3140,6 +3231,7 @@
         const standards = String((client && client.standard) || '').split(',').map(s => s.trim()).filter(Boolean);
         const choices = standards.length ? standards : _gap.selected;
         const untagged = ((client && client.documents) || []).filter(d => d && d.name && !String(d.linkedStandards || '').trim()).length;
+        const requestText = gapRequestFor(client);
 
         const body = document.getElementById('gap-body');
         if (!body) return;
@@ -3165,7 +3257,7 @@
             ${untagged} document(s) name no standard and are counted toward every standard. Re-run the bulk analysis to have the standard detected, or set it on the document, for a per-standard reading.
         </div>` : ''}
         <div class="table-container" style="max-height: 45vh; overflow: auto;">
-            ${results.map(r => gapTableHTML(r, _gap.onlyGaps)).join('')}
+            ${results.map(r => gapTableHTML(r, _gap.onlyGaps, requestText)).join('')}
         </div>`;
     }
 
@@ -3180,6 +3272,7 @@
             percent: rawTotals.total ? Math.round((rawTotals.covered / rawTotals.total) * 100) : 0
         });
         const today = new Date().toISOString().split('T')[0];
+        const requestText = gapRequestFor(client);
 
         const win = window.open('', 'DocumentGapAnalysis', 'width=1000,height=800');
         if (!win) { notify('Allow pop-ups to print this report.', 'error'); return; }
@@ -3225,7 +3318,7 @@
                     <td>${esc(r.clause)}</td>
                     <td>${esc(r.title || r.requirement.slice(0, 120))}</td>
                     <td class="${r.covered ? 'ok' : 'gap'}">${r.covered ? 'Covered' : 'Gap'}</td>
-                    <td>${r.covered ? (r.coveredVia ? `General clause — evidenced through ${esc(r.coveredVia.join(', '))}: ` : '') + esc(r.docs.map(d => docRef(d)).join('; ')) : 'No documented information supplied — request before Stage 2'}</td>
+                    <td>${r.covered ? (r.coveredVia ? `General clause — evidenced through ${esc(r.coveredVia.join(', '))}: ` : '') + esc(r.docs.map(d => docRef(d)).join('; ')) : esc(requestText)}</td>
                 </tr>`).join('')}
             </tbody>
         </table>`).join('')}
@@ -4611,6 +4704,8 @@
         buildStage1Prompt,
         analyseDocumentGaps,
         clauseSatisfies,
+        nextAuditForGaps,
+        gapRequestText,
         STAGE1_MAP,
         /**
          * Document bodies from the last import for this client, if the tab has
