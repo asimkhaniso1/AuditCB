@@ -3495,7 +3495,7 @@
         { id: 'scope', label: 'Management System Scope', clauses: ['4.3'], re: /\b(scope|manual|boundaries|applicability)/i },
         { id: 'processes', label: 'Process Identification & Interaction', clauses: ['4.4'], re: /\b(process (map|interaction|approach)|turtle|sipoc|procedure)/i },
         { id: 'legal', label: 'Legal & Statutory Requirements', clauses: ['4.2', '6.1'], re: /\b(legal|complian|export|regulator|statutory|obligation|itar|sanction)/i },
-        { id: 'objectives', label: 'Quality Objectives & Planning', clauses: ['6.2'], re: /\b(objective|kpi|target|planning|programme|program)/i },
+        { id: 'objectives', label: 'Objectives & Planning to Achieve Them', clauses: ['6.2'], re: /\b(objective|kpi|target|planning|programme|program)/i },
         { id: 'resources', label: 'Resource Availability (Personnel, Infrastructure)', clauses: ['7.1'], re: /\b(resource|infrastructure|facilit|maintenance|equipment|calibrat)/i },
         { id: 'competence', label: 'Competence & Training Records', clauses: ['7.2'], re: /\b(competenc|training|skill|qualification|induction|awareness)/i },
         { id: 'documented_info', label: 'Documented Information Control', clauses: ['7.5'], re: /\b(document|record (control|retention)|master list)/i },
@@ -3507,7 +3507,8 @@
         { id: 'context', label: 'Organizational Context & Interested Parties', clauses: ['4.1', '4.2'], re: /\b(context|interested part|stakeholder|profile|overview)/i },
         { id: 'leadership', label: 'Leadership & Commitment Evidence', clauses: ['5.1', '5.2', '5.3'], re: /\b(leadership|polic|responsibilit|authorit|organi[sz]ation chart|organogram)/i },
         { id: 'communication', label: 'Internal & External Communication', clauses: ['7.4'], re: /\b(communicat|meeting|notice|briefing)/i },
-        { id: 'site_readiness', label: 'Site Readiness for Stage 2 Audit', clauses: [], re: /\b(site|layout|facility|readiness|premises|plant)/i }
+        // Shown to the auditor as PreAuditDocument.items(plan) labels it (by audit type).
+        { id: 'site_readiness', label: 'Site / Audit Readiness', clauses: [], re: /\b(site|layout|facility|readiness|premises|plant)/i }
     ];
 
     const EVIDENCE_PREFIX = 'Documents on file: ';
