@@ -482,7 +482,13 @@ function getClientDocumentsHTML(client) {
                                         ` : ''}
                                     </td>
                                 </tr>
-                                ${doc.notes ? `<tr><td colspan="6" style="padding: 4px 12px 10px 36px; font-size: 0.82rem; color: #475569; background: #fafafa; border-bottom: 1px solid #f1f5f9;"><i class="fa-solid fa-sticky-note" style="color:#f59e0b;margin-right:6px;font-size:0.7rem;"></i>${window.UTILS.escapeHtml(doc.notes).substring(0, 200)}${doc.notes.length > 200 ? '...' : ''}</td></tr>` : ''}
+                                ${(() => {
+                                    // Running headers and contents-page leaders are not a summary.
+                                    const preview = window.ClientDocsBulk?.notePreview
+                                        ? window.ClientDocsBulk.notePreview(doc.notes, doc.name, 200)
+                                        : String(doc.notes || '').slice(0, 200);
+                                    return preview ? `<tr><td colspan="6" style="padding: 4px 12px 10px 36px; font-size: 0.82rem; color: #475569; background: #fafafa; border-bottom: 1px solid #f1f5f9;"><i class="fa-solid fa-sticky-note" style="color:#f59e0b;margin-right:6px;font-size:0.7rem;"></i>${window.UTILS.escapeHtml(preview)}</td></tr>` : '';
+                                })()}
                             `).join('')}
                         </tbody>
                     </table>
