@@ -29,8 +29,20 @@
     function arr(v) { return Array.isArray(v) ? v : []; }
     function plain(v) { return DF().decodeEntities(v == null ? '' : String(v)); }
     function t(v) { return DF().escapeHtml(plain(v)); }
-    /** Escaped text with its line breaks kept. */
-    function tLines(v) { return t(v).replace(/\r?\n/g, '<br>'); }
+    /**
+     * Saved review text (AI summaries, notes) can carry numeric dates such as
+     * "dated 2023-07-09". Client-facing documents write dates out, and the
+     * print lint rejects numeric ones, so they are converted here.
+     */
+    function writeDates(v) {
+        return plain(v).replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, function (m) {
+            const out = DF().formatDate(m);
+            return out && out !== m ? out : m;
+        });
+    }
+    function tx(v) { return DF().escapeHtml(writeDates(v)); }
+    /** Escaped text with its line breaks kept and its dates written out. */
+    function tLines(v) { return tx(v).replace(/\r?\n/g, '<br>'); }
 
     const CATEGORIES = ['Documentation', 'Compliance', 'Readiness'];
 
@@ -197,7 +209,7 @@
         const focus = arr(pa.focusPoints).filter(Boolean);
         const block = function (title, value) {
             const vals = (Array.isArray(value) ? value : (value ? [value] : [])).filter(Boolean);
-            return vals.length ? '<div class="pd-subhead">' + t(title) + '</div><ul class="bul">' + vals.map(function (v) { return '<li>' + t(v) + '</li>'; }).join('') + '</ul>' : '';
+            return vals.length ? '<div class="pd-subhead">' + t(title) + '</div><ul class="bul">' + vals.map(function (v) { return '<li>' + tx(v) + '</li>'; }).join('') + '</ul>' : '';
         };
         const findingsBody = s ? (block('New or changed processes', s.newOrChangedProcesses)
             + block('Documents updated', s.documentsUpdated)
@@ -206,7 +218,7 @@
             + block('Last internal audit', s.internalAudit)
             + block('Most likely findings', s.keyRisks)) : '';
         const focusBody = focus.length
-            ? '<div class="pd-subhead">Points this audit must cover</div><ol class="bul">' + focus.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ol>'
+            ? '<div class="pd-subhead">Points this audit must cover</div><ol class="bul">' + focus.map(function (x) { return '<li>' + tx(x) + '</li>'; }).join('') + '</ol>'
                 + '<p class="note">These are carried into the audit checklist as an Audit Focus section.</p>'
             : '';
         const findingsSection = (findingsBody || focusBody)

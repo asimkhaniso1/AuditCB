@@ -1389,8 +1389,10 @@
         [/supplier|vendor|third[- ]part/i, ['sms-supplier', 'isms-supplier']],
         [/customer|relationship/i, ['sms-brm']],
         [/report/i, ['sms-reporting']],
-        [/backup|recovery/i, ['isms-backup']],
+        // Continuity before backup: "Business Continuity & Disaster Recovery"
+        // contains "recovery" and was sent to "Backup, logging and monitoring".
         [/continuity|disaster|\bBC\b|\bDR\b/i, ['bcms-plans', 'sms-continuity']],
+        [/backup|recovery/i, ['isms-backup']],
         [/patch|vulnerab/i, ['isms-vuln']],
         [/cloud|azure|m365|\bCSP\b/i, ['isms-cloud']],
         [/access|identity|joiner|leaver/i, ['isms-access']],
@@ -3525,21 +3527,35 @@
      * @param {Array} docs - client.documents
      * @returns {Array} [{id, label, docs: [], line: string}]
      */
+    // How many documents an evidence line names before "and N more on file".
+    const EVIDENCE_LINE_MAX = 8;
+
     function mapDocumentsToStage1(docs) {
         const list = (docs || []).filter(d => d && d.name);
         return STAGE1_MAP.map(item => {
-            const matches = list.filter(doc => {
-                const docClauses = String(doc.linkedClauses || '').split(',').map(s => s.trim()).filter(Boolean);
-                if (item.clauses.some(ic => docClauses.some(dc => clauseCovers(ic, dc)))) return true;
-                const haystack = `${doc.name} ${doc.category || ''} ${(doc.headings || []).map(h => h.text).join(' ')}`;
-                return item.re.test(haystack);
+            // The subject words are matched against the document's NAME and
+            // category only. Matching its headings too put 30-50 documents on
+            // every item: nearly every procedure has "Scope", "Responsibilities"
+            // and "Documents" headings, so it matched Scope, Leadership and
+            // Documented Information regardless of what it is about.
+            const scored = [];
+            list.forEach(doc => {
+                const docClauses = String(doc.linkedClauses || '').split(/[,;]/).map(s => s.trim()).filter(Boolean);
+                const byName = item.re.test(`${doc.name} ${doc.category || ''}`);
+                const byClause = item.clauses.some(ic => docClauses.some(dc => clauseCovers(ic, dc)));
+                if (byName || byClause) scored.push({ doc, score: (byName ? 2 : 0) + (byClause ? 1 : 0) });
             });
+            // Documents named for the item first, then those linked by clause.
+            scored.sort((a, b) => b.score - a.score || String(a.doc.name).localeCompare(String(b.doc.name)));
+            const matches = scored.map(s => s.doc);
+            const shown = matches.slice(0, EVIDENCE_LINE_MAX).map(d => docRef(d));
+            const more = matches.length - shown.length;
             return {
                 id: item.id,
                 label: item.label,
                 docs: matches,
                 line: matches.length
-                    ? EVIDENCE_PREFIX + matches.map(d => docRef(d)).join('; ')
+                    ? EVIDENCE_PREFIX + shown.join('; ') + (more > 0 ? `; and ${more} more on file` : '')
                     : ''
             };
         });
@@ -4258,7 +4274,16 @@
             const bits = [`- ${d.name}`];
             if (d.docNumber) bits.push(`no ${d.docNumber}`);
             if (d.revision) bits.push(d.revision);
-            if (d.date) bits.push(`dated ${d.date}`);
+            // Bulk upload falls back to the upload day when a file carries no
+            // date of its own (see the upload below). That is not a document
+            // date: passed on, it made every undated document read "updated
+            // 2026-11-11" in the review. Dates go in written form, so the
+            // printed review never echoes a numeric one.
+            const uploadDay = String(d.uploadedAt || '').slice(0, 10);
+            if (d.date && String(d.date).slice(0, 10) !== uploadDay) {
+                const DFm = window.DocFormat;
+                bits.push(`dated ${DFm && DFm.formatDate ? DFm.formatDate(d.date) : d.date}`);
+            }
             if (d.category) bits.push(`[${d.category}]`);
             if (d.linkedClauses) bits.push(`clauses ${d.linkedClauses}`);
             let line = bits.join(' · ');
@@ -4270,9 +4295,23 @@
     }
 
     function buildStage1Prompt(client, plan, corpus) {
-        const items = STAGE1_MAP.map(i => `${i.id} | ${i.label}${i.clauses.length ? ' (clauses ' + i.clauses.join(', ') + ')' : ''}`).join('\n');
+        // Labels and wording follow the audit type (PreAuditDocument): only an
+        // initial certification is a Stage 1 review deciding on Stage 2. The
+        // prompt used to say "Stage 1 … before an on-site audit" and "not ready
+        // for Stage 2" for every audit, and the model wrote that into the notes
+        // of a remote recertification.
+        const PAD = window.PreAuditDocument;
+        const w = PAD ? PAD.wording(plan) : { initial: true, auditLabel: 'Stage 2 audit' };
+        const labelOf = {};
+        (PAD ? PAD.items(plan) : []).forEach(i => { labelOf[i.id] = i.label; });
+        const items = STAGE1_MAP.map(i => `${i.id} | ${labelOf[i.id] || i.label}${i.clauses.length ? ' (clauses ' + i.clauses.join(', ') + ')' : ''}`).join('\n');
+        const method = String(plan.auditMethod || '').trim();
+        const role = w.initial
+            ? 'You are an ISO/IEC 17021-1 lead auditor performing the Stage 1 documentation review before the Stage 2 audit.'
+            : `You are an ISO/IEC 17021-1 lead auditor reviewing the client's documented information before the ${w.auditLabel}${method ? ' (' + method.toLowerCase() + ')' : ''}. Focus on changes since the previous audit.`;
+        const notReady = w.initial ? 'the client is not ready for Stage 2' : `the ${w.auditLabel} cannot go ahead as planned`;
         return [
-            'You are an ISO/IEC 17021-1 lead auditor performing the Stage 1 documentation review before an on-site audit.',
+            role,
             `Client: ${client.name}${client.industry ? ' — ' + client.industry : ''}. Standard: ${plan.standard || client.standard || 'not stated'}. Audit type: ${plan.auditType || plan.type || 'not stated'}.`,
             `Employees: ${client.employees || 'not recorded'}. Sites: ${(client.sites || []).length || 1}.`,
             '',
@@ -4280,13 +4319,14 @@
             corpus || '(none)',
             '=== END DOCUMENTS ===',
             '',
-            'Review these documents against the 16 Stage 1 items below and judge each one:',
+            'Review these documents against the 16 review items below and judge each one:',
             items,
             '',
             'Status rules — you are judging the DOCUMENTATION only, not implementation:',
             '- "ok": documented information covering this item was supplied and looks adequate.',
             '- "minor": something was supplied but it is incomplete, out of date, or only partly covers the item.',
-            '- "major": nothing was supplied for a requirement the standard makes mandatory, so the client is not ready for Stage 2.',
+            `- "major": nothing was supplied for a requirement the standard makes mandatory, so ${notReady}.`,
+            'Do not mention Stage 1 or Stage 2 unless they are named above as this audit.',
             '- "": you genuinely cannot tell from what was supplied.',
             'Base the judgement only on the documents listed. Do not assume a document exists because a company of this type would normally have one.',
             '',
@@ -4294,7 +4334,7 @@
             '{"items":[{"id":"<one of the ids above>","status":"ok|minor|major|","comment":"one sentence citing the document, or what is missing"}],',
             ' "summary":{',
             '   "newOrChangedProcesses":["processes the documents show as new or changed since the last issue"],',
-            '   "documentsUpdated":["documents whose revision or date shows a recent update, with the revision"],',
+            '   "documentsUpdated":["documents whose own revision or date shows an update since the previous audit, with that revision or date; leave out documents with no date"],',
             '   "trainingRecords":"what the documents show about competence and training records, or that nothing was supplied",',
             '   "managementReview":"what they show about the last management review, or that nothing was supplied",',
             '   "internalAudit":"what they show about the last internal audit, or that nothing was supplied",',
@@ -4946,6 +4986,7 @@
         mergeEvidenceNote,
         parseStage1Response,
         buildStage1Prompt,
+        themeCoveringProcess,
         analyseDocumentGaps,
         clauseSatisfies,
         nextAuditForGaps,
