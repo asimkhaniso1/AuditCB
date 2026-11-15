@@ -391,9 +391,21 @@
 
         const certs = arr(client && client.certificates);
         const cert = certs[0] || null;
-        const anchor = parseDate(cert && (cert.initialDate || cert.issueDate || cert.currentIssue))
+        // First certification anchors the window, EXCEPT when it is plainly an
+        // earlier cycle: a client first certified in 2020 read "cycle 16 Dec
+        // 2020 – 15 Dec 2026" (six years, two cycles) at its 2026
+        // recertification, crediting coverage from the previous cycle. When the
+        // initial date lies more than four years before expiry (one cycle plus
+        // a year's slack for certificates re-issued off-pattern), the window is
+        // the three years that end at expiry.
+        const certExpiry = parseDate(cert && cert.expiryDate);
+        let anchor = parseDate(cert && (cert.initialDate || cert.issueDate || cert.currentIssue))
             || parseDate(programme && programme.cycleStart)
             || addMonths(now, -36);
+        if (certExpiry && addMonths(anchor, 48).getTime() < certExpiry.getTime()) {
+            anchor = addMonths(certExpiry, -36);
+            anchor.setDate(anchor.getDate() + 1);
+        }
         const expiry = parseDate(cert && cert.expiryDate);
         const cycleEnd = expiry && expiry.getTime() >= addMonths(anchor, 30).getTime()
             ? expiry : addMonths(anchor, 36);

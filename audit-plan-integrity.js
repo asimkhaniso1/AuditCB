@@ -346,7 +346,9 @@
         NC: 'improvement.nonconformity-corrective-action', CI: 'improvement.continual'
     };
 
-    const SM = { top: 'Top management', risk: 'Risk owner', support: 'Support functions', isms: 'Information security management',
+    // ims: who runs the internal audit programme. 9.2 was assigned to the
+    // "Risk owner", who is not normally its owner.
+    const SM = { top: 'Top management', risk: 'Risk owner', ims: 'Management system manager', support: 'Support functions', isms: 'Information security management',
         bcm: 'Business continuity management', sms: 'Service management', ops: 'Service operations', ci: 'Continual improvement',
         sales: 'Sales / Purchasing', production: 'Production / Quality control', quality: 'Quality management',
         env: 'Environmental management', ohs: 'OH&S management', workers: 'Workers and worker representatives' };
@@ -419,7 +421,7 @@
         // ISO 14001 and ISO 45001 share the requirement; one session covers both.
         { id: 'emergency', title: 'Emergency preparedness and response', hours: 0.75, auditee: SM.ohs,
           std: { iso14001: ['8.2'], iso45001: ['8.2'] }, priorities: ['emergency'] },
-        { id: 'internal-audit', title: 'Internal audit programme', hours: 0.75, auditee: SM.risk, shared: [S.IA], priorities: ['internal-audit'] },
+        { id: 'internal-audit', title: 'Internal audit programme', hours: 0.75, auditee: SM.ims, shared: [S.IA], priorities: ['internal-audit'] },
         { id: 'management-review', title: 'Management review', hours: 0.75, auditee: SM.top, shared: [S.MR], priorities: ['management-review'] },
         { id: 'improvement', title: 'Nonconformity and corrective action, including effectiveness of corrective action; continual improvement; overall effectiveness of the integrated management system', hours: 1.0, auditee: SM.ci,
           shared: [S.NC, S.CI], std: { iso9001: ['10.1'], iso14001: ['10.1'], iso45001: ['10.1'] }, processes: ['Continual Improvement and Process Optimization'], priorities: ['nc-effectiveness', 'continual-improvement', 'ims-effectiveness'] },
