@@ -3801,7 +3801,13 @@
 
         const clientRecord = window.DataService.findClient(_clientId) || {};
         const existing = clientRecord.documents || [];
-        const existingKeys = new Set(existing.map(d => docKey({ title: d.name, sectionRef: d.sectionRef || '' })));
+        // A file already on file UPDATES that document when imported (see
+        // updateExistingDocument), so each key remembers which document it is.
+        const existingByKey = new Map();
+        existing.forEach(d => {
+            const k = docKey({ title: d.name, sectionRef: d.sectionRef || '' });
+            if (!existingByKey.has(k)) existingByKey.set(k, d);
+        });
         const batchKeys = new Map();
         _batch = [];
 
@@ -3858,9 +3864,10 @@
             };
 
             const key = docKey({ title: row.title, sectionRef: row.sectionRef });
-            if (existingKeys.has(key)) {
+            if (existingByKey.has(key)) {
                 row.status = 'existing';
                 row.include = false;
+                row.existingId = existingByKey.get(key).id;
             } else if (batchKeys.has(key)) {
                 row.status = 'duplicate';
                 row.include = false;
@@ -3891,7 +3898,8 @@
 
     const STATUS_STYLE = {
         new: ['#dcfce7', '#166534', 'New'],
-        existing: ['#fef3c7', '#92400e', 'Already on file'],
+        // Ticked, it refreshes the document on file (file, clauses, headings).
+        existing: ['#fef3c7', '#92400e', 'On file — tick to update'],
         duplicate: ['#fee2e2', '#991b1b', 'Duplicate in batch'],
         copy: ['#e0e7ff', '#3730a3', 'Looks like a copy']
     };
@@ -3976,7 +3984,9 @@
 
     window.toggleAllBulkDocs = function (on) {
         const val = on === '1' || on === 1 || on === true;
-        _batch.forEach(r => { r.include = val; });
+        // A second copy of a file in the same batch is never imported; a file
+        // already on file is safe to tick (it updates that document).
+        _batch.forEach(r => { r.include = val && r.status !== 'duplicate'; });
         renderReview(0);
     };
 
@@ -4005,6 +4015,69 @@
         return { path, url: '' };
     }
 
+    /**
+     * Refresh a document already on file from a re-uploaded copy, instead of
+     * adding a second record. Before this, every ticked "Already on file" row
+     * was pushed as a NEW document, so re-uploading a client's folder
+     * duplicated it.
+     *
+     * Kept: id, name, category, date and the standard already recorded.
+     * Taken from the upload: the stored file, headings, document number and
+     * revision when the upload has them, and the clause links. A document
+     * that was not bulk-imported may carry clauses an auditor linked by hand,
+     * so its links are MERGED with the new ones rather than replaced.
+     *
+     * @param {Object} doc  the client.documents entry (mutated)
+     * @param {Object} r    the review row
+     * @param {{path:string,url:string}|null} stored  the upload, when the file was stored
+     * @param {string} by   who imported it
+     */
+    function updateExistingDocument(doc, r, stored, by) {
+        const now = new Date().toISOString();
+        const fresh = splitClauses(r.clauses);
+        const mapIn = r.clauseMap && typeof r.clauseMap === 'object' ? r.clauseMap : null;
+        if (doc.source === 'bulk-import') {
+            doc.linkedClauses = fresh.join(', ');
+            if (mapIn) doc.clauseMap = mapIn; else delete doc.clauseMap;
+        } else {
+            const before = splitClauses(doc.linkedClauses);
+            const union = (a, b) => sortClauses(Array.from(new Set(a.concat(b))));
+            if (mapIn) {
+                const merged = {};
+                Object.keys(mapIn).forEach(std => {
+                    const had = doc.clauseMap && Array.isArray(doc.clauseMap[std]) ? doc.clauseMap[std] : before;
+                    merged[std] = union(had, mapIn[std] || []);
+                });
+                doc.clauseMap = merged;
+            } else if (doc.clauseMap) {
+                Object.keys(doc.clauseMap).forEach(std => { doc.clauseMap[std] = union(doc.clauseMap[std] || [], fresh); });
+            }
+            doc.linkedClauses = union(before, fresh).join(', ');
+        }
+        if (!String(doc.linkedStandards || '').trim() && r.standardIds) {
+            doc.linkedStandards = r.standardIds;
+            doc.linkedStandardLabels = r.standardLabels || '';
+        }
+        if (r.headings && r.headings.length) doc.headings = r.headings.slice(0, MAX_HEADINGS);
+        if (r.notes && (doc.source === 'bulk-import' || !String(doc.notes || '').trim())) doc.notes = r.notes;
+        if (r.revision) doc.revision = r.revision;
+        if (r.docNumber) doc.docNumber = r.docNumber;
+        if (!doc.date && r.date) doc.date = r.date;
+        if (stored) {
+            doc.storagePath = stored.path;
+            doc.url = stored.url || '';
+            doc.fileName = r.file && r.file.name ? r.file.name : doc.fileName;
+            doc.sourcePath = r.path || doc.sourcePath;
+            doc.type = (r.ext || doc.type || 'file').toUpperCase();
+            doc.size = `${r.sizeMB} MB`;
+            doc.uploadedAt = now;
+        }
+        doc.clausesRelinkedAt = now;
+        doc.updatedAt = now;
+        doc.updatedBy = by;
+        return doc;
+    }
+
     window.confirmBulkDocImport = async function (clientId) {
         const client = window.DataService.findClient(clientId);
         if (!client) return;
@@ -4012,7 +4085,8 @@
         if (!chosen.length) { notify('Select at least one document to import.', 'error'); return; }
 
         if (!client.documents) client.documents = [];
-        let uploaded = 0, uploadFailed = 0;
+        let uploaded = 0, uploadFailed = 0, updated = 0;
+        const by = (window.state && window.state.currentUser && window.state.currentUser.name) || 'Admin';
 
         for (let i = 0; i < chosen.length; i++) {
             const r = chosen[i];
@@ -4028,6 +4102,16 @@
                     uploadFailed++;
                     if (window.Logger) window.Logger.warn('ClientDocsBulk', `Upload failed for ${r.file.name}: ${err.message}`);
                 }
+            }
+
+            const onFile = r.status === 'existing'
+                ? client.documents.find(d => (r.existingId != null && String(d.id) === String(r.existingId))
+                    || docKey({ title: d.name, sectionRef: d.sectionRef || '' }) === docKey({ title: r.title, sectionRef: r.sectionRef }))
+                : null;
+            if (onFile) {
+                updateExistingDocument(onFile, r, stored, by);
+                updated++;
+                continue;
             }
 
             client.documents.push({
@@ -4077,7 +4161,7 @@
         setBody(`
         <div style="padding: 1.5rem 1rem; text-align: center;">
             <i class="fa-solid fa-circle-check" style="font-size: 2.25rem; color: #16a34a;"></i>
-            <h3 style="margin: 0.75rem 0 0.25rem;">${chosen.length} document${chosen.length === 1 ? '' : 's'} imported</h3>
+            <h3 style="margin: 0.75rem 0 0.25rem;">${chosen.length - updated} document${chosen.length - updated === 1 ? '' : 's'} added${updated ? ` · ${updated} updated` : ''}</h3>
             <p style="margin: 0 0 1rem; font-size: 0.88rem; color: var(--text-secondary);">
                 ${_opts.upload ? `${uploaded} file(s) stored in the cloud${uploadFailed ? `, ${uploadFailed} could not be stored (metadata kept)` : ''}.` : 'Metadata recorded — files were not uploaded.'}
             </p>
@@ -4093,7 +4177,7 @@
             </div>
         </div>`);
 
-        notify(`Imported ${chosen.length} document(s) for ${client.name}`, 'success');
+        notify(`${client.name}: ${chosen.length - updated} document(s) added${updated ? `, ${updated} updated` : ''}`, 'success');
     };
 
     window.closeBulkDocModal = function (clientId) {
@@ -4808,6 +4892,7 @@
         storedHeadings,
         relinkDocumentClauses,
         relinkPreselect,
+        updateExistingDocument,
         rereadStoredDocument,
         notePreview,
         annexAFromName,
