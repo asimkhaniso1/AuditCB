@@ -558,6 +558,8 @@ window.archiveClient = function (clientId) {
     if (window.saveData) {
         window.saveData();
     }
+    // saveData is local-only; the next cloud sync would make the client Active again.
+    if (window.DataService) window.DataService.syncClient(client, { saveLocal: false });
 
     window.showNotification(`Client '${client.name}' archived successfully.`, 'info');
 

@@ -1449,10 +1449,18 @@
 
         // ── Headline status / recommendation ──
         let auditStatus, statusColor, recommendation, recColor;
-        if (resultCounts.majorNC > 0) {
+        // Manual Major/Minor NCRs that match no checklist item are findings too
+        // (they are in uniqueFindings). They stay out of the item-based conformity
+        // math, but the headline status and the certification recommendation must
+        // see them — otherwise an audit whose only NC is a manual Major read
+        // "Conforming / Recommended for certification".
+        const manualOnly = uniqueFindings.filter((f) => f.sources && f.sources[0] === 'manual');
+        const decisionMajor = resultCounts.majorNC + manualOnly.filter((f) => f.severity === 'major').length;
+        const decisionMinor = resultCounts.minorNC + manualOnly.filter((f) => f.severity === 'minor').length;
+        if (decisionMajor > 0) {
             auditStatus = 'Non-Conformities Identified'; statusColor = 'bad';
             recColor = 'bad';
-        } else if (resultCounts.minorNC > 0 || resultCounts.pendingClassification > 0) {
+        } else if (decisionMinor > 0 || resultCounts.pendingClassification > 0) {
             auditStatus = 'Minor Non-Conformities'; statusColor = 'warn';
             recColor = 'warn';
         } else {
@@ -1460,7 +1468,7 @@
             recColor = 'good';
         }
         const auditTypeForRec = report.auditType || auditPlan.type || auditPlan.auditType || '';
-        recommendation = recommendationText(auditTypeForRec, { majorNC: resultCounts.majorNC, minorNC: resultCounts.minorNC });
+        recommendation = recommendationText(auditTypeForRec, { majorNC: decisionMajor, minorNC: decisionMinor });
 
         // Always populated (never conditional) — exact wording per spec, shown
         // next to the coverage/conformity figures in every consumer.
@@ -1667,10 +1675,31 @@
         };
     }
 
+    /**
+     * Corrective-action due date for a Major/Minor NC, from the same resolved
+     * timeframes the report prints — so the CAPA register and the client report
+     * give one deadline. Returns a local YYYY-MM-DD (toISOString shifts a day
+     * east of UTC).
+     * @param {string} severity  'Major'|'Minor' (any case)
+     * @param {Date|string} [from] raised date; defaults to today
+     * @param {{settings?:object, standard?:string, stage?:string}} [opts]
+     */
+    function capaDueDate(severity, from, opts) {
+        const tf = capaTimeframes(opts);
+        const days = /major/i.test(String(severity || '')) ? tf.major : tf.minor;
+        const ymd = typeof from === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(from);
+        let base = ymd ? new Date(+ymd[1], +ymd[2] - 1, +ymd[3]) : (from ? new Date(from) : new Date());
+        if (isNaN(base.getTime())) base = new Date();
+        const due = new Date(base.getFullYear(), base.getMonth(), base.getDate() + days);
+        const pad = (n) => String(n).padStart(2, '0');
+        return due.getFullYear() + '-' + pad(due.getMonth() + 1) + '-' + pad(due.getDate());
+    }
+
     global.ReportStats = {
         build,
         version: 1,
         capaTimeframes,
+        capaDueDate,
         CAPA_PROCEDURE_SENTENCE,
         normalizeDeptName,
         UNASSIGNED_LABEL,

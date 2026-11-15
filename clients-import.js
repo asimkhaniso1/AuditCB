@@ -156,6 +156,7 @@
         cert.revision = revisionNumber;
 
         window.saveData();
+        window.DataService.syncClient(client, { saveLocal: false });
         window.closeModal();
         window.showNotification('Revision added successfully', 'success');
         renderClientDetail(clientId);
@@ -456,6 +457,7 @@
 
                 let importedCount = 0;
                 let updatedCount = 0;
+                const touchedClients = new Set();
 
                 clientsRaw.forEach(row => {
                     // Support both old and new template formats
@@ -467,6 +469,7 @@
 
                     if (client) {
                         updatedCount++;
+                        touchedClients.add(client);
                     } else {
                         client = {
                             id: crypto.randomUUID(),
@@ -477,6 +480,7 @@
                             certificates: []
                         };
                         window.state.clients.push(client);
+                        touchedClients.add(client);
                         importedCount++;
                     }
 
@@ -546,6 +550,11 @@
                 });
 
                 window.saveData();
+                // saveData is local-only. Push every imported/updated client, as the
+                // CCI import does — otherwise they existed only in this browser.
+                if (window.SupabaseClient?.isInitialized) {
+                    touchedClients.forEach(c => window.DataService.syncClient(c, { saveLocal: false, silent: true }));
+                }
                 window.showNotification(`Import Successful: ${importedCount} created, ${updatedCount} updated`, 'success');
                 if (typeof window.renderClientsEnhanced === 'function') window.renderClientsEnhanced();
 
@@ -1044,6 +1053,7 @@
                 }
 
                 window.saveData();
+                window.DataService.syncClient(client, { saveLocal: false });
                 renderClientDetail(clientId);
                 window.showNotification(
                     `Import Complete: ${log.sites} Sites, ${log.depts} Depts, ${log.desig} Roles, ${log.people} Staff, ${log.goods} Goods, ${log.procs} Processes`,

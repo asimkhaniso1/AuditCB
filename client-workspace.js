@@ -470,7 +470,10 @@ function renderClientOverview(client) {
     // Same derivation the dashboard and the Audit Plans table use, so the
     // "Completed" figure here can't drift from either of those views.
     const completedAudits = window.DataService.getPlanCompletionStats(clientPlans).completed;
-    const upcomingAudits = clientPlans.filter(p => p.status === 'Planned' || p.status === 'Approved').length;
+    // Plans are Draft/Validated/Scheduled until started; 'Planned'/'Approved'
+    // are never set, so this always read 0. Same rule as UpcomingAudits.build.
+    const upcomingAudits = clientPlans.filter(p => !window.DataService.isPlanCompleted(p)
+        && !/^(in progress|cancelled)$/i.test(String(p.status || ''))).length;
     // Valid Certs counts the client's own certificate register (client.certificates —
     // the store Settings edits and the cycle cards read), not the global decision
     // register, which is only populated by the Certifications module and uses a
@@ -1509,8 +1512,9 @@ function renderClientPlans(client) {
 
     const totalPlans = plans.length;
     const completedPlans = window.DataService.getPlanCompletionStats(plans).completed;
-    const inProgressPlans = plans.filter(p => p.status === 'Approved' || p.status === 'In Progress').length;
-    const upcomingPlans = plans.filter(p => p.status === 'Planned').length;
+    const inProgressPlans = plans.filter(p => p.status === 'In Progress').length;
+    const upcomingPlans = plans.filter(p => !window.DataService.isPlanCompleted(p)
+        && !/^(in progress|cancelled)$/i.test(String(p.status || ''))).length;
 
     if (plans.length === 0) {
         return `

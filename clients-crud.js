@@ -61,7 +61,7 @@
 - Organizational structure
 - Key operational locations
 - Management system certifications
-- Quality objectives and commitments">${currentProfile}</textarea>
+- Quality objectives and commitments">${window.UTILS.escapeHtml(currentProfile)}</textarea>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">
                 <div><i class="fa-solid fa-lightbulb"></i> Be concise but comprehensive</div>
@@ -76,6 +76,7 @@
                 client.profileUpdated = new Date().toISOString();
 
                 window.saveData();
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 renderClientDetail(clientId);
                 renderClientTab(client, 'profile');

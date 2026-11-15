@@ -84,7 +84,7 @@ if (!window.state.orgStructure) {
 if (!window.state.rolePermissions) {
     window.state.rolePermissions = {
         'Admin': { dashboard: 'full', clients: 'full', auditors: 'full', audits: 'full', certs: 'full', reports: 'full', settings: 'full' },
-        'Cert Manager': { dashboard: 'view', clients: 'full', auditors: 'view', audits: 'full', certs: 'full', reports: 'full', settings: 'none' },
+        'Certification Manager': { dashboard: 'view', clients: 'full', auditors: 'view', audits: 'full', certs: 'full', reports: 'full', settings: 'none' },
         'Lead Auditor': { dashboard: 'view', clients: 'partial', auditors: 'view', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
         'Auditor': { dashboard: 'view', clients: 'none', auditors: 'none', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
         'Client': { dashboard: 'none', clients: 'own', auditors: 'none', audits: 'own', certs: 'own', reports: 'own', settings: 'none' }
@@ -1577,7 +1577,7 @@ window.resetPermissions = function () {
     window.DataService.confirmAction('Are you sure you want to reset all role permissions to their system defaults? This cannot be undone.', () => {
         window.state.rolePermissions = {
             'Admin': { dashboard: 'full', clients: 'full', auditors: 'full', audits: 'full', certs: 'full', reports: 'full', settings: 'full' },
-            'Cert Manager': { dashboard: 'view', clients: 'full', auditors: 'view', audits: 'full', certs: 'full', reports: 'full', settings: 'none' },
+            'Certification Manager': { dashboard: 'view', clients: 'full', auditors: 'view', audits: 'full', certs: 'full', reports: 'full', settings: 'none' },
             'Lead Auditor': { dashboard: 'view', clients: 'partial', auditors: 'view', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
             'Auditor': { dashboard: 'view', clients: 'none', auditors: 'none', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
             'Client': { dashboard: 'none', clients: 'own', auditors: 'none', audits: 'own', certs: 'own', reports: 'own', settings: 'none' }

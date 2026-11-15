@@ -425,7 +425,7 @@ window.saveAuditorForm = function (auditorId) {
                 email: auditor.email,
                 role: auditor.role,
                 standards: auditor.standards,
-                data: auditor
+                data: (({ data: _nested, ...rest }) => rest)(auditor)
             };
 
             if (isEdit) {

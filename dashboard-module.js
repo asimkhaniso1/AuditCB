@@ -36,7 +36,7 @@ function renderDashboardEnhanced() {
     // add/remove a plan), so the status lists are folded into the key too —
     // otherwise a dashboard rendered before a completion stays stuck showing
     // it as not completed until some other array's length changes.
-    const cacheKey = `${visibleClients.length}|${auditors.length}|${auditPlans.length}|${auditReports.length}|${(window.state.certificates || []).length}|${auditPlans.map(p => p.status).join(',')}|${auditReports.map(r => r.status).join(',')}`;
+    const cacheKey = `${visibleClients.length}|${auditors.length}|${auditPlans.length}|${auditReports.length}|${(window.state.certifications || []).length}|${auditPlans.map(p => p.status).join(',')}|${auditReports.map(r => r.status).join(',')}`;
     let stats;
 
     if (window._dashboardStatsCache && window._dashboardStatsCache._key === cacheKey) {
@@ -110,7 +110,12 @@ function renderDashboardEnhanced() {
                 : (!['Closed', 'Withdrawn'].includes(n.status) && n.dueDate && !isNaN(new Date(n.dueDate)) && new Date(n.dueDate) < new Date())
         ).length;
 
-        const certificatesIssued = (window.state.certificates || []).length || completedAudits;
+        // The certificate register is state.certifications (state.certificates is
+        // never filled), scoped to the clients this user can see. The old
+        // fallback showed the completed-audit count under the certificates label.
+        const visibleClientNames = new Set(visibleClients.map(c => c.name));
+        const certificatesIssued = (window.state.certifications || [])
+            .filter(c => visibleClientNames.has(c.client)).length;
         const avgComplianceScore = complianceCount > 0 ? Math.round(complianceScoreSum / complianceCount) : 0;
 
         stats = {
