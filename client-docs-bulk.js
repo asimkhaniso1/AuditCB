@@ -214,6 +214,61 @@
         })
     };
 
+    // ── ISO/IEC 27001:2022 Annex A, from what a document is called ──────
+    // Access control, asset management, backup, cryptography ... are Annex A
+    // controls, not clauses 4-10, so a procedure named for one linked to
+    // nothing and counted as evidence of nothing. Read from the document's
+    // NAME only (title, folder, title lines): a procedure's name says which
+    // control it implements; a word in its body does not. The gap analysis
+    // measures clauses 4-10 and is unaffected; these links are evidence the
+    // auditor and the Annex A checklist sample can see.
+    const ANNEX_A_TITLE_RULES = [
+        { re: /\binformation security polic/i, controls: ['A.5.1'] },
+        { re: /\bsegregation of duties/i, controls: ['A.5.3'] },
+        { re: /\bthreat intelligence/i, controls: ['A.5.7'] },
+        { re: /\b(asset (management|register|inventory)|inventory of (information )?assets)/i, controls: ['A.5.9', 'A.5.10', 'A.5.11'] },
+        { re: /\bacceptable use/i, controls: ['A.5.10'] },
+        { re: /\b(information )?classification|\blabell?ing of information/i, controls: ['A.5.12', 'A.5.13'] },
+        { re: /\binformation transfer/i, controls: ['A.5.14'] },
+        { re: /\b(access control|access management|identity (and|&) access|user access)/i, controls: ['A.5.15', 'A.5.16', 'A.5.18', 'A.8.2', 'A.8.3', 'A.8.5'] },
+        { re: /\b(password|authentication)/i, controls: ['A.5.17', 'A.8.5'] },
+        { re: /\bsupplier (security|relationship)|\bthird[\s-]party (security|risk)/i, controls: ['A.5.19', 'A.5.20', 'A.5.21', 'A.5.22'] },
+        { re: /\bcloud (services?|security)/i, controls: ['A.5.23'] },
+        { re: /\b(security )?incident (management|response|handling)|\bsecurity incident/i, controls: ['A.5.24', 'A.5.25', 'A.5.26', 'A.5.27', 'A.5.28', 'A.6.8'] },
+        { re: /\bbusiness continuity|\bdisaster recovery|\bict (readiness|continuity)/i, controls: ['A.5.29', 'A.5.30'] },
+        { re: /\bintellectual property/i, controls: ['A.5.32'] },
+        { re: /\b(data protection|privacy|\bpii\b|personal (data|information))/i, controls: ['A.5.34'] },
+        { re: /\b(human resources?|\bhr\b) security|\bscreening|\bonboarding|\boffboarding|\bdisciplinary/i, controls: ['A.6.1', 'A.6.2', 'A.6.4', 'A.6.5'] },
+        { re: /\b(confidentiality|non[\s-]disclosure) agreement|\bnda\b/i, controls: ['A.6.6'] },
+        { re: /\b(remote|tele)[\s-]?working|\bwork from home/i, controls: ['A.6.7'] },
+        { re: /\bphysical (and environmental )?security/i, controls: ['A.7.1', 'A.7.2', 'A.7.3', 'A.7.4'] },
+        { re: /\bclear desk|\bclear screen/i, controls: ['A.7.7'] },
+        { re: /\b(mobile device|endpoint|byod|bring your own device)/i, controls: ['A.8.1'] },
+        { re: /\bprivileged access/i, controls: ['A.8.2'] },
+        { re: /\bcapacity (management|plan)/i, controls: ['A.8.6'] },
+        { re: /\b(malware|anti[\s-]?virus)/i, controls: ['A.8.7'] },
+        { re: /\b(vulnerability|patch) management/i, controls: ['A.8.8'] },
+        { re: /\bconfiguration management/i, controls: ['A.8.9'] },
+        { re: /\b(data|information) (deletion|disposal|destruction|retention)|\bmedia (disposal|handling)/i, controls: ['A.8.10', 'A.7.10', 'A.7.14'] },
+        { re: /\bdata leakage|\bdlp\b/i, controls: ['A.8.12'] },
+        { re: /\bback[\s-]?ups?\b/i, controls: ['A.8.13'] },
+        { re: /\b(logging|log management|security monitoring|monitoring activities)/i, controls: ['A.8.15', 'A.8.16'] },
+        { re: /\bnetwork (security|management|controls?)/i, controls: ['A.8.20', 'A.8.21', 'A.8.22'] },
+        { re: /\bweb filtering/i, controls: ['A.8.23'] },
+        { re: /\b(cryptograph|encryption|key management)/i, controls: ['A.8.24'] },
+        { re: /\b(secure (development|coding|software)|\bsdlc\b|software development)/i, controls: ['A.8.25', 'A.8.26', 'A.8.27', 'A.8.28', 'A.8.29'] },
+        { re: /\boutsourced development/i, controls: ['A.8.30'] },
+        { re: /\bchange (management|control)|\bmanagement of change/i, controls: ['A.8.32'] }
+    ];
+
+    /** Annex A controls a document's name says it implements (ISO/IEC 27001:2022). */
+    function annexAFromName(text) {
+        const s = String(text || '');
+        const out = new Set();
+        ANNEX_A_TITLE_RULES.forEach(rule => { if (rule.re.test(s)) rule.controls.forEach(c => out.add(c)); });
+        return Array.from(out);
+    }
+
     const STD_SHORT = { iso27001: '27001', iso22301: '22301', iso20000: '20000-1', iso9001: '9001', iso14001: '14001', iso45001: '45001' };
 
     /** True when `stdId` numbers its clauses through IMS_TOPIC_CLAUSES. */
@@ -534,8 +589,10 @@
 
     /** Numeric clause ordering: 8.5 before 8.10, 9 before 10. */
     function compareClause(a, b) {
-        const ap = String(a).split('.').map(Number);
-        const bp = String(b).split('.').map(Number);
+        // Annex A controls ("A.5.15") sort after the clauses, in control order.
+        const parts = v => String(v).split('.').map((p, i) => (i === 0 && /^A$/i.test(p) ? 1000 : Number(p)));
+        const ap = parts(a);
+        const bp = parts(b);
         for (let i = 0; i < Math.max(ap.length, bp.length); i++) {
             if ((ap[i] || 0) !== (bp[i] || 0)) return (ap[i] || 0) - (bp[i] || 0);
         }
@@ -684,6 +741,7 @@
 
         if (hasOwnNumbering(stdId)) {
             textTopics(searchText, false).forEach(tp => topicClauses(tp, stdId).forEach(c => found.add(c)));
+            if (stdId === 'iso27001') annexAFromName(searchText).forEach(c => found.add(c));
         } else {
             for (const rule of CLAUSE_KEYWORDS) {
                 if (rule.re.test(searchText)) rule.clauses.forEach(c => found.add(c));
@@ -3027,7 +3085,9 @@
             // may well be evidenced in the document.
             basis: reread ? 'file' : 'headings',
             removes: current.filter(c => !proposedSet.has(c)),
-            changed: differs && readable
+            // A document with NO links has nothing to protect: offer whatever
+            // its name and contents give, however its headings are numbered.
+            changed: differs && (readable || (!current.length && proposed.length > 0))
         };
     }
 
@@ -3038,8 +3098,40 @@
      */
     function relinkPreselect(row) {
         if (!row || !row.proposed || !row.proposed.length) return false;
-        if (!row.doc || row.doc.source !== 'bulk-import') return false;
-        return !(row.basis === 'headings' && row.removes && row.removes.length);
+        // Hand-added documents were linked by an auditor: never pre-ticked.
+        if (!row.doc || row.doc.source === 'manual') return false;
+        // A proposal that only ADDS links takes nothing away, so it starts
+        // ticked whatever else the document's source is (synced, recovered,
+        // legacy). PC Connection's "Asset Management Procedure" (20000-1
+        // 8.2.5) was listed unticked, so applying changed nothing.
+        if (!(row.removes && row.removes.length)) return true;
+        if (row.doc.source !== 'bulk-import') return false;
+        return row.basis !== 'headings';
+    }
+
+    // ── The one-line preview under a document in the Document Center ────
+    // Notes on a document without readable headings are the start of its
+    // text, which for a PDF is the running header and the contents page:
+    // "Company Confidential Page 1 of 8 Access Control Procedure Table of
+    // Contents ........". The preview drops that boilerplate; the stored
+    // notes are untouched (View Notes shows them in full).
+    const NOTE_BOILERPLATE = [
+        /\b(?:company |strictly |commercial[\s-]in[\s-])?confidential\b/gi,
+        /\binternal use only\b/gi,
+        /\bpage\s+\d+\s+(?:of|\/)\s+\d+\b/gi,
+        /\btable of contents\b/gi,
+        /(?:\s*[.…·_]){4,}\s*\d*/g
+    ];
+    function notePreview(notes, docName, limit) {
+        let s = String(notes || '');
+        if (/^\s*Sections in document:/i.test(s)) return s.replace(/\s+/g, ' ').trim().slice(0, limit || 200);
+        NOTE_BOILERPLATE.forEach(re => { s = s.replace(re, ' '); });
+        const name = String(docName || '').trim();
+        if (name.length >= 4) s = s.split(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')).join(' ');
+        s = s.replace(/\s+/g, ' ').replace(/^[\s\-–—:;,.|]+/, '').trim();
+        if (s.length < 12) return '';
+        const max = limit || 200;
+        return s.length > max ? s.slice(0, max).replace(/\s+\S*$/, '') + '…' : s;
     }
 
     /** Run `fn` over `items`, at most `limit` at a time; results in input order. */
@@ -4695,6 +4787,9 @@
         relinkDocumentClauses,
         relinkPreselect,
         rereadStoredDocument,
+        notePreview,
+        annexAFromName,
+        ANNEX_A_TITLE_RULES,
         // Per-standard clause numbering (ISO/IEC 27001, ISO 22301, ISO/IEC 20000-1).
         mapClausesByStandard,
         clauseTargets,
