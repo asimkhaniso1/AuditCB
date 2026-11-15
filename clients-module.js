@@ -473,7 +473,7 @@ function getClientDocumentsHTML(client) {
                                     </td>
                                     <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">${window.UTILS.escapeHtml(doc.category || 'General')}</span></td>
                                     <td style="font-family: monospace; font-size: 0.85rem;">${window.UTILS.escapeHtml(doc.revision || '-')}</td>
-                                    <td style="font-size: 0.85rem;">${doc.linkedClauses ? '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-size:0.78rem;">' + window.UTILS.escapeHtml(doc.linkedClauses) + '</span>' : '<span style="color:#94a3b8;">—</span>'}</td>
+                                    <td style="font-size: 0.85rem;">${doc.recovered && !doc.linkedClauses ? '<span style="color:#94a3b8;font-size:0.78rem;" title="Only the name was recovered. Clauses are linked when the file is re-uploaded.">Not on file — re-upload to link</span>' : doc.linkedClauses ?'<span style="background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-size:0.78rem;">' + window.UTILS.escapeHtml(doc.linkedClauses) + '</span>' : '<span style="color:#94a3b8;">—</span>'}</td>
                                     <td>${window.UTILS.escapeHtml(doc.date)}</td>
                                     <td>
                                         ${doc.recovered ? `<button class="btn btn-sm btn-outline-primary" data-action="openClientDocumentModal" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.name)}"><i class="fa-solid fa-cloud-arrow-up"></i> Re-upload</button>` : `<button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="viewDocumentNotes" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" title="View Notes" aria-label="View"><i class="fa-solid fa-eye"></i></button>`}
@@ -483,7 +483,9 @@ function getClientDocumentsHTML(client) {
                                     </td>
                                 </tr>
                                 ${(() => {
-                                    // Running headers and contents-page leaders are not a summary.
+                                    // Running headers and contents-page leaders are not a summary,
+                                    // and the recovered-reference note repeats the banner above.
+                                    if (doc.recovered && /^Reference recovered from the generated checklist/.test(String(doc.notes || ''))) return '';
                                     const preview = window.ClientDocsBulk?.notePreview
                                         ? window.ClientDocsBulk.notePreview(doc.notes, doc.name, 200)
                                         : String(doc.notes || '').slice(0, 200);

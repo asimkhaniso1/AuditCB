@@ -69,7 +69,8 @@
         { topic: 'change', re: /\b(change (management|control)|management of change|\bmoc\b)/i, clauses: ['6.3'] },
         { topic: 'resources', re: /\b(resource|infrastructure|facilit|maintenance|work environment|housekeeping)/i, clauses: ['7.1'] },
         { topic: 'calibration', re: /\b(calibrat|measuring (and monitoring )?equipment|\bmsa\b|gauge|instrument control)/i, clauses: ['7.1.5'] },
-        { topic: 'competence', re: /\b(competenc|training|skills? matrix|induction|qualification|certification of (operator|personnel))/i, clauses: ['7.2'] },
+        // Hiring/recruitment procedures determine and check competence on entry.
+        { topic: 'competence', re: /\b(competenc|training|skills? matrix|induction|qualification|certification of (operator|personnel)|recruit(ment|ing)?\b|hiring\b|new (starters?|hires?|joiners?)\b)/i, clauses: ['7.2'] },
         { topic: 'awareness', re: /\b(awareness)/i, clauses: ['7.3'] },
         { topic: 'communication', re: /\b(communicat)/i, clauses: ['7.4'] },
         { topic: 'docinfo', re: /\b(document(ed|ation|s)?[\s-]*(control|information)|documentation|control of (document|record)|record (control|retention)|master list|documents?\s*(?:and|&)\s*data|data control)/i, clauses: ['7.5'] },
@@ -238,7 +239,10 @@
         { re: /\bbusiness continuity|\bdisaster recovery|\bict (readiness|continuity)/i, controls: ['A.5.29', 'A.5.30'] },
         { re: /\bintellectual property/i, controls: ['A.5.32'] },
         { re: /\b(data protection|privacy|\bpii\b|personal (data|information))/i, controls: ['A.5.34'] },
-        { re: /\b(human resources?|\bhr\b) security|\bscreening|\bonboarding|\boffboarding|\bdisciplinary/i, controls: ['A.6.1', 'A.6.2', 'A.6.4', 'A.6.5'] },
+        { re: /\b(human resources?|\bhr\b) security|\bscreening|\b(employee|staff) onboarding|\bdisciplinary/i, controls: ['A.6.1', 'A.6.2', 'A.6.4', 'A.6.5'] },
+        // Hiring / new starters: screening and terms of employment; leavers: return of assets.
+        { re: /\bhiring\b|\brecruit(ment|ing)?\b|\bnew (starters?|hires?|joiners?)\b/i, controls: ['A.6.1', 'A.6.2'] },
+        { re: /\b(leavers?|offboarding|termination of employment|change of employment)\b/i, controls: ['A.6.5', 'A.5.11'] },
         { re: /\b(confidentiality|non[\s-]disclosure) agreement|\bnda\b/i, controls: ['A.6.6'] },
         { re: /\b(remote|tele)[\s-]?working|\bwork from home/i, controls: ['A.6.7'] },
         { re: /\bphysical (and environmental )?security/i, controls: ['A.7.1', 'A.7.2', 'A.7.3', 'A.7.4'] },
@@ -774,9 +778,9 @@
     // `\bSMS\b` on its own is deliberately absent — it collides with too much
     // ordinary text. ITSMS and the spelled-out system name carry it instead.
     const STANDARD_SIGNALS = [
-        { id: 'iso27001', label: 'ISO/IEC 27001:2022', re: /\b27001\b|\bISMS\b|information security management system/i },
-        { id: 'iso22301', label: 'ISO 22301:2019', re: /\b22301\b|\bBCMS\b|business continuity management system/i },
-        { id: 'iso20000', label: 'ISO/IEC 20000-1:2018', re: /\b20000(?:[-\s]?1)?\b|\bITSMS\b|service management system/i },
+        { id: 'iso27001', label: 'ISO/IEC 27001:2022', re: /\b27001\b|\bISMS\b|information security management system|\(\s*information security management\b/i },
+        { id: 'iso22301', label: 'ISO 22301:2019', re: /\b22301\b|\bBCMS\b|business continuity management system|\(\s*business continuity management\b/i },
+        { id: 'iso20000', label: 'ISO/IEC 20000-1:2018', re: /\b20000(?:[-\s]?1)?\b|\bITSMS\b|service management system|\(\s*(?:it )?service management\b/i },
         { id: 'iso9001', label: 'ISO 9001:2015', re: /\b9001\b|\bQMS\b|quality management system/i },
         { id: 'iso14001', label: 'ISO 14001:2015', re: /\b14001\b|\bEMS\b|environmental management system/i },
         { id: 'iso45001', label: 'ISO 45001:2018', re: /\b45001\b|\bOH&SMS\b|occupational health and safety management/i }
@@ -3065,7 +3069,14 @@
             sectionRef: (doc && doc.sectionRef) || '',
             category: (doc && doc.category) || ''
         };
-        const targets = clauseTargets(splitClauses(doc && doc.linkedStandards), o.clientStandard);
+        // The standard(s) the document belongs to: as stored, else as its name
+        // (or the re-read file) says, the same as an upload would record.
+        // "Hiring and New Starters Procedure (Business Continuity Management)"
+        // is a BCMS document; numbered for every standard on the client, its
+        // label read as a business continuity topic in 27001 and 20000-1.
+        const storedStds = splitClauses(doc && doc.linkedStandards);
+        const namedStds = storedStds.length ? [] : mapStandards(parsed, reread).ids;
+        const targets = clauseTargets(storedStds.length ? storedStds : namedStds, o.clientStandard);
         const mapped = mapClausesByStandard(parsed, meta, targets);
         const proposed = mapped.clauses;
         const current = sortClauses(splitClauses(doc && doc.linkedClauses));
@@ -3077,6 +3088,8 @@
             current,
             proposed,
             proposedMap: mapped.byStandard,
+            // Standards the name names, for a document that had none stored.
+            proposedStandards: namedStds,
             headings: reread ? (reread.headings || []) : null,
             numbering: meta.numbering,
             // 'file': read from the stored file just now. 'headings': only the
@@ -3120,16 +3133,22 @@
         /\binternal use only\b/gi,
         /\bpage\s+\d+\s+(?:of|\/)\s+\d+\b/gi,
         /\btable of contents\b/gi,
+        /\b(?:change|revision|version|document|amendment) (?:history|record|log)\b/gi,
         /(?:\s*[.…·_]){4,}\s*\d*/g
     ];
+    // What is left when the note was only a contents list: "1. Objective 2. Scope".
+    const CONTENTS_ONLY = /^(?:\d{1,2}(?:\.\d{1,2})*\.?\s+[A-Za-z][\w&/'’-]*(?:\s+(?:and|&|of|the|for|[A-Z][\w&/'’-]*)){0,4}\s*)+$/;
     function notePreview(notes, docName, limit) {
         let s = String(notes || '');
         if (/^\s*Sections in document:/i.test(s)) return s.replace(/\s+/g, ' ').trim().slice(0, limit || 200);
         NOTE_BOILERPLATE.forEach(re => { s = s.replace(re, ' '); });
         const name = String(docName || '').trim();
-        if (name.length >= 4) s = s.split(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')).join(' ');
+        // The full name, and the name without a "(Business Continuity Management)" label.
+        [name, name.split(/\s*\(/)[0].trim()].filter(n => n.length >= 4).forEach(n => {
+            s = s.split(new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')).join(' ');
+        });
         s = s.replace(/\s+/g, ' ').replace(/^[\s\-–—:;,.|]+/, '').trim();
-        if (s.length < 12) return '';
+        if (s.length < 12 || CONTENTS_ONLY.test(s)) return '';
         const max = limit || 200;
         return s.length > max ? s.slice(0, max).replace(/\s+\S*$/, '') + '…' : s;
     }
@@ -3255,6 +3274,9 @@
             doc.linkedClauses = r.proposed.join(', ');
             if (r.proposedMap) doc.clauseMap = r.proposedMap;
             else delete doc.clauseMap;
+            // Record the standard the links were numbered for, so the gap
+            // analysis counts them only there.
+            if (!String(doc.linkedStandards || '').trim() && r.proposedStandards && r.proposedStandards.length) doc.linkedStandards = r.proposedStandards.join(', ');
             // Keep the headings just read from the stored file, for the notes
             // and for a re-link when the file cannot be read.
             if (r.headings && r.headings.length) doc.headings = r.headings.slice(0, MAX_HEADINGS);
