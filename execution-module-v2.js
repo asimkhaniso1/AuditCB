@@ -619,7 +619,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             const displaySrc = isIdb ? '' : src;
                             const safeSrc = displaySrc.replace(/'/g, "\\'");
                             return `
-                                         <div class="ev-thumb" data-idx="${imgIdx}" data-save-url="${window.UTILS.escapeHtml(src)}" style="position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;">
+                                         <div class="ev-thumb" data-idx="${imgIdx}" data-save-url="${window.UTILS.escapeHtml(src)}" data-captured-at="${window.UTILS.escapeHtml((saved.evidenceCapturedAtList && saved.evidenceCapturedAtList[imgIdx]) || '')}" style="position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;">
                                              <img src="${displaySrc}" data-idb-key="${isIdb ? window.UTILS.escapeHtml(src) : ''}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;${isIdb ? ' background: #e2e8f0;' : ''}" data-action="viewEvidenceImageByUrlSelf" data-id="${safeSrc}"/>
                                              <button type="button" data-action="removeEvidenceByIdx" data-arg1="${uniqueId}" data-arg2="${imgIdx}" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">×</button>
                                          </div>
@@ -1173,7 +1173,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 allFindings.push({
                     id: `checklist-${originalIdx}`,
                     source: 'Checklist',
-                    type: item.ncrType || 'observation',
+                    // An NC with no classification yet is PENDING, not an observation.
+                    // Defaulting it to 'observation' made the review select save it as
+                    // one, silently dropping the finding out of the NC counts.
+                    type: item.ncrType || window.CONSTANTS.NCR_TYPES.PENDING,
                     // Don't repeat reqText here — it's already shown in the requirement box above
                     description: item.ncrDescription || item.comment || item.transcript || '',
                     remarks: item.comment || item.transcript || '',
@@ -1197,7 +1200,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     source: 'Manual',
                     type: ncr.type || 'observation',
                     description: ncr.description || '',
-                    remarks: ncr.remarks || '',
+                    // For a manual NCR the remarks box edits its description (see the
+                    // blur and save handlers), so it must start from the description —
+                    // `remarks` is never written, and an empty box blanked it on save.
+                    remarks: ncr.remarks || ncr.description || '',
                     designation: ncr.designation || '',
                     department: ncr.department || '',
                     hasEvidence: !!ncr.evidenceImage,
@@ -1206,7 +1212,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (ncr.evidenceImage) window._evidenceCache[`ncr-${idx}`] = ncr.evidenceImage;
             });
 
-            const pendingFindings = allFindings.filter(f => f.type === 'pending');
+            const pendingFindings = allFindings.filter(f => f.type === window.CONSTANTS.NCR_TYPES.PENDING);
             const isReadyToSubmit = pendingFindings.length === 0;
             const notReadyReason = pendingFindings.length
                 ? pendingFindings.length + ' finding(s) are still unclassified. Set each one to major, minor, observation or OFI before the report can be issued.'
@@ -1360,6 +1366,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <div>
                                             <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Severity Classification</label>
                                             <select class="form-control form-control-sm review-severity" data-finding-id="${f.id}" style="font-size: 0.9rem; padding: 0.4rem;">
+                                                <option value="${window.CONSTANTS.NCR_TYPES.PENDING}" ${f.type === window.CONSTANTS.NCR_TYPES.PENDING ? 'selected' : ''}>— Select classification —</option>
                                                 <option value="observation" ${f.type === 'observation' ? 'selected' : ''}>Observation (OBS)</option>
                                                 <option value="ofi" ${f.type === 'ofi' ? 'selected' : ''}>Opportunity for Improvement (OFI)</option>
                                                 <option value="minor" ${f.type === 'minor' ? 'selected' : ''}>Minor NC</option>
@@ -1526,7 +1533,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             }
                         } else if (findingId.startsWith('ncr-')) {
                             const idx = parseInt(findingId.replace('ncr-', ''), 10);
-                            if (report.ncrs && report.ncrs[idx]) {
+                            if (report.ncrs && report.ncrs[idx] && remarks) {
                                 report.ncrs[idx].description = remarks;
                             }
                         }
@@ -2008,8 +2015,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
                 const status = input.value;
                 const comment = Sanitizer.sanitizeText(document.getElementById('comment-' + uniqueId)?.value || '');
-                const ncrDesc = Sanitizer.sanitizeText(document.getElementById('ncr-desc-' + uniqueId)?.value || '');
-                const transcript = Sanitizer.sanitizeText(document.getElementById('ncr-transcript-' + uniqueId)?.value || '');
+                // The NC panel no longer renders these inputs. When an input is absent
+                // the value is null and the previously saved text is carried forward
+                // below, instead of every save blanking the NC statement.
+                const ncrDescEl = document.getElementById('ncr-desc-' + uniqueId);
+                const transcriptEl = document.getElementById('ncr-transcript-' + uniqueId);
+                const ncrDesc = ncrDescEl ? Sanitizer.sanitizeText(ncrDescEl.value || '') : null;
+                const transcript = transcriptEl ? Sanitizer.sanitizeText(transcriptEl.value || '') : null;
                 let ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
                 // Contradictory-data guard: only persist a classification when the
                 // item is actually marked NC; clear stale classification otherwise.
@@ -2043,8 +2055,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 // checklist item uses the evidence*-prefixed names the report reads.
                 const capMeta = (typeof window.getEvidenceCaptureMeta === 'function')
                     ? (window.getEvidenceCaptureMeta(uniqueId) || {}) : {};
-                const priorItem = (window.state?.currentReport?.checklistProgress || [])
-                    .find(p => p && String(p.checklistId) === String(input.dataset.checklist) && String(p.itemIdx) === String(input.dataset.item)) || {};
+                // (Read from this report: `state.currentReport` is never assigned, so
+                // looking there dropped every saved timestamp/location on reload.)
+                const isCustomItem = input.dataset.custom === 'true';
+                const priorItem = (report.checklistProgress || [])
+                    .find(p => p && !!p.isCustom === isCustomItem
+                        && (isCustomItem || String(p.checklistId) === String(input.dataset.checklist))
+                        && String(p.itemIdx) === String(input.dataset.item)) || {};
                 const evidenceCapturedAt = capMeta.capturedAt
                     || evidenceCapturedAtList.find(Boolean)
                     || priorItem.evidenceCapturedAt || '';
@@ -2096,6 +2113,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     const pk = p.isCustom ? `custom-${p.itemIdx}` : `${p.checklistId}-${p.itemIdx}`;
                     return pk === key;
                 });
+                if (item.ncrDescription === null) item.ncrDescription = (prev && prev.ncrDescription) || '';
+                if (item.transcript === null) item.transcript = (prev && prev.transcript) || '';
                 if (prev && prev._originalComment && !item._originalComment) {
                     item._originalComment = prev._originalComment;
                 }
@@ -2166,7 +2185,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     const idx = parseInt(findingId.replace('ncr-', ''), 10);
                     if (report.ncrs && report.ncrs[idx]) {
                         report.ncrs[idx].type = newType;
-                        report.ncrs[idx].description = remarks;
+                        if (remarks) report.ncrs[idx].description = remarks;
                     }
                 }
             });
@@ -2281,6 +2300,19 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         && String(n.sourceItemIdx) === String(ident.sourceItemIdx)) claimed.add(n);
                 });
             });
+            // One deadline for the register and the client report: both resolve the
+            // CB's configured CAPA timeframes (fallback Major 30 / Minor 90 days).
+            const capaDueFor = (sev, from) => {
+                if (window.ReportStats && typeof window.ReportStats.capaDueDate === 'function') {
+                    return window.ReportStats.capaDueDate(sev, from, {
+                        settings: window.state.cbSettings, standard: report.standard || '', stage: report.auditType || ''
+                    });
+                }
+                const d = new Date(from || Date.now());
+                const base = isNaN(d.getTime()) ? new Date() : d;
+                base.setDate(base.getDate() + (/major/i.test(String(sev)) ? 30 : 90));
+                return base.toISOString().split('T')[0];
+            };
             const normClause = (c) => String(c || '').trim().toLowerCase();
             const capaWork = (n) => (n.verifiedDate ? 5 : 0) + (n.correctiveAction ? 4 : 0)
                 + (n.rootCause ? 3 : 0) + (n.correction ? 2 : 0);
@@ -2409,10 +2441,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         // Update severity/description/dueDate if changed
                         const newSeverity = item.ncrType || existing.severity;
                         if (String(newSeverity).toLowerCase() !== String(existing.severity).toLowerCase()) {
-                            const today = new Date();
-                            const due = new Date(today);
-                            due.setDate(today.getDate() + (String(newSeverity).toLowerCase() === 'major' ? 90 : 30));
-                            existing.dueDate = due.toISOString().split('T')[0];
+                            existing.dueDate = capaDueFor(newSeverity, existing.raisedDate || report.date);
                         }
                         existing.severity = newSeverity;
                         existing.description = item.ncrDescription || item.comment || existing.description;
@@ -2440,8 +2469,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     const d = new Date(report.date || report.createdAt || Date.now());
                     return isNaN(d.getTime()) ? new Date() : d;
                 })();
-                const due = new Date(raisedOn);
-                due.setDate(raisedOn.getDate() + (String(severity).toLowerCase() === 'major' ? 90 : 30));
+                const dueDate = capaDueFor(severity, report.date || raisedOn);
 
                 // Create new NCR record
                 const ncrRecord = {
@@ -2459,7 +2487,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     description: item.ncrDescription || item.comment || 'Non-conformity identified during audit',
                     raisedBy: report.auditor || 'Auditor',
                     raisedDate: raisedOn.toISOString().split('T')[0],
-                    dueDate: due.toISOString().split('T')[0],
+                    dueDate: dueDate,
                     status: 'Open',
                     correction: '',
                     rootCause: '',

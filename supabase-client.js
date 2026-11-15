@@ -487,7 +487,10 @@ const SupabaseClient = {
 
     _setSyncTimestamp(table) {
         try {
-            sessionStorage.setItem(`sync_ts_${table}`, new Date().toISOString());
+            // Stamped after the response arrives, so rows written while the query
+            // was in flight (or under client clock skew) would be skipped forever.
+            // Back off two minutes; re-fetching a few rows is harmless (merged by id).
+            sessionStorage.setItem(`sync_ts_${table}`, new Date(Date.now() - 2 * 60 * 1000).toISOString());
         } catch (e) { Logger.debug('sessionStorage write failed (private mode?)', e.message); }
     },
 
@@ -1612,28 +1615,40 @@ const SupabaseClient = {
 
             data.forEach(auditor => {
                 const existing = localAuditors.find(a => String(a.id) === String(auditor.id));
+                // The full record (trainings, qualifications, documents, rate…) is
+                // written to the `data` JSONB; the columns hold only a few fields.
+                // Start from `data`, overlay the mapped columns, and never copy the
+                // raw row (that dropped snake_case keys and a nested `data` into
+                // the auditor, which then nested one level deeper on every save).
+                const full = (auditor.data && typeof auditor.data === 'object') ? Object.assign({}, auditor.data) : {};
+                delete full.data;
+                const mapped = Object.assign(full, {
+                    id: auditor.id,
+                    name: auditor.name != null ? auditor.name : full.name,
+                    role: auditor.role != null ? auditor.role : full.role,
+                    email: auditor.email != null ? auditor.email : full.email,
+                    standards: auditor.standards || full.standards || []
+                });
                 if (existing) {
-                    // Update existing
-                    Object.assign(existing, auditor);
+                    delete existing.data;
+                    Object.assign(existing, mapped);
                     updated++;
                 } else {
                     // Add new
-                    const newAuditor = {
-                        id: auditor.id,
-                        name: auditor.name,
-                        role: auditor.role,
-                        email: auditor.email,
-                        phone: auditor.phone,
-                        location: auditor.location,
-                        experience: auditor.experience,
-                        standards: auditor.standards || [],
-                        domainExpertise: auditor.expertise || [],
-                        industries: auditor.industries || [],
-                        manDayRate: auditor.man_day_rate,
-                        education: auditor.education,
-                        customerRating: auditor.rating,
-                        status: auditor.status
-                    };
+                    // Columns win only where the row actually has them; otherwise
+                    // keep what the `data` JSONB holds.
+                    const col = (v, fallback) => (v !== undefined && v !== null ? v : fallback);
+                    const newAuditor = Object.assign({}, mapped, {
+                        phone: col(auditor.phone, full.phone),
+                        location: col(auditor.location, full.location),
+                        experience: col(auditor.experience, full.experience),
+                        domainExpertise: col(auditor.expertise, full.domainExpertise || []),
+                        industries: col(auditor.industries, full.industries || []),
+                        manDayRate: col(auditor.man_day_rate, full.manDayRate),
+                        education: col(auditor.education, full.education),
+                        customerRating: col(auditor.rating, full.customerRating),
+                        status: col(auditor.status, full.status)
+                    });
                     localAuditors.push(newAuditor);
                     added++;
                 }
@@ -2613,12 +2628,26 @@ const SupabaseClient = {
                 previousCB: c.decision_record?.previous_cb || ''
             }));
 
-            // Also keep the raw decisions for other uses if needed
-            window.state.certificationDecisions = data;
+            // A delta sync returns only the rows changed since the last sync, so it
+            // must merge by id. Replacing the arrays with it wiped every other
+            // certificate from the register (and then let the next CERT id collide).
+            const mergeById = (current, incoming) => {
+                const out = Array.isArray(current) ? current.slice() : [];
+                incoming.forEach(row => {
+                    const i = out.findIndex(x => x && String(x.id) === String(row.id));
+                    if (i === -1) out.push(row); else out[i] = Object.assign({}, out[i], row);
+                });
+                return out;
+            };
+            window.state.certificationDecisions = isIncremental
+                ? mergeById(window.state.certificationDecisions, data)
+                : data;
 
-            // Overwrite local certifications with Cloud Truth
+            // Full sync: cloud is the truth. Delta sync: merge the changed rows.
             if (localCerts.length > 0) {
-                window.state.certifications = localCerts;
+                window.state.certifications = isIncremental
+                    ? mergeById(window.state.certifications, localCerts)
+                    : localCerts;
             }
 
             // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end

@@ -17,7 +17,12 @@ function renderCertificationModule() {
     const pendingDecisions = window.state.auditReports.filter(r =>
         r.status === window.CONSTANTS.STATUS.FINALIZED &&
         [window.CONSTANTS.RECOMMENDATIONS.RECOMMEND, window.CONSTANTS.RECOMMENDATIONS.CONDITIONAL].includes(r.recommendation) &&
-        !certs.find(c => c.client === r.client && c.issueDate === r.date)
+        // Linked by reportId (stored at issue). The old client+issue-date rule
+        // only matched when the certificate was issued on the audit date, so
+        // decided reports stayed "pending" and could be certified twice.
+        !certs.find(c => (c.reportId != null && String(c.reportId) === String(r.id))
+            || (c.decisionRecord && c.decisionRecord.reportId != null && String(c.decisionRecord.reportId) === String(r.id))
+            || (c.client === r.client && c.issueDate === r.date))
     );
 
     contentArea.innerHTML = `
@@ -267,6 +272,25 @@ window.switchCertTab = function (btn, tabId) {
     }
 };
 
+// Next free CERT-YYYY-NNN id. `length + 1` reused an existing id once any
+// certificate had been deleted, and the upsert (onConflict id) then overwrote
+// another client's certificate in certification_decisions.
+function nextCertificateId() {
+    const year = new Date().getFullYear();
+    const prefix = `CERT-${year}-`;
+    const taken = new Set((window.state.certifications || []).map(c => String(c.id)));
+    let max = 0;
+    taken.forEach(id => {
+        if (id.startsWith(prefix)) {
+            const n = parseInt(id.slice(prefix.length), 10);
+            if (!isNaN(n) && n > max) max = n;
+        }
+    });
+    let next = max + 1;
+    while (taken.has(prefix + String(next).padStart(3, '0'))) next++;
+    return prefix + String(next).padStart(3, '0');
+}
+
 window.openIssueCertificateModal = function (reportId) {
     let prefillClient = '';
     let prefillStandard = '';
@@ -284,7 +308,10 @@ window.openIssueCertificateModal = function (reportId) {
             _auditDate = report.date;
 
             // Try to find plan for accurate scope/standard
-            const plan = state.auditPlans.find(p => p.client === report.client);
+            // The report's own plan; the client's first plan was the wrong audit
+            // (wrong team for the independence check, wrong scope/standard).
+            const plan = (report.planId != null && state.auditPlans.find(p => String(p.id) === String(report.planId)))
+                || state.auditPlans.find(p => p.client === report.client);
             linkedPlan = plan || null;
             if (plan) {
                 prefillScope = plan.scope;
@@ -301,7 +328,7 @@ window.openIssueCertificateModal = function (reportId) {
         <form id="cert-issue-form">
             <div class="form-group">
                 <label>Certificate ID (Auto-generated)</label>
-                <input type="text" class="form-control" id="cert-id" value="CERT-${new Date().getFullYear()}-${String(state.certifications.length + 1).padStart(3, '0')}" readonly>
+                <input type="text" class="form-control" id="cert-id" value="${nextCertificateId()}" readonly>
             </div>
             <div class="form-group">
                 <label>Client Organization</label>
@@ -461,8 +488,13 @@ window.openIssueCertificateModal = function (reportId) {
         const auditTeamNames = new Set();
         if (linkedReport?.leadAuditor) auditTeamNames.add(String(linkedReport.leadAuditor).trim());
         if (linkedPlan?.leadAuditor) auditTeamNames.add(String(linkedPlan.leadAuditor).trim());
-        const teamList = linkedPlan?.auditTeam || linkedPlan?.audit_team || [];
-        (Array.isArray(teamList) ? teamList : []).forEach(m => {
+        // Plans store the team (lead first) in `team`; auditTeam/audit_team only
+        // exist on rows read back from the cloud. Check them all.
+        const teamList = [].concat(
+            Array.isArray(linkedPlan?.team) ? linkedPlan.team : [],
+            Array.isArray(linkedPlan?.auditTeam) ? linkedPlan.auditTeam : [],
+            Array.isArray(linkedPlan?.audit_team) ? linkedPlan.audit_team : []);
+        teamList.forEach(m => {
             const name = typeof m === 'string' ? m : (m?.name || m?.auditor);
             if (name) auditTeamNames.add(String(name).trim());
         });
@@ -498,7 +530,11 @@ window.openIssueCertificateModal = function (reportId) {
         const sitesCovered = (activeClient.sites || []).filter((_, i) => selectedSiteIndices.includes(i));
 
         const newCert = {
-            id: document.getElementById('cert-id').value,
+            // Re-check at submit: a sync since the modal opened may have taken the id.
+            id: (() => {
+                const shown = document.getElementById('cert-id').value;
+                return (state.certifications || []).some(c => String(c.id) === String(shown)) ? nextCertificateId() : shown;
+            })(),
             client: prefillClient || document.getElementById('cert-client').value,
             standard: standard,
             issueDate: issueDate,
@@ -506,8 +542,12 @@ window.openIssueCertificateModal = function (reportId) {
             status: window.CONSTANTS.CERT_STATUS.VALID,
             scope: scope,
             sitesCovered: sitesCovered,
+            reportId: linkedReport ? linkedReport.id : null,
             // ISO 17021-1 Decision Record
             decisionRecord: {
+                // reportId is kept here too: decision_record is the JSONB that
+                // round-trips through certification_decisions.
+                reportId: linkedReport ? linkedReport.id : null,
                 decision: decision,
                 justification: justification,
                 decisionMaker: reviewer,
@@ -803,6 +843,9 @@ window.openCertActionModal = function (certId) {
         });
 
         window.saveData();
+        // saveData is local-only; without this the suspension/withdrawal was
+        // reverted to Valid by the next cloud sync.
+        window.DataService.syncCertificate(cert, { saveLocal: false });
         window.closeModal();
         renderCertificationModule();
         window.showNotification(`Certificate ${action}ed successfully`, 'success');
@@ -815,8 +858,9 @@ window.restoreCertificate = function (certId) {
     const cert = state.certifications.find(c => String(c.id) === String(certId));
     if (confirm('Are you sure you want to restore this certificate to Valid status?')) {
         cert.status = window.CONSTANTS.CERT_STATUS.VALID;
-        cert.history.push({ date: new Date().toISOString().split('T')[0], action: 'Restored', user: 'Admin' });
+        cert.history.push({ date: new Date().toISOString().split('T')[0], action: 'Restored', user: window.state.currentUser?.name || 'Admin' });
         window.saveData();
+        window.DataService.syncCertificate(cert, { saveLocal: false });
         renderCertificationModule();
     }
 };
@@ -887,6 +931,7 @@ window.editCertificate = function (certId) {
         });
 
         window.saveData();
+        window.DataService.syncCertificate(cert, { saveLocal: false });
         window.closeModal();
         renderCertificationModule();
         window.showNotification('Certificate details updated', 'success');

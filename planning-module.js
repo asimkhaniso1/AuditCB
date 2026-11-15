@@ -51,15 +51,21 @@ function renderAuditPlanningEnhanced() {
     }
     const state = window.state;
     const searchTerm = state.planningSearchTerm || '';
+    const statusFilter = state.planningStatusFilter || 'all';
 
     let filteredPlans = window.getVisiblePlans().filter(plan => {
-        return plan.client.toLowerCase().includes(searchTerm.toLowerCase());
+        if (!String(plan.client || '').toLowerCase().includes(searchTerm.toLowerCase())) return false;
+        if (statusFilter === 'all') return true;
+        if (statusFilter === 'completed') return window.DataService.isPlanCompleted(plan);
+        if (statusFilter === 'scheduled') return /^(scheduled|validated|planned)$/i.test(String(plan.status || ''));
+        return String(plan.status || '').toLowerCase() === statusFilter;
     });
 
 
     // Permission Check
     const userRole = (window.state.currentUser?.role || 'Auditor').trim().toLowerCase();
-    const isManager = ['admin', 'certification manager', 'manager', 'lead auditor'].includes(userRole) || window.state.settings?.isAdmin === true;
+    // Role only: settings.isAdmin defaulted to true tenant-wide, granting this to everyone.
+    const isManager = ['admin', 'certification manager', 'manager', 'lead auditor'].includes(userRole);
 
     const rows = filteredPlans.map(plan => `
         <tr class="plan-row" style="cursor: pointer;">
@@ -159,12 +165,10 @@ function renderAuditPlanningEnhanced() {
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem;">
                 <div style="display: flex; gap: 1rem; flex: 1;">
-                    <input type="text" id="plan-search" placeholder="Search audit plans..." value="${searchTerm}" style="max-width: 300px; margin-bottom: 0;">
+                    <input type="text" id="plan-search" placeholder="Search audit plans..." value="${window.UTILS.escapeHtml(searchTerm)}" style="max-width: 300px; margin-bottom: 0;">
                     <select id="plan-filter" style="max-width: 150px; margin-bottom: 0;">
-                        <option value="all">All Status</option>
-                        <option value="draft">Draft</option>
-                        <option value="approved">Approved</option>
-                        <option value="completed">Completed</option>
+                        ${[['all', 'All Status'], ['draft', 'Draft'], ['scheduled', 'Scheduled'], ['in progress', 'In Progress'], ['completed', 'Completed']]
+            .map(([v, l]) => `<option value="${v}" ${statusFilter === v ? 'selected' : ''}>${l}</option>`).join('')}
                     </select>
                 </div>
             </div>
@@ -196,6 +200,13 @@ function renderAuditPlanningEnhanced() {
 
     document.getElementById('plan-search')?.addEventListener('input', (e) => {
         state.planningSearchTerm = e.target.value;
+        renderAuditPlanningEnhanced();
+        // The re-render replaced the input; put the caret back so typing continues.
+        const box = document.getElementById('plan-search');
+        if (box) { box.focus(); const n = box.value.length; try { box.setSelectionRange(n, n); } catch (_e) { /* noop */ } }
+    });
+    document.getElementById('plan-filter')?.addEventListener('change', (e) => {
+        state.planningStatusFilter = e.target.value;
         renderAuditPlanningEnhanced();
     });
 
@@ -3531,7 +3542,17 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
         selectedSites: selectedSites,
         agenda: agenda,
         halfDays: Array.from(window._agendaHalfDays || []).sort((a, b) => a - b),
-        status: saveAsDraft ? 'Draft' : (date && endDate ? 'Scheduled' : 'Validated'),
+        // Editing a plan whose audit has started or finished must not knock it
+        // back to Scheduled/Validated (it reopened completed audits).
+        status: (() => {
+            const prior = window.editingPlanId
+                ? (state.auditPlans || []).find(p => String(p.id) === String(window.editingPlanId)) : null;
+            if (prior && (/^(in progress|completed|closed|cancelled)$/i.test(String(prior.status || ''))
+                || (window.DataService && window.DataService.isPlanCompleted && window.DataService.isPlanCompleted(prior)))) {
+                return prior.status;
+            }
+            return saveAsDraft ? 'Draft' : (date && endDate ? 'Scheduled' : 'Validated');
+        })(),
         // ISO 17021-1 Compliance Fields
         auditType: auditType,
         auditMethod: auditMethod,

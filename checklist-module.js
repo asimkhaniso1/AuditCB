@@ -67,7 +67,7 @@ function renderChecklistLibrary(clientId) {
 
     const _contentArea = document.getElementById('content-area');
     const userRole = (window.state.currentUser?.role || '').toLowerCase();
-    const isAdmin = userRole === 'admin' || window.state.settings?.isAdmin || false;
+    const isAdmin = userRole === 'admin';
     const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
     // Filtering keys on the ID, never on whether the client record resolves —
@@ -690,7 +690,9 @@ function openImportChecklistModal() {
     if (!standards.length) standards = ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
     standards = standardsInScope(standards);
     const userRole = state.currentUser?.role;
-    const isAdmin = state.settings?.isAdmin || false;
+    // Admin rights come from the user's role only. settings.isAdmin defaulted to
+    // true and was shared tenant-wide, so it made every user an admin here.
+    const isAdmin = String(userRole || '').toLowerCase() === 'admin';
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
     const canEditGlobal = isCertManager || isAdmin;
 
@@ -1065,7 +1067,7 @@ function renderChecklistEditor(checklistId) {
 
     const standards = standardsInScope(window.state.cbSettings?.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'], checklist?.standard);
     const userRole = (state.currentUser?.role || '').toLowerCase();
-    const isAdmin = userRole === 'admin' || state.settings?.isAdmin || false;
+    const isAdmin = userRole === 'admin';
     const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
     const _auditTypes2 = window.CONSTANTS?.AUDIT_TYPES || [];
@@ -1282,7 +1284,7 @@ function saveChecklistFromEditor(checklistId) {
 
     // Permission check for global
     const userRole = (state.currentUser?.role || '').toLowerCase();
-    const isAdmin = userRole === 'admin' || state.settings?.isAdmin || false;
+    const isAdmin = userRole === 'admin';
     const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 
@@ -1530,7 +1532,7 @@ function openEditChecklistModal(id) {
     if (!checklist) return;
 
     const userRole = (state.currentUser?.role || '').toLowerCase();
-    const isAdmin = userRole === 'admin' || state.settings?.isAdmin || false;
+    const isAdmin = userRole === 'admin';
     const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 
@@ -1770,7 +1772,7 @@ function deleteChecklist(id) {
     }
 
     const userRole = (window.state.currentUser?.role || '').toLowerCase();
-    const isAdmin = userRole === 'admin' || window.state.settings?.isAdmin || false;
+    const isAdmin = userRole === 'admin';
     const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 

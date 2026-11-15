@@ -335,13 +335,20 @@ window.saveUser = async function (userId) {
                         .eq('email', oldEmail);
 
                     if (profileError) {
-                        console.warn('Profile update warning:', profileError);
+                        // A rejected profile update (e.g. role change blocked by RLS)
+                        // used to be logged and then reported as a success.
+                        throw new Error('Profile update failed: ' + (profileError.message || profileError));
                     }
 
-                    // Handle password if provided
+                    // Handle password if provided. Only your own password can be set
+                    // directly; for anyone else Supabase sends a reset email and the
+                    // typed password is NOT applied — say so.
+                    const isSelf = String(oldEmail || '').toLowerCase() === String(window.state.currentUser?.email || '').toLowerCase();
                     if (newPassword && newPassword.trim()) {
                         await window.SupabaseClient.updateUserPassword(email, newPassword.trim());
-                        window.showNotification('User and password updated successfully', 'success');
+                        window.showNotification(isSelf
+                            ? 'User and password updated successfully'
+                            : 'User updated. The password was not changed: a password-reset email has been sent to ' + email + '.', 'success');
                     } else {
                         window.showNotification('User updated successfully', 'success');
                     }
@@ -432,7 +439,11 @@ window.toggleUserStatus = function (userId) {
     user.status = user.status === 'Active' ? 'Inactive' : 'Active';
     window.saveData();
     document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
-    window.showNotification(`User ${user.status === 'Active' ? 'activated' : 'deactivated'}`, 'info');
+    // This flag is local and is not checked at sign-in, so it must not claim to
+    // block access. Revoking access needs the account disabled in Supabase Auth.
+    window.showNotification(user.status === 'Active'
+        ? 'User marked Active'
+        : 'User marked Inactive in this list. This does not stop them signing in: disable or delete the account in Supabase Auth to revoke access.', user.status === 'Active' ? 'info' : 'warning');
 };
 
 // Delete user permanently (Admin only)

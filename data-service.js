@@ -75,8 +75,12 @@
      * Save and sync an audit report (partial or full).
      */
     function syncAuditReport(reportId, data, options = {}) {
-        return syncToCloud('auditReport', () =>
-            window.SupabaseClient.upsertAuditReport(reportId, data),
+        // upsertAuditReport returns false on failure instead of throwing, which
+        // made every failed report save look like a success.
+        return syncToCloud('auditReport', async () => {
+            const ok = await window.SupabaseClient.upsertAuditReport(reportId, data);
+            if (ok === false) throw new Error('audit report update failed');
+        },
             options
         );
     }
@@ -131,7 +135,9 @@
      */
     function syncAuditorAssignments(options = {}) {
         return syncToCloud('auditorAssignments', () =>
-            window.SupabaseClient.syncAuditorAssignmentsToSupabase(),
+            // Same trap as syncChecklists: called with no list it returned at once,
+            // so assignments never left this browser.
+            window.SupabaseClient.syncAuditorAssignmentsToSupabase((window.state && window.state.auditorAssignments) || []),
             options
         );
     }

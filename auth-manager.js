@@ -137,6 +137,14 @@ const AuthManager = {
 
             this.clearSession();
 
+            // End the Supabase session as well (see logoutUser in script.js).
+            if (window.SupabaseClient) {
+                try { window.SupabaseClient._clearSyncTimestamps && window.SupabaseClient._clearSyncTimestamps(); } catch (_e) { /* noop */ }
+                if (window.SupabaseClient.isInitialized) {
+                    window.SupabaseClient.signOut().catch(err => Logger.warn('Supabase sign-out failed:', err && err.message));
+                }
+            }
+
             // PERF: Clear session monitor interval to prevent memory leaks
             if (this._sessionMonitorId) {
                 clearInterval(this._sessionMonitorId);
@@ -209,8 +217,12 @@ const AuthManager = {
         const perms = window.state?.rolePermissions;
         if (!perms) return 'none';
 
-        // Try exact match first, then case-insensitive
-        const rolePerms = perms[userRole] || perms[Object.keys(perms).find(k => k.toLowerCase() === userRole.toLowerCase())];
+        // Try exact match first, then case-insensitive. The default matrix keyed
+        // this role 'Cert Manager' while profiles/RLS use 'Certification Manager';
+        // matrices saved before the rename still carry the short key.
+        const findPerms = (role) => perms[role] || perms[Object.keys(perms).find(k => k.toLowerCase() === String(role).toLowerCase())];
+        const rolePerms = findPerms(userRole)
+            || (userRole.toLowerCase() === 'certification manager' ? findPerms('Cert Manager') : null);
         if (!rolePerms) return 'none';
 
         return rolePerms[module] || 'none';

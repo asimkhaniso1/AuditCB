@@ -290,6 +290,22 @@ window.capaDisplayStatus = capaDisplayStatus;
 // How much real work a record carries — when duplicates are merged the
 // survivor should be the one the auditee/auditor has already progressed, not
 // simply the oldest.
+// Default corrective-action due date. Uses the same CB-configured timeframes the
+// client report prints (ReportStats.capaDueDate; fallback Major 30 / Minor 90),
+// so the register and the report never give the client two different deadlines.
+function ncrDefaultDueDate(severity, from, ctx) {
+    const c = ctx || {};
+    if (window.ReportStats && typeof window.ReportStats.capaDueDate === 'function') {
+        return window.ReportStats.capaDueDate(severity, from, {
+            settings: (window.state && window.state.cbSettings) || {}, standard: c.standard || '', stage: c.stage || ''
+        });
+    }
+    const d = from ? new Date(from) : new Date();
+    const base = isNaN(d.getTime()) ? new Date() : d;
+    base.setDate(base.getDate() + (/major/i.test(String(severity)) ? 30 : 90));
+    return base.toISOString().split('T')[0];
+}
+
 function ncrWorkWeight(n) {
     return (n.correctiveAction ? 4 : 0) + (n.rootCause ? 3 : 0)
         + (n.correction ? 2 : 0) + (n.verifiedDate ? 5 : 0)
@@ -1029,7 +1045,7 @@ function renderNCRTable(ncrs) {
                                 <button class="btn btn-sm btn-icon" data-action="editNCR" data-id="${ncr.id}" title="Edit" aria-label="Edit">
                                     <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                 </button>
-                                <button class="btn btn-sm btn-icon" data-action="deleteNCR" data-id="${ncr.id}" title="Delete" aria-label="Delete">
+                                <button class="btn btn-sm btn-icon" data-action="deleteNCR" data-id="${ncr.id}" title="Withdraw" aria-label="Withdraw">
                                     <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                 </button>
                                 ${ncr.status === 'Open' || ncr.carStatus === 'Ineffective' || ncr.carStatus === 'Reopened' ? `
@@ -1317,8 +1333,7 @@ window.escalateObservationToNCR = async function (reportId, list, index) {
     const client = (window.state.clients || []).find(c => String(c.id) === String(report.clientId) || c.name === report.client);
     const now = new Date();
     const raised = now.toISOString().split('T')[0];
-    const due = new Date(now);
-    due.setDate(now.getDate() + (severity === 'Major' ? 90 : 30)); // same defaults as a new NCR
+    const dueDate = ncrDefaultDueDate(severity, null, { standard: report.standard || '', stage: report.auditType || '' });
     // No id here: the database assigns it on insert. A client-made id
     // ('NCR-<timestamp>') sent persistNCR down its UPDATE path, which matched
     // no row, so the NCR was never saved and vanished on the next refresh.
@@ -1327,7 +1342,7 @@ window.escalateObservationToNCR = async function (reportId, list, index) {
     const full = Object.assign({}, ncr, {
         clientId: client ? client.id : report.clientId, clientName: report.client, standard: report.standard,
         severity, level: 'client', // level is client/internal, not severity — 'Major' showed as "Internal"
-        raisedBy: user, raisedDate: raised, dueDate: due.toISOString().split('T')[0],
+        raisedBy: user, raisedDate: raised, dueDate: dueDate,
         status: 'Open', source: 'Escalated from observation', localRef,
         // audit_ncrs has no objective-evidence column; the statement carries it
         // so it survives a reload.
@@ -1797,14 +1812,8 @@ window.openNewNCRModal = function () {
 
     // Logic for Due Date
     document.getElementById('ncr-severity').addEventListener('change', function () {
-        const severity = this.value;
-        const today = new Date();
-        const dueDate = new Date(today);
-        if (severity === 'Major') dueDate.setDate(today.getDate() + 90); // 90 days default
-        else if (severity === 'Minor') dueDate.setDate(today.getDate() + 30); // 30 days default
-        // Observation might not have due date, but we'll set 30 for now
-
-        document.getElementById('ncr-due-date').value = dueDate.toISOString().split('T')[0];
+        const standard = (document.getElementById('ncr-standard') || {}).value || '';
+        document.getElementById('ncr-due-date').value = ncrDefaultDueDate(this.value, null, { standard });
     });
     // Trigger
     document.getElementById('ncr-severity').dispatchEvent(new Event('change'));
@@ -1900,8 +1909,8 @@ window.editNCR = function (ncrId) {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group"><label>Severity</label>
                     <select id="edit-severity" class="form-control">
-                        <option value="Major" ${ncr.severity === 'Major' ? 'selected' : ''}>Major</option>
-                        <option value="Minor" ${ncr.severity === 'Minor' ? 'selected' : ''}>Minor</option>
+                        <option value="Major" ${normalizedNCRSeverity(ncr) === 'major' ? 'selected' : ''}>Major</option>
+                        <option value="Minor" ${normalizedNCRSeverity(ncr) === 'minor' ? 'selected' : ''}>Minor</option>
                     </select>
                 </div>
                 <div class="form-group"><label>Status</label>
@@ -2029,21 +2038,24 @@ window.openAddCAPAModal = function (ncrId) {
     window.openModal();
 };
 
-// --- DELETE NCR ---
+// --- WITHDRAW NCR (the register's delete action) ---
+// NCRs are never hard-deleted: the record is the audit trail. A hard delete
+// also didn't stick for checklist-raised NCRs — the next checklist save found
+// no match and re-inserted the finding under a new number.
 window.deleteNCR = async function (id) {
-    if (!confirm('Are you sure you want to delete this NCR record?')) return;
-    try {
-        if (window.SupabaseClient && !String(id).startsWith('demo-')) {
-            const { error } = await window.SupabaseClient.from('audit_ncrs').delete().eq('id', id);
-            if (error) throw error;
-        }
-        window.state.ncrs = window.state.ncrs.filter(n => String(n.id) !== String(id));
-        window.saveData();
-        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
-        window.showNotification('NCR deleted', 'success');
-    } catch (e) {
-        window.showNotification('Delete failed: ' + e.message, 'error');
-    }
+    const ncr = (window.state.ncrs || []).find(n => String(n.id) === String(id));
+    if (!ncr) return;
+    const reason = window.prompt('Withdraw this NCR? It stays in the register as Withdrawn for the audit trail.\n\nReason for withdrawal:');
+    if (reason === null) return;
+    ncr.status = 'Withdrawn';
+    ncr.carStatus = 'Withdrawn';
+    const cleanReason = String(reason).trim();
+    ncr.withdrawnReason = (window.Sanitizer ? window.Sanitizer.sanitizeText(cleanReason) : cleanReason) || 'Withdrawn from the register';
+    ncr.withdrawnDate = new Date().toISOString().split('T')[0];
+    window.saveData();
+    await persistNCR(ncr);
+    renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+    window.showNotification('NCR withdrawn', 'success');
 };
 
 // --- DUPLICATE REVIEW ---

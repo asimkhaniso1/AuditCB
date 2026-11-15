@@ -30,7 +30,7 @@ const state = {
     settings: {
         standards: ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'],
         roles: ['Lead Auditor', 'Auditor', 'Technical Expert'],
-        isAdmin: true  // Toggle for admin privileges (simulated)
+        isAdmin: false  // Not used for permissions — admin rights come from currentUser.role
     },
     // Auditor-Client Assignments for role-based filtering
     auditorAssignments: []
@@ -71,9 +71,20 @@ function getVisibleClients() {
 
     // Auditors see only assigned clients
     if (AM && AM.hasRole(['lead auditor', 'auditor', 'technical expert'])) {
+        // assignment.auditorId is the auditor RECORD id; user.id is the Supabase
+        // auth UUID, stored on the assignment as userId. Comparing auditorId to
+        // user.id never matched, so assigned auditors saw no clients. Match the
+        // auth UUID, or the auditor record that belongs to this user.
         const assignments = window.state.auditorAssignments || [];
+        const email = String(user.email || '').toLowerCase();
+        const myAuditorIds = new Set((window.state.auditors || [])
+            .filter(a => (a.userId != null && String(a.userId) === String(user.id))
+                || (email && String(a.email || '').toLowerCase() === email))
+            .map(a => String(a.id)));
         const assignedClientIds = assignments
-            .filter(a => String(a.auditorId) === String(user.id))
+            .filter(a => (a.userId != null && String(a.userId) === String(user.id))
+                || myAuditorIds.has(String(a.auditorId))
+                || String(a.auditorId) === String(user.id))
             .map(a => String(a.clientId));
 
         if (assignedClientIds.length === 0) {
@@ -2032,6 +2043,17 @@ window.logoutUser = function () {
         // Clear current user completely
         window.state.currentUser = null;
         window.saveData();
+
+        // End the Supabase session too. Without this the refresh token stayed in
+        // localStorage and the next page load signed the user straight back in.
+        // Sync timestamps go as well, so the next sign-in does a full sync rather
+        // than a delta on top of the previous user's cache.
+        if (window.SupabaseClient) {
+            try { window.SupabaseClient._clearSyncTimestamps && window.SupabaseClient._clearSyncTimestamps(); } catch (_e) { /* noop */ }
+            if (window.SupabaseClient.isInitialized) {
+                window.SupabaseClient.signOut().catch(err => Logger.warn('Supabase sign-out failed:', err && err.message));
+            }
+        }
 
         // Close dropdown
         const dropdown = document.getElementById('user-dropdown-menu');

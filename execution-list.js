@@ -444,9 +444,16 @@ function openEditReportModal(reportId) {
             <div class="form-group">
                 <label>Status</label>
                 <select class="form-control" id="report-status">
-                    <option ${report.status === window.CONSTANTS.STATUS.IN_PROGRESS ? 'selected' : ''}>${window.CONSTANTS.STATUS.IN_PROGRESS}</option>
-                    <option ${report.status === window.CONSTANTS.STATUS.DRAFT ? 'selected' : ''}>${window.CONSTANTS.STATUS.DRAFT}</option>
-                    <option ${report.status === window.CONSTANTS.STATUS.FINALIZED ? 'selected' : ''}>${window.CONSTANTS.STATUS.FINALIZED}</option>
+                    ${(() => {
+            // Only the working statuses are offered. Finalizing must go through
+            // Finalize & Publish (issuance gate, snapshot, issue log). Any other
+            // current status (In Review, Approved, Finalized…) is kept as the
+            // selected option, so saving a date change can't silently revert it.
+            const S = window.CONSTANTS.STATUS;
+            const offered = [S.IN_PROGRESS, S.DRAFT];
+            const opts = offered.includes(report.status) || !report.status ? offered : [report.status, ...offered];
+            return opts.map(s => `<option value="${window.UTILS.escapeHtml(s)}" ${s === report.status ? 'selected' : ''}>${window.UTILS.escapeHtml(s)}</option>`).join('');
+        })()}
                 </select>
             </div>
         </form>
