@@ -1802,9 +1802,9 @@ const SupabaseClient = {
 
         try {
             const batch = auditPlans.map(plan => {
-                const auditorIds = Array.isArray(plan.auditors)
-                    ? plan.auditors.map(a => String(a))
-                    : [];
+                // No auditor_ids: that column was dropped from audit_plans
+                // (CLEANUP_3_TABLES_ONLY.sql), and writing it failed the whole
+                // upsert. plan.auditors still round-trips inside `data`.
                 const auditTeam = Array.isArray(plan.auditTeam)
                     ? plan.auditTeam.map(t => typeof t === 'object' ? String(t.id || t.name || t) : String(t))
                     : [];
@@ -1818,7 +1818,6 @@ const SupabaseClient = {
                     client_id: plan.clientId ? String(plan.clientId) : null,
                     standard: plan.standard || null,
                     date: plan.date || null,
-                    auditor_ids: auditorIds,
                     status: plan.status || 'Planned',
                     objectives: plan.objectives || null,
                     scope: plan.scope || null,
