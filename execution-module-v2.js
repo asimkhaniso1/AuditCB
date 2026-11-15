@@ -4201,11 +4201,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             if (plan && !plan.scope) {
                 plan.scope = value;
                 // Plans sync in batch — SupabaseClient.syncAuditPlansToSupabase.
-                try {
-                    if (window.SupabaseClient && typeof window.SupabaseClient.syncAuditPlansToSupabase === 'function') {
-                        window.SupabaseClient.syncAuditPlansToSupabase([plan]);
-                    }
-                } catch (_e) { /* local state persists via saveData either way */ }
+                // Not awaited, so a failure arrives as a rejection: report it
+                // instead of losing it (local state persists via saveData).
+                if (window.SupabaseClient && typeof window.SupabaseClient.syncAuditPlansToSupabase === 'function') {
+                    Promise.resolve(window.SupabaseClient.syncAuditPlansToSupabase([plan])).catch(err => {
+                        window.showNotification('The plan scope was saved on this device but not to the cloud: ' + (err && err.message || err), 'warning');
+                    });
+                }
             }
             window.closeModal();
             persistAndRefreshIntegrity(reportId, 'Audit scope recorded.');
