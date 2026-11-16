@@ -668,6 +668,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                  </div>
                              </div>
                              
+                             <!-- Nonconformity statement: printed under "Nonconformity
+                                  Statement" for each Major/Minor NC in the client report
+                                  (execution-reporting.js buildFormalNCParts). Its input had
+                                  gone from this panel, so every NC printed "Nonconformity
+                                  statement not recorded." with no way to write one. -->
+                             <div style="margin-bottom: 0.75rem;">
+                                 <label for="ncr-desc-${uniqueId}" style="font-size: 0.8rem;">Nonconformity statement <span style="color:#64748b;font-weight:400;">(Major/Minor NC: the requirement, what was not fulfilled, and the objective evidence)</span></label>
+                                 <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="3" placeholder="e.g. Clause 9.2 requires internal audits of all three standards at planned intervals; the latest internal audit report covering ISO 22301 and the closure status of its findings could not be produced.">${_execEscText(saved.ncrDescription || '')}</textarea>
+                             </div>
+
                              <!-- Cross-Reference: Personnel, Designation & Department -->
                              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 0.5rem;">
                                  <div>
@@ -2015,9 +2025,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
                 const status = input.value;
                 const comment = Sanitizer.sanitizeText(document.getElementById('comment-' + uniqueId)?.value || '');
-                // The NC panel no longer renders these inputs. When an input is absent
-                // the value is null and the previously saved text is carried forward
-                // below, instead of every save blanking the NC statement.
+                // The NC statement box is in the Finding Details panel; the transcript
+                // box is not rendered. When an input is absent the value is null and
+                // the previously saved text is carried forward below, instead of the
+                // save blanking it.
                 const ncrDescEl = document.getElementById('ncr-desc-' + uniqueId);
                 const transcriptEl = document.getElementById('ncr-transcript-' + uniqueId);
                 const ncrDesc = ncrDescEl ? Sanitizer.sanitizeText(ncrDescEl.value || '') : null;
