@@ -110,7 +110,11 @@
             ofi: Array.isArray(r.ofi) ? r.ofi.join('\n') : (r.ofi || ''),
             conclusion: r.editedConclusion || r.conclusion || '',
             previousFindingsStatus: r.previousFindingsStatus || '',
-            changesSinceLastAudit: r.changesSinceLastAudit || ''
+            changesSinceLastAudit: r.changesSinceLastAudit || '',
+            // Printed in the Conclusion section of the client report.
+            // PC Connection's surveillance report v1.1 went out with
+            // "Recommended for certification." here, unchecked.
+            closingMeetingSummary: (r.closingMeeting && r.closingMeeting.summary) || ''
         };
     }
 
@@ -310,16 +314,17 @@
 
         const manualRec = trim(report && report.recommendation);
         const narrative = narrativeFields(report);
-        const textsToScan = [narrative.conclusion, derivedRecText].filter(Boolean);
+        const textsToScan = [narrative.conclusion, narrative.closingMeetingSummary, derivedRecText].filter(Boolean);
 
         const grantingFound = textsToScan.some((t) => GRANTING_RE.test(t));
         if (grantingFound) {
+            const inClosing = GRANTING_RE.test(narrative.closingMeetingSummary || '');
             results.blockers.push(item(
                 'B5',
                 'blocker',
                 'recommendation',
-                `Report recommendation/conclusion text uses certification-granting language ("Recommended for Certification") but the audit type is ${isSurveillance ? 'surveillance' : 'recertification'}.`,
-                'report.conclusion / ReportStats.recommendationText',
+                `Report ${inClosing ? 'closing meeting summary' : 'recommendation/conclusion text'} uses certification-granting language ("Recommended for Certification") but the audit type is ${isSurveillance ? 'surveillance' : 'recertification'}.`,
+                inClosing ? 'report.closingMeeting.summary' : 'report.conclusion / ReportStats.recommendationText',
                 'Use surveillance/recertification-appropriate recommendation wording, not initial-certification granting language.'
             ));
             return;
@@ -341,6 +346,60 @@
                 'Confirm the recommendation wording matches the audit type before issuing.'
             ));
         }
+    }
+
+    // W31: a Major/Minor NC without a nonconformity statement prints
+    // "Nonconformity statement not recorded." in the client report (ISO/IEC
+    // 17021-1 9.4.8.2 asks for a clear statement of each nonconformity).
+    // W32: the corrective-action table takes each NC's reference and due date
+    // from the NC register; an NC with no register record, or a record with no
+    // due date, prints a reference or deadline the register does not hold.
+    function checkW31W32NcRecords(input, results) {
+        const { report, auditPlan, stats } = input;
+        safeArr(report && report.checklistProgress).forEach((i) => {
+            if (!i || i.status !== 'nc' || !['major', 'minor'].includes(lower(i.ncrType))) return;
+            if (trim(i.ncrDescription)) return;
+            const clause = trim(i.criterionRef || i.clause) || 'not stated';
+            results.warnings.push(item(
+                'W31',
+                'warning',
+                'findings',
+                `The ${lower(i.ncrType)} nonconformity at clause ${clause} has no nonconformity statement; the report prints "Nonconformity statement not recorded."`,
+                'checklistProgress[].ncrDescription',
+                'Write the statement in the checklist item\'s "Describe the non-conformity" field: the requirement, what was not fulfilled, and the objective evidence.',
+                { list: 'checklistProgress', checklistId: i.checklistId, itemIdx: i.itemIdx }
+            ));
+        });
+
+        const RS = global.ReportStats;
+        if (!stats || !RS || typeof RS.correctiveActions !== 'function') return;
+        const cas = RS.correctiveActions(stats, {
+            auditDate: (report && report.date) || '',
+            settings: global.state && global.state.cbSettings,
+            standard: (report && report.standard) || (auditPlan && auditPlan.standard) || '',
+            stage: (report && report.auditType) || (auditPlan && (auditPlan.auditType || auditPlan.type)) || ''
+        });
+        cas.forEach((ca) => {
+            if (ca.capaRef == null) {
+                results.warnings.push(item(
+                    'W32',
+                    'warning',
+                    'findings',
+                    `Nonconformity ${ca.ref} (clause ${ca.clause || 'not stated'}) has no NC register record; the client would respond against a reference the register does not hold.`,
+                    'state.ncrs vs ReportStats.correctiveActions',
+                    'Save the checklist so the nonconformity is entered in the NC register, then re-check.'
+                ));
+            } else if (ca.dueSource !== 'register') {
+                results.warnings.push(item(
+                    'W32',
+                    'warning',
+                    'findings',
+                    `${ca.ref} has no corrective-action due date in the NC register; the report prints the computed date ${ca.dueDate}.`,
+                    'state.ncrs[].dueDate vs ReportStats.correctiveActions',
+                    'Set the due date on the register record so the report and the register give the client the same deadline.'
+                ));
+            }
+        });
     }
 
     function checkB6FinancialClaims(report, results) {
@@ -1948,6 +2007,7 @@
         runCheck('checkB3MissingEvidence', () => checkB3MissingEvidence(ncrs, results), results);
         runCheck('checkB4MissingCriterion', () => checkB4MissingCriterion(ncrs, results), results);
         runCheck('checkB5RecommendationMismatch', () => checkB5RecommendationMismatch({ report, auditPlan, stats }, results), results);
+        runCheck('checkW31W32NcRecords', () => checkW31W32NcRecords({ report, auditPlan, stats }, results), results);
         runCheck('checkB6FinancialClaims', () => checkB6FinancialClaims(report, results), results);
         runCheck('checkB6BannedPhrases', () => checkB6BannedPhrases(report, results), results);
         runCheck('checkB7RecurringWithoutHistory', () => checkB7RecurringWithoutHistory(report, client, results), results);

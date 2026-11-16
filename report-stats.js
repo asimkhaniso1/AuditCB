@@ -1408,11 +1408,20 @@
             const sources = ['checklist'];
             let capaRef = null;
 
-            const regPool = registerByClause[clause] || [];
-            const regMatch = regPool.find((r) => !(r.id != null && claimedRegisterIds[String(r.id)]));
+            // The register record this finding is: first the one linked to
+            // this checklist item, else one on the same clause — a Major/Minor
+            // record only, since the pool also holds observations and OFIs.
+            const unclaimed = (r) => !(r.id != null && claimedRegisterIds[String(r.id)]);
+            const isNcRecord = (r) => /^(major|minor)/i.test(trim(r.severity || r.type));
+            const regMatch = linkedRegister.find((r) => unclaimed(r) && r.sourceChecklistId != null
+                    && item.checklistId != null && String(r.sourceChecklistId) === String(item.checklistId)
+                    && String(r.sourceItemIdx) === String(item.itemIdx))
+                || (registerByClause[clause] || []).find((r) => unclaimed(r) && isNcRecord(r));
+            let registerDueDate = null;
             if (regMatch) {
                 sources.push('register');
                 if (regMatch.id != null) { claimedRegisterIds[String(regMatch.id)] = true; capaRef = regMatch.id; }
+                registerDueDate = trim(regMatch.dueDate) || null;
             }
 
             const manualMatchIdx = manualNcrs.findIndex((n) => n && trim(n.clause) === clause && !n._statsClaimed);
@@ -1436,6 +1445,7 @@
                 comment: cleanText(item.comment || '', 200),
                 evidenceCount: evidenceCount(item),
                 caDueDate: item.caDueDate || null,
+                registerDueDate,
                 sources,
                 capaRef
             };
@@ -1782,11 +1792,54 @@
         return due.getFullYear() + '-' + pad(due.getMonth() + 1) + '-' + pad(due.getDate());
     }
 
+    // The NC register reference, as the register itself shows it (NCR-021).
+    function registerRefLabel(id) {
+        const s = trim(id);
+        return /^\d+$/.test(s) ? 'NCR-' + s.padStart(3, '0') : s;
+    }
+
+    // ─── Corrective-action requirements, one source for preview and PDF ─────
+    // Each Major/Minor finding of the report, under the reference and due date
+    // the client must answer against. Those are the NC register's: PC
+    // Connection's v1.1 report printed "NCR-177132-1, due 2026-05-18" while
+    // the register held NCR-021 and NCR-053 (due 2 June), so the client's
+    // responses could not be matched to the records the CB tracks. A finding
+    // with no register record keeps its report id; its due date is counted
+    // from the AUDIT date with the CB's timeframes, never from the day the
+    // PDF happens to be exported.
+    //
+    // @param {object} rs   ReportStats.build() result
+    // @param {{auditDate?:string, settings?:object, standard?:string, stage?:string}} opts
+    function correctiveActions(rs, opts) {
+        const o = opts || {};
+        return safeArr(rs && rs.uniqueFindings)
+            .filter((f) => !/^(observation|ofi)$/i.test(trim(f.severity)))
+            .map((f) => {
+                const sev = /major/i.test(trim(f.severity)) ? 'Major' : 'Minor';
+                const dueDate = f.registerDueDate || f.caDueDate
+                    || capaDueDate(sev, o.auditDate, { settings: o.settings, standard: o.standard, stage: o.stage });
+                return {
+                    ref: f.capaRef != null ? registerRefLabel(f.capaRef) : f.id,
+                    findingId: f.id,
+                    capaRef: f.capaRef != null ? f.capaRef : null,
+                    clause: f.clause || '',
+                    criterionRef: f.criterionRef || null,
+                    criterionSource: f.criterionSource || null,
+                    type: sev,
+                    desc: f.comment || f.statement || '',
+                    dueDate,
+                    dueSource: f.registerDueDate ? 'register' : (f.caDueDate ? 'report' : 'computed')
+                };
+            });
+    }
+
     global.ReportStats = {
         build,
         version: 1,
         capaTimeframes,
         capaDueDate,
+        correctiveActions,
+        registerRefLabel,
         CAPA_PROCEDURE_SENTENCE,
         normalizeDeptName,
         UNASSIGNED_LABEL,

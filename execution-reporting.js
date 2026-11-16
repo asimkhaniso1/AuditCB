@@ -741,6 +741,27 @@
     };
     window._resolveRecommendation = resolveRecommendation;
 
+    // Inputs for ReportStats.correctiveActions: due dates count from the
+    // audit date with the CB's configured timeframes.
+    const correctiveActionOpts = (d) => ({
+        auditDate: (d && d.report && d.report.date) || '',
+        settings: window.state && window.state.cbSettings,
+        standard: (d && d.report && d.report.standard) || (d && d.auditPlan && d.auditPlan.standard) || '',
+        stage: (d && d.report && d.report.auditType) || (d && d.auditPlan && (d.auditPlan.auditType || d.auditPlan.type)) || ''
+    });
+    // Legacy rows (no ReportStats): count from the audit date, never from
+    // the day the report is exported, so re-exporting cannot move a deadline.
+    const correctiveDueFallback = (d, typ) => {
+        const opts = correctiveActionOpts(d);
+        if (window.ReportStats && typeof window.ReportStats.capaDueDate === 'function') {
+            return window.ReportStats.capaDueDate(typ, opts.auditDate, { settings: opts.settings, standard: opts.standard, stage: opts.stage });
+        }
+        const base = opts.auditDate ? new Date(opts.auditDate) : new Date();
+        const dt = isNaN(base.getTime()) ? new Date() : base;
+        dt.setDate(dt.getDate() + (/major/i.test(String(typ || '')) ? 30 : 90));
+        return dt.toISOString().split('T')[0];
+    };
+
     // Detect whether a FINAL report's content has drifted since it was issued, so the
     // preview + PDF can surface a "MODIFIED SINCE ISSUE" banner. Uses the cheap djb2
     // fingerprint exposed by ai-service.js (window._reportContentHash).
@@ -2276,22 +2297,12 @@
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#fdf2f8;"><th style="padding:10px 14px;text-align:left;width:10%;">NC Ref</th><th style="padding:10px 14px;text-align:left;width:10%;">Criterion</th><th style="padding:10px 14px;text-align:left;width:10%;">Type</th><th style="padding:10px 14px;text-align:left;width:35%;">Corrective Action Required</th><th style="padding:10px 14px;text-align:left;width:15%;">Due Date</th><th style="padding:10px 14px;text-align:left;width:20%;">Verification Method</th></tr></thead>
                             <tbody>${(() => {
-                    const dueFromType = (typ) => { const t = (typ || '').toLowerCase(); const dt = new Date(); dt.setDate(dt.getDate() + (t === 'major' ? 30 : 90)); return dt.toISOString().split('T')[0]; };
+                    const dueFromType = (typ) => correctiveDueFallback(d, typ);
                     let allNCs;
-                    if (d.stats.rs && Array.isArray(d.stats.rs.uniqueFindings)) {
-                        // Shared numbering (F-01, F-02, ...) so this table agrees with the Findings
-                        // section and risk sections — no independent, conflicting ref sequence.
-                        allNCs = d.stats.rs.uniqueFindings
-                            .filter(f => (f.severity || '').toLowerCase() !== 'observation' && (f.severity || '').toLowerCase() !== 'ofi')
-                            .map(f => ({
-                                ref: f.id,
-                                clause: f.clause || '',
-                                criterionRef: f.criterionRef || null,
-                                criterionSource: f.criterionSource || null,
-                                type: f.severity || 'Minor',
-                                desc: f.comment || f.statement || '',
-                                dueDate: f.caDueDate || dueFromType(f.severity)
-                            }));
+                    if (d.stats.rs && Array.isArray(d.stats.rs.uniqueFindings) && window.ReportStats && typeof window.ReportStats.correctiveActions === 'function') {
+                        // The register's reference and due date (NCR-021), one
+                        // source with the PDF: ReportStats.correctiveActions.
+                        allNCs = window.ReportStats.correctiveActions(d.stats.rs, correctiveActionOpts(d));
                     } else {
                         // Legacy fallback: union checklist NC items + report.ncrs with independent numbering.
                         const ncItems = (d.report.checklistProgress || []).filter(p => p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi');
@@ -3737,25 +3748,28 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     }
                 }
                 g.count++;
-                // Worst-status ranking: major NC > minor NC > observation > conforming
-                const rank = { major: 3, minor: 2, observation: 1, conform: 0 };
-                let itemRank = 0;
+                // Worst-status ranking: major NC > minor NC > observation > OFI > conforming.
+                // An OFI fell through to "unclassified" and printed as Minor NC:
+                // PC Connection's Managed Services, with three OFIs and three
+                // observations and no NC, read "Minor NC".
+                const rank = { major: 4, minor: 3, observation: 2, ofi: 1, conform: 0 };
+                let worstKey = 'conform';
                 if (item.status === 'nc') {
                     const t = (item.ncrType || '').toLowerCase();
-                    if (t === 'major') itemRank = rank.major;
-                    else if (t === 'minor') itemRank = rank.minor;
-                    else if (t === 'observation') itemRank = rank.observation;
-                    else itemRank = rank.minor; // unclassified NC treated as minor for worst-case display
+                    if (t === 'major') worstKey = 'major';
+                    else if (t === 'minor') worstKey = 'minor';
+                    else if (/^obs/.test(t)) worstKey = 'observation';
+                    else if (/^(ofi|opportunit)/.test(t)) worstKey = 'ofi';
+                    else worstKey = 'minor'; // unclassified NC treated as minor for worst-case display
                 }
-                if (itemRank > (rank[g.worst] || 0)) {
-                    g.worst = itemRank === rank.major ? 'major' : itemRank === rank.minor ? 'minor' : itemRank === rank.observation ? 'observation' : 'conform';
-                }
+                if (rank[worstKey] > (rank[g.worst] || 0)) g.worst = worstKey;
             });
-            const worstLabel = { major: 'Major NC', minor: 'Minor NC', observation: 'Observation', conform: 'Conforming' };
+            const worstLabel = { major: 'Major NC', minor: 'Minor NC', observation: 'Observation', ofi: 'OFI', conform: 'Conforming' };
             const worstStyle = {
                 major: 'background:#fee2e2;color:#991b1b;',
                 minor: 'background:#fef3c7;color:#92400e;',
                 observation: 'background:#ede9fe;color:#5b21b6;',
+                ofi: 'background:#e0f2fe;color:#075985;',
                 conform: 'background:#dcfce7;color:#166534;'
             };
             return order.map(function (dept, idx) {
@@ -3792,7 +3806,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const dept = (window.ReportStats && window.ReportStats.normalizeDeptName)
                     ? window.ReportStats.normalizeDeptName(item.department)
                     : ((item.department && String(item.department).trim()) || 'Unassigned / Cross-functional');
-                if (!groups[dept]) { groups[dept] = { personnel: new Set(), clauses: new Set(), count: 0, nc: 0, major: 0 }; order.push(dept); }
+                if (!groups[dept]) { groups[dept] = { personnel: new Set(), clauses: new Set(), count: 0, nc: 0, major: 0, advisory: 0 }; order.push(dept); }
                 const g = groups[dept];
                 if (item.personnel) String(item.personnel).split(/[,;]/).map(function (p) { return p.trim(); }).filter(Boolean).forEach(function (p) { g.personnel.add(p); });
                 const clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || item.clause;
@@ -3800,7 +3814,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 g.count++;
                 if (item.status === 'nc') {
                     const t = (item.ncrType || '').toLowerCase();
-                    if (t === 'major' || t === 'minor' || !t) g.nc++;
+                    // Observations and OFIs are findings too: an area with
+                    // six of them read "No findings raised".
+                    if (/^(obs|ofi|opportunit)/.test(t)) g.advisory++;
+                    else g.nc++;
                     if (t === 'major') g.major++;
                 }
             });
@@ -3810,9 +3827,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     const g = groups[dept];
                     const tone = g.major ? 'bad' : g.nc ? 'warn' : 'good';
                     const dot = tone === 'bad' ? '#b91c1c' : tone === 'warn' ? '#b45309' : '#15803d';
-                    const outcome = g.major ? (g.major + ' major finding' + (g.major > 1 ? 's' : ''))
-                        : g.nc ? (g.nc + ' finding' + (g.nc > 1 ? 's' : '') + ' raised')
-                            : 'No findings raised';
+                    const ncPart = g.major ? (g.major + ' major nonconformit' + (g.major > 1 ? 'ies' : 'y')
+                            + (g.nc > g.major ? ', ' + (g.nc - g.major) + ' minor' : ''))
+                        : g.nc ? (g.nc + ' nonconformit' + (g.nc > 1 ? 'ies' : 'y')) : '';
+                    const advPart = g.advisory ? (g.advisory + ' observation' + (g.advisory > 1 ? 's' : '') + ' / OFI' + (g.advisory > 1 ? 's' : '')) : '';
+                    const outcome = (ncPart || advPart) ? [ncPart, advPart].filter(Boolean).join(', ') + ' raised' : 'No findings raised';
                     const people = g.personnel.size ? Array.from(g.personnel).join(', ') : 'Personnel not recorded';
                     return '<div class="b4-timeline-item ' + tone + '" style="position:relative;padding:0 0 20px 18px;border-left:1px solid #e7ecf1;break-inside:avoid;">'
                         + '<span style="position:absolute;left:-5px;top:3px;width:9px;height:9px;border-radius:50%;background:' + dot + ';box-shadow:0 0 0 3px #fff;"></span>'
@@ -4502,7 +4521,18 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     // end date) and stored as item.caDueDate / ncr.caDueDate. Reuse that stored value
                     // here so regenerating the PDF does not shift due dates. Fall back to computing
                     // from today only for legacy records that predate persistence.
-                    var fallbackDue = function (typ) { var due = new Date(); due.setDate(due.getDate() + ((typ || '').toLowerCase() === 'major' ? 30 : 90)); return due.toISOString().split('T')[0]; };
+                    // The register's reference and due date, the same rows as
+                    // the preview (ReportStats.correctiveActions). The legacy
+                    // path below runs only when the stats module is missing.
+                    var cas = (d.stats && d.stats.rs && window.ReportStats && typeof window.ReportStats.correctiveActions === 'function')
+                        ? window.ReportStats.correctiveActions(d.stats.rs, correctiveActionOpts(d)) : null;
+                    if (cas) {
+                        return cas.map(function (nc) {
+                            var major = nc.type === 'Major';
+                            return '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">' + htmlEsc(nc.ref) + '</td><td>' + formalCriterionCell(nc, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (major ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + htmlEsc(nc.type) + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + htmlEsc(nc.dueDate) + '</td><td>Document review & follow-up</td></tr>';
+                        }).join('');
+                    }
+                    var fallbackDue = function (typ) { return correctiveDueFallback(d, typ); };
                     var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typRaw = (item.ncrType || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : typRaw === 'minor' ? 'Minor' : 'Minor †'; var dueStr = item.caDueDate || fallbackDue(item.ncrType); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + formalCriterionCell({ clause: item.clauseRef || item.clause || '', criterionRef: item.criterionRef || null, criterionSource: item.criterionSource || null }, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + htmlEsc(typ) + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typRaw = (ncr.type || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : (ncr.type || 'Minor'); var dueStr = ncr.caDueDate || fallbackDue(ncr.type); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + formalCriterionCell(ncr, standard) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + htmlEsc(typ) + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
                 + '</tbody></table>'
                 + '<div style="margin-top:12px;padding:10px;background:#f1f5f9;border-radius:8px;font-size:0.82rem;color:#475569;">' + capaTimeframesInnerHtml(d) + '</div>'
