@@ -204,6 +204,28 @@
         return base + suffix;
     }
 
+    // ─── What a report's recommendation prints as ────────────────────────────
+    // `primary` is the auditor's DECISION (the radio: Recommended / Pending /
+    // Not Recommended) and drives the badge colour. `wording` is what is
+    // printed: a "Recommended" decision is printed in the audit type's own
+    // words (recommendationText above — "Continued certification is
+    // recommended…" for a surveillance), never as a bare "Recommended", which
+    // on a surveillance report reads as a certification grant. `auto` is the
+    // derived sentence; `showAutoCaption` flags a decision that departs from it.
+    function resolveRecommendation(report, stats) {
+        const manual = trim(report && report.recommendation);
+        const auto = trim((stats && stats.rs && stats.rs.recommendation) || (stats && stats.recommendation));
+        const primary = manual || auto || 'Pending';
+        const typed = manual === 'Recommended' && /\brecommended\b/i.test(auto) ? auto : '';
+        return {
+            primary,
+            wording: typed || primary,
+            isManual: !!manual,
+            auto,
+            showAutoCaption: !!manual && !!auto && manual !== auto && !typed
+        };
+    }
+
     // ─── Single-source criterion formatter ─────────────────────────────────────
     // Internal tracking references (FOCUS.n / SURV.n / ORG / DOC — Stage 1
     // carryover pseudo-clauses, never real standard clauses) need one shared
@@ -1769,6 +1791,7 @@
         normalizeDeptName,
         UNASSIGNED_LABEL,
         recommendationText,
+        resolveRecommendation,
         buildProgramme,
         cycleState,
         certificationHistory,
