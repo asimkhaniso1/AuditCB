@@ -303,7 +303,25 @@
 
         if (!prevReport) return 'Records of previous findings were not available for review.';
 
-        const prevNCs = (prevReport.checklistProgress || []).filter(function (p) {
+        // The NCR/CAPA register (window.state.ncrs) is the live lifecycle store
+        // for the previous audit's nonconformities — closure is recorded there,
+        // not on the old report. Join on auditId === the previous report's plan
+        // (or report) id; withdrawn records (merged duplicates) don't count.
+        const prevKeys = [prevReport.planId, prevReport.id].filter(function (k) { return k != null; }).map(String);
+        const registerNCs = ((window.state && window.state.ncrs) || []).filter(function (n) {
+            if (!n || n.auditId == null || prevKeys.indexOf(String(n.auditId)) === -1) return false;
+            if (String(n.status || '') === 'Withdrawn') return false;
+            return /^(major|minor)$/i.test(String(n.severity || n.type || '').trim());
+        });
+        if (registerNCs.length) {
+            const registerOpen = registerNCs.some(function (n) {
+                const car = String(n.carStatus || '');
+                return !(String(n.status || '') === 'Closed' || car === 'Closed' || car === 'Effective');
+            });
+            return registerOpen ? 'Previous nonconformity(ies) remain open.' : 'Previous nonconformities verified and closed.';
+        }
+
+        const prevNCs =(prevReport.checklistProgress || []).filter(function (p) {
             return p && p.status === 'nc' && ['major', 'minor'].includes(String(p.ncrType || '').toLowerCase());
         });
         const prevNCRs = (prevReport.ncrs || []).filter(function (n) {
