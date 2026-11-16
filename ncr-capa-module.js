@@ -430,11 +430,14 @@ window.reconcileDuplicateNCRs = function (opts) {
  * supersede convention: set status/carStatus to 'Withdrawn' and optionally
  * point _supersededBy at the record being kept).
  *
- * Only Major/Minor records are grouped. A record with no auditId groups only
- * with records whose wording is identical, since without an audit link two
- * engagements' findings can't otherwise be told apart.
+ * Major/Minor NCs, observations and OFIs are grouped, each type on its own:
+ * older checklist-sync code minted a copy of every finding on each save, and
+ * for PC Connection 44 of the 48 open copies were observations and OFIs that
+ * this finder used to skip. A record with no auditId groups only with records
+ * whose wording is identical, since without an audit link two engagements'
+ * findings can't otherwise be told apart.
  *
- * Grouped by clientId + auditId + clause + severity — a narrower key than
+ * Grouped by clientId + auditId + clause + finding type — a narrower key than
  * reconcileDuplicateNCRs' client+clause+description (which is scoped to
  * assume same-audit dupes are already merged at mint time). This finder
  * intentionally keys ON auditId too and ignores description wording, so it
@@ -444,24 +447,35 @@ window.reconcileDuplicateNCRs = function (opts) {
  *
  * @returns {Array<{clientId:*, auditId:*, clause:string, severity:string, records:Array}>}
  */
+// The finding type a duplicate is grouped by: 'major', 'minor', 'observation'
+// or 'ofi'; '' for anything else, which is never grouped.
+function duplicateTypeKey(n) {
+    const sev = normalizedNCRSeverity(n);
+    if (sev === 'major' || sev === 'minor') return sev;
+    if (/^obs/.test(sev)) return 'observation';
+    if (/^(ofi|opportunit)/.test(sev)) return 'ofi';
+    return '';
+}
+const DUPLICATE_TYPE_LABEL = { major: 'Major NC', minor: 'Minor NC', observation: 'Observation', ofi: 'OFI' };
+
 function findDuplicateNCRs() {
     const all = (window.state && window.state.ncrs) || [];
     const norm = (v) => String(v == null ? '' : v).toLowerCase().replace(/\s+/g, ' ').trim();
 
     const groups = new Map();
     all.forEach((n) => {
-        if (!n || isWithdrawnNCR(n) || n._supersededBy || !isMajorMinorNCR(n)) return;
+        if (!n || isWithdrawnNCR(n) || n._supersededBy || !duplicateTypeKey(n)) return;
         if (n.clientId == null || n.clientId === '' || !n.clause) return; // nothing reliable to group on
         // Without an audit link, records from different engagements can't be
         // told apart — only identical wording is then evidence of a duplicate.
         const hasAudit = n.auditId != null && n.auditId !== '';
         if (!hasAudit && !norm(n.description)) return;
         const auditKey = hasAudit ? String(n.auditId) : '~' + norm(n.description).slice(0, 180);
-        const key = JSON.stringify([String(n.clientId), auditKey, norm(n.clause), normalizedNCRSeverity(n)]);
+        const key = JSON.stringify([String(n.clientId), auditKey, norm(n.clause), duplicateTypeKey(n)]);
         if (!groups.has(key)) {
             groups.set(key, {
                 clientId: String(n.clientId), auditId: hasAudit ? String(n.auditId) : null,
-                clause: norm(n.clause), severity: normalizedNCRSeverity(n), records: []
+                clause: norm(n.clause), severity: duplicateTypeKey(n), records: []
             });
         }
         groups.get(key).records.push(n);
@@ -2093,10 +2107,50 @@ function ncrDuplicateBannerHTML() {
             <div style="font-size: 0.9rem; color: #92400e;">
                 <i class="fa-solid fa-clone" style="margin-right: 0.4rem;"></i>
                 <strong>${extra} possible duplicate record${extra === 1 ? '' : 's'}</strong> in ${groups.length} group${groups.length === 1 ? '' : 's'}:
-                same client, audit, clause and severity recorded more than once.
+                same client, audit, clause and finding type recorded more than once.
             </div>
             <button class="btn btn-sm btn-secondary" data-action="openNCRDuplicateReview" aria-label="Review duplicates">Review duplicates</button>
         </div>`;
+}
+
+// What the audit's own report now records at a duplicate group's clause: the
+// wording of each finding there, and their types. Used to preselect the copy
+// that matches the report, and to spot copies left over from before a finding
+// was reclassified.
+function reportFindingsForGroup(g) {
+    const normText = (v) => String(v == null ? '' : v).toLowerCase().replace(/\s+/g, ' ').trim();
+    const texts = new Set();
+    const types = new Set();
+    if (g.auditId == null) return { texts, types };
+    (window.state.auditReports || []).forEach((r) => {
+        if (!r || String(r.planId) !== String(g.auditId)) return;
+        (r.checklistProgress || []).forEach((item) => {
+            if (!item || item.status !== 'nc' || normText(item.clause || item.criterionRef) !== g.clause) return;
+            texts.add(normText(item.ncrDescription || item.comment));
+            const t = duplicateTypeKey({ severity: item.ncrType });
+            if (t) types.add(t);
+        });
+        (r.findings || []).forEach((f) => {
+            if (!f || normText(f.clause) !== g.clause) return;
+            texts.add(normText(f.description));
+            const t = duplicateTypeKey({ severity: f.type || f.severity });
+            if (t) types.add(t);
+        });
+    });
+    texts.delete('');
+    return { texts, types, normText };
+}
+
+// The record a group's copies were superseded by when the report no longer
+// records this clause as the group's type (an OFI later raised to a minor NC):
+// an active register record from the same audit and clause, of a type the
+// report now records. Null when the report still records the group's type.
+function reclassifiedSurvivor(g, report) {
+    if (!report.types.size || report.types.has(g.severity)) return null;
+    const norm = (v) => String(v == null ? '' : v).toLowerCase().replace(/\s+/g, ' ').trim();
+    return (window.state.ncrs || []).find(n => n && !isWithdrawnNCR(n) && !n._supersededBy
+        && String(n.clientId) === String(g.clientId) && String(n.auditId) === String(g.auditId)
+        && norm(n.clause) === g.clause && report.types.has(duplicateTypeKey(n))) || null;
 }
 
 window.openNCRDuplicateReview = function () {
@@ -2107,29 +2161,50 @@ window.openNCRDuplicateReview = function () {
     const work = (n) => [n.correction && 'correction', n.rootCause && 'root cause', n.correctiveAction && 'corrective action', n.verifiedDate && 'verified']
         .filter(Boolean).join(', ');
 
-    const groupHTML = groups.map((g, gi) => {
+    const context = groups.map((g) => {
+        const report = reportFindingsForGroup(g);
+        const inReport = (n) => !!report.normText && report.texts.has(report.normText(n.description));
+        // Keep, in order: the copy with CAPA work; the copy worded as the
+        // audit report now words it; the newest. The oldest copy is usually the
+        // auditor's raw note from before the wording was finalised.
         const sorted = g.records.slice().sort((a, b) => ncrWorkWeight(b) - ncrWorkWeight(a)
-            || String(a.raisedDate || '').localeCompare(String(b.raisedDate || ''))
-            || (Number(a.id) || 0) - (Number(b.id) || 0));
+            || (inReport(b) ? 1 : 0) - (inReport(a) ? 1 : 0)
+            || String(b.raisedDate || '').localeCompare(String(a.raisedDate || ''))
+            || (Number(b.id) || 0) - (Number(a.id) || 0));
+        const replacedBy = sorted.some(n => ncrWorkWeight(n) > 0) ? null : reclassifiedSurvivor(g, report);
+        return { g, sorted, inReport, replacedBy };
+    });
+
+    const groupHTML = context.map(({ g, sorted, inReport, replacedBy }, gi) => {
         const first = sorted[0];
         const rows = sorted.map(n => `
             <label style="display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; padding: 0.5rem; border-top: 1px solid var(--border-color); cursor: pointer;">
-                <input type="radio" name="ncr-dup-keep-${gi}" value="${esc(String(n.id))}" ${n === first ? 'checked' : ''}>
+                <input type="radio" name="ncr-dup-keep-${gi}" value="${esc(String(n.id))}" ${n === first && !replacedBy ? 'checked' : ''}>
                 <span style="font-size: 0.85rem;">
                     <strong>${esc(num(n))}</strong>
                     &middot; ${esc(resolveAuditRef(n))}
                     &middot; ${esc(n.status || 'Open')}
+                    ${n.raisedDate ? `&middot; raised ${esc(String(n.raisedDate).slice(0, 10))}` : ''}
                     ${work(n) ? `&middot; <span style="color: #166534;">has ${esc(work(n))}</span>` : ''}
+                    ${inReport(n) ? '&middot; <span style="color: #1d4ed8;">worded as in the audit report</span>' : ''}
                     <br><span style="color: var(--text-secondary);">${esc(String(n.description || '').slice(0, 260))}</span>
                 </span>
             </label>`).join('');
+        const replacedRow = replacedBy ? `
+                <label style="display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; padding: 0.5rem; border-top: 1px solid var(--border-color); cursor: pointer; font-size: 0.85rem;">
+                    <input type="radio" name="ncr-dup-keep-${gi}" value="replaced:${esc(String(replacedBy.id))}" checked>
+                    <span>None of these &mdash; the audit report now records this finding as a
+                        ${esc(DUPLICATE_TYPE_LABEL[duplicateTypeKey(replacedBy)] || 'different finding')} (${esc(num(replacedBy))}).
+                        Withdraw all ${g.records.length}.</span>
+                </label>` : '';
         return `
             <div class="ncr-dup-group" data-group="${gi}" style="border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 0.9rem;">
                 <div style="padding: 0.5rem; background: #f8fafc; font-size: 0.85rem;">
-                    <strong>${esc(first.clientName || '')}</strong> &middot; Clause ${esc(resolveClauseDisplay(first).text)} &middot; ${esc(normalizedNCRSeverity(first) === 'major' ? 'Major' : 'Minor')}
+                    <strong>${esc(first.clientName || '')}</strong> &middot; Clause ${esc(resolveClauseDisplay(first).text)} &middot; ${esc(DUPLICATE_TYPE_LABEL[g.severity] || g.severity)}
                     &middot; ${g.records.length} records
                 </div>
                 ${rows}
+                ${replacedRow}
                 <label style="display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; padding: 0.5rem; border-top: 1px solid var(--border-color); cursor: pointer; font-size: 0.85rem; color: var(--text-secondary);">
                     <input type="radio" name="ncr-dup-keep-${gi}" value="">
                     <span>These are separate findings &mdash; keep them all</span>
@@ -2137,12 +2212,12 @@ window.openNCRDuplicateReview = function () {
             </div>`;
     }).join('');
 
-    document.getElementById('modal-title').textContent = 'Review duplicate NCRs';
+    document.getElementById('modal-title').textContent = 'Review duplicate findings';
     document.getElementById('modal-body').innerHTML = `
         <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0;">
             In each group, choose the record to keep. The others are set to <strong>Withdrawn</strong> with a note
             pointing at the kept record. Nothing is deleted, and withdrawn records stay available under Status &rarr; Withdrawn.
-            The record with CAPA work recorded is preselected.
+            Preselected: the record with CAPA work, else the one worded as in the audit report, else the newest.
         </p>
         ${groupHTML}`;
     const saveBtn = document.getElementById('modal-save');
@@ -2150,13 +2225,19 @@ window.openNCRDuplicateReview = function () {
     saveBtn.onclick = async () => {
         const plan = [];
         const dismissed = readDismissedDupGroups();
-        groups.forEach((g, gi) => {
+        context.forEach(({ g, replacedBy }, gi) => {
             const picked = document.querySelector(`input[name="ncr-dup-keep-${gi}"]:checked`);
             const keepId = picked ? picked.value : '';
             if (!keepId) { dismissed.add(ncrDupGroupSignature(g)); return; }
+            if (replacedBy && keepId === 'replaced:' + String(replacedBy.id)) {
+                const label = (DUPLICATE_TYPE_LABEL[duplicateTypeKey(replacedBy)] || 'a different finding').toLowerCase();
+                g.records.forEach(r => plan.push({ dupe: r, survivor: replacedBy,
+                    why: `the finding was reclassified as a ${label}; this copy predates that` }));
+                return;
+            }
             const survivor = g.records.find(r => String(r.id) === keepId);
             if (!survivor) return;
-            g.records.forEach(r => { if (r !== survivor) plan.push({ dupe: r, survivor }); });
+            g.records.forEach(r => { if (r !== survivor) plan.push({ dupe: r, survivor, why: 'the same finding was recorded more than once' }); });
         });
         writeDismissedDupGroups(dismissed);
         if (plan.length && !confirm(`Withdraw ${plan.length} duplicate record(s)? They stay in the register as Withdrawn, each pointing at the record kept.`)) return;
@@ -2164,7 +2245,7 @@ window.openNCRDuplicateReview = function () {
         // Mark every record first: each persistNCR() refetches and replaces the
         // register objects, so marking after the first persist would only
         // touch detached copies.
-        plan.forEach(({ dupe, survivor }) => supersedeNCR(dupe, survivor, 'the same finding was recorded more than once'));
+        plan.forEach(({ dupe, survivor, why }) => supersedeNCR(dupe, survivor, why));
         if (window.saveData) window.saveData();
         for (const { dupe } of plan) await persistNCR(dupe); // reports its own sync errors
         window.closeModal();

@@ -280,8 +280,10 @@
         const priorIds = new Set(priorPlans.map(function (p) { return str(p.id); }));
 
         const out = [];
-        const seen = { source: new Set(), text: new Set() };
+        const seen = { source: new Set(), text: new Set(), unlinked: new Set() };
         const key = function (clause, text) { return norm(clause) + '|' + norm(text).slice(0, 60); };
+        // Clause as its number ("7.5 (Integrated)" and "7.5" are one clause).
+        const sameFindingKey = function (auditId, clause, type) { return str(auditId) + '|' + norm(clauseToken(clause)) + '|' + type; };
         const push = function (f) {
             const std = standardsOfFinding(f, scopeIds);
             if (scopeIds.length && !std.length) return;
@@ -303,6 +305,13 @@
             const noAudit = n.auditId == null || str(n.auditId) === '';
             if (!inPrior && !noAudit) return;
             if (n.sourceChecklistId != null) seen.source.add(str(n.sourceChecklistId) + ':' + str(n.sourceItemIdx));
+            // Older records carry no link to their checklist item, and their
+            // wording was often polished afterwards, so neither key above
+            // recognises the report's own copy of the finding. One from the
+            // same audit, clause and type is that copy (PC Connection's
+            // 7.5 minor NC was listed for follow-up twice: NCR-021 and the
+            // February report's checklist item).
+            else if (str(n.auditId)) seen.unlinked.add(sameFindingKey(n.auditId, n.clause, fw.normalizeType(n)));
             seen.text.add(key(n.clause, n.description));
             push(Object.assign({}, n, { __source: 'register' }));
         });
@@ -315,6 +324,7 @@
                 const desc = item.ncrDescription || item.comment || item.requirement || '';
                 if (item.checklistId != null && seen.source.has(str(item.checklistId) + ':' + str(item.itemIdx))) return;
                 if (seen.text.has(key(clause, desc))) return;
+                if (seen.unlinked.has(sameFindingKey(r.planId, clause, fw.normalizeType(item.ncrType)))) return;
                 seen.text.add(key(clause, desc));
                 push({ id: r.id + ':' + (item.checklistId || '') + ':' + (item.itemIdx != null ? item.itemIdx : idx), clause: clause,
                     ncrType: item.ncrType, type: item.ncrType, description: desc, auditId: r.planId, raisedDate: r.date, status: item.ncrStatus || 'Open', __source: 'report-checklist' });
