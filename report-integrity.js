@@ -325,8 +325,13 @@
             return;
         }
 
-        // W8: manual radio value is just 'Recommended' but doesn't match derived type-specific wording.
-        if (manualRec && derivedRecText && lower(manualRec) === 'recommended' && lower(manualRec) !== lower(derivedRecText)) {
+        // W8: manual radio value is just 'Recommended' and no type-specific
+        // wording can stand in for it. A "Recommended" decision is printed in
+        // the audit type's own words (execution-reporting.js
+        // resolveRecommendation) whenever recommendationText supplies a
+        // recommending sentence, so it is only a mismatch when it does not.
+        if (manualRec && derivedRecText && lower(manualRec) === 'recommended'
+            && !/\brecommended\b/i.test(derivedRecText) && lower(manualRec) !== lower(derivedRecText)) {
             results.warnings.push(item(
                 'W8',
                 'warning',

@@ -720,15 +720,24 @@
     // report.recommendation (manual radio) is authoritative whenever the auditor has
     // set it. stats.recommendation (auto-derived from NC counts) is shown only as a
     // small "system-derived" caption so the two never contradict on the printed page.
+    //
+    // `primary` is the DECISION (the radio's code: Recommended / Pending / Not
+    // Recommended) and drives the badge colour. `wording` is what is printed:
+    // a "Recommended" decision is printed in the audit type's own words
+    // (ReportStats.recommendationText: "Continued certification is
+    // recommended…" for a surveillance, "Recertification is recommended…" for
+    // a recertification), never as a bare "Recommended", which on a
+    // surveillance report reads as a certification grant.
+    // The rule lives in ReportStats.resolveRecommendation so it is tested
+    // against the real module; this fallback only covers a failed load.
     const resolveRecommendation = (report, stats) => {
+        if (window.ReportStats && typeof window.ReportStats.resolveRecommendation === 'function') {
+            return window.ReportStats.resolveRecommendation(report, stats);
+        }
         const manual = report && report.recommendation;
-        const auto = stats && stats.recommendation;
-        return {
-            primary: manual || auto || 'Pending',
-            isManual: !!manual,
-            auto: auto || '',
-            showAutoCaption: !!manual && !!auto && manual !== auto
-        };
+        const auto = (stats && stats.recommendation) || '';
+        const primary = manual || auto || 'Pending';
+        return { primary, wording: primary, isManual: !!manual, auto, showAutoCaption: !!manual && !!auto && manual !== auto };
     };
     window._resolveRecommendation = resolveRecommendation;
 
@@ -2349,7 +2358,7 @@
                     <div class="rp-sec-body">
                         <div style="margin-bottom:10px;">${(function () {
                             const rec = resolveRecommendation(d.report, d.stats);
-                            return '<strong style="color:#334155;">Recommendation:</strong> <span style="margin-left:6px;padding:4px 14px;border-radius:20px;font-weight:700;font-size:0.82rem;' + (rec.primary === 'Recommended' ? 'background:#dcfce7;color:#166534;' : rec.primary === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + rec.primary + '</span>'
+                            return '<strong style="color:#334155;">Recommendation:</strong> <span style="margin-left:6px;padding:4px 14px;border-radius:20px;font-weight:700;font-size:0.82rem;' + (rec.primary === 'Recommended' ? 'background:#dcfce7;color:#166534;' : rec.primary === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + rec.wording + '</span>'
                                 + (rec.showAutoCaption ? ' <span style="margin-left:8px;font-size:0.72rem;color:#94a3b8;font-style:italic;">(system-derived: ' + rec.auto + ')</span>' : '');
                         })()}</div>
                         ${(function () {
@@ -4518,7 +4527,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     // rec.showAutoCaption (manual vs auto-derived recommendation mismatch) is
                     // surfaced to CB staff in the preview/edit modal only — "system-derived" is
                     // internal terminology and must never reach the client-facing PDF.
-                    return '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (rec.primary === 'Recommended' ? 'background:#ecfdf5;color:#15803d;' : rec.primary === 'Not Recommended' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + rec.primary + '</span></div>';
+                    return '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (rec.primary === 'Recommended' ? 'background:#ecfdf5;color:#15803d;' : rec.primary === 'Not Recommended' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + htmlEsc(rec.wording) + '</span></div>';
                 })()
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + formatRichText(editedConclusion) + '</div>'
                 + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1d4ed8;"><strong style="color:#1d4ed8;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + htmlEsc(d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return htmlEsc(att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'); return htmlEsc(String(att)); })() + '</td></tr><tr><td>Summary</td><td>' + (htmlEsc(fmtRemark(editedClosingSummary)) || '—') + '</td></tr><tr><td>Unresolved Issues / Diverging Opinions</td><td>' + htmlEsc(editedUnresolved) + '</td></tr></table></div>'
@@ -4679,7 +4688,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                         const color = rec.isManual ? (rec.primary === 'Recommended' ? '#15803d' : rec.primary === 'Not Recommended' ? '#b91c1c' : '#b45309') : d.stats.recColor;
                         // "system-derived" is internal terminology (see resolveRecommendation) —
                         // never printed to the client; the spacer keeps the layout unchanged.
-                        return '<div style="display:inline-block;padding:10px 26px;border:1px solid ' + color + ';border-radius:6px;color:' + color + ';font-weight:700;font-size:0.95rem;margin-bottom:8px;">' + rec.primary + '</div>'
+                        return '<div style="display:inline-block;padding:10px 26px;border:1px solid ' + color + ';border-radius:6px;color:' + color + ';font-weight:700;font-size:0.95rem;margin-bottom:8px;max-width:520px;">' + htmlEsc(rec.wording) + '</div>'
                             + '<div style="margin-bottom:26px;"></div>';
                     })()
                     + '<table style="border-collapse:collapse;width:100%;max-width:460px;text-align:left;border-top:1px solid #e7ecf1;border-bottom:1px solid #e7ecf1;margin-bottom:32px;">'
