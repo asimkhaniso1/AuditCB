@@ -1251,7 +1251,12 @@
         const programmeAnchorCaption = (programme) => {
             const dt = programme.anchorDate ? new Date(programme.anchorDate) : null;
             const fmtDate = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('en-GB') : '';
-            if (programme.anchored === 'certificate') return 'anchored on the initial certification date of ' + fmtDate;
+            if (programme.anchored === 'certificate') {
+                // A later cycle says which cycle the stages below belong to.
+                const cs = programme.laterCycle && programme.cycleStart ? new Date(programme.cycleStart) : null;
+                const cycleFrom = cs && !isNaN(cs.getTime()) ? '; current certification cycle from ' + cs.toLocaleDateString('en-GB') : '';
+                return 'anchored on the initial certification date of ' + fmtDate + cycleFrom;
+            }
             if (programme.anchored === 'history') return 'based on recorded audit history' + (fmtDate ? ' (earliest record ' + fmtDate + ')' : '');
             return 'prior stage dates unavailable — no certificate on file';
         };
@@ -3857,7 +3862,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const programmeAnchorCaptionExport = function (programme) {
             const dt = programme.anchorDate ? new Date(programme.anchorDate) : null;
             const fmtDate = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('en-GB') : '';
-            if (programme.anchored === 'certificate') return 'anchored on the initial certification date of ' + fmtDate;
+            if (programme.anchored === 'certificate') {
+                // A later cycle says which cycle the stages below belong to.
+                const cs = programme.laterCycle && programme.cycleStart ? new Date(programme.cycleStart) : null;
+                const cycleFrom = cs && !isNaN(cs.getTime()) ? '; current certification cycle from ' + cs.toLocaleDateString('en-GB') : '';
+                return 'anchored on the initial certification date of ' + fmtDate + cycleFrom;
+            }
             if (programme.anchored === 'history') return 'based on recorded audit history' + (fmtDate ? ' (earliest record ' + fmtDate + ')' : '');
             return 'prior stage dates unavailable — no certificate on file';
         };

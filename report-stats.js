@@ -463,6 +463,39 @@
             baseDate = auditDate;
         }
 
+        // The programme describes the CURRENT three-year cycle: the one that
+        // contains this audit, counted from first certification (the same rule
+        // as cycleState). Counting every stage from Initial Date put PC
+        // Connection's February 2026 surveillance (first certified Dec 2020,
+        // recertified Dec 2023) after a recertification "by Dec 2023" and
+        // blocked the report. A recertification held shortly after the
+        // anniversary still closes the cycle it belongs to.
+        let cycleStart = baseDate;
+        if (certStart) {
+            // A certificate that lapsed before the audit evidences no later
+            // cycle: the audit is placed in the cycle the certificate covered,
+            // so an overdue recertification is still flagged, not skipped.
+            const cycleRef = certExpiry && certExpiry < auditDate ? certExpiry : auditDate;
+            cycleStart = cycleStartFrom(certStart, cycleRef, cert ? parseDateSafe(cert.currentIssue) : null);
+            const LATE_RECERT_DAYS = 180;
+            if (currentStageId === 'recert' && cycleStart > certStart
+                && auditDate.getTime() - cycleStart.getTime() < LATE_RECERT_DAYS * 24 * 60 * 60 * 1000) {
+                cycleStart = addMonths(cycleStart, -CYCLE_MONTHS);
+                if (cycleStart < certStart) cycleStart = certStart;
+            }
+        }
+        // A later cycle began with a recertification, not with Stage 1/2.
+        const laterCycle = !!certStart && cycleStart.getTime() - certStart.getTime() > 180 * 24 * 60 * 60 * 1000;
+        if (laterCycle) {
+            // Audits from earlier cycles are not this cycle's stages. The
+            // recertification that opened this cycle fills its opening row.
+            const from = cycleStart.getTime() - 90 * 24 * 60 * 60 * 1000;
+            for (let i = history.length - 1; i >= 0; i--) {
+                const d = parseDateSafe(history[i].date || history[i].createdAt);
+                if (!d || d.getTime() < from) history.splice(i, 1);
+            }
+        }
+
         // A generic "Surveillance" audit type carries no cycle-year. When a real
         // anchor exists, slot the current audit into the surveillance visit nearest
         // its own date (two years after initial certification = Surveillance 2) —
@@ -478,15 +511,15 @@
             if (hasPriorSv1History) {
                 currentStageId = 'sv2';
             } else {
-                const sv1Due = new Date(baseDate.getTime()); sv1Due.setMonth(sv1Due.getMonth() + 12);
-                const sv2Due = new Date(baseDate.getTime()); sv2Due.setMonth(sv2Due.getMonth() + 24);
+                const sv1Due = new Date(cycleStart.getTime()); sv1Due.setMonth(sv1Due.getMonth() + 12);
+                const sv2Due = new Date(cycleStart.getTime()); sv2Due.setMonth(sv2Due.getMonth() + 24);
                 if (Math.abs(auditDate - sv2Due) < Math.abs(auditDate - sv1Due)) currentStageId = 'sv2';
             }
         }
         const currentStageIdx = STAGE_DEFS.findIndex((s) => s.id === currentStageId);
 
         const fmt = (dt) => dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-        const offsetDate = (offset) => { const dt = new Date(baseDate.getTime()); dt.setMonth(dt.getMonth() + offset); return dt; };
+        const offsetDate = (offset) => { const dt = new Date(cycleStart.getTime()); dt.setMonth(dt.getMonth() + offset); return dt; };
         const monthYear = (offset) => fmt(offsetDate(offset));
         // recertDate is the precise anchor used for chronology comparisons;
         // recertTiming is its display string. Kept separate so month/year
@@ -502,14 +535,21 @@
         // the audit, counted from first certification — not from the date the
         // certificate on file happens to carry.
         const recertDate = certStart
-            ? cycleEndFrom(cycleStartFrom(certStart, baseDate), certExpiry)
+            ? cycleEndFrom(cycleStart, certExpiry)
             : (certExpiry ? cycleEndFrom(baseDate, certExpiry) : offsetDate(36));
         const recertTiming = certExpiry ? ('by ' + fmt(recertDate)) : monthYear(36);
 
-        // Match history records to stage slots by their own audit type.
+        // Match history records to stage slots by their own audit type. In a
+        // later cycle the recertification that opened it sits in the opening
+        // row (s2), and only one dated well into the cycle is its closing one.
         const historyByStage = {};
         history.forEach((r) => {
-            const sid = classifyAuditType(r.auditType || (r.auditPlan && r.auditPlan.type));
+            let sid = classifyAuditType(r.auditType || (r.auditPlan && r.auditPlan.type));
+            if (laterCycle && (sid === 's1' || sid === 's2')) return;
+            if (laterCycle && sid === 'recert') {
+                const d = parseDateSafe(r.date || r.createdAt);
+                if (d && d.getTime() < cycleStart.getTime() + 180 * 24 * 60 * 60 * 1000) sid = 's2';
+            }
             if (!historyByStage[sid]) historyByStage[sid] = r;
         });
 
@@ -563,8 +603,32 @@
                 source = anchored;
             }
 
+            // A later cycle has no Stage 1/2 of its own: its opening rows are the
+            // original certification and the recertification that began it.
+            let label = s.label;
+            let def = s.def;
+            if (laterCycle && !isCurrent && (s.id === 's1' || s.id === 's2')) {
+                if (s.id === 's1') {
+                    label = 'Initial certification';
+                    def = 'First certification of the management system (previous cycle)';
+                    rawDate = certStart;
+                    timing = fmt(certStart);
+                    status = 'Completed';
+                    source = 'certificate';
+                } else {
+                    label = 'Recertification (start of this cycle)';
+                    def = 'Recertification audit that began the current three-year cycle';
+                    if (!histRec) {
+                        rawDate = cycleStart;
+                        timing = fmt(cycleStart);
+                        status = 'Completed';
+                        source = 'certificate';
+                    }
+                }
+            }
+
             rawDates[s.id] = rawDate;
-            return { id: s.id, label: s.label, timing, status, source, def: s.def };
+            return { id: s.id, label, timing, status, source, def };
         });
 
         // Chronology rule: a stage still awaiting its visit ('Planned') whose
@@ -612,7 +676,8 @@
             issues.push('Current audit does not match exactly one programme stage — check the audit type against the certification cycle.');
         }
 
-        return { stages, anchored, issues, anchorDate: baseDate ? baseDate.toISOString() : null, nextAudit };
+        return { stages, anchored, issues, anchorDate: baseDate ? baseDate.toISOString() : null,
+            cycleStart: cycleStart ? cycleStart.toISOString() : null, laterCycle, nextAudit };
     }
 
     // ─── Certification-cycle state for dashboards ───────────────────────────
