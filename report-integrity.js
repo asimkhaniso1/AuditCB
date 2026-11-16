@@ -366,7 +366,7 @@
                 'findings',
                 `The ${lower(i.ncrType)} nonconformity at clause ${clause} has no nonconformity statement; the report prints "Nonconformity statement not recorded."`,
                 'checklistProgress[].ncrDescription',
-                'Write the statement in the checklist item\'s "Describe the non-conformity" field: the requirement, what was not fulfilled, and the objective evidence.',
+                'Write it in the checklist item\'s Finding Details → "Nonconformity statement": the requirement, what was not fulfilled, and the objective evidence. Then Save.',
                 { list: 'checklistProgress', checklistId: i.checklistId, itemIdx: i.itemIdx }
             ));
         });
