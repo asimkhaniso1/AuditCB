@@ -1269,6 +1269,12 @@ function getOFIOBSHTML() {
                 </div>
             </div>
 
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <span id="ofiobs-selected-count" style="font-size: 0.85rem; color: var(--text-secondary);">0 selected</span>
+                <button class="btn btn-primary btn-sm" id="ofiobs-bulk-btn" data-action="openBulkFindingResponse" disabled title="Tick findings first">
+                    <i class="fa-solid fa-list-check" style="margin-right: 0.4rem;"></i>Record response for selected
+                </button>
+            </div>
             <div class="table-container" id="ofi-obs-table-container">
                 ${renderOFIOBSTable(findings)}
             </div>
@@ -1285,9 +1291,8 @@ function renderOFIOBSTable(findings) {
         <table>
             <thead>
                 <tr>
+                    <th style="width: 32px;"><input type="checkbox" id="ofiobs-select-all" data-action-change="toggleOFIOBSSelectAll" title="Select all shown" aria-label="Select all shown"></th>
                     <th>Ref#</th>
-                    <th>Level</th>
-                    <th>Client</th>
                     <th>Audit</th>
                     <th>Clause</th>
                     <th>Type</th>
@@ -1299,11 +1304,10 @@ function renderOFIOBSTable(findings) {
             <tbody>
                 ${findings.map(f => `
                     <tr>
+                        <td><input type="checkbox" class="ofiobs-select" data-arg-key="${esc(ofiObsKey(f))}" data-action-change="updateOFIOBSSelection" aria-label="Select ${esc(f.refNo)}"></td>
                         <td><strong>${esc(f.refNo)}</strong></td>
-                        <td><span class="badge" style="background: #0284c7; color: white; font-size: 0.75rem;">Client</span></td>
-                        <td>${esc(f.client || 'N/A')}</td>
                         <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-secondary);">${esc(f.auditRef || '-')}</td>
-                        <td>${renderClauseCell(f)}</td>
+                        <td>${ofiObsClauseCell(f)}</td>
                         <td><span class="badge" style="background: ${f.type === 'OFI' ? '#0891b2' : '#7c3aed'}; color: white;">${f.type}</span></td>
                         <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${esc(f.description || '')}">${esc(f.description || '-')}</td>
                         <td>${findingResponseStatusHTML(f)}</td>
@@ -1338,7 +1342,133 @@ window.filterOFIOBS = function () {
     });
     const box = document.getElementById('ofi-obs-table-container');
     if (box) box.innerHTML = renderOFIOBSTable(filtered);
+    window.updateOFIOBSSelection();
 };
+
+// ---- Selection and bulk response (OBS / OFI register) ----
+function ofiObsKey(f) { return [f.reportId, f.ref.list, f.ref.index].join('|'); }
+function ofiObsByKey(key) { return (window._ofiObsFindings || []).find(f => ofiObsKey(f) === key) || null; }
+
+// The finding's own clause, plus the criterion assigned to it when that differs
+// (e.g. by the Report Integrity panel's "Set criterion"), so a wrong assignment
+// is visible instead of silently replacing the clause.
+function ofiObsClauseCell(f) {
+    const esc = window.UTILS.escapeHtml;
+    const own = String(f.clause || '').trim();
+    const crit = String(f.criterionRef || '').trim();
+    if (!own) return renderClauseCell(f);
+    const base = `<span class="badge bg-gray">${esc(own)}</span>`;
+    return crit && crit.toLowerCase() !== own.toLowerCase()
+        ? base + `<div style="font-size: 0.72rem; color: #b45309; margin-top: 2px;" title="Criterion assigned to this finding">criterion set: ${esc(crit)}</div>`
+        : base;
+}
+
+window.updateOFIOBSSelection = function () {
+    const boxes = Array.from(document.querySelectorAll('#ofi-obs-table-container .ofiobs-select'));
+    const ticked = boxes.filter(b => b.checked);
+    const count = document.getElementById('ofiobs-selected-count');
+    if (count) count.textContent = ticked.length + ' selected';
+    const btn = document.getElementById('ofiobs-bulk-btn');
+    if (btn) { btn.disabled = ticked.length === 0; btn.title = ticked.length ? '' : 'Tick findings first'; }
+    const all = document.getElementById('ofiobs-select-all');
+    if (all) { all.checked = boxes.length > 0 && ticked.length === boxes.length; all.indeterminate = ticked.length > 0 && ticked.length < boxes.length; }
+};
+window.toggleOFIOBSSelectAll = function (el) {
+    const on = !!(el && el.checked);
+    document.querySelectorAll('#ofi-obs-table-container .ofiobs-select').forEach(b => { b.checked = on; });
+    window.updateOFIOBSSelection();
+};
+
+// Save the reports whose findings changed: locally and to the cloud. Responses
+// sit on report.checklistProgress; saveData() alone is local only, so a
+// response recorded here never reached the database.
+function persistFindingReports(reportIds) {
+    if (typeof window.saveData === 'function') window.saveData();
+    const DS = window.DataService;
+    if (!DS || typeof DS.syncAuditReport !== 'function') return;
+    Array.from(new Set(reportIds.map(String))).forEach(id => {
+        const report = (window.state.auditReports || []).find(r => String(r.id) === id);
+        if (report) DS.syncAuditReport(report.id, { checklistProgress: report.checklistProgress || [] });
+    });
+}
+window.NCRModule.persistFindingReports = persistFindingReports;
+
+window.openBulkFindingResponse = function () {
+    const selected = Array.from(document.querySelectorAll('#ofi-obs-table-container .ofiobs-select:checked'))
+        .map(b => ofiObsByKey(b.getAttribute('data-arg-key'))).filter(Boolean);
+    if (!selected.length) { window.showNotification('Tick the findings to update first.', 'warning'); return; }
+    const esc = window.UTILS.escapeHtml;
+    const obs = selected.filter(f => f.type === 'OBS');
+    const ofi = selected.filter(f => f.type === 'OFI');
+    document.getElementById('modal-title').textContent = 'Record response — ' + selected.length + ' finding(s)';
+    document.getElementById('modal-body').innerHTML = `
+        <p style="font-size: 0.85rem; color: var(--text-secondary);">Applies to every ticked finding: ${selected.map(f => esc(f.refNo)).join(', ')}. Fields left blank keep each finding’s current value.</p>
+        ${obs.length ? `
+        <h4 style="font-size: 0.95rem; margin: 0.75rem 0 0.5rem;">Observations (${obs.length})</h4>
+        <div class="form-group"><label>Management evaluation</label><textarea class="form-control" id="bfr-eval" rows="2"></textarea></div>
+        <div class="form-group"><label>Risk / impact consideration</label><textarea class="form-control" id="bfr-impact" rows="2"></textarea></div>
+        <div class="form-group"><label>Disposition</label>
+            <select class="form-control" id="bfr-disposition"><option value="">— keep current —</option><option>Accepted</option><option>Monitor</option><option>Action planned</option></select></div>
+        <div class="form-group"><label>Improvement, preventive or risk-treatment action (optional)</label><textarea class="form-control" id="bfr-obs-action" rows="2"></textarea></div>` : ''}
+        ${ofi.length ? `
+        <h4 style="font-size: 0.95rem; margin: 0.75rem 0 0.5rem;">Opportunities for improvement (${ofi.length})</h4>
+        <div class="form-group"><label>Decision</label>
+            <select class="form-control" id="bfr-decision"><option value="">— keep current —</option><option value="accepted">Accepted</option><option value="rejected">Rejected</option><option value="deferred">Deferred</option></select></div>
+        <div class="form-group"><label>Rationale (optional)</label><textarea class="form-control" id="bfr-rationale" rows="2"></textarea></div>
+        <div class="form-group"><label>Voluntary improvement action (optional)</label><textarea class="form-control" id="bfr-ofi-action" rows="2"></textarea></div>
+        <div class="form-group"><label>Improvement register reference (optional)</label><input class="form-control" id="bfr-register"></div>` : ''}`;
+    const val = (id) => ((document.getElementById(id) || {}).value || '').trim();
+    document.getElementById('modal-save').style.display = 'block';
+    document.getElementById('modal-save').onclick = function () {
+        const changed = window.applyBulkFindingResponse(selected, {
+            managementEvaluation: val('bfr-eval'), impactConsideration: val('bfr-impact'),
+            disposition: val('bfr-disposition'), voluntaryAction: val('bfr-obs-action'),
+            decision: val('bfr-decision'), rationale: val('bfr-rationale'),
+            action: val('bfr-ofi-action'), improvementRegisterRef: val('bfr-register')
+        });
+        window.closeModal();
+        window.showNotification(changed ? 'Response recorded for ' + changed + ' finding(s).' : 'Nothing to record: every field was left blank.', changed ? 'success' : 'info');
+        if (typeof window.switchNCRTab === 'function') window.switchNCRTab('ofi-obs');
+    };
+    window.openModal();
+};
+
+// Applies one response to many findings. Blank fields keep the current value.
+// Returns how many findings changed. Saves locally and to the cloud.
+window.applyBulkFindingResponse = function (findings, v) {
+    const user = window.state.currentUser?.name || 'Unknown';
+    const now = new Date().toISOString();
+    const touched = [];
+    let count = 0;
+    findings.forEach(f => {
+        const { record } = findingRecordFor(f.reportId, f.ref);
+        if (!record) return;
+        let changed = false;
+        if (f.type === 'OBS') {
+            [['managementEvaluation', v.managementEvaluation], ['impactConsideration', v.impactConsideration], ['disposition', v.disposition], ['voluntaryAction', v.voluntaryAction]]
+                .forEach(([k, value]) => { if (value) { record[k] = value; changed = true; } });
+            if (changed) { record.respondedBy = user; record.respondedAt = now; }
+        } else if (f.type === 'OFI' && (v.decision || v.rationale || v.action || v.improvementRegisterRef)) {
+            const decision = v.decision || record.ofiDecision || '';
+            if (decision && window.FindingWorkflow && typeof window.FindingWorkflow.recordOfiDecision === 'function') {
+                const updated = window.FindingWorkflow.recordOfiDecision({ type: 'ofi' }, {
+                    decision, rationale: v.rationale || record.ofiRationale || '', action: v.action || record.improvementAction || '',
+                    improvementRegisterRef: v.improvementRegisterRef || record.improvementRegisterRef || '', decidedBy: user
+                });
+                ['ofiDecision', 'ofiRationale', 'improvementAction', 'improvementRegisterRef', 'ofiDecidedBy', 'ofiDecidedAt'].forEach(k => { if (updated[k] !== undefined) record[k] = updated[k]; });
+            } else {
+                if (v.rationale) record.ofiRationale = v.rationale;
+                if (v.action) record.improvementAction = v.action;
+                if (v.improvementRegisterRef) record.improvementRegisterRef = v.improvementRegisterRef;
+            }
+            changed = true;
+        }
+        if (changed) { count++; touched.push(f.reportId); }
+    });
+    if (touched.length) persistFindingReports(touched);
+    return count;
+};
+
 
 window.viewFindingDetails = function (reportId, list, index) {
     const f = (window._ofiObsFindings || []).find(x => String(x.reportId) === String(reportId) && x.ref.list === list && String(x.ref.index) === String(index));
@@ -1438,7 +1568,7 @@ window.openFindingResponse = function (reportId, list, index) {
         } else {
             Object.assign(record, { managementEvaluation: get('fr-eval'), impactConsideration: get('fr-impact'), disposition: get('fr-disposition'), voluntaryAction: get('fr-action'), respondedBy: user, respondedAt: new Date().toISOString() });
         }
-        window.saveData();
+        persistFindingReports([reportId]);
         window.closeModal();
         window.showNotification('Response recorded.', 'success');
         if (typeof window.switchNCRTab === 'function') window.switchNCRTab('ofi-obs');

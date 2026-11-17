@@ -117,31 +117,33 @@ describe('register OBS / OFI tab follows the NCR Register layout', () => {
 
     it('has the register columns, references and audit, without the KPI cards', () => {
         const heads = Array.from(document.querySelectorAll('#ofi-obs-table-container th')).map(th => th.textContent.trim());
-        expect(heads).toEqual(['Ref#', 'Level', 'Client', 'Audit', 'Clause', 'Type', 'Description', 'Response', 'Actions']);
+        expect(heads).toEqual(['', 'Ref#', 'Audit', 'Clause', 'Type', 'Description', 'Response', 'Actions']);
         const rows = Array.from(document.querySelectorAll('#ofi-obs-table-container tbody tr'));
-        expect(rows.map(r => r.cells[0].textContent.trim()).sort()).toEqual(['OBS-001', 'OFI-001']);
-        expect(rows[0].cells[3].textContent).toMatch(/Surveillance/);
+        expect(rows.map(r => r.cells[1].textContent.trim()).sort()).toEqual(['OBS-001', 'OFI-001']);
+        expect(rows[0].cells[2].textContent).toMatch(/Surveillance/);
         expect(document.body.textContent).not.toContain('Total Findings');
         expect(document.getElementById('host').textContent).toContain('OBS / OFI Register');
+        expect(heads).not.toContain('Level');
+        expect(heads).not.toContain('Client');
     });
 
     it('filters by type and search, like the NCR Register', () => {
         document.getElementById('ofiobs-filter-type').value = 'OFI';
         window.filterOFIOBS();
-        let refs = Array.from(document.querySelectorAll('#ofi-obs-table-container tbody tr')).map(r => r.cells[0].textContent.trim());
+        let refs = Array.from(document.querySelectorAll('#ofi-obs-table-container tbody tr')).map(r => r.cells[1].textContent.trim());
         expect(refs).toEqual(['OFI-001']);
         document.getElementById('ofiobs-filter-type').value = 'all';
         document.getElementById('ofiobs-filter-search').value = 'backup';
         window.filterOFIOBS();
-        refs = Array.from(document.querySelectorAll('#ofi-obs-table-container tbody tr')).map(r => r.cells[0].textContent.trim());
+        refs = Array.from(document.querySelectorAll('#ofi-obs-table-container tbody tr')).map(r => r.cells[1].textContent.trim());
         expect(refs).toEqual(['OBS-001']);
     });
 
     it('the eye opens the full finding; response and escalation stay in Actions', () => {
-        const row = Array.from(document.querySelectorAll('#ofi-obs-table-container tbody tr')).find(r => r.cells[0].textContent.trim() === 'OBS-001');
-        expect(row.cells[8].querySelector('[data-action="openFindingResponse"]')).not.toBeNull();
-        expect(row.cells[8].querySelector('[data-action="escalateObservationToNCR"]')).not.toBeNull();
-        const eye = row.cells[8].querySelector('[data-action="viewFindingDetails"]');
+        const row = Array.from(document.querySelectorAll('#ofi-obs-table-container tbody tr')).find(r => r.cells[1].textContent.trim() === 'OBS-001');
+        expect(row.cells[7].querySelector('[data-action="openFindingResponse"]')).not.toBeNull();
+        expect(row.cells[7].querySelector('[data-action="escalateObservationToNCR"]')).not.toBeNull();
+        const eye = row.cells[7].querySelector('[data-action="viewFindingDetails"]');
         window.viewFindingDetails(eye.getAttribute('data-arg1'), eye.getAttribute('data-arg2'), eye.getAttribute('data-arg3'));
         expect(document.getElementById('modal-title').textContent).toContain('OBS-001');
         expect(document.getElementById('modal-body').textContent).toContain('Review backup logs');
