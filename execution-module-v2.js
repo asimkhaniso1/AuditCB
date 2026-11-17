@@ -26,6 +26,55 @@ window.NCRSyncUtils = window.NCRSyncUtils || {};
 window.NCRSyncUtils.buildSourceKey = buildChecklistSourceKey;
 window.NCRSyncUtils.buildStableIdentity = buildChecklistStableIdentity;
 
+// ---------- Checklist question numbers ("IMS 13") ----------
+// The printed checklist and the auditor's agenda index name a question by its
+// section and its 1-based position in that section. The execution view's item
+// id is "<section>-<0-based index>", so the number is derived, never stored.
+// parse() accepts what an auditor types: "IMS 13", "ims13", "IMS-13", "a 30".
+window.ChecklistQuestionRef = {
+    fromItemId: function (itemId) {
+        const m = /^(.+)-(\d+)$/.exec(String(itemId == null ? '' : itemId));
+        return m ? m[1] + ' ' + (Number(m[2]) + 1) : null;
+    },
+    parse: function (text) {
+        const m = /^\s*([A-Za-z][A-Za-z0-9]*?)[\s.\-_]*(\d+)\s*$/.exec(String(text == null ? '' : text));
+        return m && Number(m[2]) > 0 ? m[1].toUpperCase() + ' ' + Number(m[2]) : null;
+    }
+};
+
+// Jump to a checklist question by its number: open its section, scroll it into
+// view and highlight it — the same landing the NC-register "go to item" uses.
+window.jumpToChecklistQuestion = function (text) {
+    const ref = window.ChecklistQuestionRef.parse(text);
+    if (!ref) {
+        if (String(text || '').trim()) window.showNotification('Type a question number such as IMS 13 or SMS 3.', 'warning');
+        return false;
+    }
+    const row = Array.from(document.querySelectorAll('.checklist-item[data-q-ref]'))
+        .find(function (r) { return r.getAttribute('data-q-ref').toUpperCase() === ref; });
+    if (!row) {
+        window.showNotification('There is no question ' + ref + ' in this audit’s checklist.', 'warning');
+        return false;
+    }
+    const section = row.closest('.accordion-content');
+    if (section && section.style.display === 'none') {
+        section.style.display = 'block';
+        const icon = document.getElementById('icon-' + section.id);
+        if (icon) icon.style.transform = 'rotate(180deg)';
+        if (typeof window.syncToggleAllAccordions === 'function') window.syncToggleAllAccordions();
+    }
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const previousBorder = row.style.borderLeftColor;
+    row.style.transition = 'border-left-color 0.4s';
+    row.style.borderLeftColor = '#8b5cf6';
+    setTimeout(function () { row.style.borderLeftColor = previousBorder; }, 2500);
+    return true;
+};
+window.jumpToChecklistQuestionFromBox = function () {
+    const box = document.getElementById('jump-to-question');
+    return window.jumpToChecklistQuestion(box ? box.value : '');
+};
+
 // Escape stored text (auditor remarks, AI-drafted summary, client/KB names)
 // for an HTML string. Several of these fields were written through
 // Sanitizer.sanitizeText (escaped on WRITE), so decode first: the value is
@@ -561,13 +610,23 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     requirementText = overridesMap[checklistId][idx];
                 }
 
+                // Question number as printed on the checklist and the agenda
+                // index ("IMS 13" = 13th question of section IMS), so the
+                // auditor can find a question named on paper. Only sectioned
+                // items have one; custom and old flat-format items don't.
+                const qRef = window.ChecklistQuestionRef.fromItemId(isCustom ? null : idx);
+                const qRefAttr = qRef ? ` data-q-ref="${_execEscText(qRef)}"` : '';
+                const qRefBadge = qRef
+                    ? `<div class="q-ref-badge" title="Checklist question ${_execEscText(qRef)}" style="display: inline-block; margin-bottom: 0.25rem; padding: 0 0.4rem; border: 1px solid var(--primary-color); border-radius: 4px; font-size: 0.75rem; font-weight: 700; color: var(--primary-color); white-space: nowrap;">${_execEscText(qRef)}</div>`
+                    : '';
+
                 return `
-                    <div class="card checklist-item" id="row-${uniqueId}" style="margin-bottom: 0.5rem; padding: 1rem; border-left: 4px solid #e2e8f0;">
+                    <div class="card checklist-item" id="row-${uniqueId}"${qRefAttr} style="margin-bottom: 0.5rem; padding: 1rem; border-left: 4px solid #e2e8f0;">
                          <div style="display: grid; grid-template-columns: 30px 80px 1fr 180px; gap: 1rem; align-items: start;">
                             <div style="display: flex; align-items: center;">
                                 <input type="checkbox" class="item-checkbox" data-unique-id="${uniqueId}" style="width: 18px; height: 18px; cursor: pointer;" title="Select this item for bulk action">
                             </div>
-                            <div style="font-weight: bold; color: var(--primary-color);">${item.clause || 'N/A'}</div>
+                            <div style="font-weight: bold; color: var(--primary-color);">${qRefBadge}<div>${item.clause || 'N/A'}</div></div>
                             <div>
                                 <div style="font-weight: 500; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(requirementText)}</div>
                                 <div style="position: relative;">
@@ -847,6 +906,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <!-- Filters & Actions Bar -->
                     <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;">
 
+                        <div style="display: flex; gap: 0.25rem; align-items: center; margin-right: auto;">
+                            <label for="jump-to-question" style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; margin: 0;">Jump to</label>
+                            <input type="text" id="jump-to-question" class="form-control" style="width: 9rem;" placeholder="e.g. IMS 13" autocomplete="off" title="Type a question number from the checklist or agenda index, then press Enter" data-action-change="jumpToChecklistQuestion" data-arg1="this.value">
+                            <button type="button" class="btn btn-outline-secondary" data-action="jumpToChecklistQuestionFromBox" title="Go to the question">Go</button>
+                        </div>
                         <div style="display: flex; gap: 0.5rem;">
                             <button class="btn btn-outline-secondary" id="toggle-all-accordions" data-action="toggleAllAccordions" title="Collapse/Expand all sections">
                                 <i class="fa-solid fa-compress-alt" style="margin-right: 0.5rem;"></i> <span>Collapse All</span>
