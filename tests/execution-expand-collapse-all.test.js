@@ -56,16 +56,30 @@ describe('checklist row markup', () => {
         expect(document.querySelectorAll('.checklist-item').length).toBe(6);
     });
 
-    it('the nonconformity statement and personnel fields are inside the NC panel', () => {
+    it('the nonconformity statement is inside the NC panel', () => {
         document.querySelectorAll('.checklist-item').forEach(row => {
             const id = row.id.replace('row-', '');
             const panel = document.getElementById('ncr-panel-' + id);
             expect(panel.contains(document.getElementById('ncr-desc-' + id))).toBe(true);
-            expect(panel.contains(document.getElementById('ncr-personnel-' + id))).toBe(true);
         });
         // only the NC item shows them
         const visibleStatements = Array.from(document.querySelectorAll('textarea[id^="ncr-desc-"]')).filter(t => t.closest('.ncr-panel').style.display !== 'none');
         expect(visibleStatements.map(t => t.id)).toEqual(['ncr-desc-cl1-RECERT-2']);
+    });
+
+    it('personnel, designation and department show on every question, outside the NC panel', () => {
+        // Who was interviewed is recorded per question (saveChecklist stores it
+        // for every item; AI Auto Map fills it across all rows), so it must not
+        // disappear into the NC-only panel.
+        document.querySelectorAll('.checklist-item').forEach(row => {
+            const id = row.id.replace('row-', '');
+            const panel = document.getElementById('ncr-panel-' + id);
+            ['ncr-personnel-', 'ncr-designation-', 'ncr-department-'].forEach(prefix => {
+                const el = document.getElementById(prefix + id);
+                expect(row.contains(el)).toBe(true);
+                expect(panel.contains(el)).toBe(false);
+            });
+        });
     });
 });
 

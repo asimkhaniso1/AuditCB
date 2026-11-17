@@ -698,6 +698,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                          <!-- Hidden status input -->
                          <input type="hidden" class="status-input" data-checklist="${checklistId}" data-item="${idx}" data-custom="${isCustom}" data-clause="${window.UTILS.escapeHtml(item.clause || '')}" data-requirement="${window.UTILS.escapeHtml(requirementText || '')}" id="status-${uniqueId}" value="${s}">
                          
+                             <!-- Auditee interviewed for this question (personnel, designation, department).
+                              Shown on every question, not only NCs: saveChecklist stores these
+                              for every item and AI Auto Map fills them across all rows. -->
+                             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+                                 <div>
+                                     <label style="font-size: 0.8rem;">Personnel Name</label>
+                                     <select id="ncr-personnel-${uniqueId}" class="form-control form-control-sm" data-action-change="_autoFillPersonnel" data-id="${uniqueId}">
+                                        <option value="">-- Select --</option>
+                                        ${clientPersonnel.map(p => `<option value="${window.UTILS.escapeHtml(p.name)}" ${saved.personnel === p.name ? 'selected' : ''}>${window.UTILS.escapeHtml(p.name)}</option>`).join('')}
+                                        ${saved.personnel && !clientPersonnel.some(p => p.name === saved.personnel) ? `<option value="${window.UTILS.escapeHtml(saved.personnel)}" selected>${window.UTILS.escapeHtml(saved.personnel)}</option>` : ''}
+                                     </select>
+                                 </div>
+                                 <div>
+                                     <label style="font-size: 0.8rem;">Designation</label>
+                                     <input type="text" id="ncr-designation-${uniqueId}" class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.designation || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
+                                 </div>
+                                 <div>
+                                     <label style="font-size: 0.8rem;">Department</label>
+                                     <input type="text" id="ncr-department-${uniqueId}" class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.department || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
+                                 </div>
+                             </div>
+
                          <!-- NCR Panel (Conditional) -->
                          <div id="ncr-panel-${uniqueId}" class="ncr-panel" style="display: ${s === 'nc' ? 'block' : 'none'}; background: #fff1f2; border: 1px solid #fecaca; padding: 1rem; margin-top: 1rem; border-radius: 6px;">
                              <h5 style="color: var(--danger-color); margin-bottom: 0.5rem; display: flex; align-items: center;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.5rem;"></i> Finding Details</h5>
@@ -740,25 +762,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                  <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="3" placeholder="e.g. Clause 9.2 requires internal audits of all three standards at planned intervals; the latest internal audit report covering ISO 22301 and the closure status of its findings could not be produced.">${_execEscText(saved.ncrDescription || '')}</textarea>
                              </div>
 
-                             <!-- Cross-Reference: Personnel, Designation & Department -->
-                             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 0.5rem;">
-                                 <div>
-                                     <label style="font-size: 0.8rem;">Personnel Name</label>
-                                     <select id="ncr-personnel-${uniqueId}" class="form-control form-control-sm" data-action-change="_autoFillPersonnel" data-id="${uniqueId}">
-                                        <option value="">-- Select --</option>
-                                        ${clientPersonnel.map(p => `<option value="${window.UTILS.escapeHtml(p.name)}" ${saved.personnel === p.name ? 'selected' : ''}>${window.UTILS.escapeHtml(p.name)}</option>`).join('')}
-                                        ${saved.personnel && !clientPersonnel.some(p => p.name === saved.personnel) ? `<option value="${window.UTILS.escapeHtml(saved.personnel)}" selected>${window.UTILS.escapeHtml(saved.personnel)}</option>` : ''}
-                                     </select>
-                                 </div>
-                                 <div>
-                                     <label style="font-size: 0.8rem;">Designation</label>
-                                     <input type="text" id="ncr-designation-${uniqueId}" class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.designation || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
-                                 </div>
-                                 <div>
-                                     <label style="font-size: 0.8rem;">Department</label>
-                                     <input type="text" id="ncr-department-${uniqueId}" class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.department || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
-                                 </div>
-                             </div>
                              
 
 
