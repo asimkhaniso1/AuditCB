@@ -1021,86 +1021,82 @@ function renderNCRTable(ncrs) {
     }
 
     const today = new Date();
+    const esc = window.UTILS.escapeHtml;
 
-    return `
-        <table>
-            <thead>
-                <tr>
-                    <th>NCR#</th>
-                    <th>Level</th>
-                    <th>Client</th>
-                    <th>Audit</th>
-                    <th>Clause</th>
-                    <th>Severity</th>
-                    <th>Description</th>
-                    <th>Due Date</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${ncrs.map(ncr => {
+    // Grouped by audit, newest first, like the OBS / OFI register: the audit is a
+    // heading row instead of a column on every line. The client goes in the
+    // heading only when the list spans more than one client (the global view).
+    const clientOf = (n) => String(n.clientName || n.client || '').trim();
+    const multiClient = new Set(ncrs.map(clientOf)).size > 1;
+    const planDate = (n) => {
+        const plan = (window.state.auditPlans || []).find(p => p && String(p.id) === String(n.auditId));
+        return String((plan && (plan.date || plan.startDate)) || n.raisedDate || '');
+    };
+    const groups = [];
+    ncrs.forEach(n => {
+        const key = clientOf(n) + '|' + String(n.auditId == null ? '' : n.auditId);
+        let g = groups.find(x => x.key === key);
+        if (!g) {
+            g = { key, date: planDate(n), label: (multiClient && clientOf(n) ? clientOf(n) + ' — ' : '') + resolveAuditRef(n), items: [] };
+            groups.push(g);
+        }
+        g.items.push(n);
+    });
+    groups.sort((x, y) => y.date.localeCompare(x.date));
+    const sevCount = (items, sev) => items.filter(n => normalizedNCRSeverity(n) === sev).length;
+
+    const rowHTML = (ncr) => {
         const hasDueDate = !!ncr.dueDate;
         const dueDate = hasDueDate ? new Date(ncr.dueDate) : null;
         // Missing due date is never "overdue" — it's flagged separately below.
         const isOverdue = hasDueDate && ncr.status !== 'Closed' && !isWithdrawnNCR(ncr) && dueDate < today;
         const daysDiff = hasDueDate ? Math.floor((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
-
+        const major = normalizedNCRSeverity(ncr) === 'major';
+        const canAdd = ncr.status === 'Open' || ncr.carStatus === 'Ineffective' || ncr.carStatus === 'Reopened';
+        const canVerify = (ncr.status === 'In Progress' || ncr.status === 'Verification') && ncr.capaImplementedDate;
         return `
-                        <tr style="${isOverdue ? 'background: #fef2f2;' : ''}">
-                            <td><strong>NCR-${String(ncr.id).padStart(3, '0')}</strong></td>
-                            <td>
-                                <span class="badge" style="background: ${ncr.level === 'client' ? '#0284c7' : '#7c3aed'}; color: white; font-size: 0.75rem;">
-                                    ${ncr.level === 'client' ? 'Client' : 'Internal'}
-                                </span>
-                            </td>
-                            <td>${window.UTILS.escapeHtml(ncr.clientName || 'N/A')}</td>
-                            <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(resolveAuditRef(ncr))}</td>
-                            <td>${renderClauseCell(ncr)}</td>
-                            <td>
-                                <span class="badge" style="background: ${normalizedNCRSeverity(ncr) === 'major' ? '#dc2626' : '#f59e0b'}; color: white;">
-                                    ${normalizedNCRSeverity(ncr) === 'major' ? 'Major' : 'Minor'}
-                                </span>
-                            </td>
-                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                ${window.UTILS.escapeHtml(ncr.description || '')}
-                            </td>
-                            <td>
-                                ${hasDueDate ? window.UTILS.formatDate(ncr.dueDate) : '-'}
-                                ${!hasDueDate ? '<br><span style="color: #6b7280; font-size: 0.75rem; font-weight: bold;">No due date</span>' :
-                isOverdue ? '<br><span style="color: #dc2626; font-size: 0.75rem; font-weight: bold;">⚠️ OVERDUE</span>' :
-                    daysDiff <= 7 && ncr.status !== 'Closed' ? '<br><span style="color: #f59e0b; font-size: 0.75rem;">⏰ Due Soon</span>' : ''}
-                            </td>
-                            <td>
-                                <span class="badge" style="background: ${ncr.status === 'Closed' ? '#059669' :
-                ncr.status === 'Verification' ? '#0284c7' :
-                    ncr.status === 'In Progress' ? '#f59e0b' : '#6b7280'
-            }; color: white;">
-                                    ${ncr.status}
-                                </span>
-                            </td>
-                            <td style="white-space: nowrap;">
-                                <button class="btn btn-sm btn-icon" data-action="viewNCRDetails" data-id="${ncr.id}" title="View Details" aria-label="View">
-                                    <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
-                                </button>
-                                <button class="btn btn-sm btn-icon" data-action="editNCR" data-id="${ncr.id}" title="Edit" aria-label="Edit">
-                                    <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
-                                </button>
-                                <button class="btn btn-sm btn-icon" data-action="deleteNCR" data-id="${ncr.id}" title="Withdraw" aria-label="Withdraw">
-                                    <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
-                                </button>
-                                ${ncr.status === 'Open' || ncr.carStatus === 'Ineffective' || ncr.carStatus === 'Reopened' ? `
-                                <button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" data-action="openAddCAPAModal" data-id="${ncr.id}" title="Add CAPA" aria-label="Add">
-                                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>CAPA
-                                </button>` : ''}
-                                ${(ncr.status === 'In Progress' || ncr.status === 'Verification') && ncr.capaImplementedDate ? `
-                                <button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" data-action="verifyCAPA" data-id="${ncr.id}" title="Verify CAPA" aria-label="Confirm">
-                                    <i class="fa-solid fa-check"></i> Verify
-                                </button>` : ''}
-                            </td>
-                        </tr>
-                    `;
-    }).join('')}
+                    <tr class="ncr-row" style="${isOverdue ? 'background: #fef2f2;' : ''}">
+                        <td style="white-space: nowrap;"><strong>NCR-${String(ncr.id).padStart(3, '0')}</strong>${ncr.level && ncr.level !== 'client' ? '<div><span class="badge" style="background: #7c3aed; color: white; font-size: 0.68rem;" title="CB-internal nonconformity">Internal</span></div>' : ''}</td>
+                        <td>${renderClauseCell(ncr)}</td>
+                        <td><span class="badge" style="background: ${major ? '#dc2626' : '#f59e0b'}; color: white;">${major ? 'Major' : 'Minor'}</span></td>
+                        <td title="${esc(ncr.description || '')}"><div style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35;">${esc(ncr.description || '')}</div></td>
+                        <td style="white-space: nowrap;">
+                            ${hasDueDate ? window.UTILS.formatDate(ncr.dueDate) : '-'}
+                            ${!hasDueDate ? '<div style="color: #6b7280; font-size: 0.72rem; font-weight: bold;">No due date</div>' :
+                isOverdue ? '<div style="color: #dc2626; font-size: 0.72rem; font-weight: bold;">OVERDUE</div>' :
+                    daysDiff <= 7 && ncr.status !== 'Closed' ? '<div style="color: #f59e0b; font-size: 0.72rem;">Due soon</div>' : ''}
+                        </td>
+                        <td><span class="badge" style="background: ${ncr.status === 'Closed' ? '#059669' : ncr.status === 'Verification' ? '#0284c7' : ncr.status === 'In Progress' ? '#f59e0b' : '#6b7280'}; color: white;">${esc(ncr.status || '')}</span></td>
+                        <td style="white-space: nowrap;">
+                            <button class="btn btn-sm btn-icon" data-action="viewNCRDetails" data-id="${ncr.id}" title="View details" aria-label="View"><i class="fa-solid fa-eye" style="color: var(--primary-color);"></i></button>
+                            <button class="btn btn-sm btn-icon" data-action="editNCR" data-id="${ncr.id}" title="Edit" aria-label="Edit"><i class="fa-solid fa-pen-to-square" style="color: var(--primary-color);"></i></button>
+                            ${canAdd ? `<button class="btn btn-sm btn-icon" data-action="openAddCAPAModal" data-id="${ncr.id}" title="Add CAPA (correction, root cause, corrective action)" aria-label="Add CAPA"><i class="fa-solid fa-circle-plus" style="color: #10b981;"></i></button>` : ''}
+                            ${canVerify ? `<button class="btn btn-sm btn-icon" data-action="verifyCAPA" data-id="${ncr.id}" title="Verify CAPA (Effective closes the NCR)" aria-label="Verify CAPA"><i class="fa-solid fa-circle-check" style="color: #3b82f6;"></i></button>` : ''}
+                            <button class="btn btn-sm btn-icon" data-action="deleteNCR" data-id="${ncr.id}" title="Withdraw" aria-label="Withdraw"><i class="fa-solid fa-trash" style="color: #ef4444;"></i></button>
+                        </td>
+                    </tr>`;
+    };
+
+    return `
+        <table class="ncr-register-table" style="font-size: 0.85rem; table-layout: auto;">
+            <thead>
+                <tr>
+                    <th style="width: 84px;">NCR#</th>
+                    <th style="width: 120px;">Clause</th>
+                    <th style="width: 64px;">Severity</th>
+                    <th>Description</th>
+                    <th style="width: 104px;">Due Date</th>
+                    <th style="width: 96px;">Status</th>
+                    <th style="width: 150px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${groups.map(g => `
+                    <tr class="ncr-group-row" style="background: #f1f5f9;">
+                        <td colspan="7" style="font-weight: 600; color: #334155;">${esc(g.label)}<span style="font-weight: 400; color: var(--text-secondary);"> &middot; ${sevCount(g.items, 'major')} Major &middot; ${sevCount(g.items, 'minor')} Minor</span></td>
+                    </tr>
+                    ${g.items.map(rowHTML).join('')}
+                `).join('')}
             </tbody>
         </table>
     `;
