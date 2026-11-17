@@ -561,7 +561,8 @@ const SupabaseClient = {
                 plansResult,
                 reportsResult,
                 checklistsResult,
-                certsResult
+                certsResult,
+                ncrsResult
             ] = await Promise.allSettled([
                 this.syncClientsFromSupabase(),
                 this.syncAuditorsFromSupabase(),
@@ -572,7 +573,10 @@ const SupabaseClient = {
                 this.syncAuditPlansFromSupabase(),
                 this.syncAuditReportsFromSupabase(),
                 this.syncChecklistsFromSupabase(),
-                this.syncCertificationDecisionsFromSupabase()
+                this.syncCertificationDecisionsFromSupabase(),
+                // The NCR & CAPA register: the cached copy was never refreshed
+                // once this browser had one (ncr-capa-module.js fetchNCRs).
+                typeof window.fetchNCRs === 'function' ? window.fetchNCRs() : Promise.resolve(false)
             ]);
 
             // Process results — log failures but don't crash
@@ -598,6 +602,7 @@ const SupabaseClient = {
             if (reportsResult.status === 'rejected') { Logger.warn('Audit Reports sync failed:', reportsResult.reason); window.showNotification('Failed to sync audit reports. Working offline.', 'warning'); }
             if (checklistsResult.status === 'rejected') Logger.warn('Checklists sync failed:', checklistsResult.reason);
             if (certsResult.status === 'rejected') Logger.warn('Certification Decisions sync failed:', certsResult.reason);
+            if (ncrsResult.status === 'rejected') Logger.warn('NCR register sync failed:', ncrsResult.reason);
 
             // HYDRATION: Link Certifications to Clients (optimized with Map for O(N+M) instead of O(N×M))
             if (window.state.clients && window.state.certifications) {

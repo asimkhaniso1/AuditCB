@@ -517,6 +517,7 @@ window.fetchNCRs = async function () {
         // local value still wins whenever the row comes back empty.
         const prevList = window.state.ncrs || [];
         const prevById = new Map(prevList.map(n => [String(n.id), n]));
+        const prevSnapshot = JSON.stringify(prevList);
 
         // Map DB snake_case to app camelCase
         window.state.ncrs = (data || []).map(row => {
@@ -601,14 +602,20 @@ window.fetchNCRs = async function () {
 
         updateNCRAnalytics();
 
-        // Refresh view if active
-        if (document.getElementById('ncr-content') || window.contentArea.innerHTML.includes('Loading NCRs')) {
+        // Refresh the view if it is on screen — only when the register actually
+        // changed, so a background refresh does not throw the auditor back to
+        // the Register tab from the CAPA Tracker for nothing.
+        const changed = JSON.stringify(window.state.ncrs) !== prevSnapshot;
+        const loading = !!(window.contentArea && window.contentArea.innerHTML.includes('Loading NCRs'));
+        if (loading || (changed && document.getElementById('ncr-content'))) {
             renderNCRCAPAModuleContent(window.state.ncrContextClientId);
         }
+        return changed;
 
     } catch (err) {
         console.error('Error fetching NCRs:', err);
         // Fallback to empty or local cache if we had one
+        return false;
     }
 };
 
@@ -792,8 +799,13 @@ function renderNCRCAPAModule(clientId) {
         return;
     }
 
-    // Render normally if we have data or no Supabase
+    // Render the register we have, then refresh it from the database. The
+    // register is restored from this browser's cache on load and used to be
+    // fetched only when that cache was empty, so a change saved anywhere else
+    // (another tab, another device, a fix made in the database) never showed,
+    // and saving the stale record from Update wrote the old values back.
     renderNCRCAPAModuleContent(clientId);
+    if (window.SupabaseClient && typeof window.fetchNCRs === 'function') window.fetchNCRs();
 }
 
 function renderNCRCAPAModuleContent(clientId) {
