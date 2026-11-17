@@ -2993,77 +2993,75 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         }, 1500);
     };
 
+    // Voice dictation into a checklist remark. One session per remark: the mic
+    // button starts it and the same button stops it. (The button is wired through
+    // the delegator to startDictation, so a separate stop listener stopped the
+    // session and the same click started a new one — it kept listening.) The
+    // transcript is written after the text already in the box and announced with
+    // an input event, so autosave picks it up like typing.
+    const DICTATION_LIMIT_MS = 60000;
+    const dictationSessions = {};
+    window._dictationSessions = dictationSessions;
     window.startDictation = function (uniqueId) {
-        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-            alert('Voice dictation is not supported in this browser. Please use Chrome or Edge.');
-            return;
-        }
+        const active = dictationSessions[uniqueId];
+        if (active) { active.stop(); return; }
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-
+        if (!SpeechRecognition) {
+            window.showNotification('Voice dictation is not supported in this browser. Please use Chrome or Edge.', 'warning');
+            return;
+        }
         const micBtn = document.getElementById('mic-btn-' + uniqueId);
-        const textarea = document.getElementById('comment-' + uniqueId);
+        const box = document.getElementById('comment-' + uniqueId);
+        if (!micBtn || !box) return;
 
+        const recognition = new SpeechRecognition();
         recognition.lang = 'en-US';
         recognition.continuous = true;
         recognition.interimResults = true;
 
-        // Visual feedback — show stop button so user can end early
+        const base = box.value;
+        const join = (text) => (base && text ? base.replace(/\s+$/, '') + ' ' + text.trim() : (base || text.trim()));
+        let finalTranscript = '';
+        let stopped = false;
         const originalIcon = '<i class="fa-solid fa-microphone"></i>';
         micBtn.innerHTML = '<i class="fa-solid fa-stop fa-fade" style="color: red;"></i>';
-        micBtn.title = 'Click to stop recording';
-        micBtn.removeAttribute('disabled');
+        micBtn.title = 'Listening — click to stop';
 
-        // Allow user to stop early by clicking the mic button again
-        const stopHandler = () => {
-            recognition.stop();
-            micBtn.removeEventListener('click', stopHandler);
+        const finish = () => {
+            if (stopped) return;
+            stopped = true;
+            clearTimeout(limit);
+            delete dictationSessions[uniqueId];
+            micBtn.innerHTML = originalIcon;
+            micBtn.title = 'Dictate to Remarks';
+            const text = finalTranscript.trim();
+            box.value = join(text);
+            if (text) {
+                box.dispatchEvent(new Event('input', { bubbles: true }));
+                box.dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.ChecklistAutoSave) window.ChecklistAutoSave.schedule();
+            }
         };
-        micBtn.addEventListener('click', stopHandler);
+        const limit = setTimeout(() => {
+            try { recognition.stop(); } catch (_e) { /* already stopping */ }
+            window.showNotification('Dictation stops after 60 seconds. Click the microphone again to continue.', 'info');
+        }, DICTATION_LIMIT_MS);
 
-        recognition.start();
-
-        let finalTranscript = '';
-
-        // Auto-stop after 30 seconds
-        const timeout = setTimeout(() => {
-            recognition.stop();
-            window.showNotification('Recording limit (30s) reached.', 'info');
-        }, 30000);
+        dictationSessions[uniqueId] = { stop: () => { try { recognition.stop(); } catch (_e) { finish(); } } };
 
         recognition.onresult = function (event) {
-            let interimTranscript = '';
+            let interim = '';
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
-                } else {
-                    interimTranscript += event.results[i][0].transcript;
-                }
+                if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + ' ';
+                else interim += event.results[i][0].transcript;
             }
-            // Show live preview in the textarea
-            const currentVal = textarea.getAttribute('data-pre-dictation') || textarea.value;
-            if (!textarea.getAttribute('data-pre-dictation')) {
-                textarea.setAttribute('data-pre-dictation', textarea.value);
-            }
-            textarea.value = currentVal ? currentVal + ' ' + finalTranscript + interimTranscript : finalTranscript + interimTranscript;
+            box.value = join(finalTranscript + interim);
         };
-
-        recognition.onend = function () {
-            clearTimeout(timeout);
-            micBtn.removeEventListener('click', stopHandler);
-            // Set final value
-            const preVal = textarea.getAttribute('data-pre-dictation') || '';
-            textarea.removeAttribute('data-pre-dictation');
-            textarea.value = preVal ? preVal + ' ' + finalTranscript : finalTranscript;
-
-            micBtn.innerHTML = originalIcon;
-            micBtn.title = 'Voice dictation';
-        };
-
+        recognition.onend = finish;
         recognition.onerror = function (event) {
             window.Logger.error('Execution', 'Speech recognition error', event.error);
-            if (event.error !== 'no-speech') {
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
                 const DICTATION_ERRORS = {
                     'not-allowed': 'Microphone blocked. Click the lock icon in the address bar, allow Microphone for this site, then try again.',
                     'service-not-allowed': 'Dictation is not available in this browser. Use Chrome or Edge.',
@@ -3072,11 +3070,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 };
                 window.showNotification(DICTATION_ERRORS[event.error] || ('Error recording audio: ' + event.error), 'error');
             }
-            micBtn.innerHTML = originalIcon;
-            micBtn.title = 'Voice dictation';
-            micBtn.removeEventListener('click', stopHandler);
-            clearTimeout(timeout);
+            finish();
         };
+
+        try {
+            recognition.start();
+        } catch (e) {
+            finish();
+            window.showNotification('Could not start dictation: ' + (e && e.message ? e.message : e), 'error');
+        }
     };
 
     // A clause value that is actually an internal checklist pseudo-reference
