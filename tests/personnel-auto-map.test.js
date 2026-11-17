@@ -74,6 +74,7 @@ describe('autoMapPersonnel wiring', () => {
         expect(SRC).toContain('PAM.chunk(itemsToMap, PAM.BATCH_SIZE)');
         expect(SRC).toContain('AI_SERVICE.callProxyAPI(PAM.buildPrompt(contactList, batches[b]), { maxTokens: 8192 })');
         expect(SRC).toContain('failures.push(');
-        expect(SRC).toContain('Click Save Progress to keep them.');
+        expect(SRC).toContain('They save automatically in a few seconds.');
+        expect(SRC).toContain('if (mapped && window.ChecklistAutoSave) window.ChecklistAutoSave.schedule();');
     });
 });
