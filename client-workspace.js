@@ -324,7 +324,16 @@ window.renderClientModule = function (clientId, moduleName) {
     });
 
     // Update Page Title
-    document.getElementById('page-title').textContent = `${client.name} - ${moduleName.charAt(0).toUpperCase() + moduleName.slice(1)}`;
+    // Section names as the sidebar shows them; the route name ("ncr-capa")
+    // printed as "Ncr-capa". Unknown routes fall back to Title Case words.
+    const WORKSPACE_TITLES = {
+        overview: 'Overview', cycle: 'Certification Cycle', plans: 'Plans & Audits', execution: 'Execution',
+        checklists: 'Checklists', findings: 'Findings', 'ncr-capa': 'NCR & CAPA', certs: 'Certificates',
+        compliance: 'Compliance', docs: 'Document Center', settings: 'Settings', 'account-setup': 'Account Setup'
+    };
+    const sectionTitle = WORKSPACE_TITLES[moduleName]
+        || String(moduleName || '').split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    document.getElementById('page-title').textContent = `${client.name} - ${sectionTitle}`;
 
     const contentArea = document.getElementById('content-area');
 
