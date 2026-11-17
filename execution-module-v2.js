@@ -46,6 +46,56 @@ window.ChecklistQuestionRef = {
     }
 };
 
+// ---------- AI Auto Map: personnel per question ----------
+// Pure helpers for window.autoMapPersonnel (inside renderExecutionTab). The AI
+// only proposes a name; designation and department always come from the
+// client's contact list, and a name not on that list is never assigned.
+window.PersonnelAutoMap = {
+    BATCH_SIZE: 20,
+    chunk: function (list, size) {
+        const out = [];
+        for (let i = 0; i < (list || []).length; i += size) out.push(list.slice(i, i + size));
+        return out;
+    },
+    buildPrompt: function (contacts, items) {
+        const people = contacts.map((c, i) => `${i + 1}. ${c.name} — ${c.designation || 'No designation'}${c.department ? ' (' + c.department + ')' : ''}`).join('\n');
+        return 'You are an ISO audit expert. Given these client personnel:\n' + people
+            + '\n\nFor each audit question below, choose the one person who would be interviewed for it, based on their role.'
+            + ' Spread assignments across the personnel by role; do not give every question to the same person.'
+            + '\n\nQuestions (JSON):\n' + JSON.stringify(items.map(it => ({ id: it.id, clause: it.clause, question: it.question })))
+            + '\n\nRespond ONLY with a JSON array, no markdown, no explanation:\n[{"id":"...","personnel":"exact name from the list"}]'
+            + '\nUse EXACT names from the list. If no one fits, use the most senior person.';
+    },
+    parseMappings: function (text) {
+        const raw = String(text || '').replace(/```json?\s*/gi, '').replace(/```/g, '').trim();
+        try {
+            const v = JSON.parse(raw);
+            if (Array.isArray(v)) return v;
+        } catch (_e) { /* fall through to the first array in the text */ }
+        const m = raw.match(/\[[\s\S]*\]/);
+        if (!m) throw new Error('The AI reply was not a list of assignments');
+        const v = JSON.parse(m[0]);
+        if (!Array.isArray(v)) throw new Error('The AI reply was not a list of assignments');
+        return v;
+    },
+    // -> { assignments: [{id, personnel, designation, department}], skipped }
+    resolve: function (mappings, contacts, items) {
+        const byName = new Map(contacts.map(c => [String(c.name || '').trim().toLowerCase(), c]));
+        const wanted = new Set(items.map(it => String(it.id)));
+        const seen = new Set();
+        const assignments = [];
+        (mappings || []).forEach(m => {
+            const id = String(m && m.id);
+            if (!wanted.has(id) || seen.has(id)) return;
+            const contact = byName.get(String(m.personnel || '').trim().toLowerCase());
+            if (!contact) return;
+            seen.add(id);
+            assignments.push({ id: id, personnel: contact.name, designation: contact.designation || '', department: contact.department || '' });
+        });
+        return { assignments: assignments, skipped: items.length - assignments.length };
+    }
+};
+
 // ---------- Audit finding categories ----------
 // An audit finding is a nonconformity (Major or Minor), an observation (OBS) or
 // an opportunity for improvement (OFI). Only Major/Minor are NCRs; the others
@@ -547,30 +597,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
                 if (!choice) return;
 
-                // Collect NC items from the DOM
-                const rows = document.querySelectorAll('.checklist-item');
+                // Collect the questions to map. Clause and question text come from
+                // the row's status input (data-clause / data-requirement), not from
+                // scraping styled elements, which broke whenever the row layout moved.
+                const PAM = window.PersonnelAutoMap;
                 const itemsToMap = [];
-                rows.forEach(row => {
+                document.querySelectorAll('.checklist-item').forEach(row => {
                     const uniqueId = row.id?.replace('row-', '');
                     if (!uniqueId) return;
                     const personnelEl = document.getElementById('ncr-personnel-' + uniqueId);
-                    if (!personnelEl) return; // No personnel field = not expanded NC form
-                    const _desEl = document.getElementById('ncr-designation-' + uniqueId);
-                    const _deptEl = document.getElementById('ncr-department-' + uniqueId);
-
-                    // Check if already filled
-                    const currentPersonnel = personnelEl.value || '';
-                    if (choice === 'unfilled' && currentPersonnel) return;
-
-                    // Get the question/clause context from the row
-                    const clauseEl = row.querySelector('[style*="font-weight: bold"]');
-                    const reqEl = row.querySelector('.requirement-text') || row.querySelector('[style*="line-height"]');
-                    const clause = clauseEl?.textContent?.trim() || '';
-                    const question = reqEl?.textContent?.trim() || '';
-
-                    if (clause || question) {
-                        itemsToMap.push({ uniqueId, clause, question: question.substring(0, 200) });
-                    }
+                    if (!personnelEl) return;
+                    if (choice === 'unfilled' && personnelEl.value) return;
+                    const statusInput = document.getElementById('status-' + uniqueId);
+                    const clause = String(statusInput?.dataset.clause || '').trim();
+                    const question = String(statusInput?.dataset.requirement || '').trim();
+                    if (clause || question) itemsToMap.push({ id: uniqueId, clause, question: question.substring(0, 300) });
                 });
 
                 if (!itemsToMap.length) {
@@ -578,69 +619,47 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     return;
                 }
 
-                // Show loading
-                window.showNotification(`AI mapping ${itemsToMap.length} item(s)... Please wait.`, 'info');
-
-                try {
-                    const contactsDesc = contactList.map((c, i) =>
-                        `${i + 1}. ${c.name} — ${c.designation || 'No designation'}${c.department ? ' (' + c.department + ')' : ''}`
-                    ).join('\n');
-
-                    const questionsDesc = itemsToMap.map(it =>
-                        `{ "id": "${it.uniqueId}", "clause": "${it.clause}", "question": "${it.question.replace(/"/g, '\\"')}" }`
-                    ).join(',\n');
-
-                    const prompt = `You are an ISO audit expert. Given these client personnel:\n${contactsDesc}\n\nFor each audit question below, determine the most appropriate person(s) who would be responsible or interviewed for that area. You MUST distribute assignments across ALL available personnel based on their designation/role — do NOT assign the same person to every item.\n\nQuestions:\n[${questionsDesc}]\n\nRespond ONLY with a JSON array, no markdown, no explanation:\n[{"id":"...","personnel":"exact name","designation":"their designation","department":"their department"}]\n\nRules:\n- Use EXACT names from the personnel list\n- DISTRIBUTE across all personnel — each person should be assigned to the clauses matching their role\n- Match based on clause topic (e.g., quality clauses → quality roles, production → operations, HR → HR roles, management review → top management, IT/security → IT roles, documentation → document control)\n- Multiple questions in the same clause area should go to the same relevant person\n- Every person in the list should appear at least once if there are enough questions\n- Only use the most senior person as a fallback when no specific role matches`;
-
-                    const response = await AI_SERVICE.callProxyAPI(prompt);
-
-                    // Parse JSON from response
-                    let mappings;
+                // One request per batch: a single request for a whole checklist
+                // (100+ questions) can time out or come back cut short, and then
+                // nothing is mapped. Each batch stands alone, so one failed batch
+                // does not lose the others.
+                const batches = PAM.chunk(itemsToMap, PAM.BATCH_SIZE);
+                let mapped = 0;
+                let skipped = 0;
+                const failures = [];
+                for (let b = 0; b < batches.length; b++) {
+                    window.showNotification(`AI mapping questions ${b * PAM.BATCH_SIZE + 1}–${b * PAM.BATCH_SIZE + batches[b].length} of ${itemsToMap.length}…`, 'info');
                     try {
-                        const jsonStr = response.replace(/```json?\s*/g, '').replace(/```/g, '').trim();
-                        mappings = JSON.parse(jsonStr);
-                    } catch (_e) {
-                        // Try to extract JSON array
-                        const match = response.match(/\[[\s\S]*\]/);
-                        if (match) {
-                            mappings = JSON.parse(match[0]);
-                        } else {
-                            throw new Error('Could not parse AI response');
-                        }
-                    }
-
-                    // Apply mappings to DOM
-                    let mapped = 0;
-                    mappings.forEach(m => {
-                        const pEl = document.getElementById('ncr-personnel-' + m.id);
-                        const dEl = document.getElementById('ncr-designation-' + m.id);
-                        const dpEl = document.getElementById('ncr-department-' + m.id);
-                        if (pEl && m.personnel) {
-                            // Set personnel dropdown — find matching option or add it
-                            const opts = Array.from(pEl.options);
-                            const match = opts.find(o => o.value === m.personnel);
-                            if (match) {
-                                pEl.value = m.personnel;
-                            } else {
-                                // Add the option if not found (shouldn't happen but safe)
+                        const response = await AI_SERVICE.callProxyAPI(PAM.buildPrompt(contactList, batches[b]), { maxTokens: 8192 });
+                        const result = PAM.resolve(PAM.parseMappings(response), contactList, batches[b]);
+                        skipped += result.skipped;
+                        result.assignments.forEach(a => {
+                            const pEl = document.getElementById('ncr-personnel-' + a.id);
+                            if (!pEl) return;
+                            if (!Array.from(pEl.options).some(o => o.value === a.personnel)) {
                                 const opt = document.createElement('option');
-                                opt.value = m.personnel;
-                                opt.textContent = m.personnel;
+                                opt.value = a.personnel;
+                                opt.textContent = a.personnel;
                                 pEl.appendChild(opt);
-                                pEl.value = m.personnel;
                             }
-                            if (dEl) dEl.value = m.designation || '';
-                            if (dpEl) dpEl.value = m.department || '';
+                            pEl.value = a.personnel;
+                            const dEl = document.getElementById('ncr-designation-' + a.id);
+                            const dpEl = document.getElementById('ncr-department-' + a.id);
+                            if (dEl) dEl.value = a.designation;
+                            if (dpEl) dpEl.value = a.department;
                             mapped++;
-                        }
-                    });
-
-                    window.showNotification(`AI Auto Map complete: ${mapped} of ${itemsToMap.length} items mapped successfully!`, 'success');
-
-                } catch (error) {
-                    console.error('AI Auto Map error:', error);
-                    window.showNotification('AI Auto Map failed: ' + (error.message || 'Unknown error'), 'error');
+                        });
+                    } catch (error) {
+                        console.error('AI Auto Map batch error:', error);
+                        failures.push(error && error.message ? error.message : 'Unknown error');
+                    }
                 }
+
+                const parts = [`AI Auto Map: ${mapped} of ${itemsToMap.length} question(s) assigned.`];
+                if (skipped) parts.push(`${skipped} left blank (no clear match on the contact list).`);
+                if (failures.length) parts.push(`${failures.length} of ${batches.length} batch(es) failed: ${failures[0]}`);
+                if (mapped) parts.push('Click Save Progress to keep them.');
+                window.showNotification(parts.join(' '), failures.length && !mapped ? 'error' : (failures.length ? 'warning' : 'success'));
             };
 
             // Helper to render row
