@@ -67,11 +67,14 @@ describe('CAPA tab shows the NCR & CAPA register', () => {
         expect(tab.textContent).not.toContain('Create CAPA');
     });
 
-    it('offers + CAPA on an open NCR and Verify once implementation is recorded', () => {
+    it('offers one Review on a previous NCR and + CAPA on this audit NCR', () => {
+        // Previous NCs are reviewed in one step (tests/review-previous-ncr.test.js);
+        // + CAPA / Verify stay for this audit's own NCRs.
         const row = (ref) => Array.from(tab.querySelectorAll('tbody tr')).find(r => r.cells[0].textContent.includes(ref));
-        expect(row('NCR-053').querySelector('[data-action="openAddCAPAModal"]').getAttribute('data-id')).toBe('53');
-        expect(row('NCR-053').querySelector('[data-action="verifyCAPA"]')).toBeNull();
-        expect(row('NCR-021').querySelector('[data-action="verifyCAPA"]').getAttribute('data-id')).toBe('21');
+        expect(row('NCR-053').querySelector('[data-action="reviewPreviousNCR"]').getAttribute('data-id')).toBe('53');
+        expect(row('NCR-053').querySelector('[data-action="openAddCAPAModal"]')).toBeNull();
+        expect(row('NCR-021').querySelector('[data-action="reviewPreviousNCR"]').getAttribute('data-id')).toBe('21');
+        expect(row('NCR-060').querySelector('[data-action="openAddCAPAModal"]').getAttribute('data-id')).toBe('60');
         expect(row('NCR-021').textContent).toContain('Retrained');
         expect(row('NCR-053').textContent).toContain('OVERDUE');
     });
@@ -83,7 +86,7 @@ describe('register forms redraw the screen they were opened from', () => {
         // Left: the two already-guarded redraws and the one inside refreshNCRViews.
         expect(afterSave).toHaveLength(3);
         expect(NCR_SRC).toContain("if (document.getElementById('exec-capa-register')) {");
-        expect((NCR_SRC.match(/refreshNCRViews\(\);/g) || []).length).toBe(6);
+        expect((NCR_SRC.match(/refreshNCRViews\(\);/g) || []).length).toBe(7); // + reviewPreviousNCR
     });
 });
 

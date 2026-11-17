@@ -2482,6 +2482,144 @@ window.verifyCAPA = function (ncrId) {
     };
     window.openModal();
 }
+
+// --- REVIEW A PREVIOUS AUDIT'S NC (one step, on site) ---
+// At a surveillance or recertification audit the auditor reviews each open NC
+// from the previous audit (ISO/IEC 17021-1 9.6.2.2 / 9.6.3.2): what the
+// organisation did, the evidence seen, and whether it worked. The register
+// needed two forms for that — + CAPA (the organisation's response) and then
+// Verify, which only appeared once an implementation date was on file — and an
+// NC whose action was still under way had no verdict at all. One form records
+// all of it. The report's Previous Findings Status reads the register, so it
+// follows without further entry.
+const PREV_REVIEW_OUTCOMES = {
+    closed: 'Closed — corrective action implemented and effective',
+    ineffective: 'Not effective — the action did not work or the nonconformity recurs',
+    open: 'Still open — action not yet complete'
+};
+
+/**
+ * Apply a review to a register record. Pure apart from mutating `ncr`.
+ * input: { outcome: 'closed'|'ineffective'|'open', correction, rootCause,
+ *          correctiveAction, implementedDate, evidence, targetDate }
+ * ctx:   { by, today }  (today as YYYY-MM-DD)
+ * Returns { ok: true } or { ok: false, error } and leaves `ncr` untouched on error.
+ */
+function applyPreviousNCRReview(ncr, input, ctx) {
+    const v = (k) => String((input && input[k]) || '').trim();
+    const outcome = v('outcome');
+    if (!PREV_REVIEW_OUTCOMES[outcome]) return { ok: false, error: 'Choose an outcome.' };
+    const evidence = v('evidence');
+    if (outcome === 'closed') {
+        if (!v('correctiveAction')) return { ok: false, error: 'To close it, record the corrective action the organisation took.' };
+        if (!v('implementedDate')) return { ok: false, error: 'To close it, record when the corrective action was implemented.' };
+    }
+    if (outcome !== 'open' && !evidence) {
+        return { ok: false, error: 'Record the evidence you reviewed — records sampled, people interviewed, what you saw.' };
+    }
+
+    ncr.correction = v('correction');
+    ncr.rootCause = v('rootCause');
+    ncr.correctiveAction = v('correctiveAction');
+    ncr.capaImplementedDate = v('implementedDate') || null;
+    if (outcome === 'open') {
+        if (v('targetDate')) ncr.dueDate = v('targetDate');
+        // A new action plan after a Not Effective verdict reopens the record.
+        if (ncr.carStatus === 'Ineffective') ncr.carStatus = 'Reopened';
+        ncr.carStatus = computeAutoCarStatus(ncr);
+        ncr.status = legacyStatusFromCar(ncr.carStatus);
+        // Still open is not a verification verdict: leave any earlier one alone.
+        return { ok: true };
+    }
+    ncr.verificationMethod = evidence;
+    ncr.verifiedBy = (ctx && ctx.by) || 'Auditor';
+    ncr.verifiedDate = (ctx && ctx.today) || new Date().toISOString().split('T')[0];
+    if (outcome === 'closed') {
+        ncr.effectiveness = 'Effective';
+        ncr.status = 'Closed';
+        ncr.carStatus = 'Closed';
+    } else {
+        ncr.effectiveness = 'Not Effective';
+        ncr.carStatus = 'Ineffective';
+        ncr.status = legacyStatusFromCar(ncr.carStatus);
+    }
+    return { ok: true };
+}
+window.NCRModule.applyPreviousNCRReview = applyPreviousNCRReview;
+window.NCRModule.PREV_REVIEW_OUTCOMES = PREV_REVIEW_OUTCOMES;
+
+window.reviewPreviousNCR = function (ncrId) {
+    const ncr = (window.state.ncrs || []).find(n => String(n.id) === String(ncrId));
+    if (!ncr) return;
+    if (!isMajorMinorNCR(ncr)) {
+        window.showNotification('Only Major and Minor nonconformities are followed up. Observations and OFIs need no verification.', 'warning');
+        return;
+    }
+    const esc = (s) => window.UTILS.escapeHtml(s == null ? '' : String(s));
+    const ref = 'NCR-' + String(ncr.id).padStart(3, '0');
+    const isClosed = ncr.status === 'Closed' || ncr.carStatus === 'Closed' || ncr.carStatus === 'Effective';
+    const current = isClosed ? 'closed' : (ncr.carStatus === 'Ineffective' ? 'ineffective' : '');
+    const clause = resolveClauseDisplay(ncr).text;
+    const sev = normalizedNCRSeverity(ncr) === 'major' ? 'Major' : 'Minor';
+    const outcomeHTML = Object.keys(PREV_REVIEW_OUTCOMES).map(k => `
+        <label style="display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.5rem 0.6rem; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 0.4rem; cursor: pointer; font-weight: 400;">
+            <input type="radio" name="prev-review-outcome" value="${k}" ${current === k ? 'checked' : ''} style="margin-top: 3px;">
+            <span>${esc(PREV_REVIEW_OUTCOMES[k])}</span>
+        </label>`).join('');
+
+    document.getElementById('modal-title').textContent = 'Review previous finding — ' + ref;
+    document.getElementById('modal-body').innerHTML = `
+        <form id="prev-review-form">
+            <div style="padding: 0.75rem; background: #f8fafc; border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--primary-color);">
+                <strong>${esc(ref)}</strong> · ${esc(sev)} · Clause ${esc(clause)}
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">${esc(resolveAuditRef(ncr))}</div>
+                <div style="margin-top: 0.35rem;">${esc(ncr.description || '')}</div>
+            </div>
+            <h4 style="font-size: 0.95rem; margin: 0 0 0.5rem;">What the organisation did</h4>
+            <div class="form-group"><label>Correction</label>
+                <textarea id="prev-review-correction" class="form-control" rows="2">${esc(ncr.correction)}</textarea></div>
+            <div class="form-group"><label>Root cause</label>
+                <textarea id="prev-review-rootcause" class="form-control" rows="2">${esc(ncr.rootCause)}</textarea></div>
+            <div class="form-group"><label>Corrective action</label>
+                <textarea id="prev-review-action" class="form-control" rows="2">${esc(ncr.correctiveAction)}</textarea></div>
+            <div class="form-group"><label>Implemented on</label>
+                <input type="date" id="prev-review-implemented" class="form-control" value="${esc(ncr.capaImplementedDate)}"></div>
+            <h4 style="font-size: 0.95rem; margin: 1rem 0 0.5rem;">Your review</h4>
+            <div class="form-group"><label>Evidence reviewed</label>
+                <textarea id="prev-review-evidence" class="form-control" rows="3" placeholder="Records sampled, people interviewed, what you saw">${esc(ncr.verificationMethod)}</textarea></div>
+            <div class="form-group"><label>Outcome</label>${outcomeHTML}</div>
+            <div class="form-group" id="prev-review-target-wrap"><label>New target date <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.8rem;">(still open only)</span></label>
+                <input type="date" id="prev-review-target" class="form-control" value="${esc(ncr.dueDate)}"></div>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">If the action was not effective, raise the nonconformity again in this audit's checklist as needed.</p>
+            <div id="prev-review-error" role="alert" style="display: none; color: var(--danger-color); font-size: 0.85rem; margin-top: 0.5rem;"></div>
+        </form>`;
+
+    const save = document.getElementById('modal-save');
+    save.style.display = 'block';
+    save.onclick = async () => {
+        const val = (id) => (document.getElementById(id) || {}).value || '';
+        const picked = document.querySelector('input[name="prev-review-outcome"]:checked');
+        const res = applyPreviousNCRReview(ncr, {
+            outcome: picked ? picked.value : '',
+            correction: val('prev-review-correction'),
+            rootCause: val('prev-review-rootcause'),
+            correctiveAction: val('prev-review-action'),
+            implementedDate: val('prev-review-implemented'),
+            evidence: val('prev-review-evidence'),
+            targetDate: val('prev-review-target')
+        }, { by: (window.state.currentUser && window.state.currentUser.name) || 'Auditor', today: new Date().toISOString().split('T')[0] });
+        if (!res.ok) {
+            const err = document.getElementById('prev-review-error');
+            if (err) { err.textContent = res.error; err.style.display = 'block'; }
+            return;
+        }
+        await persistNCR(ncr);
+        window.closeModal();
+        window.showNotification(ref + ' reviewed: ' + (ncr.status === 'Closed' ? 'closed' : ncr.carStatus === 'Ineffective' ? 'not effective' : 'still open') + '.', ncr.status === 'Closed' ? 'success' : 'warning');
+        refreshNCRViews();
+    };
+    window.openModal();
+};
 // --- UPDATE CAPA PROGRESS ---
 window.updateCAPAProgress = function (ncrId) {
     const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
@@ -2551,5 +2689,5 @@ window.switchNCRTab = switchNCRTab;
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getNCRAuditPlanOptions, updateNCRAuditPlanOptions, initNCRAnalyticsCharts, openNewNCRModal, viewNCRDetails, editNCR, openAddCAPAModal, printNCRRegister, verifyCAPA, updateCAPAProgress, renderNCRCAPAModule, switchNCRTab, capaDisplayStatus, isOverdueNCR };
+    module.exports = { getNCRAuditPlanOptions, updateNCRAuditPlanOptions, initNCRAnalyticsCharts, openNewNCRModal, viewNCRDetails, editNCR, openAddCAPAModal, printNCRRegister, verifyCAPA, updateCAPAProgress, renderNCRCAPAModule, switchNCRTab, capaDisplayStatus, isOverdueNCR, applyPreviousNCRReview };
 }

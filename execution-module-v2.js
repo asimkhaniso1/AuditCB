@@ -1342,10 +1342,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const isClosed = (n) => n.status === 'Closed' || n.carStatus === 'Closed' || n.carStatus === 'Effective';
             const registerNcrs = (window.state.ncrs || []).filter(live);
             const thisAudit = registerNcrs.filter(n => report.planId != null && String(n.auditId) === String(report.planId));
-            const previous = registerNcrs.filter(n => !thisAudit.includes(n) && sameClient(n) && !isClosed(n));
+            // Previous audits' NCs: every open one, plus any closed by a review
+            // made during this audit, so a reviewed finding stays in view
+            // instead of dropping off the list the moment it is closed.
+            const auditStart = String(report.date || '').slice(0, 10);
+            const reviewedHere = (n) => !!(auditStart && n.verifiedDate && String(n.verifiedDate).slice(0, 10) >= auditStart);
+            const previous = registerNcrs.filter(n => !thisAudit.includes(n) && sameClient(n) && (!isClosed(n) || reviewedHere(n)));
+            const previousOpen = previous.filter(n => !isClosed(n)).length;
             const legacyCapas = report.capas || [];
 
-            const rowHTML = (n) => {
+            const rowHTML = (n, isPrevious) => {
                 const ref = 'NCR-' + String(n.id).padStart(3, '0');
                 const sev = String(n.severity || n.type || '').toLowerCase() === 'major' ? 'Major' : 'Minor';
                 const overdue = typeof NM.isOverdue === 'function' ? NM.isOverdue(n) : false;
@@ -1368,16 +1374,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <td>${esc(status)}${n.capaImplementedDate ? `<div style="font-size: 0.75rem; color: var(--text-secondary);">Implemented ${esc(n.capaImplementedDate)}</div>` : ''}</td>
                         <td style="white-space: nowrap;">
                             <button class="btn btn-sm btn-icon" data-action="viewNCRDetails" data-id="${esc(String(n.id))}" title="View details" aria-label="View"><i class="fa-solid fa-eye" style="color: var(--primary-color);"></i></button>
-                            ${canAdd ? `<button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" data-action="openAddCAPAModal" data-id="${esc(String(n.id))}" title="Record correction, root cause, corrective action and implementation"><i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>CAPA</button>` : ''}
-                            ${canVerify ? `<button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" data-action="verifyCAPA" data-id="${esc(String(n.id))}" title="Record verification and effectiveness; Effective closes the NCR"><i class="fa-solid fa-check"></i> Verify</button>` : ''}
+                            ${isPrevious ? `<button class="btn btn-sm btn-primary" style="margin-left: 0.25rem;" data-action="reviewPreviousNCR" data-id="${esc(String(n.id))}" title="Record what the organisation did, the evidence you saw and the outcome: closed, not effective or still open"><i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i>${isClosed(n) ? 'Edit review' : 'Review'}</button>` : ''}
+                            ${!isPrevious && canAdd ? `<button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" data-action="openAddCAPAModal" data-id="${esc(String(n.id))}" title="Record correction, root cause, corrective action and implementation"><i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>CAPA</button>` : ''}
+                            ${!isPrevious && canVerify ? `<button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" data-action="verifyCAPA" data-id="${esc(String(n.id))}" title="Record verification and effectiveness; Effective closes the NCR"><i class="fa-solid fa-check"></i> Verify</button>` : ''}
                         </td>
                     </tr>`;
             };
-            const tableHTML = (list, empty) => list.length ? `
+            const tableHTML = (list, empty, isPrevious) => list.length ? `
                 <div class="table-container">
                     <table>
                         <thead><tr><th>NCR #</th><th>Clause</th><th>Severity</th><th>CAPA</th><th>Due date</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody>${list.map(rowHTML).join('')}</tbody>
+                        <tbody>${list.map(n => rowHTML(n, isPrevious)).join('')}</tbody>
                     </table>
                 </div>` : `<p style="color: var(--text-secondary); padding: 0.75rem 0;">${empty}</p>`;
 
@@ -1386,12 +1393,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div style="margin-bottom: 1rem;">
                         <h3 style="margin: 0;">Corrective Actions (CAPA)</h3>
                         <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.85rem;">
-                            From the NCR & CAPA register. <strong>+ CAPA</strong> records the organisation's correction, root cause, corrective action and implementation date; <strong>Verify</strong> then records how you verified it, and <em>Effective</em> closes the NCR. Observations and OFIs need no CAPA.
+                            From the NCR & CAPA register. For a previous audit's nonconformity, <strong>Review</strong> records in one step what the organisation did, the evidence you saw and the outcome; the report's Previous Findings Status follows. For this audit's, <strong>+ CAPA</strong> records the organisation's correction, root cause, corrective action and implementation date; <strong>Verify</strong> then records how you verified it, and <em>Effective</em> closes the NCR. Observations and OFIs need no CAPA.
                         </p>
                     </div>
 
-                    <h4 style="font-size: 1rem; margin: 1rem 0 0.5rem;">Previous audits — nonconformities to verify (${previous.length})</h4>
-                    ${tableHTML(previous, 'No open nonconformities from previous audits.')}
+                    <h4 style="font-size: 1rem; margin: 1rem 0 0.5rem;">Previous audits — nonconformities to review (${previousOpen} open${previous.length > previousOpen ? `, ${previous.length - previousOpen} closed in this audit` : ''})</h4>
+                    ${tableHTML(previous, 'No open nonconformities from previous audits.', true)}
 
                     <h4 style="font-size: 1rem; margin: 1.5rem 0 0.5rem;">This audit — nonconformities (${thisAudit.length})</h4>
                     ${tableHTML(thisAudit, 'No Major or Minor nonconformities raised in this audit yet. Flag a checklist question, classify it Major or Minor and click Save Progress; it appears here.')}
