@@ -411,6 +411,35 @@ function recoverClientDocumentReferences(client) {
     return [...unique.values()];
 }
 
+// Client Documents search. Each document's two rows (details + notes) share
+// one <tbody class="client-doc-group">, so a filter hides or shows them
+// together. The search text covers the row number, name, revision, category
+// and linked clauses; several words must all match, and a number on its own
+// matches that document's number exactly.
+window.clientDocSearchText = function (doc, no) {
+    return [no, doc && doc.name, doc && doc.revision, doc && doc.category, doc && doc.linkedClauses, doc && doc.type]
+        .filter(v => v != null && v !== '').join(' ').toLowerCase();
+};
+window.filterClientDocuments = function (el) {
+    const input = el && el.value !== undefined ? el : document.getElementById('client-docs-search');
+    const q = String((input && input.value) || '').trim().toLowerCase();
+    const groups = Array.from(document.querySelectorAll('#client-docs-table .client-doc-group'));
+    const words = q.split(/\s+/).filter(Boolean);
+    let shown = 0;
+    groups.forEach(g => {
+        const hay = g.getAttribute('data-search') || '';
+        const match = !words.length
+            || (/^\d+$/.test(q) ? g.getAttribute('data-doc-no') === q : words.every(w => hay.includes(w)));
+        g.style.display = match ? '' : 'none';
+        if (match) shown++;
+    });
+    const count = document.getElementById('client-docs-count');
+    if (count) count.textContent = words.length ? `${shown} of ${groups.length} documents` : `${groups.length} document${groups.length === 1 ? '' : 's'}`;
+    const none = document.getElementById('client-docs-none');
+    if (none) none.style.display = shown ? 'none' : 'block';
+    return shown;
+};
+
 function getClientDocumentsHTML(client) {
     const savedDocs = client.documents || [];
     const savedNames = new Set(savedDocs.map(doc => String(doc.name || '').trim().toLowerCase()));
@@ -452,10 +481,18 @@ function getClientDocumentsHTML(client) {
             
             ${recoveredDocs.length ? `<div class="alert alert-warning" style="margin-bottom:1rem;"><strong>Document references recovered from the client-specific checklist.</strong> Their original attachments were not retained by the previous sync. Re-upload any files you need to open or download.</div>` : ''}
             ${docs.length > 0 ? `
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
+                    <div style="position: relative; flex: 1; min-width: 240px; max-width: 460px;">
+                        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.85rem;"></i>
+                        <input type="search" id="client-docs-search" class="form-control" placeholder="Search by name, number, clause or revision" autocomplete="off" data-action-input="filterClientDocuments" style="padding-left: 2rem;" aria-label="Search documents">
+                    </div>
+                    <span id="client-docs-count" style="font-size: 0.82rem; color: var(--text-secondary);">${docs.length} document${docs.length === 1 ? '' : 's'}</span>
+                </div>
                 <div class="table-container">
-                    <table>
+                    <table id="client-docs-table">
                         <thead>
                             <tr>
+                                <th style="width: 48px;">#</th>
                                 <th>Document Name</th>
                                 <th>Category</th>
                                 <th>Revision</th>
@@ -464,9 +501,10 @@ function getClientDocumentsHTML(client) {
                                 <th style="width: 80px;">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            ${docs.map(doc => `
+                            ${docs.map((doc, docIdx) => `
+                                <tbody class="client-doc-group" data-doc-no="${docIdx + 1}" data-search="${window.UTILS.escapeHtml(window.clientDocSearchText(doc, docIdx + 1))}">
                                 <tr>
+                                    <td style="font-weight: 600; color: var(--text-secondary);">${docIdx + 1}</td>
                                     <td>
                                         <i class="fa-solid fa-file-${doc.type === 'PDF' ? 'pdf' : doc.category === 'System Manual' ? 'book' : doc.category === 'Process Map' ? 'diagram-project' : 'lines'}" style="color: var(--text-secondary); margin-right: 0.5rem;"></i>
                                         ${window.UTILS.escapeHtml(doc.name)}
@@ -489,11 +527,12 @@ function getClientDocumentsHTML(client) {
                                     const preview = window.ClientDocsBulk?.notePreview
                                         ? window.ClientDocsBulk.notePreview(doc.notes, doc.name, 200)
                                         : String(doc.notes || '').slice(0, 200);
-                                    return preview ? `<tr><td colspan="6" style="padding: 4px 12px 10px 36px; font-size: 0.82rem; color: #475569; background: #fafafa; border-bottom: 1px solid #f1f5f9;"><i class="fa-solid fa-sticky-note" style="color:#f59e0b;margin-right:6px;font-size:0.7rem;"></i>${window.UTILS.escapeHtml(preview)}</td></tr>` : '';
+                                    return preview ? `<tr><td colspan="7" style="padding: 4px 12px 10px 36px; font-size: 0.82rem; color: #475569; background: #fafafa; border-bottom: 1px solid #f1f5f9;"><i class="fa-solid fa-sticky-note" style="color:#f59e0b;margin-right:6px;font-size:0.7rem;"></i>${window.UTILS.escapeHtml(preview)}</td></tr>` : '';
                                 })()}
+                                </tbody>
                             `).join('')}
-                        </tbody>
                     </table>
+                    <p id="client-docs-none" style="display: none; text-align: center; padding: 1.5rem; color: var(--text-secondary);">No documents match your search.</p>
                 </div>
             ` : `
                 <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
