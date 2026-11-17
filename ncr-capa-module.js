@@ -1015,17 +1015,10 @@ function getNCRRegisterHTML() {
     `;
 }
 
-function renderNCRTable(ncrs) {
-    if (ncrs.length === 0) {
-        return `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No NCRs found.</p>`;
-    }
-
-    const today = new Date();
-    const esc = window.UTILS.escapeHtml;
-
-    // Grouped by audit, newest first, like the OBS / OFI register: the audit is a
-    // heading row instead of a column on every line. The client goes in the
-    // heading only when the list spans more than one client (the global view).
+// Register records grouped by audit, newest audit first: the audit becomes a
+// heading row instead of a column on every line. The client goes in the
+// heading only when the list spans more than one client (the global view).
+function groupNCRsByAudit(ncrs) {
     const clientOf = (n) => String(n.clientName || n.client || '').trim();
     const multiClient = new Set(ncrs.map(clientOf)).size > 1;
     const planDate = (n) => {
@@ -1042,7 +1035,20 @@ function renderNCRTable(ncrs) {
         }
         g.items.push(n);
     });
-    groups.sort((x, y) => y.date.localeCompare(x.date));
+    return groups.sort((x, y) => y.date.localeCompare(x.date));
+}
+window.NCRModule.groupNCRsByAudit = groupNCRsByAudit;
+
+function renderNCRTable(ncrs) {
+    if (ncrs.length === 0) {
+        return `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No NCRs found.</p>`;
+    }
+
+    const today = new Date();
+    const esc = window.UTILS.escapeHtml;
+
+    // Grouped by audit, newest first, like the OBS / OFI register.
+    const groups = groupNCRsByAudit(ncrs);
     const sevCount = (items, sev) => items.filter(n => normalizedNCRSeverity(n) === sev).length;
 
     const rowHTML = (ncr) => {
@@ -1693,48 +1699,64 @@ function getCAPATrackerHTML() {
                 </label>
             </div>
 
+            ${capaTrackerTableHTML(ncrs)}
+        </div>
+    `;
+}
+
+// CAPA Tracker table, in the registers' style: grouped by audit (heading row
+// with open / overdue counts), no Client or Audit column, root cause and
+// corrective action wrapped, smaller text, icon actions.
+function capaTrackerTableHTML(ncrs) {
+    const esc = window.UTILS.escapeHtml;
+    const clamp = (text, lines, empty) => text
+        ? `<div title="${esc(text)}" style="display: -webkit-box; -webkit-line-clamp: ${lines}; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35;">${esc(text)}</div>`
+        : `<span style="color: #94a3b8;">${empty}</span>`;
+    const groups = groupNCRsByAudit(ncrs);
+    const row = (ncr) => {
+        const major = normalizedNCRSeverity(ncr) === 'major';
+        const overdue = isOverdueNCR(ncr);
+        const canVerify = (ncr.status === 'In Progress' || ncr.status === 'Verification') && ncr.capaImplementedDate;
+        return `
+                        <tr class="capa-row" style="${overdue ? 'background: #fef2f2;' : ''}">
+                            <td style="white-space: nowrap;"><strong>NCR-${String(ncr.id).padStart(3, '0')}</strong></td>
+                            <td><span class="badge" style="background: ${major ? '#dc2626' : '#f59e0b'}; color: white;">${major ? 'Major' : 'Minor'}</span></td>
+                            <td>${clamp(ncr.rootCause, 2, 'Pending analysis')}</td>
+                            <td>${clamp(ncr.correctiveAction, 3, 'Not yet defined')}</td>
+                            <td>${ncr.capaResponsible ? esc(ncr.capaResponsible) : '<span style="color: #94a3b8;">Not assigned</span>'}</td>
+                            <td style="white-space: nowrap;">${ncr.dueDate ? window.UTILS.formatDate(ncr.dueDate) : '-'}${overdue ? '<div style="color: #dc2626; font-size: 0.72rem; font-weight: bold;">OVERDUE</div>' : ''}</td>
+                            <td style="font-size: 0.78rem;">${esc(capaDisplayStatus(ncr))}</td>
+                            <td style="white-space: nowrap;">
+                                <button class="btn btn-sm btn-icon" data-action="viewNCRDetails" data-id="${ncr.id}" title="View details" aria-label="View"><i class="fa-solid fa-eye" style="color: var(--primary-color);"></i></button>
+                                <button class="btn btn-sm btn-icon" data-action="updateCAPAProgress" data-id="${ncr.id}" title="Update CAPA progress" aria-label="Update CAPA"><i class="fa-solid fa-pen-to-square" style="color: #b45309;"></i></button>
+                                ${canVerify ? `<button class="btn btn-sm btn-icon" data-action="verifyCAPA" data-id="${ncr.id}" title="Verify CAPA (Effective closes the NCR)" aria-label="Verify CAPA"><i class="fa-solid fa-circle-check" style="color: #3b82f6;"></i></button>` : ''}
+                            </td>
+                        </tr>`;
+    };
+    return `
             <div class="table-container">
-                <table>
+                <table class="capa-tracker-table" style="font-size: 0.85rem; table-layout: auto;">
                     <thead>
                         <tr>
-                            <th>NCR#</th>
-                            <th>Client</th>
-                            <th>Audit</th>
-                            <th>Severity</th>
-                            <th>Root Cause</th>
+                            <th style="width: 84px;">NCR#</th>
+                            <th style="width: 64px;">Severity</th>
+                            <th style="width: 22%;">Root Cause</th>
                             <th>Corrective Action</th>
-                            <th>Responsible</th>
-                            <th>Target Date</th>
-                            <th>Action</th>
+                            <th style="width: 110px;">Responsible</th>
+                            <th style="width: 100px;">Target Date</th>
+                            <th style="width: 110px;">Status</th>
+                            <th style="width: 100px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${ncrs.map(ncr => `
-                            <tr>
-                                <td><strong>NCR-${String(ncr.id).padStart(3, '0')}</strong></td>
-                                <td>${window.UTILS.escapeHtml(ncr.clientName || '')}</td>
-                                <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(resolveAuditRef(ncr))}</td>
-                                <td>
-                                    <span class="badge" style="background: ${ncr.severity === 'Major' ? '#dc2626' : '#f59e0b'}; color: white;">
-                                        ${ncr.severity}
-                                    </span>
-                                </td>
-                                <td style="max-width: 200px;">${window.UTILS.escapeHtml(ncr.rootCause || 'Pending analysis')}</td>
-                                <td style="max-width: 250px;">${window.UTILS.escapeHtml(ncr.correctiveAction || 'Not yet defined')}</td>
-                                <td>${window.UTILS.escapeHtml(ncr.capaResponsible || 'Not assigned')}</td>
-                                <td>${ncr.dueDate ? window.UTILS.formatDate(ncr.dueDate) : '-'}</td>
-                                <td>
-                                    <button class="btn btn-sm" data-action="updateCAPAProgress" data-id="${ncr.id}" aria-label="Edit">
-                                        <i class="fa-solid fa-edit"></i> Update
-                                    </button>
-                                </td>
-                            </tr>
-                        `).join('')}
+                        ${groups.map(g => `
+                        <tr class="capa-group-row" style="background: #f1f5f9;">
+                            <td colspan="8" style="font-weight: 600; color: #334155;">${esc(g.label)}<span style="font-weight: 400; color: var(--text-secondary);"> &middot; ${g.items.length} CAPA${g.items.length === 1 ? '' : 's'}${g.items.some(isOverdueNCR) ? ` &middot; <span style="color: #dc2626;">${g.items.filter(isOverdueNCR).length} overdue</span>` : ''}</span></td>
+                        </tr>
+                        ${g.items.map(row).join('')}`).join('')}
                     </tbody>
                 </table>
-            </div>
-        </div>
-    `;
+            </div>`;
 }
 
 // --------------------------------------------
