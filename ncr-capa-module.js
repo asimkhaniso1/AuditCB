@@ -1184,76 +1184,157 @@ function getOFIOBSHTML() {
         });
     });
 
-    const obsCount = findings.filter(f => f.type === 'OBS').length;
-    const ofiCount = findings.filter(f => f.type === 'OFI').length;
+    // Same row shape as the NCR Register: one line per finding, a reference, the
+    // audit it came from, and actions. Numbered per type (OBS-001, OFI-001) in
+    // audit order, newest audit first.
+    findings.forEach(f => {
+        const report = reports.find(r => String(r.id) === String(f.reportId)) || {};
+        f.auditRef = resolveAuditRef({ auditId: report.planId, raisedDate: f.auditDate });
+    });
+    findings.sort((a, b) => String(b.auditDate || '').localeCompare(String(a.auditDate || '')));
+    const seq = { OBS: 0, OFI: 0 };
+    findings.forEach(f => { seq[f.type] += 1; f.refNo = f.type + '-' + String(seq[f.type]).padStart(3, '0'); });
+    window._ofiObsFindings = findings;
+
+    const obsCount = seq.OBS;
+    const ofiCount = seq.OFI;
 
     return `
         <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h3 style="color: var(--primary-color); margin: 0;">
-                    <i class="fa-solid fa-lightbulb" style="margin-right: 0.5rem;"></i>
-                    Observations & Opportunities for Improvement
-                </h3>
-            </div>
-
-            <!-- KPI Cards -->
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                <div class="card" style="background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); color: white; padding: 1.25rem; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold;">${findings.length}</div>
-                    <div style="opacity: 0.9; font-size: 0.85rem;">Total Findings</div>
-                </div>
-                <div class="card" style="background: linear-gradient(135deg, #8b5cf6 0%, #c4b5fd 100%); color: white; padding: 1.25rem; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold;">${obsCount}</div>
-                    <div style="opacity: 0.9; font-size: 0.85rem;">Observations (OBS)</div>
-                </div>
-                <div class="card" style="background: linear-gradient(135deg, #0891b2 0%, #67e8f9 100%); color: white; padding: 1.25rem; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold;">${ofiCount}</div>
-                    <div style="opacity: 0.9; font-size: 0.85rem;">Opportunities (OFI)</div>
+                <div>
+                    <h3 style="color: var(--primary-color); margin: 0;">
+                        <i class="fa-solid fa-lightbulb" style="margin-right: 0.5rem;"></i>
+                        OBS / OFI Register
+                    </h3>
+                    <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.85rem;">${obsCount} observation${obsCount === 1 ? '' : 's'} &middot; ${ofiCount} opportunit${ofiCount === 1 ? 'y' : 'ies'} for improvement</p>
                 </div>
             </div>
 
-            <div style="background: #f0fdf4; border-left: 3px solid #22c55e; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.85rem; color: #166534;">
+            <div style="background: #f0fdf4; border-left: 3px solid #22c55e; padding: 0.6rem 1rem; border-radius: 6px; margin-bottom: 1.25rem; font-size: 0.85rem; color: #166534;">
                 <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                Observations and opportunities for improvement do not require corrective action. An observation needs the organisation's evaluation and a disposition; an opportunity for improvement needs its decision to accept or reject it (a rationale is optional). Neither needs a root cause or an effectiveness check unless the organisation chooses to open a corrective action.
+                Not NCRs: no corrective action is required. An observation needs the organisation's evaluation and a disposition; an OFI needs its decision to accept or reject it. Neither needs a root cause or an effectiveness check unless the organisation opens a corrective action.
             </div>
 
-            ${findings.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No OFI/OBS findings recorded across audits.</p>' : `
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>Clause</th>
-                            <th>Description</th>
-                            <th>Client</th>
-                            <th>Audit Date</th>
-                            <th>Standard</th>
-                            <th>Organisation's response</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${findings.map(f => `
-                            <tr>
-                                <td>
-                                    <span class="badge" style="background: ${f.type === 'OFI' ? '#0891b2' : '#7c3aed'}; color: white; font-size: 0.75rem;">
-                                        ${f.type}
-                                    </span>
-                                </td>
-                                <td>${renderClauseCell(f)}</td>
-                                <td style="max-width: 350px;">${window.UTILS.escapeHtml(f.description || '-')}</td>
-                                <td>${window.UTILS.escapeHtml(f.client)}</td>
-                                <td>${window.UTILS.formatDate(f.auditDate)}</td>
-                                <td>${window.UTILS.escapeHtml(f.standard || '-')}</td>
-                                <td>${findingResponseCellHTML(f)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+            <!-- Filters -->
+            <div class="card" style="background: #f8fafc; padding: 1rem; margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                    <div class="form-group" style="margin: 0;">
+                        <label style="font-size: 0.85rem; margin-bottom: 0.3rem;">Type</label>
+                        <select class="form-control" id="ofiobs-filter-type" data-action-change="filterOFIOBS" style="font-size: 0.9rem;">
+                            <option value="all">All</option>
+                            <option value="OBS">Observation (OBS)</option>
+                            <option value="OFI">Opportunity for improvement (OFI)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="font-size: 0.85rem; margin-bottom: 0.3rem;">Response</label>
+                        <select class="form-control" id="ofiobs-filter-response" data-action-change="filterOFIOBS" style="font-size: 0.9rem;">
+                            <option value="all">All</option>
+                            <option value="awaiting">Awaiting response</option>
+                            <option value="responded">Responded</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="font-size: 0.85rem; margin-bottom: 0.3rem;">Search</label>
+                        <input type="text" class="form-control" id="ofiobs-filter-search" placeholder="Search..." data-action-input="filterOFIOBS" style="font-size: 0.9rem;">
+                    </div>
+                </div>
             </div>
-            `}
+
+            <div class="table-container" id="ofi-obs-table-container">
+                ${renderOFIOBSTable(findings)}
+            </div>
         </div>
     `;
 }
+
+function renderOFIOBSTable(findings) {
+    if (!findings.length) {
+        return '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No observations or opportunities for improvement found.</p>';
+    }
+    const esc = window.UTILS.escapeHtml;
+    return `
+        <table>
+            <thead>
+                <tr>
+                    <th>Ref#</th>
+                    <th>Level</th>
+                    <th>Client</th>
+                    <th>Audit</th>
+                    <th>Clause</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Response</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${findings.map(f => `
+                    <tr>
+                        <td><strong>${esc(f.refNo)}</strong></td>
+                        <td><span class="badge" style="background: #0284c7; color: white; font-size: 0.75rem;">Client</span></td>
+                        <td>${esc(f.client || 'N/A')}</td>
+                        <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-secondary);">${esc(f.auditRef || '-')}</td>
+                        <td>${renderClauseCell(f)}</td>
+                        <td><span class="badge" style="background: ${f.type === 'OFI' ? '#0891b2' : '#7c3aed'}; color: white;">${f.type}</span></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${esc(f.description || '')}">${esc(f.description || '-')}</td>
+                        <td>${findingResponseStatusHTML(f)}</td>
+                        <td style="white-space: nowrap;">${findingResponseActionsHTML(f)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function ofiObsResponded(f) {
+    const FW = window.FindingWorkflow;
+    if (!FW || !f.record) return false;
+    const rec = Object.assign({}, f.record, { type: f.type === 'OFI' ? 'ofi' : 'observation' });
+    return f.type === 'OFI' ? !!rec.ofiDecision : !!FW.evaluate(rec).complete;
+}
+
+window.filterOFIOBS = function () {
+    const type = String(document.getElementById('ofiobs-filter-type')?.value || 'all');
+    const response = String(document.getElementById('ofiobs-filter-response')?.value || 'all');
+    const search = String(document.getElementById('ofiobs-filter-search')?.value || '').trim().toLowerCase();
+    const filtered = (window._ofiObsFindings || []).filter(f => {
+        if (type !== 'all' && f.type !== type) return false;
+        if (response === 'awaiting' && ofiObsResponded(f)) return false;
+        if (response === 'responded' && !ofiObsResponded(f)) return false;
+        if (search) {
+            const hay = [f.refNo, f.description, f.clause, f.client, f.auditRef].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+    const box = document.getElementById('ofi-obs-table-container');
+    if (box) box.innerHTML = renderOFIOBSTable(filtered);
+};
+
+window.viewFindingDetails = function (reportId, list, index) {
+    const f = (window._ofiObsFindings || []).find(x => String(x.reportId) === String(reportId) && x.ref.list === list && String(x.ref.index) === String(index));
+    if (!f) return;
+    const esc = window.UTILS.escapeHtml;
+    document.getElementById('modal-title').textContent = `${f.refNo} — ${f.type === 'OFI' ? 'Opportunity for improvement' : 'Observation'}`;
+    document.getElementById('modal-body').innerHTML = `
+        <div style="padding: 1rem;">
+            <p style="white-space: pre-wrap; line-height: 1.5;">${esc(f.description || '-')}</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div><strong>Clause:</strong> ${esc(resolveClauseDisplay(f).text)}</div>
+                <div><strong>Audit:</strong> ${esc(f.auditRef || '-')}</div>
+                <div><strong>Client:</strong> ${esc(f.client || '-')}</div>
+                <div><strong>Standard:</strong> ${esc(f.standard || '-')}</div>
+            </div>
+            <hr>
+            <h5>Organisation's response</h5>
+            ${findingResponseStatusHTML(f)}
+        </div>
+    `;
+    document.getElementById('modal-save').style.display = 'none';
+    window.openModal();
+};
 
 // --------------------------------------------
 // OBSERVATION / OFI RESPONSE (finding-workflow.js)
@@ -1272,23 +1353,32 @@ function findingRecordFor(reportId, ref) {
     return { report, record: (list || [])[ref.index] || null };
 }
 
-function findingResponseCellHTML(f) {
+function findingResponseStatusHTML(f) {
     const FW = window.FindingWorkflow;
     if (!FW || !f.record) return '<span style="color:#94a3b8;">&mdash;</span>';
     const esc = window.UTILS.escapeHtml;
     const rec = Object.assign({}, f.record, { type: f.type === 'OFI' ? 'ofi' : 'observation' });
     const ev = FW.evaluate(rec);
     const what = f.type === 'OFI'
-        ? (rec.ofiDecision ? `Decision: ${esc(rec.ofiDecision)}${rec.improvementRegisterRef ? ` &middot; ${esc(rec.improvementRegisterRef)}` : ''}` : 'Awaiting the organisation\u2019s decision')
+        ? (rec.ofiDecision ? `Decision: ${esc(rec.ofiDecision)}${rec.improvementRegisterRef ? ` &middot; ${esc(rec.improvementRegisterRef)}` : ''}` : 'Awaiting the organisation’s decision')
         : (ev.complete ? `Evaluated &middot; ${esc(rec.disposition || '')}` : `Awaiting: ${esc(ev.missing.map(m => m.label.toLowerCase()).join(', '))}`);
-    const arg = `data-arg1="${esc(String(f.reportId))}" data-arg2="${esc(f.ref.list)}" data-arg3="${esc(String(f.ref.index))}"`;
-    return `<div style="font-size:0.8rem;color:${ev.complete ? '#166534' : '#92400e'};">${what}</div>
-        <div style="margin-top:0.25rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
-            <button class="btn btn-sm btn-secondary" data-action="openFindingResponse" ${arg}>${ev.complete ? 'Edit' : 'Record'} response</button>
-            ${f.type === 'OBS' && !rec.escalatedToNcr ? `<button class="btn btn-sm btn-secondary" data-action="escalateObservationToNCR" ${arg} title="Only on objective evidence that a requirement was not fulfilled">Escalate to NCR</button>` : ''}
-            ${rec.escalatedToNcr ? `<span style="font-size:0.75rem;color:#7c3aed;">Escalated &rarr; ${esc(ncrRefLabel(rec.escalatedToNcr))}</span>` : ''}
-        </div>`;
+    return `<div style="font-size:0.8rem;color:${ev.complete ? '#166534' : '#92400e'};">${what}</div>`
+        + (rec.escalatedToNcr ? `<div style="font-size:0.75rem;color:#7c3aed;">Escalated &rarr; ${esc(ncrRefLabel(rec.escalatedToNcr))}</div>` : '');
 }
+
+function findingResponseActionsHTML(f) {
+    const FW = window.FindingWorkflow;
+    const esc = window.UTILS.escapeHtml;
+    const arg = `data-arg1="${esc(String(f.reportId))}" data-arg2="${esc(f.ref.list)}" data-arg3="${esc(String(f.ref.index))}"`;
+    const view = `<button class="btn btn-sm btn-icon" data-action="viewFindingDetails" ${arg} title="View details" aria-label="View"><i class="fa-solid fa-eye" style="color: var(--primary-color);"></i></button>`;
+    if (!FW || !f.record) return view;
+    const rec = Object.assign({}, f.record, { type: f.type === 'OFI' ? 'ofi' : 'observation' });
+    const done = f.type === 'OFI' ? !!rec.ofiDecision : FW.evaluate(rec).complete;
+    return view
+        + `<button class="btn btn-sm btn-secondary" style="margin-left: 0.25rem;" data-action="openFindingResponse" ${arg}>${done ? 'Edit' : 'Record'} response</button>`
+        + (f.type === 'OBS' && !rec.escalatedToNcr ? `<button class="btn btn-sm btn-secondary" style="margin-left: 0.25rem;" data-action="escalateObservationToNCR" ${arg} title="Only on objective evidence that a requirement was not fulfilled">Escalate to NCR</button>` : '');
+}
+
 
 window.openFindingResponse = function (reportId, list, index) {
     const { record } = findingRecordFor(reportId, { list, index: Number(index) });
