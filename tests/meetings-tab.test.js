@@ -148,3 +148,49 @@ describe('save', () => {
         expect(report.closingMeeting.summary).toBe('1 Minor, 2 OBS');
     });
 });
+
+describe('bulk ticks', () => {
+    it('Select all ticks and clears a whole list, and follows the list', () => {
+        render(report);
+        const all = document.querySelector(".meeting-select-all[data-target='.opening-pointer']");
+        expect(all).not.toBeNull();
+        all.checked = true;
+        window.toggleMeetingSelectAll(all);
+        const points = Array.from(document.querySelectorAll('.opening-pointer'));
+        expect(points.length).toBe(9);
+        expect(points.every(cb => cb.checked)).toBe(true);
+        points[0].checked = false;
+        window.syncMeetingSelectAll();
+        expect(all.checked).toBe(false);
+        expect(all.indeterminate).toBe(true);
+        window.saveMeetingRecords('r1');
+        expect(Object.values(synced.openingMeeting.keyPointers).filter(Boolean)).toHaveLength(8);
+    });
+
+    it('each attendee group has its own Select all', () => {
+        render(report);
+        const team = document.querySelector(".meeting-select-all[data-target=\".closing-attendee-cb[data-group='team']\"]");
+        const client = document.querySelector(".meeting-select-all[data-target=\".closing-attendee-cb[data-group='client']\"]");
+        client.checked = true;
+        window.toggleMeetingSelectAll(client);
+        expect(document.querySelector('.closing-attendee-cb[data-name="Samantha Johnston"]').checked).toBe(true);
+        expect(document.querySelector('.closing-attendee-cb[data-name="Muhammad Asim Khan"]').checked).toBe(false);
+        expect(team.checked).toBe(false);
+    });
+
+    it('starts ticked when the saved list is all ticked', () => {
+        report.closingMeeting = { keyPointers: Object.fromEntries(['cl-findings', 'cl-ncr-severity', 'cl-capa-timelines', 'cl-positive', 'cl-recommendation', 'cl-appeals', 'cl-followup', 'cl-remote-evidence', 'cl-cert-scope'].map(k => [k, true])) };
+        render(report);
+        expect(document.querySelector(".meeting-select-all[data-target='.closing-pointer']").checked).toBe(true);
+    });
+
+    it('Same as opening copies the opening attendees, including added people', () => {
+        render(report);
+        document.querySelector('.opening-attendee-cb[data-name="Samantha Johnston"]').checked = true;
+        document.getElementById('opening-custom-name').value = 'Ken Mason';
+        window.addCustomMeetingAttendee('opening');
+        window.copyOpeningAttendeesToClosing();
+        window.saveMeetingRecords('r1');
+        expect(synced.closingMeeting.attendees.map(a => a.name)).toEqual(['Samantha Johnston', 'Ken Mason']);
+    });
+});

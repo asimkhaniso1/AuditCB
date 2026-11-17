@@ -821,6 +821,21 @@ function renderNCRCAPAModuleContent(clientId) {
     updateNCRAnalytics();
 }
 
+// After a register record is saved from a form, redraw whatever is showing it:
+// the NCR & CAPA page when that is on screen, or the audit execution CAPA tab
+// (which uses these same forms) without navigating away from the audit.
+function refreshNCRViews() {
+    if (document.getElementById('ncr-content')) {
+        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+        return;
+    }
+    if (document.getElementById('exec-capa-register')) {
+        const tabBtn = document.querySelector('.tab-btn[data-tab="capa"]');
+        if (tabBtn) tabBtn.click();
+    }
+}
+window.refreshNCRViews = refreshNCRViews;
+
 function switchNCRTab(tabName, btnElement) {
     document.querySelectorAll('#ncr-content ~ .tab-btn, .tab-container .tab-btn').forEach(btn => btn.classList.remove('active'));
     if (btnElement) btnElement.classList.add('active');
@@ -2046,7 +2061,7 @@ window.editNCR = function (ncrId) {
         ncr.source = document.getElementById('edit-source').value;
         await persistNCR(ncr);
         window.closeModal();
-        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+        refreshNCRViews();
     };
     window.openModal();
 };
@@ -2137,7 +2152,7 @@ window.openAddCAPAModal = function (ncrId) {
         ncr.status = legacyStatusFromCar(ncr.carStatus);
         await persistNCR(ncr);
         window.closeModal();
-        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+        refreshNCRViews();
     };
     window.openModal();
 };
@@ -2158,7 +2173,7 @@ window.deleteNCR = async function (id) {
     ncr.withdrawnDate = new Date().toISOString().split('T')[0];
     window.saveData();
     await persistNCR(ncr);
-    renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+    refreshNCRViews();
     window.showNotification('NCR withdrawn', 'success');
 };
 
@@ -2339,7 +2354,7 @@ window.openNCRDuplicateReview = function () {
         if (window.saveData) window.saveData();
         for (const { dupe } of plan) await persistNCR(dupe); // reports its own sync errors
         window.closeModal();
-        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+        refreshNCRViews();
         if (plan.length) window.showNotification(`${plan.length} duplicate record(s) withdrawn.`, 'success');
     };
     window.openModal();
@@ -2463,7 +2478,7 @@ window.verifyCAPA = function (ncrId) {
 
         await persistNCR(ncr);
         window.closeModal();
-        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+        refreshNCRViews();
     };
     window.openModal();
 }
@@ -2524,7 +2539,7 @@ window.updateCAPAProgress = function (ncrId) {
         ncr.status = legacyStatusFromCar(ncr.carStatus);
         await persistNCR(ncr);
         window.closeModal();
-        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+        refreshNCRViews();
         window.showNotification('CAPA progress updated', 'success');
     };
     window.openModal();

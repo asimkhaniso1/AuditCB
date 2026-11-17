@@ -46,6 +46,28 @@ window.ChecklistQuestionRef = {
     }
 };
 
+// Bulk ticks on the Meetings tab
+window.toggleMeetingSelectAll = function (el) {
+    if (!el || !el.dataset || !el.dataset.target) return;
+    document.querySelectorAll(el.dataset.target).forEach(cb => { cb.checked = el.checked; });
+};
+window.syncMeetingSelectAll = function () {
+    document.querySelectorAll('.meeting-select-all').forEach(sa => {
+        const boxes = Array.from(document.querySelectorAll(sa.dataset.target));
+        sa.checked = boxes.length > 0 && boxes.every(cb => cb.checked);
+        sa.indeterminate = !sa.checked && boxes.some(cb => cb.checked);
+    });
+};
+// Closing attendees = opening attendees (ticks and added people)
+window.copyOpeningAttendeesToClosing = function () {
+    const ticked = new Set(Array.from(document.querySelectorAll('.opening-attendee-cb:checked')).map(cb => cb.dataset.name));
+    document.querySelectorAll('.closing-attendee-cb').forEach(cb => { cb.checked = ticked.has(cb.dataset.name); });
+    const from = document.getElementById('opening-custom-list');
+    const to = document.getElementById('closing-custom-list');
+    if (from && to) to.innerHTML = from.innerHTML;
+    window.syncMeetingSelectAll();
+};
+
 // ---------- AI Auto Map: personnel per question ----------
 // Pure helpers for window.autoMapPersonnel (inside renderExecutionTab). The AI
 // only proposes a name; designation and department always come from the
@@ -1153,7 +1175,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     }
 
                     return {
-                        type: item.ncrType || window.CONSTANTS.NCR_TYPES.OBSERVATION,
+                        // Not yet classified = pending (as on Review & Submit), never
+                        // silently an observation.
+                        type: item.ncrType || window.CONSTANTS.NCR_TYPES.PENDING,
                         // clause is kept as-is (the internal FOCUS/SURV/ORG/DOC reference
                         // when that's what it is) — criterionRef/criterionSource, when
                         // present, tell a consumer to display criterionRef as the criterion.
@@ -1243,46 +1267,84 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         }
 
         case 'capa': {
-            const capas = report.capas || [];
+            // Corrective action lives in the NCR & CAPA register (window.state.ncrs),
+            // the store the report, the Verify step and closure all read. This tab
+            // shows that register for the audit — this audit's Major/Minor NCRs and
+            // the previous audits' NCRs still to verify — and uses the register's own
+            // + CAPA / Verify forms. The old "Create CAPA" here wrote report.capas,
+            // which nothing else read: it never advanced or closed an NCR.
+            const esc = _execEscText;
+            const NM = window.NCRModule || {};
+            const isMM = (n) => /^(major|minor)$/i.test(String((n && (n.severity || n.type)) || '').trim());
+            const live = (n) => n && String(n.status || '') !== 'Withdrawn' && isMM(n);
+            const clientKey = String(report.clientId || '');
+            const clientName = String(report.client || '').trim().toLowerCase();
+            const sameClient = (n) => (clientKey && String(n.clientId || '') === clientKey)
+                || (clientName && String(n.clientName || n.client || '').trim().toLowerCase() === clientName);
+            const isClosed = (n) => n.status === 'Closed' || n.carStatus === 'Closed' || n.carStatus === 'Effective';
+            const registerNcrs = (window.state.ncrs || []).filter(live);
+            const thisAudit = registerNcrs.filter(n => report.planId != null && String(n.auditId) === String(report.planId));
+            const previous = registerNcrs.filter(n => !thisAudit.includes(n) && sameClient(n) && !isClosed(n));
+            const legacyCapas = report.capas || [];
+
+            const rowHTML = (n) => {
+                const ref = 'NCR-' + String(n.id).padStart(3, '0');
+                const sev = String(n.severity || n.type || '').toLowerCase() === 'major' ? 'Major' : 'Minor';
+                const overdue = typeof NM.isOverdue === 'function' ? NM.isOverdue(n) : false;
+                const status = typeof NM.capaDisplayStatus === 'function' ? NM.capaDisplayStatus(n) : (n.carStatus || n.status || 'Open');
+                const canAdd = n.status === 'Open' || n.carStatus === 'Ineffective' || n.carStatus === 'Reopened';
+                const canVerify = (n.status === 'In Progress' || n.status === 'Verification') && !!n.capaImplementedDate;
+                const clause = typeof NM.resolveClauseDisplay === 'function' ? NM.resolveClauseDisplay(n).text : (n.clause || '-');
+                const audit = typeof NM.resolveAuditRef === 'function' ? NM.resolveAuditRef(n) : '';
+                return `
+                    <tr style="${overdue ? 'background: #fef2f2;' : ''}">
+                        <td><strong>${esc(ref)}</strong><div style="font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap;">${esc(audit)}</div></td>
+                        <td>${esc(clause)}</td>
+                        <td><span style="background: ${sev === 'Major' ? '#dc2626' : '#d97706'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${sev}</span></td>
+                        <td style="max-width: 260px; font-size: 0.85rem;">
+                            <div><strong>Correction:</strong> ${esc(n.correction || '—')}</div>
+                            <div><strong>Root cause:</strong> ${esc(n.rootCause || '—')}</div>
+                            <div><strong>Corrective action:</strong> ${esc(n.correctiveAction || '—')}</div>
+                        </td>
+                        <td style="white-space: nowrap;">${n.dueDate ? esc(window.UTILS.formatDate ? window.UTILS.formatDate(n.dueDate) : n.dueDate) : '-'}${overdue ? '<br><span style="color: #dc2626; font-size: 0.75rem; font-weight: bold;">OVERDUE</span>' : ''}</td>
+                        <td>${esc(status)}${n.capaImplementedDate ? `<div style="font-size: 0.75rem; color: var(--text-secondary);">Implemented ${esc(n.capaImplementedDate)}</div>` : ''}</td>
+                        <td style="white-space: nowrap;">
+                            <button class="btn btn-sm btn-icon" data-action="viewNCRDetails" data-id="${esc(String(n.id))}" title="View details" aria-label="View"><i class="fa-solid fa-eye" style="color: var(--primary-color);"></i></button>
+                            ${canAdd ? `<button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" data-action="openAddCAPAModal" data-id="${esc(String(n.id))}" title="Record correction, root cause, corrective action and implementation"><i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>CAPA</button>` : ''}
+                            ${canVerify ? `<button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" data-action="verifyCAPA" data-id="${esc(String(n.id))}" title="Record verification and effectiveness; Effective closes the NCR"><i class="fa-solid fa-check"></i> Verify</button>` : ''}
+                        </td>
+                    </tr>`;
+            };
+            const tableHTML = (list, empty) => list.length ? `
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>NCR #</th><th>Clause</th><th>Severity</th><th>CAPA</th><th>Due date</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody>${list.map(rowHTML).join('')}</tbody>
+                    </table>
+                </div>` : `<p style="color: var(--text-secondary); padding: 0.75rem 0;">${empty}</p>`;
+
             tabContent.innerHTML = `
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                        <h3>Corrective & Preventive Actions (CAPA)</h3>
-                        <button class="btn btn-primary" data-action="createCAPA" data-id="${report.id}" aria-label="Add">
-                            <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create CAPA
-                        </button>
+                <div class="card" id="exec-capa-register">
+                    <div style="margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">Corrective Actions (CAPA)</h3>
+                        <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+                            From the NCR & CAPA register. <strong>+ CAPA</strong> records the organisation's correction, root cause, corrective action and implementation date; <strong>Verify</strong> then records how you verified it, and <em>Effective</em> closes the NCR. Observations and OFIs need no CAPA.
+                        </p>
                     </div>
-                    
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>CAPA #</th>
-                                    <th>Linked NCR</th>
-                                    <th>Root Cause</th>
-                                    <th>Action Plan</th>
-                                    <th>Due Date</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${capas.length > 0 ? capas.map((capa, idx) => `
-                                    <tr>
-                                        <td>CAPA-${String(idx + 1).padStart(3, '0')}</td>
-                                        <td>${_execEscText(capa.linkedNCR || '-')}</td>
-                                        <td>${_execEscText(capa.rootCause || '-')}</td>
-                                        <td>${_execEscText(capa.actionPlan || '-')}</td>
-                                        <td>${_execEscText(capa.dueDate || '-')}</td>
-                                        <td><span style="background: ${capa.status === window.CONSTANTS.STATUS.COMPLETED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${capa.status || window.CONSTANTS.STATUS.IN_PROGRESS}</span></td>
-                                    </tr>
-                                `).join('') : `
-                                    <tr>
-                                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No CAPAs created yet</td>
-                                    </tr>
-                                `}
-                            </tbody>
-                        </table>
-                    </div>
+
+                    <h4 style="font-size: 1rem; margin: 1rem 0 0.5rem;">Previous audits — nonconformities to verify (${previous.length})</h4>
+                    ${tableHTML(previous, 'No open nonconformities from previous audits.')}
+
+                    <h4 style="font-size: 1rem; margin: 1.5rem 0 0.5rem;">This audit — nonconformities (${thisAudit.length})</h4>
+                    ${tableHTML(thisAudit, 'No Major or Minor nonconformities raised in this audit yet. Flag a checklist question, classify it Major or Minor and click Save Progress; it appears here.')}
+
+                    ${legacyCapas.length ? `
+                    <h4 style="font-size: 1rem; margin: 1.5rem 0 0.5rem;">Earlier CAPA notes on this report (${legacyCapas.length})</h4>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 0.5rem;">Entered with the old Create CAPA button, which did not update the register. Copy anything still needed into the NCR's + CAPA.</p>
+                    <div class="table-container"><table>
+                        <thead><tr><th>Linked NCR</th><th>Root cause</th><th>Action plan</th><th>Due date</th><th>Status</th></tr></thead>
+                        <tbody>${legacyCapas.map(c => `<tr><td>${esc(c.linkedNCR || '-')}</td><td>${esc(c.rootCause || '-')}</td><td>${esc(c.actionPlan || '-')}</td><td>${esc(c.dueDate || '-')}</td><td>${esc(c.status || '-')}</td></tr>`).join('')}</tbody>
+                    </table></div>` : ''}
                 </div>
             `;
             break;
@@ -1366,6 +1428,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (ncr.evidenceImage) window._evidenceCache[`ncr-${idx}`] = ncr.evidenceImage;
             });
 
+            // Same references as the Findings tab (NCR-001, OBS-001, OFI-001), so a
+            // finding is called the same thing on both screens.
+            const reviewRefById = {};
+            window.AuditFindingCategory.numberFindings([
+                ...allFindings.filter(f => f.source === 'Manual'),
+                ...allFindings.filter(f => f.source === 'Checklist')
+            ]).forEach(f => { reviewRefById[f.id] = f._ref; });
+
             const pendingFindings = allFindings.filter(f => f.type === window.CONSTANTS.NCR_TYPES.PENDING);
             const isReadyToSubmit = pendingFindings.length === 0;
             const notReadyReason = pendingFindings.length
@@ -1412,7 +1482,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 `;
             } else {
                 primaryActionBtn = `
-                   <button class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;" data-action="submitToLeadAuditor" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled title="' + window.UTILS.escapeHtml(notReadyReason) + '"' : ''} aria-label="Send">
+                   <button class="btn" id="btn-submit-lead-auditor" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;" data-action="submitToLeadAuditor" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled title="' + window.UTILS.escapeHtml(notReadyReason) + '"' : ''} aria-label="Send">
                         <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i> Submit for Review
                     </button>
                 `;
@@ -1440,20 +1510,20 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <!-- 1. High Level Stats -->
                      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
                         <div style="background: white; padding: 1.5rem; border-radius: 12px; text-align: center; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                            <div style="font-size: 2rem; font-weight: 800; color: #3b82f6; line-height: 1;">${allFindings.length}</div>
+                            <div id="review-stat-total" style="font-size: 2rem; font-weight: 800; color: #3b82f6; line-height: 1;">${allFindings.length}</div>
                             <div style="font-size: 0.85rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">Total Findings</div>
                         </div>
                         <div style="background: white; padding: 1.5rem; border-radius: 12px; text-align: center; border: 1px solid #fee2e2; box-shadow: 0 1px 3px rgba(220, 38, 38, 0.05);">
-                            <div style="font-size: 2rem; font-weight: 800; color: #dc2626; line-height: 1;">${allFindings.filter(f => f.type === 'major').length}</div>
+                            <div id="review-stat-major" style="font-size: 2rem; font-weight: 800; color: #dc2626; line-height: 1;">${allFindings.filter(f => f.type === 'major').length}</div>
                             <div style="font-size: 0.85rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">Major NC</div>
                         </div>
                         <div style="background: white; padding: 1.5rem; border-radius: 12px; text-align: center; border: 1px solid #fef3c7; box-shadow: 0 1px 3px rgba(217, 119, 6, 0.05);">
-                            <div style="font-size: 2rem; font-weight: 800; color: #d97706; line-height: 1;">${allFindings.filter(f => f.type === 'minor').length}</div>
+                            <div id="review-stat-minor" style="font-size: 2rem; font-weight: 800; color: #d97706; line-height: 1;">${allFindings.filter(f => f.type === 'minor').length}</div>
                             <div style="font-size: 0.85rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">Minor NC</div>
                         </div>
                         <div style="background: white; padding: 1.5rem; border-radius: 12px; text-align: center; border: 1px solid #f3e8ff; box-shadow: 0 1px 3px rgba(139, 92, 246, 0.05);">
-                            <div style="font-size: 2rem; font-weight: 800; color: #8b5cf6; line-height: 1;">${allFindings.filter(f => f.type === 'observation').length}</div>
-                            <div style="font-size: 0.85rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">Observations</div>
+                            <div id="review-stat-obsofi" style="font-size: 2rem; font-weight: 800; color: #8b5cf6; line-height: 1;">${allFindings.filter(f => f.type === 'observation' || f.type === 'ofi').length}</div>
+                            <div style="font-size: 0.85rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">OBS / OFI</div>
                         </div>
                     </div>
 
@@ -1493,7 +1563,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <div>
                                             <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
                                                 <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${_execEscText(f.source)}</span>
-                                                <span style="font-weight: 700; color: #1e293b;">#${idx + 1}</span>
+                                                <span style="font-weight: 700; color: #1e293b;">${_execEscText(reviewRefById[f.id] || '#' + (idx + 1))}</span>
                                                 ${f.hasEvidence ? `<span data-action="viewEvidenceImageDirect" data-id="${f.id}" style="cursor: pointer; color: var(--primary-color); font-size: 0.85rem; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-image"></i> View Evidence</span>` : ''}
                                             </div>
                                             ${f.clause || f.requirement ? `
@@ -1651,26 +1721,41 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             card.style.borderLeftColor = colors[newType] || '#8b5cf6';
                         }
 
-                        // Update stat counters
+                        // Update stat counters (by id: a style-selector lookup picked
+                        // the wrong elements whenever the layout above changed)
                         const allSelects = document.querySelectorAll('.review-severity');
-                        let majors = 0, minors = 0, obs = 0, ofis = 0;
+                        let majors = 0, minors = 0, obs = 0, ofis = 0, pending = 0;
                         allSelects.forEach(s => {
                             if (s.value === 'major') majors++;
                             else if (s.value === 'minor') minors++;
                             else if (s.value === 'observation') obs++;
                             else if (s.value === 'ofi') ofis++;
+                            else pending++;
                         });
-                        const statDivs = tabContent.querySelectorAll('[style*="text-align: center"]');
-                        if (statDivs.length >= 4) {
-                            statDivs[0].querySelector('div').textContent = allSelects.length;
-                            statDivs[1].querySelector('div').textContent = majors;
-                            statDivs[2].querySelector('div').textContent = minors;
-                            statDivs[3].querySelector('div').textContent = obs + ofis;
-                        }
+                        const setStat = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+                        setStat('review-stat-total', allSelects.length);
+                        setStat('review-stat-major', majors);
+                        setStat('review-stat-minor', minors);
+                        setStat('review-stat-obsofi', obs + ofis);
 
-                        // Auto-save
-                        window.saveData();
-                        window.showNotification('Severity updated', 'success');
+                        // Finalize / Submit were enabled or disabled only when the tab
+                        // was drawn, so classifying the last pending finding left them
+                        // disabled until the tab was reopened.
+                        ['btn-finalize-publish', 'btn-submit-lead-auditor'].forEach(id => {
+                            const btn = document.getElementById(id);
+                            if (!btn) return;
+                            btn.disabled = pending > 0;
+                            if (pending > 0) btn.title = pending + ' finding(s) are still unclassified. Set each one to major, minor, observation or OFI before the report can be issued.';
+                            else btn.removeAttribute('title');
+                        });
+
+                        // Save to the cloud and the NCR register, not just this browser:
+                        // saveData() is local only, so a classification made here did
+                        // not reach the database or create/update the register record
+                        // until the next Save Progress on the Checklist tab.
+                        if (typeof window.saveChecklist === 'function') window.saveChecklist(report.id);
+                        else window.saveData();
+                        window.showNotification('Classification saved', 'success');
                     });
                 });
 
@@ -1691,7 +1776,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 report.ncrs[idx].description = remarks;
                             }
                         }
-                        window.saveData();
+                        if (typeof window.saveChecklist === 'function') window.saveChecklist(report.id);
+                        else window.saveData();
                     });
                 });
 
@@ -1760,15 +1846,23 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 .map(a => window._customAttendeeItemHTML(a.name, a.role || '', a.organization || ''))
                 .join('');
 
+            // "Select all" for a list of meeting checkboxes; its target is a CSS
+            // selector for the list's own checkboxes. Its ticked state follows the
+            // list (window.syncMeetingSelectAll after render and on every change).
+            const selectAllHTML = (target) => `<label style="margin-left: auto; display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 500; color: #475569; text-transform: none; letter-spacing: 0; cursor: pointer;"><input type="checkbox" class="meeting-select-all" data-target="${target}" data-action-change="toggleMeetingSelectAll" style="width: 14px; height: 14px;">Select all</label>`;
+
             const buildAttendeeSection = (prefix, existingNames) => {
                 let html = '<div style="margin-bottom: 0.75rem;">';
+                if (prefix === 'closing') {
+                    html += '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="copyOpeningAttendeesToClosing" style="margin-bottom: 0.5rem; font-size: 0.75rem;" title="Tick the same people as the opening meeting"><i class="fa-solid fa-copy" style="margin-right: 0.3rem;"></i>Same as opening</button>';
+                }
                 // Audit Team section
                 if (mAuditTeam.length > 0) {
-                    html += '<div style="margin-bottom: 0.5rem;"><div style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem;"><i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Audit Team</div>';
+                    html += `<div style="margin-bottom: 0.5rem;"><div style="display: flex; align-items: center; font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem;"><i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Audit Team${selectAllHTML(`.${prefix}-attendee-cb[data-group='team']`)}</div>`;
                     mAuditTeam.forEach(a => {
                         const checked = existingNames.includes(a.name) ? 'checked' : '';
                         html += `<label style="display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0; cursor: pointer; font-size: 0.82rem;">`;
-                        html += `<input type="checkbox" class="${prefix}-attendee-cb" data-name="${(a.name || '').replace(/"/g, '&quot;')}" data-role="${(a.role || '').replace(/"/g, '&quot;')}" data-org="${cbName.replace(/"/g, '&quot;')}" ${checked} style="width: 15px; height: 15px; flex-shrink: 0;">`;
+                        html += `<input type="checkbox" class="${prefix}-attendee-cb" data-group="team" data-name="${(a.name || '').replace(/"/g, '&quot;')}" data-role="${(a.role || '').replace(/"/g, '&quot;')}" data-org="${cbName.replace(/"/g, '&quot;')}" ${checked} style="width: 15px; height: 15px; flex-shrink: 0;">`;
                         html += `<span style="font-weight: 500;">${_execEscText(a.name)}</span><span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">– ${_execEscText(a.role)}</span>`;
                         html += '</label>';
                     });
@@ -1776,11 +1870,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 }
                 // Client Personnel section
                 if (mClientPersonnel.length > 0) {
-                    html += '<div style="margin-bottom: 0.5rem;"><div style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem;"><i class="fa-solid fa-building" style="margin-right: 0.25rem;"></i>Client Personnel</div>';
+                    html += `<div style="margin-bottom: 0.5rem;"><div style="display: flex; align-items: center; font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem;"><i class="fa-solid fa-building" style="margin-right: 0.25rem;"></i>Client Personnel${selectAllHTML(`.${prefix}-attendee-cb[data-group='client']`)}</div>`;
                     mClientPersonnel.forEach(p => {
                         const checked = existingNames.includes(p.name) ? 'checked' : '';
                         html += `<label style="display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0; cursor: pointer; font-size: 0.82rem;">`;
-                        html += `<input type="checkbox" class="${prefix}-attendee-cb" data-name="${(p.name || '').replace(/"/g, '&quot;')}" data-role="${(p.role || '').replace(/"/g, '&quot;')}" data-org="${clientOrgName.replace(/"/g, '&quot;')}" ${checked} style="width: 15px; height: 15px; flex-shrink: 0;">`;
+                        html += `<input type="checkbox" class="${prefix}-attendee-cb" data-group="client" data-name="${(p.name || '').replace(/"/g, '&quot;')}" data-role="${(p.role || '').replace(/"/g, '&quot;')}" data-org="${clientOrgName.replace(/"/g, '&quot;')}" ${checked} style="width: 15px; height: 15px; flex-shrink: 0;">`;
                         html += `<span style="font-weight: 500;">${_execEscText(p.name)}</span>${p.role ? `<span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">– ${_execEscText(p.role)}</span>` : ''}`;
                         html += '</label>';
                     });
@@ -1830,6 +1924,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <i class="fa-solid fa-chevron-down" style="color: #166534; font-size: 0.7rem;"></i>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 0.4rem; width: 100%;">
+                                <div style="display: flex; padding: 0 0.25rem;">${selectAllHTML('.opening-pointer')}</div>
                                 ${[
                     { id: 'op-scope', label: 'Introduction of audit team & confirmation of audit scope' },
                     { id: 'op-methodology', label: 'Audit plan, methodology & sampling approach' },
@@ -1878,6 +1973,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <i class="fa-solid fa-chevron-down" style="color: #991b1b; font-size: 0.7rem;"></i>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 0.4rem; width: 100%;">
+                                <div style="display: flex; padding: 0 0.25rem;">${selectAllHTML('.closing-pointer')}</div>
                                 ${[
                     { id: 'cl-findings', label: 'Presentation of audit findings (Major / Minor NCs, observations, OFIs)' },
                     { id: 'cl-ncr-severity', label: 'Nonconformity severity & implications for certification' },
@@ -1907,6 +2003,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     </p>
                 </div>
             `;
+            window.syncMeetingSelectAll();
+            if (!tabContent._meetingSelectAllBound) {
+                tabContent._meetingSelectAllBound = true;
+                tabContent.addEventListener('change', function (e) {
+                    if (e.target && e.target.type === 'checkbox' && !e.target.classList.contains('meeting-select-all')) window.syncMeetingSelectAll();
+                });
+            }
             break;
         }
     }
