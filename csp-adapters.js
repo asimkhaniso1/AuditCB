@@ -101,6 +101,8 @@
         const isHidden = content.style.display === 'none';
         content.style.display = isHidden ? 'block' : 'none';
         if (icon) icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+        // Execution view: keep its Expand All / Collapse All label in step.
+        if (typeof window.syncToggleAllAccordions === 'function') window.syncToggleAllAccordions();
     };
 
     window.toggleSubAccordion = function (el) {

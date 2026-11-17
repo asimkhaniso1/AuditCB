@@ -666,8 +666,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                      </div>
                                  </div>
                                  </div>
-                             </div>
-                             
+
                              <!-- Nonconformity statement: printed under "Nonconformity
                                   Statement" for each Major/Minor NC in the client report
                                   (execution-reporting.js buildFormalNCParts). Its input had
@@ -773,7 +772,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 </div>
                                                 <div style="display: flex; align-items: center; gap: 1rem;">
                                                     <span style="font-size: 0.8rem; color: var(--text-secondary);">${completed}/${total}</span>
-                                                    <i class="fa-solid fa-chevron-down accordion-icon" id="icon-${sectionId}" style="transition: transform 0.3s; cursor: pointer;" data-action="toggleAccordion" data-id="${sectionId}"></i>
+                                                    <i class="fa-solid fa-chevron-down accordion-icon" id="icon-${sectionId}" style="transition: transform 0.3s; cursor: pointer; transform: rotate(${clauseIdx === 0 ? '180deg' : '0deg'});" data-action="toggleAccordion" data-id="${sectionId}"></i>
                                                 </div>
                                             </div>
                                             <div class="accordion-content" id="${sectionId}" style="display: ${clauseIdx === 0 ? 'block' : 'none'}; padding: 1rem; background: white;">
@@ -949,6 +948,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
                 // Init clause section drag-to-reorder
                 if (window.initClauseDragReorder) window.initClauseDragReorder();
+                // The first section opens on render; the button says what a click will do.
+                if (window.syncToggleAllAccordions) window.syncToggleAllAccordions();
 
                 // Bulk action buttons are handled by the document delegate in
                 // bindExecutionDocumentDelegates() — exactly once per click,
@@ -1743,43 +1744,37 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     // once, in csp-adapters.js.)
 
     // Collapse/Expand ALL accordion sections at once
-    window.toggleAllAccordions = function () {
-        const allContent = document.querySelectorAll('.accordion-content');
+    // The action is read from the sections, not from the button's own label:
+    // any section closed → Expand All, all open → Collapse All. The label used
+    // to start as "Collapse All" while only the first section was open, and a
+    // section opened or closed by hand left it stale. Only the clause sections
+    // open and close; what is inside an item (an NC's Finding Details panel,
+    // evidence) is hidden with its section and comes back as it was. Collapse
+    // All used to set every NC panel to display:none, so Expand All brought
+    // the sections back with each NC's severity and statement gone.
+    const execSections = () => Array.from(document.querySelectorAll('.accordion-section > .accordion-content'));
+
+    window.syncToggleAllAccordions = function () {
         const btn = document.getElementById('toggle-all-accordions');
+        if (!btn) return;
+        const sections = execSections();
+        const expand = sections.some(s => s.style.display === 'none');
+        const icon = btn.querySelector('i');
+        const label = btn.querySelector('span');
+        if (icon) icon.className = expand ? 'fa-solid fa-expand-alt' : 'fa-solid fa-compress-alt';
+        if (label) label.textContent = expand ? 'Expand All' : 'Collapse All';
+        btn.title = expand ? 'Expand all sections' : 'Collapse all sections';
+    };
 
-        // Determine action from the button label — avoids desync when individual sections are toggled
-        const label = btn?.querySelector('span');
-        const shouldExpand = label ? label.textContent.trim().toLowerCase().includes('expand') : true;
-
-        allContent.forEach(content => {
+    window.toggleAllAccordions = function () {
+        const sections = execSections();
+        const shouldExpand = sections.some(s => s.style.display === 'none');
+        sections.forEach(content => {
             content.style.display = shouldExpand ? 'block' : 'none';
-            // Update the corresponding chevron icon
             const icon = document.getElementById('icon-' + content.id);
-            if (icon) {
-                icon.style.transform = shouldExpand ? 'rotate(180deg)' : 'rotate(0deg)';
-            }
+            if (icon) icon.style.transform = shouldExpand ? 'rotate(180deg)' : 'rotate(0deg)';
         });
-
-        // Also collapse/expand NCR panels, evidence details, and sub-sections when collapsing all
-        if (!shouldExpand) {
-            document.querySelectorAll('.ncr-panel').forEach(p => { p.style.display = 'none'; });
-            document.querySelectorAll('.evidence-photos-container, .evidence-section, details[open]').forEach(el => {
-                if (el.tagName === 'DETAILS') el.removeAttribute('open');
-                else el.style.display = 'none';
-            });
-        }
-
-        // Update button label
-        if (btn) {
-            const icon = btn.querySelector('i');
-            if (shouldExpand) {
-                if (icon) icon.className = 'fa-solid fa-compress-alt';
-                if (label) label.textContent = 'Collapse All';
-            } else {
-                if (icon) icon.className = 'fa-solid fa-expand-alt';
-                if (label) label.textContent = 'Expand All';
-            }
-        }
+        window.syncToggleAllAccordions();
     };
 
     // Drag-to-reorder clause sections (data-safe: only changes DOM order, not progress keys)
