@@ -46,6 +46,48 @@ window.ChecklistQuestionRef = {
     }
 };
 
+// ---------- Audit finding categories ----------
+// An audit finding is a nonconformity (Major or Minor), an observation (OBS) or
+// an opportunity for improvement (OFI). Only Major/Minor are NCRs; the others
+// are numbered in their own series so an observation is never shown as an NCR.
+// A flagged item not yet classified is a nonconformity awaiting classification.
+window.AuditFindingCategory = (function () {
+    const CATS = {
+        major: { key: 'major', label: 'Major NC', prefix: 'NCR', color: '#dc2626', order: 0 },
+        minor: { key: 'minor', label: 'Minor NC', prefix: 'NCR', color: '#d97706', order: 1 },
+        pending: { key: 'pending', label: 'Unclassified', prefix: 'NCR', color: '#6b7280', order: 2 },
+        obs: { key: 'obs', label: 'OBS', prefix: 'OBS', color: '#7c3aed', order: 3 },
+        ofi: { key: 'ofi', label: 'OFI', prefix: 'OFI', color: '#0891b2', order: 4 }
+    };
+    function of(type) {
+        const t = String(type == null ? '' : type).trim().toLowerCase();
+        if (t === 'major') return CATS.major;
+        if (t === 'minor') return CATS.minor;
+        if (t === 'observation' || t === 'obs') return CATS.obs;
+        if (t === 'ofi' || t.indexOf('opportunit') === 0) return CATS.ofi;
+        return CATS.pending;
+    }
+    // Sorted NCRs first (Major, Minor, unclassified), then OBS, then OFI, each
+    // keeping its original order; each record gets _cat and _ref ("OBS-002").
+    function numberFindings(list) {
+        const seq = {};
+        return (list || [])
+            .map((f, i) => ({ f, i, cat: of(f && (f.type || f.ncrType || f.severity)) }))
+            .sort((a, b) => a.cat.order - b.cat.order || a.i - b.i)
+            .map(({ f, cat }) => {
+                seq[cat.prefix] = (seq[cat.prefix] || 0) + 1;
+                return Object.assign({}, f, { _cat: cat, _ref: cat.prefix + '-' + String(seq[cat.prefix]).padStart(3, '0') });
+            });
+    }
+    function counts(numbered) {
+        const c = { major: 0, minor: 0, pending: 0, obs: 0, ofi: 0 };
+        (numbered || []).forEach(f => { c[f._cat.key]++; });
+        c.nc = c.major + c.minor + c.pending;
+        return c;
+    }
+    return { of: of, numberFindings: numberFindings, counts: counts };
+})();
+
 // Jump to a checklist question by its number: open its section, scroll it into
 // view and highlight it — the same landing the NC-register "go to item" uses.
 window.jumpToChecklistQuestion = function (text) {
@@ -1100,6 +1142,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         description: item.ncrDescription || item.comment || reqText || 'Non-conformity identified in checklist',
                         status: 'Open',
                         source: 'checklist',
+                        // The checklist item that raised it, so the row's link can
+                        // open it (row id = "<checklistId>-<itemIdx>", or
+                        // "custom-<idx>" for an added question).
+                        sourceChecklistId: item.isCustom ? 'custom' : (item.checklistId == null ? '' : item.checklistId),
+                        sourceItemIdx: item.itemIdx == null ? '' : item.itemIdx,
                         department: item.department || '',
                         designation: item.designation || '',
                         evidenceImage: item.evidenceImage,
@@ -1107,23 +1154,29 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     };
                 });
 
-            // Combine all NCRs
-            const allNCRs = [
-                ...manualNCRs.map(ncr => ({ ...ncr, source: 'manual' })),
+            // All findings of this audit: nonconformities (Major / Minor), observations
+            // and OFIs. Grouped and numbered by category (NCR-001, OBS-001, OFI-001),
+            // so an observation is never labelled an NCR. A manual record keeps its
+            // index in report.ncrs for the edit button, whatever the display order.
+            const allFindings = window.AuditFindingCategory.numberFindings([
+                ...manualNCRs.map((ncr, manualIdx) => ({ ...ncr, source: 'manual', _manualIdx: manualIdx })),
                 ...checklistNCRs
-            ];
+            ]);
+            const fc = window.AuditFindingCategory.counts(allFindings);
+            const esc = window.UTILS.escapeHtml;
 
             tabContent.innerHTML = `
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                         <div>
-                            <h3>Non-Conformity Reports (NCRs)</h3>
+                            <h3>Audit Findings</h3>
                             <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.85rem;">
-                                Showing ${allNCRs.length} finding(s) - ${manualNCRs.length} manual, ${checklistNCRs.length} from checklist
+                                ${fc.nc} nonconformit${fc.nc === 1 ? 'y' : 'ies'} (Major ${fc.major} &middot; Minor ${fc.minor})${fc.pending ? ` &middot; ${fc.pending} awaiting classification` : ''} &middot; ${fc.obs} observation${fc.obs === 1 ? '' : 's'} &middot; ${fc.ofi} OFI${fc.ofi === 1 ? '' : 's'}
+                                &mdash; ${manualNCRs.length} manual, ${checklistNCRs.length} from checklist
                             </p>
                         </div>
                         <button class="btn btn-primary" data-action="createNCR" data-id="${report.id}" aria-label="Add">
-                            <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create NCR
+                            <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Finding
                         </button>
                     </div>
 
@@ -1131,9 +1184,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <table>
                             <thead>
                                 <tr>
-                                    <th>NCR #</th>
+                                    <th>Ref</th>
                                     <th>Source</th>
-                                    <th>Type</th>
+                                    <th>Finding type</th>
                                     <th>Clause</th>
                                     <th>Description</th>
                                     <th>Status</th>
@@ -1141,24 +1194,24 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${allNCRs.length > 0 ? allNCRs.map((ncr, idx) => `
+                                ${allFindings.length > 0 ? allFindings.map(f => `
                                     <tr>
-                                        <td>NCR-${String(idx + 1).padStart(3, '0')}</td>
-                                        <td><span style="background: ${ncr.source === 'manual' ? '#3b82f6' : '#8b5cf6'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${ncr.source === 'manual' ? 'Manual' : 'Checklist'}</span></td>
-                                        <td><span style="background: ${ncr.type === window.CONSTANTS.NCR_TYPES.MAJOR ? 'var(--danger-color)' : ncr.type === window.CONSTANTS.NCR_TYPES.MINOR ? 'var(--warning-color)' : '#9ca3af'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.type === window.CONSTANTS.NCR_TYPES.MAJOR ? 'Major' : ncr.type === window.CONSTANTS.NCR_TYPES.MINOR ? 'Minor' : 'Obs'}</span></td>
-                                        <td>${window.UTILS.escapeHtml(ncr.clause || '-')}</td>
-                                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${window.UTILS.escapeHtml(ncr.description || '-')}">${window.UTILS.escapeHtml(ncr.description || '-')}</td>
-                                        <td><span style="background: ${ncr.status === window.CONSTANTS.STATUS.CLOSED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.status || 'Open'}</span></td>
-                                        <td>${ncr.source === 'manual'
-                    ? `<button class="btn btn-sm" style="color: var(--primary-color);" data-action="editExecutionNCR" data-arg1="${report.id}" data-arg2="${idx - checklistNCRs.length < 0 ? idx : idx}" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>`
-                    : `<button class="btn btn-sm" style="color: #8b5cf6;" title="Open the checklist item that raised this" data-action="openNCRInChecklist" data-arg1="${window.UTILS.escapeHtml(String(ncr.sourceChecklistId == null ? '' : ncr.sourceChecklistId))}" data-arg2="${window.UTILS.escapeHtml(String(ncr.sourceItemIdx == null ? '' : ncr.sourceItemIdx))}" data-arg2="info"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
+                                        <td><strong>${esc(f._ref)}</strong></td>
+                                        <td><span style="background: ${f.source === 'manual' ? '#3b82f6' : '#8b5cf6'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${f.source === 'manual' ? 'Manual' : 'Checklist'}</span></td>
+                                        <td><span style="background: ${f._cat.color}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; white-space: nowrap;">${esc(f._cat.label)}</span></td>
+                                        <td>${esc(f.clause || '-')}</td>
+                                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${esc(f.description || '-')}">${esc(f.description || '-')}</td>
+                                        <td><span style="background: ${f.status === window.CONSTANTS.STATUS.CLOSED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${esc(f.status || 'Open')}</span></td>
+                                        <td>${f.source === 'manual'
+                    ? `<button class="btn btn-sm" style="color: var(--primary-color);" data-action="editExecutionNCR" data-arg1="${report.id}" data-arg2="${f._manualIdx}" title="Edit this finding" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>`
+                    : `<button class="btn btn-sm" style="color: #8b5cf6;" title="Open the checklist item that raised this" data-action="openNCRInChecklist" data-arg1="${esc(String(f.sourceChecklistId == null ? '' : f.sourceChecklistId))}" data-arg2="${esc(String(f.sourceItemIdx == null ? '' : f.sourceItemIdx))}" aria-label="Open in checklist"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
                 }</td>
                                     </tr>
                                 `).join('') : `
                                     <tr>
                                         <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
                                             <i class="fa-solid fa-clipboard-check" style="font-size: 2rem; margin-bottom: 0.5rem; display: block; opacity: 0.5;"></i>
-                                            No NCRs raised yet. Mark items as NC in the Checklist tab or click "Create NCR" to add manually.
+                                            No findings raised yet. Flag a question in the Checklist tab and classify it, or click "Add Finding".
                                         </td>
                                     </tr>
                                 `}

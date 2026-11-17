@@ -851,7 +851,7 @@ function renderExecutionDetail(reportId) {
                     <i class="fa-solid fa-handshake" style="margin-right: 0.25rem;"></i>Meetings
                 </button>
                 <button class="tab-btn active" data-tab="checklist">Checklist</button>
-                <button class="tab-btn" data-tab="ncr">NCRs</button>
+                <button class="tab-btn" data-tab="ncr">Findings</button>
                 <button class="tab-btn" data-tab="capa">CAPA</button>
                 <button class="tab-btn" data-tab="review">
                     <i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i> Review & Submit
