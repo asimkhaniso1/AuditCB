@@ -1287,37 +1287,59 @@ function renderOFIOBSTable(findings) {
         return '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No observations or opportunities for improvement found.</p>';
     }
     const esc = window.UTILS.escapeHtml;
+    // One group per audit (findings arrive newest audit first), so the audit is
+    // a heading instead of a column repeated on every row.
+    const groups = [];
+    findings.forEach(f => {
+        const key = String(f.reportId);
+        let g = groups.find(x => x.key === key);
+        if (!g) { g = { key, label: f.auditRef || '-', items: [] }; groups.push(g); }
+        g.items.push(f);
+    });
+    const typeCount = (items, t) => items.filter(f => f.type === t).length;
     return `
-        <table>
+        <table class="ofiobs-table" style="font-size: 0.85rem; table-layout: auto;">
             <thead>
                 <tr>
                     <th style="width: 32px;"><input type="checkbox" id="ofiobs-select-all" data-action-change="toggleOFIOBSSelectAll" title="Select all shown" aria-label="Select all shown"></th>
-                    <th>Ref#</th>
-                    <th>Audit</th>
-                    <th>Clause</th>
-                    <th>Type</th>
+                    <th style="width: 72px;">Ref#</th>
+                    <th style="width: 120px;">Clause</th>
+                    <th style="width: 52px;">Type</th>
                     <th>Description</th>
-                    <th>Response</th>
-                    <th>Actions</th>
+                    <th style="width: 150px;">Response</th>
+                    <th style="width: 110px;">Actions</th>
                 </tr>
             </thead>
             <tbody>
-                ${findings.map(f => `
-                    <tr>
-                        <td><input type="checkbox" class="ofiobs-select" data-arg-key="${esc(ofiObsKey(f))}" data-action-change="updateOFIOBSSelection" aria-label="Select ${esc(f.refNo)}"></td>
-                        <td><strong>${esc(f.refNo)}</strong></td>
-                        <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-secondary);">${esc(f.auditRef || '-')}</td>
+                ${groups.map(g => `
+                    <tr class="ofiobs-group-row" style="background: #f1f5f9;">
+                        <td><input type="checkbox" class="ofiobs-group-select" data-group="${esc(g.key)}" data-action-change="toggleOFIOBSGroup" title="Select this audit's findings" aria-label="Select this audit's findings"></td>
+                        <td colspan="6" style="font-weight: 600; color: #334155;">${esc(g.label)}<span style="font-weight: 400; color: var(--text-secondary);"> &middot; ${typeCount(g.items, 'OBS')} OBS &middot; ${typeCount(g.items, 'OFI')} OFI</span></td>
+                    </tr>
+                    ${g.items.map(f => `
+                    <tr class="ofiobs-row" data-group="${esc(g.key)}">
+                        <td><input type="checkbox" class="ofiobs-select" data-group="${esc(g.key)}" data-arg-key="${esc(ofiObsKey(f))}" data-action-change="updateOFIOBSSelection" aria-label="Select ${esc(f.refNo)}"></td>
+                        <td style="white-space: nowrap;"><strong>${esc(f.refNo)}</strong></td>
                         <td>${ofiObsClauseCell(f)}</td>
                         <td><span class="badge" style="background: ${f.type === 'OFI' ? '#0891b2' : '#7c3aed'}; color: white;">${f.type}</span></td>
-                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${esc(f.description || '')}">${esc(f.description || '-')}</td>
+                        <td title="${esc(f.description || '')}"><div style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35;">${esc(f.description || '-')}</div></td>
                         <td>${findingResponseStatusHTML(f)}</td>
                         <td style="white-space: nowrap;">${findingResponseActionsHTML(f)}</td>
-                    </tr>
+                    </tr>`).join('')}
                 `).join('')}
             </tbody>
         </table>
     `;
 }
+
+window.toggleOFIOBSGroup = function (el) {
+    if (!el || !el.dataset) return;
+    const key = el.dataset.group;
+    document.querySelectorAll('#ofi-obs-table-container .ofiobs-select').forEach(b => {
+        if (b.getAttribute('data-group') === key) b.checked = el.checked;
+    });
+    window.updateOFIOBSSelection();
+};
 
 function ofiObsResponded(f) {
     const FW = window.FindingWorkflow;
@@ -1371,7 +1393,12 @@ window.updateOFIOBSSelection = function () {
     const btn = document.getElementById('ofiobs-bulk-btn');
     if (btn) { btn.disabled = ticked.length === 0; btn.title = ticked.length ? '' : 'Tick findings first'; }
     const all = document.getElementById('ofiobs-select-all');
-    if (all) { all.checked = boxes.length > 0 && ticked.length === boxes.length; all.indeterminate = ticked.length > 0 && ticked.length < boxes.length; }
+    if (all) { all.checked = boxes.length > 0 && ticked.length === boxes.length; all.indeterminate = ticked.length > 0 && ticked.length < boxes.length; }    document.querySelectorAll('#ofi-obs-table-container .ofiobs-group-select').forEach(g => {
+        const mine = boxes.filter(b => b.getAttribute('data-group') === g.getAttribute('data-group'));
+        const on = mine.filter(b => b.checked).length;
+        g.checked = mine.length > 0 && on === mine.length;
+        g.indeterminate = on > 0 && on < mine.length;
+    });
 };
 window.toggleOFIOBSSelectAll = function (el) {
     const on = !!(el && el.checked);
@@ -1516,11 +1543,18 @@ function findingResponseStatusHTML(f) {
     const esc = window.UTILS.escapeHtml;
     const rec = Object.assign({}, f.record, { type: f.type === 'OFI' ? 'ofi' : 'observation' });
     const ev = FW.evaluate(rec);
-    const what = f.type === 'OFI'
-        ? (rec.ofiDecision ? `Decision: ${esc(rec.ofiDecision)}${rec.improvementRegisterRef ? ` &middot; ${esc(rec.improvementRegisterRef)}` : ''}` : 'Awaiting the organisation’s decision')
-        : (ev.complete ? `Evaluated &middot; ${esc(rec.disposition || '')}` : `Awaiting: ${esc(ev.missing.map(m => m.label.toLowerCase()).join(', '))}`);
-    return `<div style="font-size:0.8rem;color:${ev.complete ? '#166534' : '#92400e'};">${what}</div>`
-        + (rec.escalatedToNcr ? `<div style="font-size:0.75rem;color:#7c3aed;">Escalated &rarr; ${esc(ncrRefLabel(rec.escalatedToNcr))}</div>` : '');
+    let label, detail;
+    if (f.type === 'OFI') {
+        label = rec.ofiDecision ? 'Decision: ' + rec.ofiDecision : 'Awaiting decision';
+        detail = rec.ofiDecision
+            ? [rec.ofiRationale, rec.improvementRegisterRef].filter(Boolean).join(' · ')
+            : 'Awaiting the organisation’s decision (accept, reject or defer)';
+    } else {
+        label = ev.complete ? 'Evaluated · ' + (rec.disposition || '') : 'Awaiting response';
+        detail = ev.complete ? (rec.managementEvaluation || '') : 'Awaiting: ' + ev.missing.map(m => m.label.toLowerCase()).join(', ');
+    }
+    return `<div style="font-size:0.78rem;color:${ev.complete ? '#166534' : '#92400e'};" title="${esc(detail || label)}">${esc(label)}</div>`
+        + (rec.escalatedToNcr ? `<div style="font-size:0.72rem;color:#7c3aed;">Escalated &rarr; ${esc(ncrRefLabel(rec.escalatedToNcr))}</div>` : '');
 }
 
 function findingResponseActionsHTML(f) {
@@ -1532,8 +1566,8 @@ function findingResponseActionsHTML(f) {
     const rec = Object.assign({}, f.record, { type: f.type === 'OFI' ? 'ofi' : 'observation' });
     const done = f.type === 'OFI' ? !!rec.ofiDecision : FW.evaluate(rec).complete;
     return view
-        + `<button class="btn btn-sm btn-secondary" style="margin-left: 0.25rem;" data-action="openFindingResponse" ${arg}>${done ? 'Edit' : 'Record'} response</button>`
-        + (f.type === 'OBS' && !rec.escalatedToNcr ? `<button class="btn btn-sm btn-secondary" style="margin-left: 0.25rem;" data-action="escalateObservationToNCR" ${arg} title="Only on objective evidence that a requirement was not fulfilled">Escalate to NCR</button>` : '');
+        + `<button class="btn btn-sm btn-icon" data-action="openFindingResponse" ${arg} title="${done ? 'Edit' : 'Record'} response" aria-label="${done ? 'Edit' : 'Record'} response"><i class="fa-solid fa-pen-to-square" style="color: ${done ? '#166534' : '#b45309'};"></i></button>`
+        + (f.type === 'OBS' && !rec.escalatedToNcr ? `<button class="btn btn-sm btn-icon" data-action="escalateObservationToNCR" ${arg} title="Escalate to NCR — only on objective evidence that a requirement was not fulfilled" aria-label="Escalate to NCR"><i class="fa-solid fa-arrow-up-right-from-square" style="color: #dc2626;"></i></button>` : '');
 }
 
 

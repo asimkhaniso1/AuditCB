@@ -36,7 +36,7 @@ beforeEach(() => {
     document.getElementById('host').innerHTML = window.getOFIOBSHTML();
 });
 
-const rows = () => Array.from(document.querySelectorAll('#ofi-obs-table-container tbody tr'));
+const rows = () => Array.from(document.querySelectorAll('#ofi-obs-table-container tr.ofiobs-row'));
 const rowFor = (ref) => rows().find(r => r.cells[1].textContent.trim() === ref);
 
 describe('selection', () => {
@@ -55,7 +55,7 @@ describe('selection', () => {
     });
 
     it('shows the assigned criterion next to the finding clause when they differ', () => {
-        const cell = rowFor('OFI-001').cells[3].textContent;
+        const cell = rowFor('OFI-001').cells[2].textContent;
         expect(cell).toContain('A.8.8 (27001)');
         expect(cell).toContain('criterion set: 8.1');
     });
@@ -106,5 +106,37 @@ describe('single response also reaches the cloud', () => {
         document.getElementById('modal-save').onclick();
         expect(synced).toHaveLength(1);
         expect(report.checklistProgress[1].disposition).toBe('Accepted');
+    });
+});
+
+describe('grouped by audit, compact', () => {
+    it('one heading row per audit with counts; no Audit column; icon buttons', () => {
+        const group = document.querySelector('#ofi-obs-table-container tr.ofiobs-group-row');
+        expect(group.textContent).toMatch(/Surveillance/);
+        expect(group.textContent).toMatch(/2 OBS/);
+        expect(group.textContent).toMatch(/1 OFI/);
+        const heads = Array.from(document.querySelectorAll('#ofi-obs-table-container th')).map(th => th.textContent.trim());
+        expect(heads).not.toContain('Audit');
+        const actions = rowFor('OBS-001').cells[6];
+        expect(actions.textContent.trim()).toBe('');
+        expect(actions.querySelector('[data-action="openFindingResponse"]').getAttribute('title')).toBe('Record response');
+        expect(actions.querySelector('[data-action="escalateObservationToNCR"]').getAttribute('aria-label')).toBe('Escalate to NCR');
+    });
+
+    it('the audit tick box selects that audit\'s findings', () => {
+        const g = document.querySelector('#ofi-obs-table-container .ofiobs-group-select');
+        g.checked = true;
+        window.toggleOFIOBSGroup(g);
+        expect(document.getElementById('ofiobs-selected-count').textContent).toBe('3 selected');
+        rowFor('OFI-001').querySelector('.ofiobs-select').checked = false;
+        window.updateOFIOBSSelection();
+        expect(g.indeterminate).toBe(true);
+    });
+
+    it('response shows a short status with the details in its tooltip', () => {
+        const status = rowFor('OBS-001').cells[5].querySelector('div');
+        expect(status.textContent).toBe('Awaiting response');
+        expect(status.getAttribute('title')).toMatch(/^Awaiting: /);
+        expect(rowFor('OFI-001').cells[5].textContent.trim()).toBe('Awaiting decision');
     });
 });
