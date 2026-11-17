@@ -68,6 +68,59 @@ window.copyOpeningAttendeesToClosing = function () {
     window.syncMeetingSelectAll();
 };
 
+// ---------- Checklist autosave ----------
+// The checklist kept every status, remark and personnel pick on screen until
+// Save Progress was clicked, so a reload, a closed tab or leaving the page lost
+// them. Changes now save on their own DELAY ms after the last one, and at once
+// before the checklist is left. saveChecklist reads the on-screen inputs, so a
+// pending save is flushed while they are still there (capture-phase click on a
+// tab or navigation link, page hide, unload). Quiet: the save indicator shows,
+// the success pop-up does not; errors still do.
+window.ChecklistAutoSave = (function () {
+    const DELAY = 4000;
+    let timer = null;
+    let reportId = null;
+    let bound = false;
+    const onChecklist = () => document.querySelectorAll('.status-input').length > 0;
+    function save() {
+        timer = null;
+        if (reportId != null && onChecklist() && typeof window.saveChecklist === 'function') {
+            window.saveChecklist(reportId, { quiet: true });
+            return true;
+        }
+        return false;
+    }
+    function schedule() {
+        if (reportId == null) return;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(save, DELAY);
+    }
+    function flush() {
+        if (!timer) return false;
+        clearTimeout(timer);
+        return save();
+    }
+    function bind(id, container) {
+        reportId = id;
+        if (container && !container._checklistAutoSaveBound) {
+            container._checklistAutoSaveBound = true;
+            const onEdit = (e) => { if (e.target && e.target.closest && e.target.closest('.checklist-item')) schedule(); };
+            container.addEventListener('input', onEdit);
+            container.addEventListener('change', onEdit);
+        }
+        if (!bound) {
+            bound = true;
+            document.addEventListener('click', (e) => {
+                const leaving = e.target && e.target.closest && e.target.closest('.tab-btn, [data-hash], a[href^="#"], nav a, .sidebar a, [data-action="clickTab"]');
+                if (leaving) flush();
+            }, true);
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+            window.addEventListener('beforeunload', () => { flush(); });
+        }
+    }
+    return { DELAY: DELAY, schedule: schedule, flush: flush, bind: bind, isPending: () => !!timer };
+})();
+
 // ---------- AI Auto Map: personnel per question ----------
 // Pure helpers for window.autoMapPersonnel (inside renderExecutionTab). The AI
 // only proposes a name; designation and department always come from the
@@ -680,7 +733,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const parts = [`AI Auto Map: ${mapped} of ${itemsToMap.length} question(s) assigned.`];
                 if (skipped) parts.push(`${skipped} left blank (no clear match on the contact list).`);
                 if (failures.length) parts.push(`${failures.length} of ${batches.length} batch(es) failed: ${failures[0]}`);
-                if (mapped) parts.push('Click Save Progress to keep them.');
+                if (mapped) parts.push('They save automatically in a few seconds.');
+                if (mapped && window.ChecklistAutoSave) window.ChecklistAutoSave.schedule();
                 window.showNotification(parts.join(' '), failures.length && !mapped ? 'error' : (failures.length ? 'warning' : 'success'));
             };
 
@@ -1099,6 +1153,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         }
                     });
                 });
+
+                // Autosave: saves a few seconds after the last change, and at once
+                // before leaving the checklist (another tab, another page, closing).
+                if (window.ChecklistAutoSave) window.ChecklistAutoSave.bind(report.id, tabContent);
 
                 // Init clause section drag-to-reorder
                 if (window.initClauseDragReorder) window.initClauseDragReorder();
@@ -2206,6 +2264,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         // Update accordion counter dynamically
         window.updateAccordionCounter(uniqueId);
+        if (window.ChecklistAutoSave) window.ChecklistAutoSave.schedule();
     };
 
     // Update accordion counter based on current statuses
@@ -2273,7 +2332,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         });
     };
 
-    window.saveChecklist = function (reportId) {
+    window.saveChecklist = function (reportId, opts) {
+        const quiet = !!(opts && opts.quiet);
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
         if (!report) return;
 
@@ -2510,7 +2570,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         indicator.style.display = 'none';
                     }, 2000);
                 }
-                window.showNotification('Audit progress saved to cloud', 'success');
+                if (!quiet) window.showNotification('Audit progress saved to cloud', 'success');
 
             } catch (dbError) {
                 console.error('Database Sync Error:', JSON.stringify(dbError, null, 2));
@@ -3004,7 +3064,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         recognition.onerror = function (event) {
             window.Logger.error('Execution', 'Speech recognition error', event.error);
             if (event.error !== 'no-speech') {
-                window.showNotification('Error recording audio: ' + event.error, 'error');
+                const DICTATION_ERRORS = {
+                    'not-allowed': 'Microphone blocked. Click the lock icon in the address bar, allow Microphone for this site, then try again.',
+                    'service-not-allowed': 'Dictation is not available in this browser. Use Chrome or Edge.',
+                    'audio-capture': 'No microphone found. Check that a microphone is connected and not muted.',
+                    'network': 'Dictation needs an internet connection to the browser’s speech service.'
+                };
+                window.showNotification(DICTATION_ERRORS[event.error] || ('Error recording audio: ' + event.error), 'error');
             }
             micBtn.innerHTML = originalIcon;
             micBtn.title = 'Voice dictation';

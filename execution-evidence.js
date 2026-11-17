@@ -402,7 +402,7 @@
 
                     // 4. Update Hidden Inputs
                     const evidenceData = document.getElementById('evidence-data-' + uniqueId);
-                    if (evidenceData) evidenceData.value = 'attached';
+                    if (evidenceData) evidenceData.value = 'attached'; if (window.ChecklistAutoSave) window.ChecklistAutoSave.schedule();
 
                     window.showNotification(isCloud ? 'Image uploaded to cloud' : 'Image saved locally', 'success');
 
@@ -528,7 +528,7 @@
         const fileInput = document.getElementById('img-' + uniqueId);
 
         if (previewDiv) { previewDiv.style.display = 'none'; previewDiv.innerHTML = ''; }
-        if (evidenceData) evidenceData.value = '';
+        if (evidenceData) evidenceData.value = ''; if (window.ChecklistAutoSave) window.ChecklistAutoSave.schedule();
         if (fileInput) fileInput.value = '';
 
         window.showNotification('Evidence image removed', 'info');
@@ -544,7 +544,7 @@
         if (previewDiv.querySelectorAll('.ev-thumb').length === 0) {
             previewDiv.style.display = 'none';
             const evidenceData = document.getElementById('evidence-data-' + uniqueId);
-            if (evidenceData) evidenceData.value = '';
+            if (evidenceData) evidenceData.value = ''; if (window.ChecklistAutoSave) window.ChecklistAutoSave.schedule();
         }
     };
 
@@ -688,7 +688,7 @@
 
             // Update hidden input
             const evidenceData = document.getElementById('evidence-data-' + uniqueId);
-            if (evidenceData) evidenceData.value = 'attached';
+            if (evidenceData) evidenceData.value = 'attached'; if (window.ChecklistAutoSave) window.ChecklistAutoSave.schedule();
 
             window.showNotification(isCloud ? 'Screen captured & uploaded to cloud' : 'Screen captured & saved locally', 'success');
 
@@ -821,6 +821,7 @@
             if (previewDiv) previewDiv.style.display = 'block';
             if (dataInput) { dataInput.value = 'attached'; dataInput.dataset.capturedAt = capturedAtIso; dataInput.dataset.evId = evId; dataInput.dataset.saveUrl = finalUrl; }
             if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
+            if (window.ChecklistAutoSave) window.ChecklistAutoSave.schedule();
 
             // Close modal
             if (window.closeModal) window.closeModal();
