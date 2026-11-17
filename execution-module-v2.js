@@ -1731,6 +1731,35 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const existingOpeningNames = parseExisting(openingMeeting.attendees);
             const existingClosingNames = parseExisting(closingMeeting.attendees);
 
+            // Defaults for a meeting not yet recorded come from the audit plan's own
+            // opening/closing rows (date and start time), not a fixed 09:00 / 17:00.
+            const mPlan = contextData.plan || (window.state.auditPlans || []).find(p => String(p.id) === String(report.planId)) || null;
+            const planRow = (kind) => ((mPlan && mPlan.agenda) || []).find(r => r && r.kind === kind) || null;
+            const openRow = planRow('opening');
+            const closeRow = planRow('closing');
+            const openingDate = openingMeeting.date || (openRow && openRow.date) || report.date || '';
+            const openingTime = openingMeeting.time || (openRow && openRow.start) || '09:00';
+            const closingDate = closingMeeting.date || (closeRow && closeRow.date) || '';
+            const closingTime = closingMeeting.time || (closeRow && closeRow.start) || '17:00';
+
+            // Corrective-action timelines as the report states them: day counts only
+            // when the CB has configured them, otherwise the CB's own procedure.
+            const mTf = window.ReportStats && typeof window.ReportStats.capaTimeframes === 'function'
+                ? window.ReportStats.capaTimeframes({ settings: window.state.cbSettings || {}, standard: report.standard || (mPlan && mPlan.standard) || '', stage: (mPlan && mPlan.auditType) || report.auditType || '' })
+                : null;
+            const capaTimelineLabel = mTf && mTf.configured
+                ? `Corrective action timelines (Major: ${mTf.major} days, Minor: ${mTf.minor} days)`
+                : 'Corrective action timelines and evidence required (per the CB procedure)';
+
+            // Attendees added by hand (not on the audit team or the client's
+            // personnel list) are shown again in the added list, so a later save
+            // keeps them instead of silently dropping them.
+            const knownNames = new Set([...mAuditTeam, ...mClientPersonnel].map(p => p && p.name).filter(Boolean));
+            const customAttendeesHTML = (att) => (Array.isArray(att) ? att : [])
+                .filter(a => a && typeof a === 'object' && a.name && !knownNames.has(a.name))
+                .map(a => window._customAttendeeItemHTML(a.name, a.role || '', a.organization || ''))
+                .join('');
+
             const buildAttendeeSection = (prefix, existingNames) => {
                 let html = '<div style="margin-bottom: 0.75rem;">';
                 // Audit Team section
@@ -1765,7 +1794,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 html += `<button class="btn btn-sm btn-outline-primary" data-action="addCustomMeetingAttendee" data-id="${prefix}" style="padding: 0.25rem 0.5rem;" aria-label="Add"><i class="fa-solid fa-plus"></i></button>`;
                 html += '</div>';
                 // Custom attendees list
-                html += `<div id="${prefix}-custom-list" style="margin-top: 0.35rem;"></div>`;
+                html += `<div id="${prefix}-custom-list" style="margin-top: 0.35rem;">${customAttendeesHTML(prefix === 'opening' ? openingMeeting.attendees : closingMeeting.attendees)}</div>`;
                 html += '</div>';
                 return html;
             };
@@ -1780,11 +1809,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                             <div class="form-group">
                                 <label>Date</label>
-                                <input type="date" id="opening-date" class="form-control" value="${openingMeeting.date || report.date || ''}">
+                                <input type="date" id="opening-date" class="form-control" value="${_execEscText(openingDate)}">
                             </div>
                             <div class="form-group">
                                 <label>Time</label>
-                                <input type="time" id="opening-time" class="form-control" value="${openingMeeting.time || '09:00'}">
+                                <input type="time" id="opening-time" class="form-control" value="${_execEscText(openingTime)}">
                             </div>
                         </div>
                         <div class="form-group">
@@ -1804,7 +1833,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 ${[
                     { id: 'op-scope', label: 'Introduction of audit team & confirmation of audit scope' },
                     { id: 'op-methodology', label: 'Audit plan, methodology & sampling approach' },
-                    { id: 'op-ncr-grading', label: 'Nonconformity grading criteria (Major / Minor / OFI)' },
+                    { id: 'op-ncr-grading', label: 'Finding grading criteria (Major / Minor NC, observation, OFI)' },
                     { id: 'op-remote-evidence', label: 'Evidence collection method (photos, screen-shares for remote audits)' },
                     { id: 'op-process-flow', label: 'Process flow & department visit sequence' },
                     { id: 'op-confidentiality', label: 'Confidentiality & impartiality declaration' },
@@ -1824,11 +1853,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                             <div class="form-group">
                                 <label>Date</label>
-                                <input type="date" id="closing-date" class="form-control" value="${closingMeeting.date || ''}">
+                                <input type="date" id="closing-date" class="form-control" value="${_execEscText(closingDate)}">
                             </div>
                             <div class="form-group">
                                 <label>Time</label>
-                                <input type="time" id="closing-time" class="form-control" value="${closingMeeting.time || '17:00'}">
+                                <input type="time" id="closing-time" class="form-control" value="${_execEscText(closingTime)}">
                             </div>
                         </div>
                         <div class="form-group">
@@ -1850,9 +1879,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 0.4rem; width: 100%;">
                                 ${[
-                    { id: 'cl-findings', label: 'Presentation of audit findings (Majors, Minors, OFIs)' },
+                    { id: 'cl-findings', label: 'Presentation of audit findings (Major / Minor NCs, observations, OFIs)' },
                     { id: 'cl-ncr-severity', label: 'Nonconformity severity & implications for certification' },
-                    { id: 'cl-capa-timelines', label: 'Corrective action timelines (Major: 90 days, Minor: 6 months)' },
+                    { id: 'cl-capa-timelines', label: capaTimelineLabel },
                     { id: 'cl-positive', label: 'Positive observations & good practices noted' },
                     { id: 'cl-recommendation', label: 'Audit recommendation (grant / maintain / suspend / withdraw)' },
                     { id: 'cl-appeals', label: 'Appeals & complaints process' },
@@ -3326,6 +3355,20 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         return attendees;
     };
 
+    // One added attendee in a meeting's "added" list. The remove button removes
+    // the whole entry (it used removeSelf, which removed only the button, so a
+    // "removed" attendee was still saved).
+    window._customAttendeeItemHTML = function (name, role, org) {
+        const esc = window.UTILS.escapeHtml;
+        return `<div class="custom-attendee-item" data-name="${esc(name)}" data-role="${esc(role || '')}" data-org="${esc(org || '')}" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; background: #eff6ff; border-radius: 6px; font-size: 0.85rem; margin-bottom: 0.25rem;">`
+            + `<i class="fa-solid fa-user-plus" style="color: #3b82f6;"></i><strong>${esc(name)}</strong>${role ? ' – ' + esc(role) : ''}${org ? ' (' + esc(org) + ')' : ''}`
+            + '<button type="button" class="btn btn-sm" style="margin-left: auto; padding: 0 0.25rem; color: #dc2626;" data-action="removeCustomMeetingAttendee" title="Remove" aria-label="Remove"><i class="fa-solid fa-times"></i></button></div>';
+    };
+    window.removeCustomMeetingAttendee = function (el) {
+        const item = el && el.closest ? el.closest('.custom-attendee-item') : null;
+        if (item) item.remove();
+    };
+
     window.addCustomMeetingAttendee = function (prefix) {
         const nameEl = document.getElementById(`${prefix}-custom-name`);
         const roleEl = document.getElementById(`${prefix}-custom-role`);
@@ -3335,16 +3378,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const role = roleEl?.value?.trim() || '';
         const org = orgEl?.value?.trim() || '';
         const list = document.getElementById(`${prefix}-custom-list`);
-        if (list) {
-            const div = document.createElement('div');
-            div.className = 'custom-attendee-item';
-            div.dataset.name = name;
-            div.dataset.role = role;
-            div.dataset.org = org;
-            div.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; background: #eff6ff; border-radius: 6px; font-size: 0.85rem; margin-bottom: 0.25rem;';
-            div.innerHTML = `<i class="fa-solid fa-user-plus" style="color: #3b82f6;"></i><strong>${window.UTILS.escapeHtml(name)}</strong>${role ? ' – ' + window.UTILS.escapeHtml(role) : ''}${org ? ' (' + window.UTILS.escapeHtml(org) + ')' : ''}<button class="btn btn-sm" style="margin-left: auto; padding: 0 0.25rem; color: #dc2626;" data-action="removeSelf" aria-label="Close"><i class="fa-solid fa-times"></i></button>`;
-            list.appendChild(div);
-        }
+        if (list) list.insertAdjacentHTML('beforeend', window._customAttendeeItemHTML(name, role, org));
         nameEl.value = ''; if (roleEl) roleEl.value = ''; if (orgEl) orgEl.value = '';
     };
 
