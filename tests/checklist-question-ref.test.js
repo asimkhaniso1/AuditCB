@@ -33,14 +33,23 @@ describe('ChecklistQuestionRef', () => {
 
     it('reads what an auditor types', () => {
         const Q = window.ChecklistQuestionRef;
-        ['IMS 13', 'ims13', 'IMS-13', ' ims  13 ', 'Ims.13'].forEach(t => expect(Q.parse(t)).toBe('IMS 13'));
+        ['IMS 13', 'ims13', 'IMS-13', ' ims  13 '].forEach(t => expect(Q.parse(t)).toBe('IMS 13'));
         expect(Q.parse('a 30')).toBe('A 30');
         expect(Q.parse('recert 1')).toBe('RECERT 1');
     });
 
+    it('reads a chip pasted from the agenda index, ignoring what follows the number', () => {
+        const Q = window.ChecklistQuestionRef;
+        expect(Q.parse('ORG 3 8.1 Onboarding')).toBe('ORG 3');
+        expect(Q.parse('IMS 13 7.5 NCR-021')).toBe('IMS 13');
+        expect(Q.parse('SMS 3 8.6.2 requests GAP')).toBe('SMS 3');
+        expect(Q.parse('A 30 A.8.3')).toBe('A 30');
+        expect(Q.parse('RECERT 1 10.2/10.1 all 8 PF')).toBe('RECERT 1');
+    });
+
     it('rejects a clause number or nonsense instead of guessing', () => {
         const Q = window.ChecklistQuestionRef;
-        ['A.5.30', '7.5', 'IMS', '', '13', 'IMS 0'].forEach(t => expect(Q.parse(t)).toBeNull());
+        ['A.5.30', '7.5', 'IMS', '', '13', 'IMS 0', 'IMS 7.5', 'Ims.13', 'A.8.3 access'].forEach(t => expect(Q.parse(t)).toBeNull());
     });
 });
 
@@ -83,6 +92,11 @@ describe('jumpToChecklistQuestion', () => {
     it('asks for a question number when given a clause', () => {
         expect(window.jumpToChecklistQuestion('A.5.30')).toBe(false);
         expect(notes[0][1]).toMatch(/question number/);
+    });
+
+    it('jumps from a pasted index chip', () => {
+        expect(window.jumpToChecklistQuestion('IMS 13 7.5 NCR-021')).toBe(true);
+        expect(notes).toEqual([]);
     });
 
     it('stays quiet on an empty box', () => {

@@ -36,8 +36,12 @@ window.ChecklistQuestionRef = {
         const m = /^(.+)-(\d+)$/.exec(String(itemId == null ? '' : itemId));
         return m ? m[1] + ' ' + (Number(m[2]) + 1) : null;
     },
+    // Reads the number at the start and ignores the rest, so a chip pasted from
+    // the agenda index ("ORG 3 8.1 Onboarding") works. A clause is not a number:
+    // "A.5.30" or "IMS 7.5" never resolve, because the section may not be
+    // joined to its number by a dot and the number may not run on into ".5".
     parse: function (text) {
-        const m = /^\s*([A-Za-z][A-Za-z0-9]*?)[\s.\-_]*(\d+)\s*$/.exec(String(text == null ? '' : text));
+        const m = /^\s*([A-Za-z][A-Za-z0-9]*?)[\s\-_]*(\d+)(?![.\d])/.exec(String(text == null ? '' : text));
         return m && Number(m[2]) > 0 ? m[1].toUpperCase() + ' ' + Number(m[2]) : null;
     }
 };
@@ -47,7 +51,7 @@ window.ChecklistQuestionRef = {
 window.jumpToChecklistQuestion = function (text) {
     const ref = window.ChecklistQuestionRef.parse(text);
     if (!ref) {
-        if (String(text || '').trim()) window.showNotification('Type a question number such as IMS 13 or SMS 3.', 'warning');
+        if (String(text || '').trim()) window.showNotification('Start with a question number such as IMS 13 or SMS 3 (a clause like 7.5 is not one).', 'warning');
         return false;
     }
     const row = Array.from(document.querySelectorAll('.checklist-item[data-q-ref]'))
