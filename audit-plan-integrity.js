@@ -833,6 +833,12 @@
      * numbers exactly, so the label stopped "7.5 (Integrated)" ever meeting a
      * session that covers 7.5 and left the finding unscheduled.
      */
+    /** A register number as the register shows it: 85 → "NCR-085"; other refs unchanged. */
+    function findingRef(v) {
+        const s = str(v);
+        return /^\d+$/.test(s) ? 'NCR-' + s.padStart(3, '0') : s;
+    }
+
     function clauseToken(v) {
         const s = str(v);
         const m = s.match(/^(A\.\d{1,2}\.\d{1,2}|\d{1,2}(?:\.\d{1,2}){0,3})(?![\d.]*\d)/);
@@ -1528,7 +1534,26 @@
         const mappedIds = new Set();
         rows.forEach(function (r) { arr(r.findingIds).forEach(function (id) { mappedIds.add(str(id)); }); });
         const unmapped = need.filter(function (f) { return !mappedIds.has(str(f.id)); });
-        unmapped.forEach(function (f) { B('FINDING_UNMAPPED', 'Previous finding ' + (f.ref || f.id) + ' (' + f.typeLabel + ', clause ' + (f.clause || 'not stated') + ') is not scheduled in any agenda session.', { findingId: f.id }); });
+        // The agenda keeps the finding ids it was built with. When the register
+        // later withdraws a record (a duplicate, or one re-recorded under a new
+        // number) the agenda still points at the old one, and the open record
+        // looks unscheduled. Name the record the agenda holds so the auditor
+        // knows to rebuild rather than hunt for a missing session.
+        const currentIds = new Set(findings.map(function (f) { return str(f.id); }));
+        const staleIds = Array.from(mappedIds).filter(function (id) { return !currentIds.has(id); });
+        const register = arr(c.state && c.state.ncrs);
+        unmapped.forEach(function (f) {
+            const clause = clauseToken(f.clause);
+            const held = staleIds.map(function (id) { return register.find(function (n) { return n && str(n.id) === id; }); })
+                .filter(function (n) { return n && /^withdrawn/i.test(str(n.status)) && clause && clauseToken(n.clause) === clause; });
+            let msg = 'Previous finding ' + findingRef(f.ref || f.id) + ' (' + f.typeLabel + ', clause ' + (f.clause || 'not stated') + ') is not scheduled in any agenda session.';
+            if (held.length) {
+                msg += ' The agenda still lists ' + held.map(function (n) { return findingRef(n.ncrNumber || n.id); }).join(', ') + ' for this clause, which ' + (held.length > 1 ? 'have' : 'has') + ' been withdrawn. Rebuild the agenda (Build Agenda) to schedule ' + findingRef(f.ref || f.id) + '.';
+            } else if (staleIds.length) {
+                msg += ' The agenda was built from an earlier version of the findings register. Rebuild the agenda (Build Agenda).';
+            }
+            B('FINDING_UNMAPPED', msg, { findingId: f.id, staleFindingIds: held.map(function (n) { return str(n.id); }) });
+        });
         const findingSummary = { required: need.length, mapped: need.length - unmapped.length, unmapped: unmapped.length, total: findings.length };
         if (claimed.length && need.length && claimed.length !== need.length) W('FINDING_COUNT_DIFFERS', 'The traceability record lists ' + claimed.length + ' finding(s) but the register now requires follow-up of ' + need.length + '. Rebuild the agenda.', {});
 
