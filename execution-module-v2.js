@@ -1255,6 +1255,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <button type="button" class="btn btn-outline-secondary" data-action="jumpToChecklistQuestionFromBox" title="Go to the question">Go</button>
                         </div>
                         <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-outline-secondary" data-action="printCompletedChecklist" data-id="${_execEscText(String(report.id))}" title="Print the checklist with your answers, notes and finding references" aria-label="Print completed checklist">
+                                <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print
+                            </button>
                             <button class="btn btn-outline-secondary" id="toggle-all-accordions" data-action="toggleAllAccordions" title="Collapse/Expand all sections">
                                 <i class="fa-solid fa-compress-alt" style="margin-right: 0.5rem;"></i> <span>Collapse All</span>
                             </button>
@@ -1407,6 +1410,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 Client response due
                                 <input type="date" class="form-control" id="findings-response-due" value="${esc(String(report.findingsResponseDue || ''))}" data-action-change="setFindingsResponseDue" data-arg1="${esc(String(report.id))}" data-arg2="this.value" style="padding: 0.35rem 0.5rem; font-size: 0.85rem; width: auto;">
                             </label>
+                            <button class="btn btn-outline-secondary" data-action="printCompletedChecklist" data-id="${esc(String(report.id))}" title="Print the checklist with your answers, notes and finding references" aria-label="Print completed checklist">
+                                <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i> Print completed checklist
+                            </button>
                             <button class="btn btn-secondary" data-action="printFindingsSummary" data-id="${esc(String(report.id))}" title="Print the findings for the closing meeting, for the client to acknowledge" aria-label="Print findings summary"${allFindings.length ? '' : ' disabled'}>
                                 <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print findings summary
                             </button>
