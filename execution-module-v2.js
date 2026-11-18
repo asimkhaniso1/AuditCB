@@ -562,6 +562,13 @@ function _execEscText(v) {
     return U.escapeHtml(U.decodeEntities ? U.decodeEntities(raw) : raw);
 }
 window._execEscText = _execEscText;
+// Stored text decoded to what the user typed (no escaping), tolerant of a
+// UTILS without decodeEntities.
+function _execDecode(v) {
+    const U = window.UTILS || {};
+    const raw = String(v ?? '');
+    return U.decodeEntities ? U.decodeEntities(raw) : raw;
+}
 
 // ---------- Report Integrity "Set criterion" fix action — pure helpers ----------
 // Same reasoning as buildChecklistSourceKey/buildChecklistStableIdentity above:
@@ -1067,6 +1074,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 // items have one; custom and old flat-format items don't.
                 const qRef = window.ChecklistQuestionRef.fromItemId(isCustom ? null : idx);
                 const stmtHint = window.FindingStatementHint.forType(saved.ncrType, item.clause, requirementText);
+                // Stored text is entity-encoded (saved through sanitizeText); compare
+                // and render it decoded, or every save adds a layer of "&amp;".
+                const savedPersonnel = _execDecode(saved.personnel || '');
                 const qRefAttr = qRef ? ` data-q-ref="${_execEscText(qRef)}"` : '';
                 const qRefBadge = qRef
                     ? `<div class="q-ref-badge" title="Checklist question ${_execEscText(qRef)}" style="display: inline-block; margin-bottom: 0.25rem; padding: 0 0.4rem; border: 1px solid var(--primary-color); border-radius: 4px; font-size: 0.75rem; font-weight: 700; color: var(--primary-color); white-space: nowrap;">${_execEscText(qRef)}</div>`
@@ -1082,7 +1092,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <div>
                                 <div style="font-weight: 500; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(requirementText)}</div>
                                 <div style="position: relative;">
-                                    <input type="text" id="comment-${uniqueId}" placeholder="Auditor remarks..." class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.comment || '')}" style="margin-bottom: 0; padding-right: 35px;">
+                                    <input type="text" id="comment-${uniqueId}" placeholder="Auditor remarks..." class="form-control form-control-sm" value="${_execEscText(saved.comment || '')}" style="margin-bottom: 0; padding-right: 35px;">
                                     <button type="button" id="mic-btn-${uniqueId}" data-action="startDictation" data-id="${uniqueId}" style="position: absolute; right: 0; top: 0; height: 100%; width: 35px; background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="Dictate to Remarks">
                                         <i class="fa-solid fa-microphone"></i>
                                     </button>
@@ -1094,7 +1104,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     </button>
                                     <div id="orig-note-${uniqueId}" style="display:none;margin-top:4px;padding:6px 10px;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:0.78rem;color:#92400e;line-height:1.4;">
                                         <div style="font-weight:600;font-size:0.7rem;color:#b45309;margin-bottom:2px;"><i class="fa-solid fa-pen-nib" style="margin-right:4px;"></i>Original Auditor Notes:</div>
-                                        ${window.UTILS.escapeHtml(saved._originalComment)}
+                                        ${_execEscText(saved._originalComment)}
                                     </div>
                                 </div>` : ''}
                             </div>
@@ -1154,17 +1164,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                      <label style="font-size: 0.8rem;">Personnel Name</label>
                                      <select id="ncr-personnel-${uniqueId}" class="form-control form-control-sm" data-action-change="_autoFillPersonnel" data-id="${uniqueId}">
                                         <option value="">-- Select --</option>
-                                        ${clientPersonnel.map(p => `<option value="${window.UTILS.escapeHtml(p.name)}" ${saved.personnel === p.name ? 'selected' : ''}>${window.UTILS.escapeHtml(p.name)}</option>`).join('')}
-                                        ${saved.personnel && !clientPersonnel.some(p => p.name === saved.personnel) ? `<option value="${window.UTILS.escapeHtml(saved.personnel)}" selected>${window.UTILS.escapeHtml(saved.personnel)}</option>` : ''}
+                                        ${clientPersonnel.map(p => `<option value="${_execEscText(p.name)}" ${savedPersonnel === _execDecode(p.name || '') ? 'selected' : ''}>${_execEscText(p.name)}</option>`).join('')}
+                                        ${savedPersonnel && !clientPersonnel.some(p => _execDecode(p.name || '') === savedPersonnel) ? `<option value="${_execEscText(savedPersonnel)}" selected>${_execEscText(savedPersonnel)}</option>` : ''}
                                      </select>
                                  </div>
                                  <div>
                                      <label style="font-size: 0.8rem;">Designation</label>
-                                     <input type="text" id="ncr-designation-${uniqueId}" class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.designation || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
+                                     <input type="text" id="ncr-designation-${uniqueId}" class="form-control form-control-sm" value="${_execEscText(saved.designation || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
                                  </div>
                                  <div>
                                      <label style="font-size: 0.8rem;">Department</label>
-                                     <input type="text" id="ncr-department-${uniqueId}" class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.department || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
+                                     <input type="text" id="ncr-department-${uniqueId}" class="form-control form-control-sm" value="${_execEscText(saved.department || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
                                  </div>
                              </div>
 

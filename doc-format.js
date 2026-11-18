@@ -385,7 +385,8 @@
      */
     function decodeEntities(value) {
         if (typeof value !== 'string' || value.indexOf('&') === -1) return value;
-        let out = value;
+        // Collapse a runaway "&amp;amp;amp;…" chain (one layer per save) first.
+        let out = value.replace(/&(?:amp;)+/gi, '&');
         for (let pass = 0; pass < 6; pass++) {
             const next = out
                 .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"')

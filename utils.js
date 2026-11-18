@@ -112,7 +112,10 @@ const UTILS = {
         // Escaping was applied once per save, so a record edited twice reads back
         // as "B&amp;amp;K". Decode until the text stops changing (capped) rather
         // than assuming a single layer.
-        let out = value;
+        // A value escaped on every save (a field rendered without decoding)
+        // carries one "amp;" per save: "&amp;amp;amp;…". Collapse the chain
+        // first, then decode the remaining entity normally.
+        let out = value.replace(/&(?:amp;)+/gi, '&');
         for (let pass = 0; pass < 5; pass++) {
             const next = out
                 .replace(/&lt;/g, '<')
