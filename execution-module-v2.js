@@ -915,10 +915,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         return imgs.map((src, imgIdx) => {
                             const isIdb = src.startsWith('idb://');
                             const displaySrc = isIdb ? '' : src;
-                            const safeSrc = displaySrc.replace(/'/g, "\\'");
                             return `
                                          <div class="ev-thumb" data-idx="${imgIdx}" data-save-url="${window.UTILS.escapeHtml(src)}" data-captured-at="${window.UTILS.escapeHtml((saved.evidenceCapturedAtList && saved.evidenceCapturedAtList[imgIdx]) || '')}" style="position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;">
-                                             <img src="${displaySrc}" data-idb-key="${isIdb ? window.UTILS.escapeHtml(src) : ''}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;${isIdb ? ' background: #e2e8f0;' : ''}" data-action="viewEvidenceImageByUrlSelf" data-id="${safeSrc}"/>
+                                             <img src="${displaySrc}" data-idb-key="${isIdb ? window.UTILS.escapeHtml(src) : ''}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;${isIdb ? ' background: #e2e8f0;' : ''}" data-action="viewEvidenceImageByUrlSelf" data-src="${window.UTILS.escapeHtml(displaySrc)}"/>
                                              <button type="button" data-action="removeEvidenceByIdx" data-arg1="${uniqueId}" data-arg2="${imgIdx}" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">×</button>
                                          </div>
                                      `;
