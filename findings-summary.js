@@ -85,13 +85,90 @@
         return { statement, evidence, requirement, criterion: crit.label, where, photos: Number(f.evidenceCount) || 0 };
     }
 
+    // ── Screenshots (shared with completed-checklist.js) ──────────────
+    // Printed at a size that keeps on-screen text legible (two to a row is
+    // ~88 mm wide; 900 px is ~260 dpi there) without carrying the full
+    // capture into the PDF. One that can't be downscaled prints from its
+    // original address.
+    const SHOT_MAX_PX = 900;
+
+    /** The screenshots saved on a checklist answer or finding, with when each was captured. */
+    function evidenceOf(p) {
+        if (!p) return [];
+        const urls = Array.isArray(p.evidenceImages) && p.evidenceImages.length ? p.evidenceImages.filter(Boolean) : (p.evidenceImage ? [p.evidenceImage] : []);
+        const times = arr(p.evidenceCapturedAtList);
+        return urls.map(function (url, i) { return { url: String(url), capturedAt: times[i] || (urls.length === 1 ? p.evidenceCapturedAt || '' : '') }; });
+    }
+
+    /** { key: [{url, capturedAt}] } -> { key: [{src, capturedAt}] }, downscaled four at a time. */
+    async function prepareShots(byKey) {
+        const EU = global.EvidenceUtils;
+        const out = {};
+        const jobs = [];
+        Object.keys(byKey || {}).forEach(function (k) {
+            const list = arr(byKey[k]);
+            if (!list.length) return;
+            out[k] = list.map(function (e) { return { src: e.url, capturedAt: e.capturedAt }; });
+            out[k].forEach(function (shot) { jobs.push(shot); });
+        });
+        if (EU && typeof EU.compress === 'function') {
+            let next = 0;
+            const worker = async function () {
+                while (next < jobs.length) {
+                    const shot = jobs[next++];
+                    try { shot.src = await EU.compress(shot.src, { maxPx: SHOT_MAX_PX, quality: 0.72 }); } catch (_e) { /* keep the original */ }
+                }
+            };
+            await Promise.all([worker(), worker(), worker(), worker()]);
+        }
+        return out;
+    }
+
+    /** One captioned screenshot. The caption names what it belongs to, so a loose page still says what it shows. */
+    function shotFigure(label, shot, n, total, cls) {
+        const when = shot.capturedAt ? DF().formatDate(new Date(shot.capturedAt)) : '';
+        const cap = label + ' · screenshot ' + n + ' of ' + total + (when ? ' · captured ' + when : '');
+        return '<figure class="' + cls + '"><img src="' + t(shot.src) + '" alt="' + t(cap) + '"><figcaption>' + t(cap) + '</figcaption></figure>';
+    }
+
+    function placeholderHtml(what, count) {
+        return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Preparing ' + t(what) + '</title></head>'
+            + '<body style="font-family:Segoe UI,Arial,sans-serif;color:#334155;padding:40px">'
+            + '<p>Preparing the ' + t(what) + ' with ' + count + ' screenshot' + (count === 1 ? '' : 's') + '…</p></body></html>';
+    }
+
+    /**
+     * Print a document that may carry screenshots. The window opens now,
+     * inside the click, so the pop-up blocker allows it; with screenshots it
+     * shows a placeholder until they are prepared, then the document.
+     * buildHtml(images) returns the document; byKey maps keys to screenshots.
+     */
+    function printWithShots(what, byKey, buildHtml, logTag) {
+        const notifyBlocked = function () { notify('Pop-up blocked. Allow pop-ups for this site to print the ' + what + '.', 'warning'); };
+        const finish = function (images, win) {
+            const html = buildHtml(images);
+            const problems = PS().lint(html);
+            if (problems.length && global.Logger) global.Logger.warn(logTag, 'Print lint: ' + problems.map(function (p) { return p.code; }).join(', '));
+            const out = PS().open(html, win ? { win: win } : undefined);
+            if (!out) notifyBlocked();
+            return out;
+        };
+        let count = 0;
+        Object.keys(byKey || {}).forEach(function (k) { count += arr(byKey[k]).length; });
+        if (!count) return finish(null, null);
+        const win = PS().open(placeholderHtml(what, count));
+        if (!win) { notifyBlocked(); return null; }
+        return prepareShots(byKey).then(function (images) { return finish(images, win); });
+    }
+
     function field(label, html) {
         return '<div class="fs-field"><div class="fs-label">' + t(label) + '</div><div class="fs-value">' + html + '</div></div>';
     }
     const missing = function (what) { return '<span class="fs-missing">' + t(what) + ' not recorded.</span>'; };
 
-    function findingBlock(f) {
+    function findingBlock(f, shots) {
         const p = partsOf(f);
+        const list = arr(shots);
         const key = (f._cat && f._cat.key) || 'pending';
         const meta = [
             p.criterion ? 'Clause ' + p.criterion : 'Clause not recorded',
@@ -108,20 +185,28 @@
             body = field(key === 'ofi' ? 'Opportunity' : 'Observation', text ? t(text) : missing('Finding text'))
                 + (p.statement && p.evidence ? field('Evidence', t(p.evidence)) : '');
         }
-        if (p.photos) body += '<div class="fs-photos">' + p.photos + ' screenshot' + (p.photos === 1 ? '' : 's') + ' on file with the audit record.</div>';
-        return '<div class="fs-finding fs-' + key + '">'
+        if (p.photos && !list.length) body += '<div class="fs-photos">' + p.photos + ' screenshot' + (p.photos === 1 ? '' : 's') + ' on file with the audit record.</div>';
+        // With screenshots the block may run over a page: the text stays
+        // together and each screenshot stays whole, but the block can break.
+        const shotsHtml = list.length
+            ? '<div class="fs-shots">' + list.map(function (s, i) { return shotFigure(f._ref || 'Finding', s, i + 1, list.length, 'fs-shot'); }).join('') + '</div>'
+            : '';
+        return '<div class="fs-finding fs-' + key + (list.length ? ' fs-has-shots' : '') + '">'
+            + '<div class="fs-text">'
             + '<div class="fs-head"><span class="fs-ref">' + t(f._ref || '') + '</span> '
             + '<span class="fs-grade fs-grade-' + key + '">' + t(gradeLabel(key)) + '</span></div>'
             + '<div class="fs-meta">' + meta + '</div>'
             + body
+            + '</div>'
+            + shotsHtml
             + '</div>';
     }
 
-    function section(title, intro, list) {
+    function section(title, intro, list, images) {
         if (!list.length) return '';
         return '<h2 class="fs-h2">' + t(title) + ' (' + list.length + ')</h2>'
             + (intro ? '<p class="fs-intro">' + t(intro) + '</p>' : '')
-            + list.map(findingBlock).join('');
+            + list.map(function (f) { return findingBlock(f, images && images[f._ref]); }).join('');
     }
 
     /** When the client's response is due, from the auditor's date or the CB's configured timeframe. */
@@ -223,9 +308,9 @@
             + metaTable
             + countTable
             + (findings.length ? '' : '<p class="fs-intro">No findings were raised at this audit.</p>')
-            + section('Nonconformities', 'A nonconformity is a requirement that was not fulfilled. Each needs a correction and a corrective action.', ncs)
-            + section('Observations', '', obs)
-            + section('Opportunities for improvement', '', ofi)
+            + section('Nonconformities', 'A nonconformity is a requirement that was not fulfilled. Each needs a correction and a corrective action.', ncs, c.images)
+            + section('Observations', '', obs, c.images)
+            + section('Opportunities for improvement', '', ofi, c.images)
             + nextHtml
             + signOff;
 
@@ -263,6 +348,12 @@
         '.fs-value{white-space:pre-wrap;overflow-wrap:anywhere}',
         '.fs-missing{color:#94a3b8;font-style:italic}',
         '.fs-photos{margin-top:4px;font-size:8pt;color:#64748b}',
+        '.fs-has-shots{break-inside:auto;page-break-inside:auto}',
+        '.fs-text{break-inside:avoid;page-break-inside:avoid}',
+        '.fs-shots{display:flex;flex-wrap:wrap;gap:3mm 4mm;margin-top:6px}',
+        '.fs-shot{margin:0;flex:0 0 calc(50% - 2mm);min-width:0;break-inside:avoid;page-break-inside:avoid}',
+        '.fs-shot img{display:block;width:100%;max-height:105mm;object-fit:contain;border:.5pt solid #cbd5e1;background:#f8fafc}',
+        '.fs-shot figcaption{font-size:7pt;color:#64748b;margin-top:1.5mm}',
         '.fs-next{margin:0 0 6px 16px;padding:0}',
         '.fs-next li{margin-bottom:3px}',
         '.fs-blank{display:inline-block;min-width:38mm;border-bottom:.6pt solid #475569;height:1em;vertical-align:bottom}',
@@ -347,12 +438,9 @@
             && !global.confirm(ctx.counts.pending + ' finding' + (ctx.counts.pending === 1 ? ' has' : 's have') + ' no grade yet and will print as "grade to be confirmed". Print anyway?')) {
             return null;
         }
-        const html = build(ctx);
-        const problems = PS().lint(html);
-        if (problems.length && global.Logger) global.Logger.warn('FindingsSummary', 'Print lint: ' + problems.map(function (p) { return p.code; }).join(', '));
-        const win = PS().open(html);
-        if (!win) notify('Pop-up blocked. Allow pop-ups for this site to print the findings summary.', 'warning');
-        return win;
+        const byKey = {};
+        ctx.findings.forEach(function (f) { const list = evidenceOf(f); if (list.length) byKey[f._ref] = list; });
+        return printWithShots('findings summary', byKey, function (images) { ctx.images = images || undefined; return build(ctx); }, 'FindingsSummary');
     };
 
     global.setFindingsResponseDue = function (reportId, value) {
@@ -364,7 +452,8 @@
         if (iso) notify('Client response due ' + DF().formatDate(iso) + '. It prints on the findings summary.', 'success');
     };
 
-    const API = { build: build, context: context, gradeLabel: gradeLabel, partsOf: partsOf, metaTableHtml: metaTableHtml, clean: clean, CSS: CSS };
+    const API = { build: build, context: context, gradeLabel: gradeLabel, partsOf: partsOf, metaTableHtml: metaTableHtml, clean: clean, CSS: CSS,
+        shots: { evidenceOf: evidenceOf, prepare: prepareShots, figure: shotFigure, placeholderHtml: placeholderHtml, printWithShots: printWithShots, MAX_PX: SHOT_MAX_PX } };
     global.FindingsSummary = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
     if (global.Logger && global.Logger.debug) global.Logger.debug('Modules', 'findings-summary.js loaded successfully.');

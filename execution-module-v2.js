@@ -386,6 +386,9 @@ window.collectAuditFindings = function (report, assignedChecklists) {
                 department: item.department || '',
                 designation: item.designation || '',
                 evidenceImage: item.evidenceImage,
+                evidenceImages: images,
+                evidenceCapturedAtList: Array.isArray(item.evidenceCapturedAtList) ? item.evidenceCapturedAtList : [],
+                evidenceCapturedAt: item.evidenceCapturedAt || '',
                 evidenceCount: images.length,
                 ...(criterionSource ? { criterionRef: criterionRef || '', criterionSource } : {})
             };
