@@ -31,6 +31,113 @@ window.NCRSyncUtils.buildStableIdentity = buildChecklistStableIdentity;
 // section and its 1-based position in that section. The execution view's item
 // id is "<section>-<0-based index>", so the number is derived, never stored.
 // parse() accepts what an auditor types: "IMS 13", "ims13", "IMS-13", "a 30".
+// ---------- Finding statement: label, example and template ----------
+// The statement box showed one fixed example (clause 9.2 internal audits)
+// under every question, so on a 6.1 risk question it was no use as a model
+// (PC Connection, 2026-11-18). The label, the example and an insertable
+// template now follow the question's own clause and requirement and the
+// grade chosen: a nonconformity states the requirement, what was not
+// fulfilled and the evidence; an observation what was seen and the risk; an
+// OFI where a met requirement could be more effective, without prescribing
+// how. Bracketed blanks mark what the auditor writes; hasBlanks() finds any
+// left in, so a template is never printed half-filled.
+window.FindingStatementHint = (function () {
+    const BLANKS = ['What was not fulfilled', 'What was seen', 'record, interview or observation', 'the risk if it continues', 'evidence that it is met', 'What could be more effective, and why'];
+    const BLANK_RE = new RegExp('\\[(?:' + BLANKS.map(b => b.replace(/[.*+?^${}()|[\]\\]/g, ch => '\\' + ch)).join('|') + ')\\]');
+    // "Verify that …" / "Check whether …" are how a question asks; the
+    // requirement is what follows.
+    const LEADIN = /^(?:please\s+)?(?:verify|check|confirm|ensure|review|assess|evaluate|examine|establish|determine|demonstrate|show)\s+(?:that|whether|if)\s+/i;
+    // The checklist builder appends the client documents that should evidence
+    // a question; they are not part of the requirement.
+    const DOC_NOTE = /\s*Documented information on file[\s\S]*$/i;
+
+    function requirementPhrase(requirement) {
+        let s = String(requirement == null ? '' : requirement).replace(DOC_NOTE, '').replace(/\s+/g, ' ').trim();
+        const first = /^(.+?[.?!])(?:\s|$)/.exec(s);
+        if (first) s = first[1];
+        s = s.replace(/[.?!]+$/, '').trim();
+        if (!s) return '';
+        const lead = LEADIN.exec(s);
+        let phrase;
+        if (lead) phrase = 'that ' + s.slice(lead[0].length);
+        else phrase = (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
+        if (phrase.length > 170) phrase = phrase.slice(0, 167).replace(/\s+\S*$/, '') + '…';
+        return lead ? phrase : ': ' + phrase;
+    }
+
+    function kindOf(type) {
+        const t = String(type == null ? '' : type).trim().toLowerCase();
+        if (t === 'observation' || t === 'obs') return 'obs';
+        if (t === 'ofi' || t.indexOf('opportunit') === 0) return 'ofi';
+        return 'nc';
+    }
+
+    function forType(type, clause, requirement) {
+        const c = String(clause == null ? '' : clause).trim();
+        const req = requirementPhrase(requirement);
+        const who = c ? 'Clause ' + c : 'The requirement';
+        const reqPart = req ? who + ' requires' + (req.indexOf(': ') === 0 ? req : ' ' + req) : who + ' applies';
+        const kind = kindOf(type);
+        if (kind === 'obs') {
+            return { kind, title: 'Observation', help: 'what was seen, and why it could become a nonconformity if it continues',
+                template: reqPart + '. [What was seen], as shown by [record, interview or observation]. This is not a nonconformity yet, but [the risk if it continues].' };
+        }
+        if (kind === 'ofi') {
+            return { kind, title: 'Opportunity for improvement', help: 'a requirement that is met but could be more effective; do not prescribe a solution',
+                template: reqPart + '. This is met: [evidence that it is met]. [What could be more effective, and why].' };
+        }
+        return { kind, title: 'Nonconformity statement', help: 'the requirement, what was not fulfilled, and the objective evidence',
+            template: reqPart + '. [What was not fulfilled], as shown by [record, interview or observation].' };
+    }
+
+    function example(hint) { return 'e.g. ' + hint.template; }
+    function hasBlanks(text) { return BLANK_RE.test(String(text == null ? '' : text)); }
+
+    // Redraw the label and example for the grade now chosen.
+    function apply(uniqueId) {
+        if (typeof document === 'undefined') return;
+        const sel = document.getElementById('ncr-type-' + uniqueId);
+        const box = document.getElementById('ncr-desc-' + uniqueId);
+        if (!sel || !box) return;
+        const hint = forType(sel.value, box.getAttribute('data-clause'), box.getAttribute('data-req'));
+        box.setAttribute('placeholder', example(hint));
+        const title = document.getElementById('ncr-desc-title-' + uniqueId);
+        const help = document.getElementById('ncr-desc-help-' + uniqueId);
+        if (title) title.textContent = hint.title;
+        if (help) help.textContent = '(' + hint.help + ')';
+    }
+
+    // Put the template in an empty box and select its first blank.
+    function insert(uniqueId) {
+        const sel = document.getElementById('ncr-type-' + uniqueId);
+        const box = document.getElementById('ncr-desc-' + uniqueId);
+        if (!box) return false;
+        if (String(box.value || '').trim()) {
+            if (typeof window.showNotification === 'function') window.showNotification('The statement already has text. Clear it first to insert the template.', 'info');
+            return false;
+        }
+        const hint = forType(sel ? sel.value : '', box.getAttribute('data-clause'), box.getAttribute('data-req'));
+        box.value = hint.template;
+        // Programmatic edits raise no input event; autosave listens for one.
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+        box.focus();
+        const start = box.value.indexOf('[');
+        if (start !== -1 && typeof box.setSelectionRange === 'function') box.setSelectionRange(start, box.value.indexOf(']', start) + 1);
+        return true;
+    }
+
+    if (typeof document !== 'undefined' && !window._findingHintBound) {
+        window._findingHintBound = true;
+        document.addEventListener('change', function (e) {
+            const el = e.target;
+            if (el && el.id && el.id.indexOf('ncr-type-') === 0) apply(el.id.slice('ncr-type-'.length));
+        });
+    }
+
+    return { forType, example, requirementPhrase, hasBlanks, apply, insert, BLANKS };
+})();
+window.insertFindingTemplate = function (uniqueId) { return window.FindingStatementHint.insert(uniqueId); };
+
 window.ChecklistQuestionRef = {
     fromItemId: function (itemId) {
         const m = /^(.+)-(\d+)$/.exec(String(itemId == null ? '' : itemId));
@@ -959,6 +1066,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 // auditor can find a question named on paper. Only sectioned
                 // items have one; custom and old flat-format items don't.
                 const qRef = window.ChecklistQuestionRef.fromItemId(isCustom ? null : idx);
+                const stmtHint = window.FindingStatementHint.forType(saved.ncrType, item.clause, requirementText);
                 const qRefAttr = qRef ? ` data-q-ref="${_execEscText(qRef)}"` : '';
                 const qRefBadge = qRef
                     ? `<div class="q-ref-badge" title="Checklist question ${_execEscText(qRef)}" style="display: inline-block; margin-bottom: 0.25rem; padding: 0 0.4rem; border: 1px solid var(--primary-color); border-radius: 4px; font-size: 0.75rem; font-weight: 700; color: var(--primary-color); white-space: nowrap;">${_execEscText(qRef)}</div>`
@@ -1097,8 +1205,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                   gone from this panel, so every NC printed "Nonconformity
                                   statement not recorded." with no way to write one. -->
                              <div style="margin-bottom: 0.75rem;">
-                                 <label for="ncr-desc-${uniqueId}" style="font-size: 0.8rem;">Nonconformity statement <span style="color:#64748b;font-weight:400;">(Major/Minor NC: the requirement, what was not fulfilled, and the objective evidence)</span></label>
-                                 <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="3" placeholder="e.g. Clause 9.2 requires internal audits of all three standards at planned intervals; the latest internal audit report covering ISO 22301 and the closure status of its findings could not be produced.">${_execEscText(saved.ncrDescription || '')}</textarea>
+                                 <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;">
+                                     <label for="ncr-desc-${uniqueId}" style="font-size: 0.8rem; margin: 0;"><span id="ncr-desc-title-${uniqueId}">${_execEscText(stmtHint.title)}</span> <span id="ncr-desc-help-${uniqueId}" style="color:#64748b;font-weight:400;">(${_execEscText(stmtHint.help)})</span></label>
+                                     <button type="button" class="btn btn-sm btn-link" style="padding: 0; font-size: 0.75rem; white-space: nowrap;" data-action="insertFindingTemplate" data-arg1="${_execEscText(uniqueId)}" title="Fill the box with a statement built from this question's clause and requirement; then replace the [bracketed] parts">Insert template</button>
+                                 </div>
+                                 <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="3" data-clause="${_execEscText(item.clause || '')}" data-req="${_execEscText(requirementText)}" placeholder="${_execEscText(window.FindingStatementHint.example(stmtHint))}">${_execEscText(saved.ncrDescription || '')}</textarea>
                              </div>
 
                              

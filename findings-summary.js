@@ -463,6 +463,12 @@
             && !global.confirm(ctx.counts.pending + ' finding' + (ctx.counts.pending === 1 ? ' has' : 's have') + ' no grade yet and will print as "grade to be confirmed". Print anyway?')) {
             return null;
         }
+        const FSH = global.FindingStatementHint;
+        const blanks = FSH ? ctx.findings.filter(function (f) { return FSH.hasBlanks(f.ncrDescription) || FSH.hasBlanks(f.description); }).map(function (f) { return f._ref; }) : [];
+        if (blanks.length && typeof global.confirm === 'function'
+            && !global.confirm(blanks.join(', ') + (blanks.length === 1 ? ' still has' : ' still have') + ' a template blank such as "[What was not fulfilled]" in the statement. Print anyway?')) {
+            return null;
+        }
         const byKey = {};
         ctx.findings.forEach(function (f) { const list = evidenceOf(f); if (list.length) byKey[f._ref] = list; });
         return printWithShots('findings summary', byKey, function (images) { ctx.images = images || undefined; return build(ctx); }, 'FindingsSummary', opts);
