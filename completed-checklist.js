@@ -39,6 +39,14 @@
         return str(item && (item.requirement || item.text || item.title || item.requirement_text)) || str(nested);
     }
 
+    /** The screenshots saved on a checklist answer, with when each was captured. */
+    function evidenceOf(p) {
+        if (!p) return [];
+        const urls = Array.isArray(p.evidenceImages) ? p.evidenceImages.filter(Boolean) : (p.evidenceImage ? [p.evidenceImage] : []);
+        const times = arr(p.evidenceCapturedAtList);
+        return urls.map(function (url, i) { return { url: String(url), capturedAt: times[i] || (urls.length === 1 ? p.evidenceCapturedAt || '' : '') }; });
+    }
+
     /**
      * Every question of the audit, grouped by checklist and section, with its
      * saved answer. Mirrors renderExecutionTab's checklist case.
@@ -124,7 +132,7 @@
         return { html: t(r.label), cls: r.cls, key: s || 'open' };
     }
 
-    function notesOf(row) {
+    function notesOf(row, embedded) {
         const p = row.progress || {};
         const parts = [];
         const remark = clean(p.clientEvidenceStatement || p.comment);
@@ -135,12 +143,35 @@
         const where = [str(p.department), who].filter(Boolean).join(' · ');
         if (where) parts.push('<div class="cc-sub"><span class="cc-k">Interviewed:</span> ' + t(where) + '</div>');
         const images = Array.isArray(p.evidenceImages) ? p.evidenceImages.filter(Boolean).length : (p.evidenceImage ? 1 : 0);
-        if (images) parts.push('<div class="cc-sub">' + images + ' screenshot' + (images === 1 ? '' : 's') + ' on file</div>');
+        if (images) parts.push('<div class="cc-sub">' + images + ' screenshot' + (images === 1 ? '' : 's') + (embedded ? ' below' : ' on file') + '</div>');
         return parts.join('') || (p.status ? '' : '<span class="cc-none">—</span>');
     }
 
     /**
-     * @param {Object} ctx  FindingsSummary.context(...) plus { sections: rows(...), reportFinal }
+     * The screenshots of one question, two to a row, each row its own table
+     * row so a page can break between them. Captioned with the question and
+     * the capture date, so a loose page still says what it shows.
+     */
+    function screenshotRows(row, shots) {
+        if (!shots.length) return '';
+        const df = DF();
+        const label = row.questionRef || row.clause || 'Question';
+        let out = '';
+        for (let i = 0; i < shots.length; i += 2) {
+            const figs = shots.slice(i, i + 2).map(function (s, j) {
+                const n = i + j + 1;
+                const when = s.capturedAt ? df.formatDate(new Date(s.capturedAt)) : '';
+                const cap = label + ' · screenshot ' + n + ' of ' + shots.length + (when ? ' · captured ' + when : '');
+                return '<figure class="cc-shot"><img src="' + t(s.src) + '" alt="' + t(cap) + '"><figcaption>' + t(cap) + '</figcaption></figure>';
+            }).join('');
+            out += '<tr class="cc-ev-row"><td></td><td colspan="4"><div class="cc-ev">' + figs + '</div></td></tr>';
+        }
+        return out;
+    }
+
+    /**
+     * @param {Object} ctx  FindingsSummary.context(...) plus { sections: rows(...), reportFinal,
+     *                      images: { [row.key]: [{src, capturedAt}] } — omitted = counts only }
      */
     function build(ctx) {
         const c = ctx || {};
@@ -157,6 +188,7 @@
             const groupHtml = sec.groups.map(function (g) {
                 const trs = g.rows.map(function (row) {
                     const res = resultOf(row, findingByKey);
+                    const shots = arr(c.images && c.images[row.key]);
                     counts.total++;
                     if (res.key === 'conform') counts.conform++;
                     else if (res.key === 'na') counts.na++;
@@ -169,8 +201,9 @@
                         + '<td class="cc-clause">' + t(row.clause || '') + '</td>'
                         + '<td>' + t(row.requirement || '') + '</td>'
                         + '<td class="cc-res ' + res.cls + '">' + res.html + '</td>'
-                        + '<td class="cc-notes">' + notesOf(row) + '</td>'
-                        + '</tr>';
+                        + '<td class="cc-notes">' + notesOf(row, shots.length > 0) + '</td>'
+                        + '</tr>'
+                        + screenshotRows(row, shots);
                 }).join('');
                 const head = g.code || g.title
                     ? '<tr class="cc-group"><td colspan="5">' + t([g.code, g.title].filter(Boolean).join(' · ')) + '</td></tr>' : '';
@@ -230,12 +263,58 @@
         '.cc-k{font-weight:600;color:#475569}',
         '.cc-none{color:#cbd5e1}',
         '.fs-counts .fs-n{font-size:13pt}',
-        '.cc-sign{margin-top:12px}.cc-sign .fs-sig{max-width:50%}'
+        '.cc-sign{margin-top:12px}.cc-sign .fs-sig{max-width:50%}',
+        '.cc-ev-row td{border-bottom:.5pt solid #e2e8f0;padding-top:0}',
+        '.cc-ev{display:flex;gap:4mm;align-items:flex-start}',
+        '.cc-shot{margin:0;flex:0 0 calc(50% - 2mm);min-width:0}',
+        '.cc-shot img{display:block;width:100%;max-height:105mm;object-fit:contain;border:.5pt solid #cbd5e1;background:#f8fafc}',
+        '.cc-shot figcaption{font-size:7pt;color:#64748b;margin-top:1.5mm}'
     ].join('\n');
 
     // ── Browser glue ──────────────────────────────────────────────────
 
     function notify(msg, type) { if (typeof global.showNotification === 'function') global.showNotification(msg, type); }
+
+    // Screenshots print at a size that keeps on-screen text legible (two to a
+    // row is ~88 mm wide; 900 px is ~260 dpi there) without carrying the full
+    // capture into the PDF. A screenshot that can't be downscaled prints from
+    // its original address.
+    const SHOT_MAX_PX = 900;
+    async function prepareImages(sections, opts) {
+        const o = opts || {};
+        const EU = global.EvidenceUtils;
+        const jobs = [];
+        const out = {};
+        arr(sections).forEach(function (sec) {
+            arr(sec.groups).forEach(function (g) {
+                arr(g.rows).forEach(function (row) {
+                    const list = evidenceOf(row.progress);
+                    if (!list.length) return;
+                    out[row.key] = list.map(function (e) { return { src: e.url, capturedAt: e.capturedAt }; });
+                    out[row.key].forEach(function (shot) { jobs.push(shot); });
+                });
+            });
+        });
+        if (EU && typeof EU.compress === 'function') {
+            let next = 0; let done = 0;
+            const worker = async function () {
+                while (next < jobs.length) {
+                    const shot = jobs[next++];
+                    try { shot.src = await EU.compress(shot.src, { maxPx: SHOT_MAX_PX, quality: 0.72 }); } catch (_e) { /* keep the original */ }
+                    done++;
+                    if (o.onProgress) o.onProgress(done, jobs.length);
+                }
+            };
+            await Promise.all([worker(), worker(), worker(), worker()]);
+        }
+        return out;
+    }
+
+    function placeholder(count) {
+        return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Preparing checklist</title></head>'
+            + '<body style="font-family:Segoe UI,Arial,sans-serif;color:#334155;padding:40px">'
+            + '<p>Preparing the completed checklist with ' + count + ' screenshot' + (count === 1 ? '' : 's') + '…</p></body></html>';
+    }
 
     global.printCompletedChecklist = function (reportId) {
         const id = reportId && typeof reportId === 'object' ? (reportId.dataset && reportId.dataset.id) : reportId;
@@ -256,15 +335,28 @@
         ctx.sections = rows(ctx.report, plan, checklists);
         ctx.reportFinal = ctx.report.reportStatus === 'final';
         if (!ctx.sections.length) { notify('No checklist questions are assigned to this audit.', 'info'); return null; }
-        const html = build(ctx);
-        const problems = PS().lint(html);
-        if (problems.length && global.Logger) global.Logger.warn('CompletedChecklist', 'Print lint: ' + problems.map(function (p) { return p.code; }).join(', '));
-        const win = PS().open(html);
-        if (!win) notify('Pop-up blocked. Allow pop-ups for this site to print the checklist.', 'warning');
-        return win;
+        const finish = function (win) {
+            const html = build(ctx);
+            const problems = PS().lint(html);
+            if (problems.length && global.Logger) global.Logger.warn('CompletedChecklist', 'Print lint: ' + problems.map(function (p) { return p.code; }).join(', '));
+            const out = PS().open(html, win ? { win: win } : undefined);
+            if (!out) notify('Pop-up blocked. Allow pop-ups for this site to print the checklist.', 'warning');
+            return out;
+        };
+        let count = 0;
+        ctx.sections.forEach(function (sec) { sec.groups.forEach(function (g) { g.rows.forEach(function (r) { count += evidenceOf(r.progress).length; }); }); });
+        if (!count) return finish(null);
+        // Open the window now, inside the click, so the pop-up blocker allows
+        // it; the screenshots are prepared and the document written into it.
+        const win = PS().open(placeholder(count));
+        if (!win) { notify('Pop-up blocked. Allow pop-ups for this site to print the checklist.', 'warning'); return null; }
+        return prepareImages(ctx.sections).then(function (images) {
+            ctx.images = images;
+            return finish(win);
+        });
     };
 
-    const API = { rows: rows, build: build };
+    const API = { rows: rows, build: build, evidenceOf: evidenceOf, prepareImages: prepareImages };
     global.CompletedChecklist = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
     if (global.Logger && global.Logger.debug) global.Logger.debug('Modules', 'completed-checklist.js loaded successfully.');
