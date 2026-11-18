@@ -29,9 +29,14 @@
     };
 
     // ─── View evidence image (fallback to data-id src) ──────────────
+    // The delegator passes the element when the <img> has no data-id / data-arg,
+    // and the data-id string when it has one. Reading .dataset on that string
+    // threw a TypeError, so every saved checklist photo failed to open
+    // (PC Connection, 2026-11-18). Both shapes are accepted.
     window.viewEvidenceImageByUrlSelf = function (el) {
-        let src = el.src || el.dataset.id || '';
-        if (window.viewEvidenceImageByUrl) window.viewEvidenceImageByUrl(src);
+        const src = typeof el === 'string' ? el
+            : (el && ((el.getAttribute && el.getAttribute('src')) || (el.dataset && (el.dataset.src || el.dataset.id)))) || '';
+        if (src && window.viewEvidenceImageByUrl) window.viewEvidenceImageByUrl(src);
     };
 
     // ─── Click a tab by data-tab value ──────────────────────────────
