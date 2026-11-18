@@ -82,7 +82,8 @@
             if (t === 'ofi') return 'ofi';
             return 'pendingClassification';
         }
-        // Unrecognized status string — treat conservatively as not assessed
+        // 'not_sampled' (risk-based sampling) and any unrecognized status string
+        // — treat conservatively as not assessed
         // rather than guessing a classification that could misstate conformity.
         return 'notAssessed';
     }
@@ -1220,6 +1221,7 @@
     function safeMinimalDataset() {
         return {
             resultCounts: { conform: 0, majorNC: 0, minorNC: 0, na: 0, notAssessed: 0, pendingClassification: 0 },
+            notSampled: 0,
             advisories: { observation: 0, ofi: 0, total: 0 },
             totals: { totalItems: 0, applicable: 0, assessed: 0 },
             coveragePct: null,
@@ -1260,6 +1262,9 @@
         // ── Pass 1: classify every item, accumulate counts + per-dept/clause aggregates ──
         const resultCounts = { conform: 0, majorNC: 0, minorNC: 0, na: 0, notAssessed: 0, pendingClassification: 0 };
         const advisories = { observation: 0, ofi: 0, total: 0 };
+        // Items the auditor marked "not sampled" (risk-based sampling). They
+        // stay in notAssessed for every figure; this only lets the text say why.
+        let notSampled = 0;
         const byDepartment = {};
         const byClauseTop = {};
 
@@ -1275,6 +1280,7 @@
         items.forEach((item) => {
             if (!item) return;
             const bucket = classifyItem(item);
+            if (trim(item.status).toLowerCase() === 'not_sampled') notSampled++;
             const dept = normalizeDeptName(item.department);
             const clause = trim(item.clause) || 'General';
             const dAgg = deptAgg(dept);
@@ -1584,7 +1590,9 @@
             reconciliation.push({ code: 'nc_count_mismatch', message: `Sum of classified NC/advisory items (${ncSum}) does not match total items marked non-conforming (${ncItemCount}).` });
         }
         if (resultCounts.notAssessed > 0) {
-            reconciliation.push({ code: 'coverage_gap', message: `${resultCounts.notAssessed} checklist item(s) have no recorded status and are excluded from coverage and conformity.` });
+            reconciliation.push({ code: 'coverage_gap', message: notSampled
+                ? `${resultCounts.notAssessed} checklist item(s) have no assessed result (${notSampled} marked not sampled under risk-based sampling) and are excluded from coverage and conformity.`
+                : `${resultCounts.notAssessed} checklist item(s) have no recorded status and are excluded from coverage and conformity.` });
         }
         // Duplicate detection: a manual NCR that matched a checklist finding is fine;
         // flag only if the same clause+department appears as more than one *unmatched*
@@ -1602,6 +1610,7 @@
 
         return {
             resultCounts,
+            notSampled,
             advisories,
             totals: { totalItems, applicable, assessed },
             coveragePct,

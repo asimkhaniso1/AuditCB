@@ -470,7 +470,7 @@ ${data.forwardOutlook ? `
                 if (ds && ds.conformityPct != null) return ds.conformityPct;
             }
         } catch (_e) { /* fall through to legacy calc */ }
-        const items = safeArr(d && d.hydratedProgress).filter(i => i.status && i.status !== 'na');
+        const items = safeArr(d && d.hydratedProgress).filter(i => i.status && i.status !== 'na' && i.status !== 'not_sampled');
         if (!items.length) return null;
         const conform = items.filter(i => i.status === 'conform').length;
         const advisories = items.filter(i => i.status === 'nc' && ['observation', 'ofi'].includes((i.ncrType || '').toLowerCase())).length;
@@ -490,7 +490,7 @@ ${data.forwardOutlook ? `
         } catch (_e) { /* fall through */ }
         const all = safeArr(d && d.hydratedProgress).filter(i => i.status !== 'na');
         if (!all.length) return null;
-        const assessed = all.filter(i => !!i.status).length;
+        const assessed = all.filter(i => !!i.status && i.status !== 'not_sampled').length;
         return Math.round((assessed / all.length) * 100);
     }
 
@@ -889,7 +889,7 @@ ${data.forwardOutlook ? `
 
     function computeEvidenceIntel(d) {
         // Exclude both 'na' and blank/not-assessed items from the applicable set.
-        const items = safeArr(d && d.hydratedProgress).filter(i => i.status && i.status !== 'na');
+        const items = safeArr(d && d.hydratedProgress).filter(i => i.status && i.status !== 'na' && i.status !== 'not_sampled');
         const total = items.length;
         let withEvidence = 0;
         let totalPhotos = 0;

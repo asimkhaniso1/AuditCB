@@ -111,6 +111,7 @@
     const RESULT = {
         conform: { label: 'Conforming', cls: 'cc-conform' },
         na: { label: 'Not applicable', cls: 'cc-na' },
+        not_sampled: { label: 'Not sampled', cls: 'cc-ns' },
         '': { label: 'Not assessed', cls: 'cc-open' }
     };
 
@@ -174,7 +175,7 @@
             findingByKey[f.sourceChecklistId === 'custom' ? 'custom-' + f.sourceItemIdx : f.sourceChecklistId + '-' + f.sourceItemIdx] = f;
         });
 
-        const counts = { total: 0, conform: 0, nc: 0, obs: 0, ofi: 0, na: 0, open: 0 };
+        const counts = { total: 0, conform: 0, nc: 0, obs: 0, ofi: 0, na: 0, ns: 0, open: 0 };
         const body = sections.map(function (sec) {
             const groupHtml = sec.groups.map(function (g) {
                 const trs = g.rows.map(function (row) {
@@ -183,6 +184,7 @@
                     counts.total++;
                     if (res.key === 'conform') counts.conform++;
                     else if (res.key === 'na') counts.na++;
+                    else if (res.key === 'not_sampled') counts.ns++;
                     else if (res.key === 'obs') counts.obs++;
                     else if (res.key === 'ofi') counts.ofi++;
                     else if (res.key === 'open') counts.open++;
@@ -210,7 +212,7 @@
         const clientName = str(c.clientName) || 'Client';
         const asAt = df.formatDate(c.generatedOn || new Date()) || '';
         const status = c.reportFinal ? 'Audit completed' : 'Audit in progress';
-        const assessed = counts.total - counts.open;
+        const assessed = counts.total - counts.open - counts.ns;
 
         const cell = function (n, label, cls) { return '<td class="' + (cls || '') + '"><div class="fs-n">' + n + '</div><div class="fs-n-label">' + t(label) + '</div></td>'; };
         const countTable = '<table class="fs-counts"><tr>'
@@ -220,6 +222,7 @@
             + cell(counts.obs, 'Observations')
             + cell(counts.ofi, 'Opportunities for improvement')
             + cell(counts.na, 'Not applicable')
+            + (counts.ns ? cell(counts.ns, 'Not sampled') : '')
             + '</tr></table>';
 
         const meta = fs ? fs.metaTableHtml(c, [{ label: 'Record status', html: t(status + ', as at ' + asAt) }]) : '';
@@ -246,7 +249,7 @@
         '.cc-q{font-weight:700;color:#334155;white-space:nowrap}',
         '.cc-clause{color:#334155}',
         '.cc-res{font-weight:600;font-size:7.8pt}',
-        '.cc-conform{color:#047857}.cc-na{color:#64748b}.cc-open{color:#94a3b8;font-weight:400;font-style:italic}',
+        '.cc-ns{color:#64748b;font-style:italic}.cc-conform{color:#047857}.cc-na{color:#64748b}.cc-open{color:#94a3b8;font-weight:400;font-style:italic}',
         '.cc-major{color:#b91c1c;background:#fef2f2}.cc-minor{color:#b45309;background:#fffbeb}.cc-pending{color:#475569;background:#f1f5f9}',
         '.cc-obs{color:#6d28d9;background:#f5f3ff}.cc-ofi{color:#0e7490;background:#ecfeff}',
         '.cc-notes div+div{margin-top:2px}',

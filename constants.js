@@ -20,7 +20,11 @@ const CONSTANTS = {
         PASS: 'Pass',
         CONFORM: 'conform',
         NC: 'nc',
-        NA: 'na'
+        NA: 'na',
+        // A control or question deliberately not examined at this audit
+        // (risk-based sampling). Not assessed for every figure; it differs
+        // from a blank only in saying the auditor decided it.
+        NOT_SAMPLED: 'not_sampled'
     },
     CERT_STATUS: {
         VALID: 'Valid',

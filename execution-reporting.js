@@ -1001,7 +1001,7 @@
         const conformityItems = hydratedProgress.filter(i => i.status === 'conform');
         const naItems = hydratedProgress.filter(i => i.status === 'na');
         // Blank/undefined status = not yet assessed (counts against coverage, excluded from conformity)
-        const notAssessedItems = hydratedProgress.filter(i => !i.status);
+        const notAssessedItems = hydratedProgress.filter(i => !i.status || i.status === 'not_sampled');
         const majorNC = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'major').length;
         const minorNC = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'minor').length;
         const observationCount = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'observation').length;
