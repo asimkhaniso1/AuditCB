@@ -252,3 +252,89 @@ describe('screenshots in the findings summary', () => {
         expect(calls.length).toBe(0);
     });
 });
+
+describe('print without screenshots', () => {
+    async function print(opts) {
+        const open = vi.spyOn(PS, 'open').mockReturnValue({ placeholder: true });
+        await window.printFindingsSummary('r1', opts);
+        const calls = open.mock.calls.slice();
+        open.mockRestore();
+        return calls;
+    }
+    beforeEach(() => {
+        window.EvidenceUtils = { compress: vi.fn(async (src) => 'data:image/jpeg;base64,' + Buffer.from(String(src)).toString('base64')) };
+        window.confirm = vi.fn(() => true);
+        try { localStorage.clear(); } catch (_e) { /* jsdom */ }
+    });
+
+    it('includes screenshots by default', async () => {
+        seedState();
+        expect(window.printIncludesScreenshots()).toBe(true);
+        const calls = await print();
+        expect(calls.length).toBe(2);
+        expect(calls[1][0]).toContain('<figure');
+    });
+
+    it('unticked, prints at once with the screenshot count instead, and remembers the choice', async () => {
+        seedState();
+        document.body.innerHTML = '<input type="checkbox" class="print-shots-toggle" checked><input type="checkbox" class="print-shots-toggle" checked>';
+        window.setPrintScreenshots(false);
+        expect(Array.from(document.querySelectorAll('.print-shots-toggle')).map(b => b.checked)).toEqual([false, false]);
+        expect(window.printIncludesScreenshots()).toBe(false);
+        const calls = await print();
+        expect(calls.length).toBe(1);
+        expect(calls[0][1]).toBeUndefined();
+        expect(calls[0][0]).not.toContain('<figure');
+        expect(text(calls[0][0])).toContain('2 screenshots on file with the audit record.');
+        expect(window.EvidenceUtils.compress).not.toHaveBeenCalled();
+        window.setPrintScreenshots(true);
+        expect(window.printIncludesScreenshots()).toBe(true);
+    });
+
+    it('applies to the completed checklist as well', async () => {
+        seedState();
+        loadScript('./completed-checklist.js', { params: { module: undefined } });
+        window.setPrintScreenshots(false);
+        const open = vi.spyOn(PS, 'open').mockReturnValue({});
+        await window.printCompletedChecklist('r1');
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(open.mock.calls[0][0]).not.toContain('<figure');
+        expect(text(open.mock.calls[0][0])).toContain('2 screenshots on file');
+        open.mockRestore();
+    });
+
+    it('an explicit option overrides the remembered choice', async () => {
+        seedState();
+        window.setPrintScreenshots(false);
+        const calls = await print({ screenshots: true });
+        expect(calls.length).toBe(2);
+    });
+
+    it('the Checklist toolbar box changes the choice through the event delegator', () => {
+        const report = seedState();
+        window.setPrintScreenshots(true);
+        vi.useFakeTimers();
+        document.body.innerHTML = '<div id="tab-content"></div>';
+        window.__renderExecutionTab(report, 'checklist', { assignedChecklists: [checklist], progressMap: {}, customItems: [] });
+        vi.useRealTimers();
+        loadScript('./event-delegator.js', { params: { module: undefined } });
+        const box = document.querySelector('#tab-content .print-shots-toggle');
+        expect(box.checked).toBe(true);
+        box.checked = false;
+        box.dispatchEvent(new Event('change', { bubbles: true }));
+        expect(window.printIncludesScreenshots()).toBe(false);
+        window.setPrintScreenshots(true);
+    });
+
+    it('shows the box beside the print buttons, reflecting the choice', () => {
+        const report = seedState();
+        window.setPrintScreenshots(false);
+        document.body.innerHTML = '<div id="tab-content"></div>';
+        window.__renderExecutionTab(report, 'ncr', { assignedChecklists: [checklist] });
+        const box = document.querySelector('#tab-content .print-shots-toggle');
+        expect(box.checked).toBe(false);
+        expect(box.getAttribute('data-action-change')).toBe('setPrintScreenshots');
+        expect(box.getAttribute('data-arg1')).toBe('this.checked');
+        window.setPrintScreenshots(true);
+    });
+});

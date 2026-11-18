@@ -1257,7 +1257,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <input type="text" id="jump-to-question" class="form-control" style="width: 9rem;" placeholder="e.g. IMS 13" autocomplete="off" title="Type a question number from the checklist or agenda index, then press Enter" data-action-change="jumpToChecklistQuestion" data-arg1="this.value">
                             <button type="button" class="btn btn-outline-secondary" data-action="jumpToChecklistQuestionFromBox" title="Go to the question">Go</button>
                         </div>
-                        <div style="display: flex; gap: 0.5rem;">
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            ${window.printScreenshotsToggleHtml ? window.printScreenshotsToggleHtml() : ''}
                             <button class="btn btn-outline-secondary" data-action="printCompletedChecklist" data-id="${_execEscText(String(report.id))}" title="Print the checklist with your answers, notes and finding references" aria-label="Print completed checklist">
                                 <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print
                             </button>
@@ -1413,6 +1414,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 Client response due
                                 <input type="date" class="form-control" id="findings-response-due" value="${esc(String(report.findingsResponseDue || ''))}" data-action-change="setFindingsResponseDue" data-arg1="${esc(String(report.id))}" data-arg2="this.value" style="padding: 0.35rem 0.5rem; font-size: 0.85rem; width: auto;">
                             </label>
+                            <span style="align-self: center;">${window.printScreenshotsToggleHtml ? window.printScreenshotsToggleHtml() : ''}</span>
                             <button class="btn btn-outline-secondary" data-action="printCompletedChecklist" data-id="${esc(String(report.id))}" title="Print the checklist with your answers, notes and finding references" aria-label="Print completed checklist">
                                 <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i> Print completed checklist
                             </button>
