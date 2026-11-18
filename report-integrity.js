@@ -371,6 +371,25 @@
             ));
         });
 
+        // W33: a statement inserted from the template with a [bracketed]
+        // blank still in it would print half-written.
+        const FSH = global.FindingStatementHint;
+        if (FSH && typeof FSH.hasBlanks === 'function') {
+            safeArr(report && report.checklistProgress).forEach((i) => {
+                if (!i || i.status !== 'nc' || !FSH.hasBlanks(i.ncrDescription)) return;
+                const clause = trim(i.criterionRef || i.clause) || 'not stated';
+                results.warnings.push(item(
+                    'W33',
+                    'warning',
+                    'findings',
+                    `The finding at clause ${clause} still has a template blank in its statement, such as "[What was not fulfilled]"; the report would print it as written.`,
+                    'checklistProgress[].ncrDescription',
+                    'Replace each [bracketed] part of the statement in the checklist item\'s Finding Details, then Save.',
+                    { list: 'checklistProgress', checklistId: i.checklistId, itemIdx: i.itemIdx }
+                ));
+            });
+        }
+
         const RS = global.ReportStats;
         if (!stats || !RS || typeof RS.correctiveActions !== 'function') return;
         const cas = RS.correctiveActions(stats, {
