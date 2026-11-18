@@ -187,8 +187,12 @@
      */
     function open(html, opts) {
         const o = opts || {};
-        const win = global.open('', '_blank');
+        // opts.win: a window opened earlier (inside the click, so the pop-up
+        // blocker allows it) that showed a placeholder while the document was
+        // prepared; its content is replaced.
+        const win = o.win || global.open('', '_blank');
         if (!win) return null;
+        if (o.win) win.document.open();
         win.document.write(html);
         win.document.close();
         const pendingImages = function () {
@@ -213,10 +217,15 @@
         const wire = function () {
             const btn = win.document.querySelector('[data-action="print"]');
             if (!btn) return false;
+            // Once per button: a window reused for a second document (opts.win)
+            // can fire a load handler left by the first, and a second listener
+            // would open the print dialog twice.
+            if (btn.getAttribute('data-ps-wired')) return true;
+            btn.setAttribute('data-ps-wired', '1');
             btn.addEventListener('click', function (e) { e.preventDefault(); print(); });
             return true;
         };
-        if (!wire()) win.addEventListener('load', wire);
+        if (!wire() && /data-action="print"/.test(String(html))) win.addEventListener('load', wire, { once: true });
         if (o.autoPrint) print();
         return win;
     }
