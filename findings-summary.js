@@ -141,6 +141,20 @@
         return { html: '<span class="fs-blank"></span> (agreed at the closing meeting). ' + t(sentence), set: false };
     }
 
+    /** The audit identification block shared by the summary and the completed checklist. */
+    function metaTableHtml(c, extraRows) {
+        const row = function (label, value) { return '<tr><th>' + t(label) + '</th><td>' + value + '</td></tr>'; };
+        return '<table class="fs-meta-table">'
+            + row('Organisation', t(str(c.clientName) || 'Client'))
+            + row('Audit standards', arr(c.standards).length ? arr(c.standards).map(t).join(' &middot; ') : 'Not recorded')
+            + row('Audit', t([str(c.auditType), str(c.method)].filter(Boolean).join(' · ') || 'Not recorded'))
+            + row('Audit dates', t(str(c.auditDates) || 'Not recorded'))
+            + row('Lead auditor', t(str(c.leadAuditor) || 'Not recorded'))
+            + (c.auditRef ? row('Audit reference', t(c.auditRef)) : '')
+            + arr(extraRows).map(function (r) { return row(r.label, r.html); }).join('')
+            + '</table>';
+    }
+
     /**
      * @param {Object} ctx {
      *   findings: numbered findings (window.collectAuditFindings().findings),
@@ -163,16 +177,7 @@
         const closing = df.formatDate(c.closingDate) || '';
         const due = dueText(c, counts);
 
-        const row = function (label, value) { return '<tr><th>' + t(label) + '</th><td>' + value + '</td></tr>'; };
-        const metaTable = '<table class="fs-meta-table">'
-            + row('Organisation', t(clientName))
-            + row('Audit standards', arr(c.standards).length ? arr(c.standards).map(t).join(' &middot; ') : 'Not recorded')
-            + row('Audit', t([str(c.auditType), str(c.method)].filter(Boolean).join(' · ') || 'Not recorded'))
-            + row('Audit dates', t(str(c.auditDates) || 'Not recorded'))
-            + row('Lead auditor', t(str(c.leadAuditor) || 'Not recorded'))
-            + (c.auditRef ? row('Audit reference', t(c.auditRef)) : '')
-            + row('Closing meeting', closing ? t(closing) : '<span class="fs-blank"></span>')
-            + '</table>';
+        const metaTable = metaTableHtml(c, [{ label: 'Closing meeting', html: closing ? t(closing) : '<span class="fs-blank"></span>' }]);
 
         const cell = function (n, label, cls) { return '<td class="' + cls + '"><div class="fs-n">' + n + '</div><div class="fs-n-label">' + t(label) + '</div></td>'; };
         const countTable = '<table class="fs-counts"><tr>'
@@ -359,7 +364,7 @@
         if (iso) notify('Client response due ' + DF().formatDate(iso) + '. It prints on the findings summary.', 'success');
     };
 
-    const API = { build: build, context: context, gradeLabel: gradeLabel, partsOf: partsOf };
+    const API = { build: build, context: context, gradeLabel: gradeLabel, partsOf: partsOf, metaTableHtml: metaTableHtml, clean: clean, CSS: CSS };
     global.FindingsSummary = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
     if (global.Logger && global.Logger.debug) global.Logger.debug('Modules', 'findings-summary.js loaded successfully.');
