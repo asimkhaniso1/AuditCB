@@ -121,6 +121,99 @@ window.ChecklistAutoSave = (function () {
     return { DELAY: DELAY, schedule: schedule, flush: flush, bind: bind, isPending: () => !!timer };
 })();
 
+// ---------- Stale-view guard for checklist saves ----------
+// saveChecklist rebuilds checklistProgress from the inputs on screen. A view
+// drawn earlier (a second tab left open, a tab woken from sleep, the checklist
+// re-opened from data loaded when the page opened) therefore wrote its old
+// screen over everything saved since: PC Connection lost Day 1 this way on
+// 2026-11-18, when a tab drawn at 13:25 UTC autosaved its near-empty view at
+// 05:27 UTC the next morning. Each view now remembers what it was drawn from
+// (`base`). When a save finds newer data — in this tab's memory or in the cloud —
+// only the questions changed in this view are taken from the screen; every
+// other question keeps the newer saved value (a three-way merge per question).
+window.ChecklistMerge = (function () {
+    const bases = {};
+    const FIELDS = ['status', 'comment', 'ncrType', 'ncrDescription', 'transcript', 'personnel', 'designation', 'department'];
+    const keyOf = (p) => (p && p.isCustom ? 'custom-' + p.itemIdx : (p ? p.checklistId + '-' + p.itemIdx : ''));
+    const norm = (v) => (v == null ? '' : String(v).trim());
+    const images = (p) => ((p && p.evidenceImages) || (p && p.evidenceImage ? [p.evidenceImage] : [])).map(String).join('|');
+    function same(a, b) {
+        a = a || {}; b = b || {};
+        return FIELDS.every(f => norm(a[f]) === norm(b[f])) && images(a) === images(b);
+    }
+    const clone = (v) => JSON.parse(JSON.stringify(v == null ? null : v));
+    const revCount = (report) => ((report && report.checklistRevisions) || []).length;
+
+    const EVIDENCE = ['evidenceImages', 'evidenceImage', 'evidenceCapturedAtList', 'evidenceCapturedAt', 'evidenceLocation', 'evidenceLocationRaw'];
+
+    // mine: the questions as on screen; base: what this view was drawn from;
+    // theirs: the newer saved copy. Per question and per field, a value changed
+    // on this screen wins; every other value comes from theirs.
+    function merge(baseItems, mine, theirs) {
+        const baseMap = {}; (baseItems || []).forEach(p => { baseMap[keyOf(p)] = p; });
+        const theirMap = {}; (theirs || []).forEach(p => { theirMap[keyOf(p)] = p; });
+        const seen = new Set();
+        let kept = 0;
+        const out = (mine || []).map(m => {
+            const k = keyOf(m); seen.add(k);
+            const t = theirMap[k];
+            if (!t) return m;
+            const b = baseMap[k] || {};
+            const r = Object.assign(clone(t), { checklistId: m.checklistId, itemIdx: m.itemIdx, isCustom: m.isCustom, clause: m.clause || t.clause, requirement: m.requirement || t.requirement });
+            FIELDS.forEach(f => { if (norm(m[f]) !== norm(b[f])) r[f] = m[f]; });
+            if (images(m) !== images(b)) EVIDENCE.forEach(f => { r[f] = m[f]; });
+            if (r.status !== 'nc' && norm(m.status) !== norm(b.status)) r.ncrType = '';
+            if (!same(r, m)) kept++;
+            return r;
+        });
+        (theirs || []).forEach(t => { if (!seen.has(keyOf(t))) { out.push(clone(t)); kept++; } });
+        return { items: out, kept: kept };
+    }
+
+    // Called when the checklist is drawn and after each save from it.
+    function setBase(reportId, report) {
+        bases[String(reportId)] = { revs: revCount(report), items: clone((report && report.checklistProgress) || []) };
+    }
+    const getBase = (reportId) => bases[String(reportId)] || null;
+
+    // Before a save: newer data in this tab's memory than the view was drawn from?
+    function reconcileLocal(reportId, report, mine) {
+        const base = getBase(reportId);
+        if (!base || revCount(report) <= base.revs) return { items: mine, merged: false, kept: 0 };
+        const r = merge(base.items, mine, report.checklistProgress || []);
+        return { items: r.items, merged: true, kept: r.kept };
+    }
+
+    // The cloud copy's progress and revision log, or null when it can't be read.
+    async function fetchRemote(reportId) {
+        const sb = window.SupabaseClient && window.SupabaseClient.client;
+        if (!sb || typeof sb.from !== 'function') return null;
+        try {
+            const { data, error } = await sb.from('audit_reports')
+                .select('checklist_progress, revisions:data->checklistRevisions')
+                .eq('id', String(reportId)).maybeSingle();
+            if (error || !data) return null;
+            return { items: data.checklist_progress || [], revisions: Array.isArray(data.revisions) ? data.revisions : [] };
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    return { keyOf: keyOf, same: same, merge: merge, setBase: setBase, getBase: getBase, reconcileLocal: reconcileLocal, fetchRemote: fetchRemote, revCount: revCount };
+})();
+
+// The checklist view is drawn from the report as it is now, not from the
+// progress map built when the page opened (switching Findings → Checklist
+// redrew the opening data, and the next autosave wrote it back).
+window.liveProgressMap = function (report, fallback) {
+    const live = ((window.state && window.state.auditReports) || []).find(r => r && report && String(r.id) === String(report.id)) || report;
+    const progress = (live && live.checklistProgress) || [];
+    if (!progress.length) return { report: live, progressMap: fallback || {} };
+    const map = {};
+    progress.forEach(p => { if (p) map[window.ChecklistMerge.keyOf(p)] = p; });
+    return { report: live, progressMap: map };
+};
+
 // ---------- AI Auto Map: personnel per question ----------
 // Pure helpers for window.autoMapPersonnel (inside renderExecutionTab). The AI
 // only proposes a name; designation and department always come from the
@@ -575,7 +668,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
     switch (tabName) {
         case 'checklist': {
-            const { assignedChecklists = [], progressMap = {}, customItems = [], departments: _departments = [], designations: _designations = [], auditTeam: _auditTeam = [], clientPersonnel = [], clientData = null, plan: _plan = null, selectionMap = {}, overridesMap = {} } = contextData;
+            const { assignedChecklists = [], progressMap: passedProgressMap = {}, customItems = [], departments: _departments = [], designations: _designations = [], auditTeam: _auditTeam = [], clientPersonnel = [], clientData = null, plan: _plan = null, selectionMap = {}, overridesMap = {} } = contextData;
+            // Drawn from the report as saved now; the view remembers it so a later
+            // save can tell newer data apart from edits made on this screen.
+            const liveView = window.liveProgressMap(report, passedProgressMap);
+            const progressMap = liveView.progressMap;
+            window.ChecklistMerge.setBase(report.id, liveView.report);
 
             // Auto-fill designation and department when personnel name is selected
             window._autoFillPersonnel = function (suffix) {
@@ -2353,7 +2451,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         }
 
         const statusInputs = document.querySelectorAll('.status-input');
-        const checklistData = [];
+        let checklistData = [];
+        // Stale-view guard (window.ChecklistMerge): what this view was drawn
+        // from, the questions as on screen, and how many revisions this tab knew.
+        let domData = null;
+        let baseUsed = null;
+        let knownRevs = 0;
+        let mergedKept = -1;
 
         // Only update checklistProgress if we are on a screen that has checklist inputs
         if (statusInputs.length > 0) {
@@ -2481,6 +2585,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 }
             });
 
+            // This tab holds newer answers than the view was drawn from (saved in
+            // another tab and synced here): keep them for every question that was
+            // not changed on this screen, instead of writing the old screen back.
+            domData = checklistData;
+            baseUsed = window.ChecklistMerge.getBase(reportId);
+            const local = window.ChecklistMerge.reconcileLocal(reportId, report, checklistData);
+            checklistData = local.items;
+            if (local.merged) mergedKept = local.kept;
+
             report.checklistProgress = checklistData;
 
             // Revision tracking
@@ -2493,6 +2606,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 conformCount: checklistData.filter(d => d.status === 'conform').length,
                 naCount: checklistData.filter(d => d.status === 'na').length
             });
+            knownRevs = report.checklistRevisions.length - 1;
+            window.ChecklistMerge.setBase(reportId, report);
 
             // Update revision badge in UI
             const badge = document.getElementById('revision-badge');
@@ -2552,6 +2667,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // Persist to Database (Async)
         (async () => {
             try {
+                // The cloud copy moved on since this tab last knew it (another tab or
+                // device saved): merge with it per question before writing.
+                let remoteMerged = false;
+                if (domData) {
+                    const remote = await window.ChecklistMerge.fetchRemote(reportId);
+                    if (remote && remote.revisions.length > knownRevs) {
+                        const r = window.ChecklistMerge.merge(baseUsed ? baseUsed.items : [], domData, remote.items);
+                        const ours = report.checklistRevisions[report.checklistRevisions.length - 1] || {};
+                        report.checklistProgress = r.items;
+                        report.checklistRevisions = remote.revisions.concat([Object.assign({}, ours, {
+                            rev: remote.revisions.length + 1,
+                            itemCount: r.items.length,
+                            ncCount: r.items.filter(d => d.status === 'nc').length,
+                            conformCount: r.items.filter(d => d.status === 'conform').length,
+                            naCount: r.items.filter(d => d.status === 'na').length
+                        })]);
+                        window.ChecklistMerge.setBase(reportId, report);
+                        mergedKept = Math.max(mergedKept, 0) + r.kept;
+                        remoteMerged = true;
+                    }
+                }
+
                 // Use correct DB column names (client_name, not client)
                 await window.SupabaseClient.db.upsert('audit_reports', {
                     id: String(reportId),  // DB uses TEXT for id
@@ -2578,6 +2715,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     }, 2000);
                 }
                 if (!quiet) window.showNotification('Audit progress saved to cloud', 'success');
+
+                // Merged with newer answers: redraw so the screen shows them, and
+                // after a cloud merge save once more so the NCR register is synced
+                // from the merged checklist rather than from the old screen.
+                if (mergedKept >= 0) {
+                    window.showNotification('This checklist was also saved in another tab or device. Your changes here were merged with it'
+                        + (mergedKept ? ` and ${mergedKept} newer answer${mergedKept === 1 ? ' was' : 's were'} kept.` : '.'), 'warning');
+                    const tabBtn = document.querySelector('.tab-btn[data-tab="checklist"]');
+                    if (tabBtn && document.querySelectorAll('.status-input').length) {
+                        const y = window.scrollY;
+                        tabBtn.click();
+                        window.scrollTo(0, y);
+                        if (remoteMerged) setTimeout(() => window.saveChecklist(reportId, { quiet: true }), 0);
+                    }
+                }
 
             } catch (dbError) {
                 console.error('Database Sync Error:', JSON.stringify(dbError, null, 2));
