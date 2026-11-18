@@ -172,8 +172,11 @@
             var row = byDept[dept];
             row.total++;
             if (!item || item.status !== 'na') row.applicable++;
-            if (item && item.status) row.audited++;
-            if (item && (item.comment || evidenceCount(item) > 0)) row.sampled++;
+            // A question marked "not sampled" was neither audited nor sampled,
+            // whatever note explains why.
+            const notSampled = !!(item && item.status === 'not_sampled');
+            if (item && item.status && !notSampled) row.audited++;
+            if (item && !notSampled && (item.comment || evidenceCount(item) > 0)) row.sampled++;
             row.evidenceRefs += evidenceCount(item);
             if (isMajorNc(item)) row.majors++;
             if (isMinorOrObs(item)) row.minorObs++;

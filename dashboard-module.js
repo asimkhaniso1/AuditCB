@@ -85,7 +85,7 @@ function renderDashboardEnhanced() {
 
             const progress = report.checklistProgress || [];
             if (progress.length > 0) {
-                const assessed = progress.filter(p => p.status && p.status !== '');
+                const assessed = progress.filter(p => p.status && p.status !== '' && p.status !== 'not_sampled');
                 if (assessed.length > 0) {
                     const conformCount = assessed.filter(p => p.status === 'conform').length;
                     complianceScoreSum += Math.round((conformCount / assessed.length) * 100);

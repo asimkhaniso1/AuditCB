@@ -767,7 +767,12 @@ function renderExecutionDetail(reportId) {
         const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
         return progressMap[key]?.status === 'na';
     }).length;
-    const answeredCount = conformCount + ncCount + naCount;
+    const notSampledCount = allItems.filter(item => {
+        const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
+        return progressMap[key]?.status === 'not_sampled';
+    }).length;
+    // Not sampled is a decision, so it is not pending; it is still not assessed.
+    const answeredCount = conformCount + ncCount + naCount + notSampledCount;
     const pendingCount = totalItems - answeredCount;
     const progressPct = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
 
@@ -837,7 +842,7 @@ function renderExecutionDetail(reportId) {
                                 </div>
                                 <div style="text-align: center; background: rgba(156, 163, 175, 0.3); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
                                     <div style="font-size: 1.5rem; font-weight: bold;">${pendingCount}</div>
-                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">Pending</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">Pending${notSampledCount ? ` · ${notSampledCount} not sampled` : ''}</div>
                                 </div>
                             </div>
                         </div>

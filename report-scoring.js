@@ -191,7 +191,7 @@
     }
     function scoreItems(items) {
         const total = items.length;
-        const applicable = items.filter((i) => i?.status && i.status !== 'na');
+        const applicable = items.filter((i) => i?.status && i.status !== 'na' && i.status !== 'not_sampled');
         const conforming = items.filter((i) => i?.status === 'conform');
         const advisories = applicable.filter(isAdvisory);
         const majors = items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'major');

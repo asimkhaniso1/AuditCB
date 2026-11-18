@@ -1874,7 +1874,7 @@ window.initClientDashboardCharts = function (clientId) {
         reports.forEach(r => {
             const progress = r.checklistProgress || [];
             if (progress.length > 0) {
-                const assessed = progress.filter(p => p.status && p.status !== '');
+                const assessed = progress.filter(p => p.status && p.status !== '' && p.status !== 'not_sampled');
                 totalItems += assessed.length;
                 conformItems += assessed.filter(p => p.status === 'conform').length;
             }

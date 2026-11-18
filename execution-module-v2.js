@@ -1099,6 +1099,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 </div>` : ''}
                             </div>
                             <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                <button type="button" class="btn-icon btn-ns status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NOT_SAMPLED || 'not_sampled'}" title="Not sampled at this audit (risk-based sampling). Counts as not assessed, never as conforming." aria-label="Not sampled"><i class="fa-solid fa-eye-slash"></i></button>
                                 <button type="button" class="btn-icon btn-na status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NA}" title="Not Applicable">N/A</button>
                                 <button type="button" class="btn-icon btn-ok status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.CONFORM}" title="Conformity" aria-label="Confirm"><i class="fa fa-check"></i></button>
                                 <button type="button" class="btn-icon btn-nc status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NC}" title="Non-Conformity" aria-label="Flag"><i class="fa fa-flag"></i></button>
@@ -1272,7 +1273,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 const key = `${checklist.id}-${obj.itemId}`;
                                 return progressMap[key]?.status || '';
                             });
-                            const completed = sectionProgress.filter(s => s === 'conform' || s === 'nc' || s === 'na').length;
+                            const completed = sectionProgress.filter(s => s === 'conform' || s === 'nc' || s === 'na' || s === 'not_sampled').length;
                             const total = itemsToRender.length;
                             const _progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -1346,6 +1347,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     .btn-icon.btn-ok.active { background: var(--success-color); color: white; }
                     .btn-icon.btn-nc.active { background: var(--danger-color); color: white; }
                     .btn-icon.btn-na.active { background: #9ca3af; color: white; }
+                    .btn-icon.btn-ns.active { background: #64748b; color: white; }
                     .checklist-item:focus-within { border-color: var(--primary-color) !important; background: #f0f9ff !important; }
                     .checklist-item.filtered-out { display: none !important; }
                     .progress-ring { transform: rotate(-90deg); }
@@ -1398,6 +1400,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     <button class="bulk-action-btn" data-action="na" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;">
                                         <i class="fa-solid fa-ban" style="color: #9ca3af; width: 18px;"></i>
                                         <span>Not Applicable</span>
+                                    </button>
+                                    <button class="bulk-action-btn" data-action="not_sampled" data-report-id="${report.id}" title="Marks the selected (or shown) questions that have no answer yet; answered ones are left as they are" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;">
+                                        <i class="fa-solid fa-eye-slash" style="color: #64748b; width: 16px;"></i> <span>Not sampled</span>
                                     </button>
                                     <div style="border-top: 1px solid #e2e8f0; padding: 0.75rem 1rem;">
                                         <div style="font-size: 0.7rem; color: var(--text-secondary);">
@@ -2505,6 +2510,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         if (status === window.CONSTANTS.STATUS.CONFORM) activeBtnClass = '.btn-ok';
         else if (status === window.CONSTANTS.STATUS.NC) activeBtnClass = '.btn-nc';
         else if (status === window.CONSTANTS.STATUS.NA) activeBtnClass = '.btn-na';
+        else if (status === (window.CONSTANTS.STATUS.NOT_SAMPLED || 'not_sampled')) activeBtnClass = '.btn-ns';
 
         if (activeBtnClass) row.querySelector(activeBtnClass)?.classList.add('active');
 
@@ -2552,7 +2558,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const itemId = item.id.replace('row-', '');
             const statusInput = document.getElementById('status-' + itemId);
             const status = statusInput?.value || '';
-            if (status === 'conform' || status === 'nc' || status === 'na') {
+            if (status === 'conform' || status === 'nc' || status === 'na' || status === 'not_sampled') {
                 completed++;
             }
         });
@@ -3246,6 +3252,27 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             return;
         }
 
+        // "Not sampled" is for questions with no answer yet: it never replaces
+        // a recorded result (an NC would be withdrawn from the register).
+        const notSampled = status === (window.CONSTANTS.STATUS.NOT_SAMPLED || 'not_sampled');
+        let skipped = 0;
+        if (notSampled) {
+            const open = Array.from(targetItems).filter(item => {
+                const v = (document.getElementById('status-' + item.id.replace('row-', '')) || {}).value || '';
+                return !v || v === status;
+            });
+            skipped = targetItems.length - open.length;
+            targetItems = open;
+            if (!targetItems.length) {
+                window.showNotification('Every question in this set already has a result; none were marked Not sampled.', 'info');
+                return;
+            }
+            if (!useSelection && typeof window.confirm === 'function'
+                && !window.confirm('Mark ' + targetItems.length + ' unanswered question' + (targetItems.length === 1 ? '' : 's') + ' as Not sampled?')) {
+                return;
+            }
+        }
+
         window.Logger.debug('Execution', `Bulk updating ${targetItems.length} items to status: ${status}`);
         let updatedCount = 0;
         targetItems.forEach(item => {
@@ -3275,7 +3302,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             window.Logger.error('Execution', 'Menu not found: bulk-menu-' + reportId);
         }
 
-        window.showNotification(`Updated ${updatedCount} item(s) to ${status.toUpperCase()}`, 'success');
+        const statusLabel = { conform: 'Conforming', nc: 'Nonconforming', na: 'Not applicable', not_sampled: 'Not sampled' }[status] || String(status).toUpperCase();
+        window.showNotification(`Updated ${updatedCount} item(s) to ${statusLabel}` + (skipped ? ` (${skipped} already answered, left as they were)` : ''), 'success');
         window.saveChecklist(reportId);
     };
 

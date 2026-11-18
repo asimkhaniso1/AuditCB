@@ -275,13 +275,18 @@
             var c = String(item.clause).trim();
             return c === refStr || c.indexOf(refStr) === 0 || refStr.indexOf(c) === 0;
         });
-        if (!matches.length) return { audited: false, result: null };
+        // Only a recorded result counts. A blank answer, or one marked "not
+        // sampled", is not an audit of the requirement: it used to fall
+        // through to 'conform' and print "Conforming" for a control nobody
+        // looked at (PC Connection, 2026-11-18).
+        var answered = matches.filter(function (item) { return item.status === 'nc' || item.status === 'na' || item.status === 'conform'; });
+        if (!answered.length) return { audited: false, result: null };
         // Worst status wins: nc > na > conform
         var worst = null;
-        matches.forEach(function (item) {
+        answered.forEach(function (item) {
             if (item.status === 'nc') worst = 'nc';
             else if (item.status === 'na' && worst !== 'nc') worst = 'na';
-            else if (!worst) worst = item.status || 'conform';
+            else if (!worst) worst = 'conform';
         });
         return { audited: true, result: worst };
     }
