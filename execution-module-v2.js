@@ -1401,28 +1401,32 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             tabContent.innerHTML = `
                 <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                        <div>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                        <div style="flex: 1 1 320px; min-width: 0;">
                             <h3>Audit Findings</h3>
                             <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.85rem;">
                                 ${fc.nc} nonconformit${fc.nc === 1 ? 'y' : 'ies'} (Major ${fc.major} &middot; Minor ${fc.minor})${fc.pending ? ` &middot; ${fc.pending} awaiting classification` : ''} &middot; ${fc.obs} observation${fc.obs === 1 ? '' : 's'} &middot; ${fc.ofi} OFI${fc.ofi === 1 ? '' : 's'}
                                 &mdash; ${collected.manualCount} manual, ${collected.checklistCount} from checklist
                             </p>
                         </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; justify-content: flex-end;">
-                            <label style="display: flex; flex-direction: column; font-size: 0.75rem; color: var(--text-secondary); margin: 0;" title="Printed on the findings summary as the date the client's correction and corrective action plan is due">
-                                Client response due
-                                <input type="date" class="form-control" id="findings-response-due" value="${esc(String(report.findingsResponseDue || ''))}" data-action-change="setFindingsResponseDue" data-arg1="${esc(String(report.id))}" data-arg2="this.value" style="padding: 0.35rem 0.5rem; font-size: 0.85rem; width: auto;">
-                            </label>
-                            <span style="align-self: center;">${window.printScreenshotsToggleHtml ? window.printScreenshotsToggleHtml() : ''}</span>
-                            <button class="btn btn-outline-secondary" data-action="printCompletedChecklist" data-id="${esc(String(report.id))}" title="Print the checklist with your answers, notes and finding references" aria-label="Print completed checklist">
+                        <button class="btn btn-primary" data-action="createNCR" data-id="${report.id}" aria-label="Add" style="flex: none; white-space: nowrap;">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Finding
+                        </button>
+                    </div>
+
+                    <!-- Print toolbar: settings on the left, the two prints on the right, one line on a wide screen. -->
+                    <div class="findings-print-bar" style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; padding: 0.75rem 1rem; margin-bottom: 1.25rem; border: 1px solid var(--border-color); border-radius: 8px;">
+                        <label for="findings-response-due" style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); margin: 0; white-space: nowrap;" title="Printed on the findings summary as the date the client's correction and corrective action plan is due">
+                            Client response due
+                            <input type="date" class="form-control" id="findings-response-due" value="${esc(String(report.findingsResponseDue || ''))}" data-action-change="setFindingsResponseDue" data-arg1="${esc(String(report.id))}" data-arg2="this.value" style="padding: 0.3rem 0.5rem; font-size: 0.85rem; width: auto; margin: 0;">
+                        </label>
+                        ${window.printScreenshotsToggleHtml ? window.printScreenshotsToggleHtml() : ''}
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-left: auto;">
+                            <button class="btn btn-outline-secondary" data-action="printCompletedChecklist" data-id="${esc(String(report.id))}" title="Print the checklist with your answers, notes and finding references" aria-label="Print completed checklist" style="white-space: nowrap;">
                                 <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i> Print completed checklist
                             </button>
-                            <button class="btn btn-secondary" data-action="printFindingsSummary" data-id="${esc(String(report.id))}" title="Print the findings for the closing meeting, for the client to acknowledge" aria-label="Print findings summary"${allFindings.length ? '' : ' disabled'}>
+                            <button class="btn btn-outline-secondary" data-action="printFindingsSummary" data-id="${esc(String(report.id))}" title="Print the findings for the closing meeting, for the client to acknowledge" aria-label="Print findings summary" style="white-space: nowrap;"${allFindings.length ? '' : ' disabled'}>
                                 <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print findings summary
-                            </button>
-                            <button class="btn btn-primary" data-action="createNCR" data-id="${report.id}" aria-label="Add">
-                                <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Finding
                             </button>
                         </div>
                     </div>
@@ -1447,7 +1451,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <td><span style="background: ${f.source === 'manual' ? '#3b82f6' : '#8b5cf6'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${f.source === 'manual' ? 'Manual' : 'Checklist'}</span></td>
                                         <td><span style="background: ${f._cat.color}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; white-space: nowrap;">${esc(f._cat.label)}</span></td>
                                         <td>${esc(f.clause || '-')}</td>
-                                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${esc(f.description || '-')}">${esc(f.description || '-')}</td>
+                                        <td style="min-width: 260px; max-width: 520px; font-size: 0.8rem; line-height: 1.4;" title="${esc(f.description || '-')}"><div class="finding-desc" style="display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;">${esc(f.description || '-')}</div></td>
                                         <td><span style="background: ${f.status === window.CONSTANTS.STATUS.CLOSED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${esc(f.status || 'Open')}</span></td>
                                         <td>${f.source === 'manual'
                     ? `<button class="btn btn-sm" style="color: var(--primary-color);" data-action="editExecutionNCR" data-arg1="${report.id}" data-arg2="${f._manualIdx}" title="Edit this finding" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>`
