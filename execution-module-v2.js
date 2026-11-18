@@ -306,6 +306,108 @@ window.AuditFindingCategory = (function () {
     return { of: of, numberFindings: numberFindings, counts: counts };
 })();
 
+// Every finding of an audit: the manual ones (report.ncrs) and the checklist
+// items flagged NC (report.checklistProgress), numbered by category. The
+// Findings tab and the printed findings summary both read this, so the paper
+// handed to the client carries the same references (NCR-001, OBS-002) as the
+// screen. Checklist findings also carry what the summary prints: the
+// requirement, the auditor's evidence remark and the NC statement as recorded.
+window.collectAuditFindings = function (report, assignedChecklists) {
+    const r = report || {};
+    const lists = Array.isArray(assignedChecklists) ? assignedChecklists : [];
+    const manualNCRs = r.ncrs || [];
+    const checklistNCRs = (r.checklistProgress || [])
+        .filter(item => item && item.status === 'nc')
+        .map(item => {
+            // Resolve clause from checklist definition
+            let clauseText = 'Checklist Item';
+            let reqText = '';
+            // Carried from the checklist item when present (FOCUS.n/SURV items
+            // store the real ISO clause here since their own `clause` is an
+            // internal pseudo-reference — see client-docs-bulk.js's question()).
+            // The item's own value (e.g. set via window.setFindingCriterion)
+            // takes precedence over the checklist template lookup below, same
+            // reasoning as the checklist->NCR sync.
+            let criterionRef = item.criterionRef;
+            let criterionSource = item.criterionSource;
+
+            if (!criterionSource && item.checklistId && lists.length > 0) {
+                const cl = lists.find(c => String(c.id) === String(item.checklistId));
+                if (cl) {
+                    if (cl.clauses && (String(item.itemIdx).includes('-'))) {
+                        const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
+                        const mainObj = cl.clauses.find(m => m.mainClause === mainClauseVal);
+                        if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
+                            const subItem = mainObj.subClauses[subIdxVal];
+                            clauseText = subItem.clause || `Clause ${mainClauseVal}`;
+                            reqText = subItem.requirement || '';
+                            if (subItem.criterionRef !== undefined) criterionRef = subItem.criterionRef;
+                            if (subItem.criterionSource) criterionSource = subItem.criterionSource;
+                        }
+                    } else if (cl.items && cl.items[item.itemIdx]) {
+                        clauseText = cl.items[item.itemIdx].clause || 'Checklist Item';
+                        reqText = cl.items[item.itemIdx].requirement || '';
+                        if (cl.items[item.itemIdx].criterionRef !== undefined) criterionRef = cl.items[item.itemIdx].criterionRef;
+                        if (cl.items[item.itemIdx].criterionSource) criterionSource = cl.items[item.itemIdx].criterionSource;
+                    }
+                }
+            } else if (item.isCustom) {
+                const customItem = (r.customItems || [])[item.itemIdx];
+                if (customItem) {
+                    clauseText = customItem.clause || 'Custom Question';
+                    reqText = customItem.requirement || '';
+                }
+            }
+
+            const images = Array.isArray(item.evidenceImages) ? item.evidenceImages.filter(Boolean)
+                : (item.evidenceImage ? [item.evidenceImage] : []);
+            return {
+                // Not yet classified = pending (as on Review & Submit), never
+                // silently an observation.
+                type: item.ncrType || window.CONSTANTS.NCR_TYPES.PENDING,
+                // clause is kept as-is (the internal FOCUS/SURV/ORG/DOC reference
+                // when that's what it is) — criterionRef/criterionSource, when
+                // present, tell a consumer to display criterionRef as the criterion.
+                clause: clauseText,
+                description: item.ncrDescription || item.comment || reqText || 'Non-conformity identified in checklist',
+                status: 'Open',
+                source: 'checklist',
+                // The checklist item that raised it, so the row's link can
+                // open it (row id = "<checklistId>-<itemIdx>", or
+                // "custom-<idx>" for an added question).
+                sourceChecklistId: item.isCustom ? 'custom' : (item.checklistId == null ? '' : item.checklistId),
+                sourceItemIdx: item.itemIdx == null ? '' : item.itemIdx,
+                questionRef: item.isCustom ? null : window.ChecklistQuestionRef.fromItemId(item.itemIdx),
+                requirement: reqText,
+                comment: item.comment || '',
+                ncrDescription: item.ncrDescription || '',
+                clientEvidenceStatement: item.clientEvidenceStatement || '',
+                personnel: item.personnel || '',
+                department: item.department || '',
+                designation: item.designation || '',
+                evidenceImage: item.evidenceImage,
+                evidenceCount: images.length,
+                ...(criterionSource ? { criterionRef: criterionRef || '', criterionSource } : {})
+            };
+        });
+
+    // A manual record keeps its index in report.ncrs for the edit button,
+    // whatever the display order.
+    const findings = window.AuditFindingCategory.numberFindings([
+        ...manualNCRs.map((ncr, manualIdx) => ({
+            ...ncr, source: 'manual', _manualIdx: manualIdx,
+            evidenceCount: Array.isArray(ncr.evidenceImages) ? ncr.evidenceImages.filter(Boolean).length : (ncr.evidenceImage ? 1 : 0)
+        })),
+        ...checklistNCRs
+    ]);
+    return {
+        findings,
+        counts: window.AuditFindingCategory.counts(findings),
+        manualCount: manualNCRs.length,
+        checklistCount: checklistNCRs.length
+    };
+};
+
 // Jump to a checklist question by its number: open its section, scroll it into
 // view and highlight it — the same landing the NC-register "go to item" uses.
 window.jumpToChecklistQuestion = function (text) {
@@ -1281,86 +1383,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         }
 
         case 'ncr': {
-            // Combine Manual NCRs and Checklist-marked NCs for real-time display
-            const manualNCRs = report.ncrs || [];
-
-            // Get checklist-marked NCs from checklistProgress
-            const checklistNCRs = (report.checklistProgress || [])
-                .filter(item => item.status === 'nc')
-                .map((item, _idx) => {
-                    // Resolve clause from checklist definition
-                    let clauseText = 'Checklist Item';
-                    let reqText = '';
-                    // Carried from the checklist item when present (FOCUS.n/SURV items
-                    // store the real ISO clause here since their own `clause` is an
-                    // internal pseudo-reference — see client-docs-bulk.js's question()).
-                    // The item's own value (e.g. set via window.setFindingCriterion)
-                    // takes precedence over the checklist template lookup below, same
-                    // reasoning as the checklist->NCR sync above.
-                    let criterionRef = item.criterionRef;
-                    let criterionSource = item.criterionSource;
-                    const { assignedChecklists = [] } = contextData;
-
-                    if (!criterionSource && item.checklistId && assignedChecklists.length > 0) {
-                        const cl = assignedChecklists.find(c => String(c.id) === String(item.checklistId));
-                        if (cl) {
-                            if (cl.clauses && (String(item.itemIdx).includes('-'))) {
-                                const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
-                                const mainObj = cl.clauses.find(m => m.mainClause === mainClauseVal);
-                                if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
-                                    const subItem = mainObj.subClauses[subIdxVal];
-                                    clauseText = subItem.clause || `Clause ${mainClauseVal}`;
-                                    reqText = subItem.requirement || '';
-                                    if (subItem.criterionRef !== undefined) criterionRef = subItem.criterionRef;
-                                    if (subItem.criterionSource) criterionSource = subItem.criterionSource;
-                                }
-                            } else if (cl.items && cl.items[item.itemIdx]) {
-                                clauseText = cl.items[item.itemIdx].clause || 'Checklist Item';
-                                reqText = cl.items[item.itemIdx].requirement || '';
-                                if (cl.items[item.itemIdx].criterionRef !== undefined) criterionRef = cl.items[item.itemIdx].criterionRef;
-                                if (cl.items[item.itemIdx].criterionSource) criterionSource = cl.items[item.itemIdx].criterionSource;
-                            }
-                        }
-                    } else if (item.isCustom) {
-                        const customItem = (report.customItems || [])[item.itemIdx];
-                        if (customItem) {
-                            clauseText = customItem.clause || 'Custom Question';
-                            reqText = customItem.requirement || '';
-                        }
-                    }
-
-                    return {
-                        // Not yet classified = pending (as on Review & Submit), never
-                        // silently an observation.
-                        type: item.ncrType || window.CONSTANTS.NCR_TYPES.PENDING,
-                        // clause is kept as-is (the internal FOCUS/SURV/ORG/DOC reference
-                        // when that's what it is) — criterionRef/criterionSource, when
-                        // present, tell a consumer to display criterionRef as the criterion.
-                        clause: clauseText,
-                        description: item.ncrDescription || item.comment || reqText || 'Non-conformity identified in checklist',
-                        status: 'Open',
-                        source: 'checklist',
-                        // The checklist item that raised it, so the row's link can
-                        // open it (row id = "<checklistId>-<itemIdx>", or
-                        // "custom-<idx>" for an added question).
-                        sourceChecklistId: item.isCustom ? 'custom' : (item.checklistId == null ? '' : item.checklistId),
-                        sourceItemIdx: item.itemIdx == null ? '' : item.itemIdx,
-                        department: item.department || '',
-                        designation: item.designation || '',
-                        evidenceImage: item.evidenceImage,
-                        ...(criterionSource ? { criterionRef: criterionRef || '', criterionSource } : {})
-                    };
-                });
-
             // All findings of this audit: nonconformities (Major / Minor), observations
-            // and OFIs. Grouped and numbered by category (NCR-001, OBS-001, OFI-001),
-            // so an observation is never labelled an NCR. A manual record keeps its
-            // index in report.ncrs for the edit button, whatever the display order.
-            const allFindings = window.AuditFindingCategory.numberFindings([
-                ...manualNCRs.map((ncr, manualIdx) => ({ ...ncr, source: 'manual', _manualIdx: manualIdx })),
-                ...checklistNCRs
-            ]);
-            const fc = window.AuditFindingCategory.counts(allFindings);
+            // and OFIs, grouped and numbered by category (NCR-001, OBS-001, OFI-001),
+            // so an observation is never labelled an NCR. Same list the printed
+            // findings summary uses (window.collectAuditFindings).
+            const collected = window.collectAuditFindings(report, contextData.assignedChecklists || []);
+            const allFindings = collected.findings;
+            const fc = collected.counts;
             const esc = window.UTILS.escapeHtml;
 
             tabContent.innerHTML = `
@@ -1370,12 +1399,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <h3>Audit Findings</h3>
                             <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.85rem;">
                                 ${fc.nc} nonconformit${fc.nc === 1 ? 'y' : 'ies'} (Major ${fc.major} &middot; Minor ${fc.minor})${fc.pending ? ` &middot; ${fc.pending} awaiting classification` : ''} &middot; ${fc.obs} observation${fc.obs === 1 ? '' : 's'} &middot; ${fc.ofi} OFI${fc.ofi === 1 ? '' : 's'}
-                                &mdash; ${manualNCRs.length} manual, ${checklistNCRs.length} from checklist
+                                &mdash; ${collected.manualCount} manual, ${collected.checklistCount} from checklist
                             </p>
                         </div>
-                        <button class="btn btn-primary" data-action="createNCR" data-id="${report.id}" aria-label="Add">
-                            <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Finding
-                        </button>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; justify-content: flex-end;">
+                            <label style="display: flex; flex-direction: column; font-size: 0.75rem; color: var(--text-secondary); margin: 0;" title="Printed on the findings summary as the date the client's correction and corrective action plan is due">
+                                Client response due
+                                <input type="date" class="form-control" id="findings-response-due" value="${esc(String(report.findingsResponseDue || ''))}" data-action-change="setFindingsResponseDue" data-arg1="${esc(String(report.id))}" data-arg2="this.value" style="padding: 0.35rem 0.5rem; font-size: 0.85rem; width: auto;">
+                            </label>
+                            <button class="btn btn-secondary" data-action="printFindingsSummary" data-id="${esc(String(report.id))}" title="Print the findings for the closing meeting, for the client to acknowledge" aria-label="Print findings summary"${allFindings.length ? '' : ' disabled'}>
+                                <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print findings summary
+                            </button>
+                            <button class="btn btn-primary" data-action="createNCR" data-id="${report.id}" aria-label="Add">
+                                <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Finding
+                            </button>
+                        </div>
                     </div>
 
                     <div class="table-container">
