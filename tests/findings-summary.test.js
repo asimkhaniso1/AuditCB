@@ -193,3 +193,62 @@ describe('Findings tab print controls', () => {
         open.mockRestore();
     });
 });
+
+describe('screenshots in the findings summary', () => {
+    async function print() {
+        const open = vi.spyOn(PS, 'open').mockReturnValue({ placeholder: true });
+        await window.printFindingsSummary('r1');
+        const calls = open.mock.calls.slice();
+        open.mockRestore();
+        return calls;
+    }
+    beforeEach(() => {
+        window.EvidenceUtils = { compress: vi.fn(async (src) => 'data:image/jpeg;base64,' + Buffer.from(String(src)).toString('base64')) };
+        window.confirm = vi.fn(() => true);
+    });
+
+    it('prints each finding\'s screenshots under it, downscaled and captioned with the finding reference', async () => {
+        seedState();
+        window.state.auditReports[0].checklistProgress[0].evidenceCapturedAtList = ['2026-11-17T14:42:00Z', ''];
+        const calls = await print();
+        expect(calls.length).toBe(2);
+        expect(calls[0][0]).toContain('Preparing the findings summary with 2 screenshots');
+        expect(calls[1][1]).toEqual({ win: { placeholder: true } });
+        expect(window.EvidenceUtils.compress).toHaveBeenCalledWith('https://x/1.jpg', { maxPx: 900, quality: 0.72 });
+        const doc = new DOMParser().parseFromString(calls[1][0], 'text/html');
+        const block = Array.from(doc.querySelectorAll('.fs-finding')).find(b => b.textContent.includes('NCR-001'));
+        expect(block.classList.contains('fs-has-shots')).toBe(true);
+        const caps = Array.from(block.querySelectorAll('figcaption')).map(c => c.textContent);
+        expect(caps).toEqual(['NCR-001 · screenshot 1 of 2 · captured 17 November 2026', 'NCR-001 · screenshot 2 of 2']);
+        expect(Array.from(block.querySelectorAll('img')).every(i => i.getAttribute('src').startsWith('data:image/jpeg;base64,'))).toBe(true);
+        // The count line is replaced by the screenshots themselves.
+        expect(block.textContent).not.toContain('on file with the audit record');
+        // Findings without screenshots are unchanged.
+        const other = Array.from(doc.querySelectorAll('.fs-finding')).find(b => b.textContent.includes('NCR-002'));
+        expect(other.querySelector('figure')).toBeNull();
+        expect(PS.lint(calls[1][0])).toEqual([]);
+    });
+
+    it('includes a manual finding\'s screenshot', async () => {
+        seedState({ checklistProgress: [], ncrs: [{ type: 'minor', clause: '8.1', description: 'Change not assessed', evidenceImage: 'https://x/manual.jpg', status: 'Open' }] });
+        const calls = await print();
+        expect(calls.length).toBe(2);
+        expect(window.EvidenceUtils.compress).toHaveBeenCalledWith('https://x/manual.jpg', { maxPx: 900, quality: 0.72 });
+        expect(calls[1][0]).toContain('NCR-001 · screenshot 1 of 1');
+    });
+
+    it('prints straight away, with no placeholder, when no finding has screenshots', async () => {
+        seedState({ checklistProgress: [{ checklistId: 'cl1', itemIdx: 'IMS-0', status: 'nc', ncrType: 'minor', ncrDescription: 'Gap' }] });
+        const calls = await print();
+        expect(calls.length).toBe(1);
+        expect(calls[0][1]).toBeUndefined();
+        expect(window.EvidenceUtils.compress).not.toHaveBeenCalled();
+    });
+
+    it('asks about ungraded findings before opening any window', async () => {
+        seedState({ checklistProgress: [{ checklistId: 'cl1', itemIdx: 'IMS-0', status: 'nc', comment: 'x', evidenceImages: ['https://x/1.jpg'] }] });
+        window.confirm = vi.fn(() => false);
+        const calls = await print();
+        expect(calls.length).toBe(0);
+    });
+});

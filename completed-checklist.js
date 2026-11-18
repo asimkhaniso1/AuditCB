@@ -39,13 +39,8 @@
         return str(item && (item.requirement || item.text || item.title || item.requirement_text)) || str(nested);
     }
 
-    /** The screenshots saved on a checklist answer, with when each was captured. */
-    function evidenceOf(p) {
-        if (!p) return [];
-        const urls = Array.isArray(p.evidenceImages) ? p.evidenceImages.filter(Boolean) : (p.evidenceImage ? [p.evidenceImage] : []);
-        const times = arr(p.evidenceCapturedAtList);
-        return urls.map(function (url, i) { return { url: String(url), capturedAt: times[i] || (urls.length === 1 ? p.evidenceCapturedAt || '' : '') }; });
-    }
+    /** The screenshots saved on a checklist answer (shared helper in findings-summary.js). */
+    function evidenceOf(p) { const fs = FS(); return fs && fs.shots ? fs.shots.evidenceOf(p) : []; }
 
     /**
      * Every question of the audit, grouped by checklist and section, with its
@@ -154,15 +149,11 @@
      */
     function screenshotRows(row, shots) {
         if (!shots.length) return '';
-        const df = DF();
         const label = row.questionRef || row.clause || 'Question';
         let out = '';
         for (let i = 0; i < shots.length; i += 2) {
             const figs = shots.slice(i, i + 2).map(function (s, j) {
-                const n = i + j + 1;
-                const when = s.capturedAt ? df.formatDate(new Date(s.capturedAt)) : '';
-                const cap = label + ' · screenshot ' + n + ' of ' + shots.length + (when ? ' · captured ' + when : '');
-                return '<figure class="cc-shot"><img src="' + t(s.src) + '" alt="' + t(cap) + '"><figcaption>' + t(cap) + '</figcaption></figure>';
+                return FS().shots.figure(label, s, i + j + 1, shots.length, 'cc-shot');
             }).join('');
             out += '<tr class="cc-ev-row"><td></td><td colspan="4"><div class="cc-ev">' + figs + '</div></td></tr>';
         }
@@ -275,46 +266,17 @@
 
     function notify(msg, type) { if (typeof global.showNotification === 'function') global.showNotification(msg, type); }
 
-    // Screenshots print at a size that keeps on-screen text legible (two to a
-    // row is ~88 mm wide; 900 px is ~260 dpi there) without carrying the full
-    // capture into the PDF. A screenshot that can't be downscaled prints from
-    // its original address.
-    const SHOT_MAX_PX = 900;
-    async function prepareImages(sections, opts) {
-        const o = opts || {};
-        const EU = global.EvidenceUtils;
-        const jobs = [];
-        const out = {};
+    function keyedShots(sections) {
+        const byKey = {};
         arr(sections).forEach(function (sec) {
             arr(sec.groups).forEach(function (g) {
-                arr(g.rows).forEach(function (row) {
-                    const list = evidenceOf(row.progress);
-                    if (!list.length) return;
-                    out[row.key] = list.map(function (e) { return { src: e.url, capturedAt: e.capturedAt }; });
-                    out[row.key].forEach(function (shot) { jobs.push(shot); });
-                });
+                arr(g.rows).forEach(function (row) { const list = evidenceOf(row.progress); if (list.length) byKey[row.key] = list; });
             });
         });
-        if (EU && typeof EU.compress === 'function') {
-            let next = 0; let done = 0;
-            const worker = async function () {
-                while (next < jobs.length) {
-                    const shot = jobs[next++];
-                    try { shot.src = await EU.compress(shot.src, { maxPx: SHOT_MAX_PX, quality: 0.72 }); } catch (_e) { /* keep the original */ }
-                    done++;
-                    if (o.onProgress) o.onProgress(done, jobs.length);
-                }
-            };
-            await Promise.all([worker(), worker(), worker(), worker()]);
-        }
-        return out;
+        return byKey;
     }
-
-    function placeholder(count) {
-        return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Preparing checklist</title></head>'
-            + '<body style="font-family:Segoe UI,Arial,sans-serif;color:#334155;padding:40px">'
-            + '<p>Preparing the completed checklist with ' + count + ' screenshot' + (count === 1 ? '' : 's') + '…</p></body></html>';
-    }
+    /** Downscaled screenshots per question key (kept for callers of the old API). */
+    function prepareImages(sections) { return FS().shots.prepare(keyedShots(sections)); }
 
     global.printCompletedChecklist = function (reportId) {
         const id = reportId && typeof reportId === 'object' ? (reportId.dataset && reportId.dataset.id) : reportId;
@@ -335,25 +297,10 @@
         ctx.sections = rows(ctx.report, plan, checklists);
         ctx.reportFinal = ctx.report.reportStatus === 'final';
         if (!ctx.sections.length) { notify('No checklist questions are assigned to this audit.', 'info'); return null; }
-        const finish = function (win) {
-            const html = build(ctx);
-            const problems = PS().lint(html);
-            if (problems.length && global.Logger) global.Logger.warn('CompletedChecklist', 'Print lint: ' + problems.map(function (p) { return p.code; }).join(', '));
-            const out = PS().open(html, win ? { win: win } : undefined);
-            if (!out) notify('Pop-up blocked. Allow pop-ups for this site to print the checklist.', 'warning');
-            return out;
-        };
-        let count = 0;
-        ctx.sections.forEach(function (sec) { sec.groups.forEach(function (g) { g.rows.forEach(function (r) { count += evidenceOf(r.progress).length; }); }); });
-        if (!count) return finish(null);
-        // Open the window now, inside the click, so the pop-up blocker allows
-        // it; the screenshots are prepared and the document written into it.
-        const win = PS().open(placeholder(count));
-        if (!win) { notify('Pop-up blocked. Allow pop-ups for this site to print the checklist.', 'warning'); return null; }
-        return prepareImages(ctx.sections).then(function (images) {
-            ctx.images = images;
-            return finish(win);
-        });
+        return FS().shots.printWithShots('completed checklist', keyedShots(ctx.sections), function (images) {
+            ctx.images = images || undefined;
+            return build(ctx);
+        }, 'CompletedChecklist');
     };
 
     const API = { rows: rows, build: build, evidenceOf: evidenceOf, prepareImages: prepareImages };
