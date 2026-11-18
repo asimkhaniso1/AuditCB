@@ -278,7 +278,7 @@
     /** Downscaled screenshots per question key (kept for callers of the old API). */
     function prepareImages(sections) { return FS().shots.prepare(keyedShots(sections)); }
 
-    global.printCompletedChecklist = function (reportId) {
+    global.printCompletedChecklist = function (reportId, opts) {
         const id = reportId && typeof reportId === 'object' ? (reportId.dataset && reportId.dataset.id) : reportId;
         if (!PS() || !FS() || !global.collectAuditFindings) {
             notify('The print module is not loaded. Reload the page and try again.', 'warning');
@@ -300,7 +300,7 @@
         return FS().shots.printWithShots('completed checklist', keyedShots(ctx.sections), function (images) {
             ctx.images = images || undefined;
             return build(ctx);
-        }, 'CompletedChecklist');
+        }, 'CompletedChecklist', opts);
     };
 
     const API = { rows: rows, build: build, evidenceOf: evidenceOf, prepareImages: prepareImages };

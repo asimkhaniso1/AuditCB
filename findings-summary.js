@@ -137,13 +137,38 @@
             + '<p>Preparing the ' + t(what) + ' with ' + count + ' screenshot' + (count === 1 ? '' : 's') + '…</p></body></html>';
     }
 
+    // Whether prints include screenshots: one choice for both prints,
+    // remembered on this browser (a per-viewer convenience — nothing about
+    // the audit depends on it). Default: included.
+    const SHOTS_PREF = 'auditcb.print.includeScreenshots';
+    function includeShots() {
+        try { return global.localStorage.getItem(SHOTS_PREF) !== '0'; } catch (_e) { return true; }
+    }
+    function setIncludeShots(on) {
+        const value = !(on === false || on === 'false');
+        try { global.localStorage.setItem(SHOTS_PREF, value ? '1' : '0'); } catch (_e) { /* not remembered; the boxes still show it */ }
+        if (global.document) {
+            Array.prototype.forEach.call(global.document.querySelectorAll('.print-shots-toggle'), function (box) { box.checked = value; });
+        }
+        return value;
+    }
+    /** The "Include screenshots" box shown beside the print buttons. */
+    function toggleHtml() {
+        return '<label class="print-shots-label" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-secondary); margin: 0; white-space: nowrap; cursor: pointer;" title="Print screenshots with the findings summary and the completed checklist">'
+            + '<input type="checkbox" class="print-shots-toggle"' + (includeShots() ? ' checked' : '') + ' data-action-change="setPrintScreenshots" data-arg1="this.checked" style="margin: 0;"> Include screenshots</label>';
+    }
+
     /**
      * Print a document that may carry screenshots. The window opens now,
      * inside the click, so the pop-up blocker allows it; with screenshots it
      * shows a placeholder until they are prepared, then the document.
      * buildHtml(images) returns the document; byKey maps keys to screenshots.
      */
-    function printWithShots(what, byKey, buildHtml, logTag) {
+    function printWithShots(what, byKey, buildHtml, logTag, opts) {
+        // Without screenshots the document prints at once and each item says
+        // how many are on file instead.
+        const include = opts && typeof opts.screenshots === 'boolean' ? opts.screenshots : includeShots();
+        if (!include) byKey = {};
         const notifyBlocked = function () { notify('Pop-up blocked. Allow pop-ups for this site to print the ' + what + '.', 'warning'); };
         const finish = function (images, win) {
             const html = buildHtml(images);
@@ -423,7 +448,7 @@
 
     function notify(msg, type) { if (typeof global.showNotification === 'function') global.showNotification(msg, type); }
 
-    global.printFindingsSummary = function (reportId) {
+    global.printFindingsSummary = function (reportId, opts) {
         const id = reportId && typeof reportId === 'object' ? (reportId.dataset && reportId.dataset.id) : reportId;
         if (!PS() || !global.collectAuditFindings) {
             notify('The print module is not loaded. Reload the page and try again.', 'warning');
@@ -440,8 +465,12 @@
         }
         const byKey = {};
         ctx.findings.forEach(function (f) { const list = evidenceOf(f); if (list.length) byKey[f._ref] = list; });
-        return printWithShots('findings summary', byKey, function (images) { ctx.images = images || undefined; return build(ctx); }, 'FindingsSummary');
+        return printWithShots('findings summary', byKey, function (images) { ctx.images = images || undefined; return build(ctx); }, 'FindingsSummary', opts);
     };
+
+    global.setPrintScreenshots = setIncludeShots;
+    global.printIncludesScreenshots = includeShots;
+    global.printScreenshotsToggleHtml = toggleHtml;
 
     global.setFindingsResponseDue = function (reportId, value) {
         const report = arr(global.state && global.state.auditReports).find(function (r) { return String(r.id) === String(reportId); });
@@ -453,7 +482,7 @@
     };
 
     const API = { build: build, context: context, gradeLabel: gradeLabel, partsOf: partsOf, metaTableHtml: metaTableHtml, clean: clean, CSS: CSS,
-        shots: { evidenceOf: evidenceOf, prepare: prepareShots, figure: shotFigure, placeholderHtml: placeholderHtml, printWithShots: printWithShots, MAX_PX: SHOT_MAX_PX } };
+        shots: { evidenceOf: evidenceOf, prepare: prepareShots, figure: shotFigure, placeholderHtml: placeholderHtml, printWithShots: printWithShots, include: includeShots, setInclude: setIncludeShots, toggleHtml: toggleHtml, MAX_PX: SHOT_MAX_PX } };
     global.FindingsSummary = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
     if (global.Logger && global.Logger.debug) global.Logger.debug('Modules', 'findings-summary.js loaded successfully.');
