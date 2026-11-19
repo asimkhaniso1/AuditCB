@@ -2915,7 +2915,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     status: report.status,
                     findings: report.findings || 0,
                     checklist_progress: report.checklistProgress || [],  // Standardized column name
-                    data: report || {},
+                    data: Object.assign({}, report, { _evidenceIndexBuilt: undefined }),
                     custom_items: report.customItems || [],
                     opening_meeting: report.openingMeeting || {},
                     closing_meeting: report.closingMeeting || {},
@@ -3373,7 +3373,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             try {
                 await window.SupabaseClient.db.update('audit_reports', String(reportId), {
                     status: report.status,
-                    data: report
+                    data: Object.assign({}, report, { _evidenceIndexBuilt: undefined })
                 });
                 window.showNotification('Findings submitted to Lead Auditor for review!', 'success');
             } catch (err) {

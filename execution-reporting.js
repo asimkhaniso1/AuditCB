@@ -259,6 +259,11 @@
         return 'RPT-' + String((d && d.report && d.report.id) || '').substring(0, 8);
     };
     window._reportRef = reportRef;
+    // Evidence index built by generateAuditReport, per report id, for this
+    // page only (see generateAuditReport).
+    const evidenceIndexByReport = {};
+    const evidenceIndexFor = (report) => (report && evidenceIndexByReport[String(report.id)]) || [];
+    window._evidenceIndexFor = evidenceIndexFor;
     // A closing-meeting field nobody filled in says so; it is never filled
     // with an assumed outcome.
     const CLOSING_NOT_RECORDED = '<span style="color:#94a3b8;font-style:italic;">Not recorded.</span>';
@@ -1034,7 +1039,10 @@
                     });
                 });
             });
-            report._evidenceIndexBuilt = _evIndex;
+            // Kept beside the report, never on it: the index carries every
+            // screenshot at full size, and on the report it was saved with it.
+            evidenceIndexByReport[String(report.id)] = _evIndex;
+            delete report._evidenceIndexBuilt;
         })();
 
         // Attempt to get client details for address/logo if available
@@ -3139,7 +3147,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
     window.exportEvidencePack = function (_reportId) {
         const d = window._reportPreviewData;
         if (!d) { window.showNotification && window.showNotification('Open the report preview first.', 'warning'); return; }
-        const evIdx = (d.report._evidenceIndexBuilt || []);
+        const evIdx = evidenceIndexFor(d.report);
         if (evIdx.length === 0) {
             window.showNotification ? window.showNotification('No evidence images recorded for this report.', 'info') : alert('No evidence images recorded for this report.');
             return;
@@ -4558,7 +4566,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // removes what was previously an unbounded, full-res image gallery.
             + (function () {
                 if (!secMap['evidence']) return '';
-                const evIdx = (d.report._evidenceIndexBuilt || []).concat(
+                const evIdx = evidenceIndexFor(d.report).concat(
                     // Include NCR-only evidence not already attached to a checklist item.
                     (d.report.ncrs || []).filter(function (n) { return n.evidenceImage && !n._evIndexed; }).map(function (ncr) {
                         return { evId: 'EV-NCR-' + (ncr.id || ''), image: ncr.evidenceImage, comment: '', clause: ncr.clause || '', criterionRef: ncr.criterionRef || null, criterionSource: ncr.criterionSource || null, dept: '', findingRef: ncr.type || 'NC', capturedAt: '', location: '' };
