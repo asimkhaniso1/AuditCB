@@ -1296,6 +1296,10 @@
         // traceability); analytics/capa off. Persisted at report.reportConfig.annexes.
         const _annexToggles = Object.assign({ analytics: false, evidence: true, capa: false }, (d.report.reportConfig && d.report.reportConfig.annexes) || {});
         window._reportAnnexState = _annexToggles;
+        // The CAPA annex's only content is the CAR forms section, which started
+        // off, so ticking "CAPA Annex" printed nothing (PC Connection draft,
+        // 2026-11-19). One choice now: the annex tick includes the forms.
+        window._reportSectionState[CAPA_ANNEX_SECTION] = !!_annexToggles.capa;
 
         // ─── Audit Programme (3-year certification cycle) — preview data ──
         // Single computation shared with the export path via ReportStats.buildProgramme:
@@ -2502,6 +2506,10 @@
         </div>`;
 
         document.body.appendChild(overlay);
+        // The sidebar and preview were drawn from each section's default, not
+        // from the saved choice, so a section left out of the PDF still showed
+        // as ticked. Draw them from the state the export uses.
+        _applySectionStateToPreview();
 
         // Charts: <script> inside innerHTML doesn't execute — init programmatically
         window._initPreviewCharts = function () {
@@ -2707,16 +2715,43 @@
     // so this only flips state, the class, the checkbox, and the section.
     window.toggleReportSection = function (id, _color) {
         const row = document.getElementById('pill-' + id);
-        const sec = document.getElementById('sec-' + id);
         if (!row) return;
         const nowActive = !row.classList.contains('active');
-        window._reportSectionState[id] = nowActive;
-        row.classList.toggle('active', nowActive);
-        const cb = row.querySelector('input[type=checkbox]');
-        if (cb) cb.checked = nowActive;
-        if (sec) sec.style.display = nowActive ? '' : 'none';
+        _setSectionShown(id, nowActive);
+        // The CAR forms ARE the CAPA annex: keep its tick in step.
+        if (id === CAPA_ANNEX_SECTION) _setAnnexTick('capa', nowActive);
         _persistReportConfig();
     };
+
+    // Section CAR Forms is the whole CAPA annex (report-findings-ops.js).
+    const CAPA_ANNEX_SECTION = 'carForms';
+
+    // Show a section as included or left out: its sidebar row, its checkbox
+    // and its preview block, the same state the PDF export reads.
+    function _setSectionShown(id, on) {
+        if (!window._reportSectionState) window._reportSectionState = {};
+        window._reportSectionState[id] = !!on;
+        const row = document.getElementById('pill-' + id);
+        if (row) {
+            row.classList.toggle('active', !!on);
+            const cb = row.querySelector('input[type=checkbox]');
+            if (cb) cb.checked = !!on;
+        }
+        const sec = document.getElementById('sec-' + id);
+        if (sec) sec.style.display = on ? '' : 'none';
+    }
+
+    function _setAnnexTick(group, on) {
+        if (!window._reportAnnexState) window._reportAnnexState = {};
+        window._reportAnnexState[group] = !!on;
+        const cb = document.getElementById('annex-toggle-' + group);
+        if (cb) cb.checked = !!on;
+    }
+
+    function _applySectionStateToPreview() {
+        const st = window._reportSectionState || {};
+        Object.keys(st).forEach(function (id) { _setSectionShown(id, st[id]); });
+    }
 
     // Sidebar row click: scroll the preview pane to that section.
     window.scrollToReportSection = function (id) {
@@ -2728,9 +2763,9 @@
     // CSP-safe: wired via data-action, not inline onclick.
     window.toggleReportAnnex = function (group) {
         if (!window._reportAnnexState) window._reportAnnexState = {};
-        window._reportAnnexState[group] = !window._reportAnnexState[group];
-        const cb = document.getElementById('annex-toggle-' + group);
-        if (cb) cb.checked = !!window._reportAnnexState[group];
+        const on = !window._reportAnnexState[group];
+        _setAnnexTick(group, on);
+        if (group === 'capa') _setSectionShown(CAPA_ANNEX_SECTION, on);
         _persistReportConfig();
     };
 
