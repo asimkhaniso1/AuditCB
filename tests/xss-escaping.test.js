@@ -4,7 +4,7 @@
 // Each test renders a real sink with a hostile value and asserts that it
 // arrives as text: no <img> element is created and the payload shows up as
 // the literal characters the user typed.
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { loadScript } from './helpers/load-script.js';
 
 const fs = await import('fs');
@@ -147,7 +147,12 @@ describe('AI narrative in the report preview (execution-reporting.js)', () => {
             positiveObservations: 'Strength ' + PAYLOAD,
             ofi: ['Improve ' + PAYLOAD]
         });
+        // The preview starts a 300 ms chart timer; one left pending fires after
+        // the test environment is gone ("window is not defined", flaky CI).
+        vi.useFakeTimers();
         window.showReportPreviewModal();
+        vi.clearAllTimers();
+        vi.useRealTimers();
         const overlay = document.getElementById('report-preview-overlay');
         expect(overlay).not.toBeNull();
         expect(document.getElementById('rp-conclusion').textContent).toContain('Conclusion ' + PAYLOAD);

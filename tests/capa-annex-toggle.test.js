@@ -4,7 +4,7 @@
 // rather than the saved choice, so CAR Forms showed as ticked while the export
 // left it out. The annex tick and the CAR Forms section are now one choice,
 // and the sidebar shows what the export will print.
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { loadScript } from './helpers/load-script.js';
 
 globalThis.window = globalThis.window || globalThis;
@@ -31,7 +31,12 @@ function open(reportConfig) {
         stats: { majorNC: 0, minorNC: 0, ncCount: 0, observationCount: 0, ofiCount: 0, conformCount: 0, naCount: 0, totalItems: 0, statusColor: '#10b981', auditStatus: 'Recommended', coveragePct: 0, ncByClause: {} },
         today: '19/11/2026'
     };
+    // The preview starts a 300 ms chart timer; one left pending fires after
+    // the test environment is gone ("window is not defined", flaky CI).
+    vi.useFakeTimers();
     window.showReportPreviewModal();
+    vi.clearAllTimers();
+    vi.useRealTimers();
 }
 const annexBox = () => document.getElementById('annex-toggle-capa');
 const carRow = () => document.getElementById('pill-carForms');
