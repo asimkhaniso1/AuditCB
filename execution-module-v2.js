@@ -1907,9 +1907,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div style="margin-bottom: 2rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">Findings & Classification</h4>
-                            <button id="btn-ai-classify" class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border: none;" data-action="runFollowUpAIAnalysis" data-id="${report.id}" aria-label="Auto-generate">
-                                <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto-Classify & Polish
-                            </button>
                         </div>
 
                          ${allFindings.length > 0 ? `

@@ -31,7 +31,7 @@ window.KB_HELPERS = {
 
     /**
      * Resolve standard name from a report, with fallback to plan → client.
-     * Eliminates duplicated fallback chains across runFollowUpAIAnalysis & runAutoSummary.
+     * Eliminates duplicated fallback chains across the AI callers (runAutoSummary and others).
      */
     resolveStandardName: (report) => {
         if (report.standard) return report.standard;
@@ -2164,10 +2164,8 @@ window.finalizeAndPublish = function (reportId) {
     })();
 };
 
-// 2. AI auto-analysis of findings: window.runFollowUpAIAnalysis lives in
-// execution-reporting.js (it loads after this file, so the copy that used to
-// be here never ran; it also rewrote ncrType, which the live one deliberately
-// leaves to the auditor).
+// 2. AI auto-analysis of findings (window.runFollowUpAIAnalysis, "AI
+// Auto-Classify & Polish") was removed on 2026-11-19; see execution-reporting.js.
 
 // 3. AI Auto-Summary Generation
 window.runAutoSummary = async function (reportId) {

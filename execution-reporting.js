@@ -2734,174 +2734,12 @@
         _persistReportConfig();
     };
 
-    // ============================================
-    // AI AUTO-CLASSIFY & POLISH (Combined: classify severity + refine notes)
-    // ============================================
-    window.runFollowUpAIAnalysis = async function (reportId) {
-        const btn = document.getElementById('btn-ai-classify');
-        if (!btn) return;
-
-        // Get the report and standard
-        const reports = window.state?.auditReports || JSON.parse(localStorage.getItem('audit_reports') || '[]');
-        const report = reports.find(r => String(r.id) === String(reportId));
-        if (!report) { window.showNotification('Report not found.', 'error'); return; }
-
-        const standardName = report.standard || '';
-        const _checklistProgress = report.checklistProgress || [];
-
-        // Check AI service availability
-        if (!window.AI_SERVICE) {
-            window.showNotification('AI Service not available.', 'warning');
-            return;
-        }
-
-        // Show loading state
-        const originalBtnHtml = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Classifying & Polishing...';
-        btn.disabled = true;
-        btn.style.opacity = '0.7';
-
-        try {
-            // STEP 1: Collect all findings from the DOM
-            const findingCards = document.querySelectorAll('.review-severity');
-            const findings = [];
-            findingCards.forEach(select => {
-                const fid = select.dataset.findingId;
-                const textarea = document.querySelector('.review-remarks[data-finding-id="' + fid + '"]');
-                const remarkText = textarea?.value || '';
-                const card = select.closest('.card');
-                const clauseEl = card?.querySelector('[style*="font-weight: 700"]');
-                const clause = clauseEl?.textContent?.match(/[\d.]+/)?.[0] || '';
-
-                const descEl = card?.querySelector('[style*="color: #334155"]') || card?.querySelector('[style*="color:#334155"]');
-                const reqEl = card?.querySelector('[style*="color: var(--primary-color)"]');
-                const descText = descEl?.textContent?.trim() || '';
-                const reqText = reqEl?.parentElement?.textContent?.trim() || '';
-                findings.push({
-                    id: fid,
-                    clause: clause,
-                    status: select.value,
-                    comment: remarkText,
-                    remarks: remarkText,
-                    type: select.value,
-                    description: descText || reqText,
-                    requirement: reqText
-                });
-            });
-
-            if (findings.length === 0) {
-                window.showNotification('No findings to process.', 'info');
-                btn.innerHTML = originalBtnHtml;
-                btn.disabled = false;
-                btn.style.opacity = '1';
-                return;
-            }
-
-            let classifyCount = 0;
-            let polishCount = 0;
-
-            // STEP 2: Severity classification is PRESERVED as-is (set by auditor/senior reviewer)
-            // AI does NOT change severity — it only polishes text below
-
-            // An empty remark is left for the auditor: the AI would see only the
-            // requirement and describe evidence nobody recorded.
-            const unwritten = findings.filter(f => !f.comment || f.comment.trim().length < 5).length;
-
-            // STEP 3: AI Polish Notes (refine raw text to professional language)
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Polishing notes...';
-            if (window.AI_SERVICE.refineAuditNotes) {
-                try {
-                    const toPolish = findings.filter(f => f.comment && f.comment.trim());
-                    if (toPolish.length > 0) {
-                        const refined = await window.AI_SERVICE.refineAuditNotes(toPolish, standardName);
-                        if (refined && Array.isArray(refined)) {
-                            refined.forEach((result, i) => {
-                                if (result.comment && result.comment !== toPolish[i].comment) {
-                                    const textarea = document.querySelector('.review-remarks[data-finding-id="' + toPolish[i].id + '"]');
-                                    if (textarea) {
-                                        textarea.value = result.comment;
-                                        polishCount++;
-                                        // Flash green for polished items
-                                        textarea.style.transition = 'background 0.3s';
-                                        textarea.style.background = '#f0fdf4';
-                                        setTimeout(() => { textarea.style.background = ''; }, 2500);
-                                    }
-                                }
-                            });
-                        }
-                    }
-                } catch (polishErr) {
-                    console.warn('Polish error:', polishErr);
-                }
-            }
-
-            // STEP 4: Auto-save to DB by updating the report object and persisting
-            findingCards.forEach(select => {
-                const fid = select.dataset.findingId;
-                const newType = select.value;
-                const textarea = document.querySelector('.review-remarks[data-finding-id="' + fid + '"]');
-                const remarks = textarea?.value || '';
-
-                if (fid.startsWith('checklist-')) {
-                    const idx = parseInt(fid.replace('checklist-', ''), 10);
-                    if (report.checklistProgress && report.checklistProgress[idx]) {
-                        report.checklistProgress[idx].ncrType = newType;
-                        if (remarks) report.checklistProgress[idx].comment = remarks;
-                    }
-                } else if (fid.startsWith('ncr-')) {
-                    const idx = parseInt(fid.replace('ncr-', ''), 10);
-                    if (report.ncrs && report.ncrs[idx]) {
-                        report.ncrs[idx].type = newType;
-                        if (remarks) report.ncrs[idx].description = remarks;
-                    }
-                }
-            });
-
-            // Persist to localStorage
-            const existingReports = JSON.parse(localStorage.getItem('audit_reports') || '[]');
-            const rIdx = existingReports.findIndex(r => r.id === reportId);
-            if (rIdx !== -1) {
-                existingReports[rIdx] = report;
-                localStorage.setItem('audit_reports', JSON.stringify(existingReports));
-            }
-
-            // Persist to Supabase
-            if (window.SupabaseClient?.db?.upsert) {
-                try {
-                    await window.SupabaseClient.db.upsert('audit_reports', {
-                        id: String(reportId),
-                        checklist_progress: report.checklistProgress || [],
-                        ncrs: report.ncrs || [],
-                        data: report || {}
-                    });
-                } catch (dbErr) {
-                    console.warn('DB save after AI classify:', dbErr);
-                }
-            }
-
-            // Success UI
-            const parts = [];
-            if (classifyCount) parts.push(classifyCount + ' classified');
-            if (polishCount) parts.push(polishCount + ' polished');
-            if (unwritten) parts.push(unwritten + ' without a remark left for you to write');
-            btn.innerHTML = '<i class="fa-solid fa-check" style="margin-right: 0.5rem;"></i> Done! ' + (parts.join(', ') || 'No changes');
-            btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-            window.showNotification('AI: ' + (parts.join(', ') || 'No changes needed') + '. All saved.', 'success');
-
-        } catch (error) {
-            console.error('AI Classify & Polish error:', error);
-            btn.innerHTML = originalBtnHtml;
-            window.showNotification('AI processing failed: ' + error.message, 'error');
-        }
-
-        // Reset button after 4s
-        setTimeout(() => {
-            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto-Classify & Polish';
-            btn.disabled = false;
-            btn.style.opacity = '1';
-            btn.style.background = 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)';
-        }, 4000);
-    };
+    // "AI Auto-Classify & Polish" (window.runFollowUpAIAnalysis) was removed
+    // on 2026-11-19. It classified nothing (severity is the auditor's), wrote
+    // the AI text over the checklist remark with no original kept and no
+    // AI flag, and saved the whole checklist straight to the database around
+    // the stale-tab guard (ChecklistMerge). Polishing is done in the report
+    // preview, which never changes the checklist.
 
     // ============================================
     // POLISH NOTES WITH AI (Refine raw notes into professional audit language)
@@ -4879,5 +4717,5 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { generateAuditReport: window.generateAuditReport, showReportPreviewModal: window.showReportPreviewModal, toggleReportSection: window.toggleReportSection, exportReportPDF: window.exportReportPDF, exportEvidencePack: window.exportEvidencePack, runFollowUpAIAnalysis: window.runFollowUpAIAnalysis, polishNotesWithAI: window.polishNotesWithAI, polishSingleNote: window.polishSingleNote };
+    module.exports = { generateAuditReport: window.generateAuditReport, showReportPreviewModal: window.showReportPreviewModal, toggleReportSection: window.toggleReportSection, exportReportPDF: window.exportReportPDF, exportEvidencePack: window.exportEvidencePack, polishNotesWithAI: window.polishNotesWithAI, polishSingleNote: window.polishSingleNote };
 }
