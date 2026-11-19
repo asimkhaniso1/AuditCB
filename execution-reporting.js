@@ -63,6 +63,17 @@
     };
     window._fmtRemark = fmtRemark;
 
+    // A row with no written remark. Polish no longer writes one: the AI saw
+    // only the requirement, so it described evidence nobody recorded ("review
+    // of the SoA and interview with the CISO" — PC Connection, 2026-11-19).
+    // The report states what was recorded instead: the row's screenshots.
+    const noRemarkHtml = (item) => {
+        const imgs = (item && (item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []))) || [];
+        const n = Array.isArray(imgs) ? imgs.filter(Boolean).length : 0;
+        return '<span style="color:#94a3b8;">' + (n ? 'No written remark; ' + n + ' screenshot' + (n === 1 ? '' : 's') + ' of the evidence attached.' : 'No remarks recorded.') + '</span>';
+    };
+    window._noRemarkHtml = noRemarkHtml;
+
     // Mechanical evidence-text normalization for Evidence Index / Evidence Pack
     // cells — trim, collapse whitespace, sentence-case the first letter, ensure
     // terminal punctuation. Unlike fmtRemark above, this NEVER rewrites content
@@ -1361,7 +1372,7 @@
             const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return `<tr style="background:${idx % 2 ? '#f5f3ff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:10px 14px;color:#334155;">${htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f5f3ff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:10px 14px;color:#334155;">${htmlEsc(fmtRemark(item.comment)) || noRemarkHtml(item)}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         // OFI rows (Opportunities for Improvement only)
@@ -1369,7 +1380,7 @@
             const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return `<tr style="background:${idx % 2 ? '#f0fbff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:10px 14px;color:#334155;">${htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f0fbff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:10px 14px;color:#334155;">${htmlEsc(fmtRemark(item.comment)) || noRemarkHtml(item)}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         // Conformance rows (items with comments or evidence)
@@ -1377,7 +1388,7 @@
             const clause = displayCriterion(item, false);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return `<tr style="background:${idx % 2 ? '#f0fdf4' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">${htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f0fdf4' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">${htmlEsc(fmtRemark(item.comment)) || noRemarkHtml(item)}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         const overlay = document.createElement('div');
@@ -2788,41 +2799,13 @@
 
             let classifyCount = 0;
             let polishCount = 0;
-            let generateCount = 0;
 
             // STEP 2: Severity classification is PRESERVED as-is (set by auditor/senior reviewer)
             // AI does NOT change severity — it only polishes text below
 
-            // STEP 2.5: AI Generate Conformance Text (for findings with empty remarks)
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Generating conformance text...';
-            if (window.AI_SERVICE.generateConformanceText) {
-                try {
-                    const emptyFindings = findings.filter(f => !f.comment || f.comment.trim().length < 5);
-                    if (emptyFindings.length > 0) {
-                        const generated = await window.AI_SERVICE.generateConformanceText(emptyFindings, standardName);
-                        if (generated && Array.isArray(generated)) {
-                            generated.forEach((result, i) => {
-                                if (result.comment && result._aiGenerated) {
-                                    const textarea = document.querySelector('.review-remarks[data-finding-id="' + emptyFindings[i].id + '"]');
-                                    if (textarea) {
-                                        textarea.value = result.comment;
-                                        // Also update the finding object for later save
-                                        const origIdx = findings.findIndex(f => f.id === emptyFindings[i].id);
-                                        if (origIdx >= 0) findings[origIdx].comment = result.comment;
-                                        generateCount++;
-                                        // Flash blue for generated items
-                                        textarea.style.transition = 'background 0.3s';
-                                        textarea.style.background = '#eff6ff';
-                                        setTimeout(() => { textarea.style.background = ''; }, 3000);
-                                    }
-                                }
-                            });
-                        }
-                    }
-                } catch (genErr) {
-                    console.warn('Conformance text generation error (continuing with polish):', genErr);
-                }
-            }
+            // An empty remark is left for the auditor: the AI would see only the
+            // requirement and describe evidence nobody recorded.
+            const unwritten = findings.filter(f => !f.comment || f.comment.trim().length < 5).length;
 
             // STEP 3: AI Polish Notes (refine raw text to professional language)
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Polishing notes...';
@@ -2899,8 +2882,8 @@
             // Success UI
             const parts = [];
             if (classifyCount) parts.push(classifyCount + ' classified');
-            if (generateCount) parts.push(generateCount + ' generated');
             if (polishCount) parts.push(polishCount + ' polished');
+            if (unwritten) parts.push(unwritten + ' without a remark left for you to write');
             btn.innerHTML = '<i class="fa-solid fa-check" style="margin-right: 0.5rem;"></i> Done! ' + (parts.join(', ') || 'No changes');
             btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
             window.showNotification('AI: ' + (parts.join(', ') || 'No changes needed') + '. All saved.', 'success');
@@ -2964,44 +2947,11 @@
 
         try {
             const standardName = d.report.standard || d.auditPlan?.standard || '';
-            // Step 1: Generate AI text for conformance items with empty comments
-            if (d.hydratedProgress && d.hydratedProgress.length > 0 && window.AI_SERVICE.generateConformanceText) {
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>Generating conformance text...';
-                try {
-                    const emptyConformItems = d.hydratedProgress
-                        .map((item, idx) => ({ ...item, _hpIdx: idx }))
-                        .filter(item => item.status === 'conform' && (!item.comment || item.comment.trim().length < 5));
-
-                    if (emptyConformItems.length > 0) {
-                        const conformFindings = emptyConformItems.map(item => ({
-                            id: `conform-${item._hpIdx}`,
-                            clause: item.kbMatch ? item.kbMatch.clause : item.clause,
-                            status: 'conform',
-                            type: 'conform',
-                            description: (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || ''),
-                            comment: item.comment || '',
-                            requirement: (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || '')
-                        }));
-
-                        const generated = await window.AI_SERVICE.generateConformanceText(conformFindings, standardName);
-                        if (generated && Array.isArray(generated)) {
-                            generated.forEach((result, i) => {
-                                if (result.comment && result._aiGenerated) {
-                                    const hpIdx = emptyConformItems[i]._hpIdx;
-                                    d.hydratedProgress[hpIdx].comment = result.comment;
-                                    d.hydratedProgress[hpIdx]._aiGenerated = true;
-                                }
-                            });
-                        }
-                    }
-                } catch (conformErr) {
-                    console.warn('Conformance text generation error (continuing with polish):', conformErr);
-                    // Do not let this fail silently — an auditor seeing no
-                    // notification at all would reasonably assume the empty
-                    // conformance remarks were filled in by AI when they were not.
-                    window.showNotification(describeAiFailure('AI conformance text generation', conformErr), 'warning');
-                }
-            }
+            // Step 1 used to have the AI write a remark for each Conform row
+            // without one, from the requirement alone. It described evidence
+            // nobody recorded, so those rows are left for the auditor and
+            // counted in the closing message instead.
+            const unwritten = (d.hydratedProgress || []).filter(item => item.status === 'conform' && (!item.comment || String(item.comment).trim().length < 5)).length;
 
             // Step 2: Refine/polish all checklist progress notes
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>Polishing Notes...';
@@ -3103,7 +3053,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 }).join('');
             }
 
-            // Also refresh the conformance table to show AI-generated remarks
+            // Also refresh the conformance table to show the polished remarks
             const conformSec = document.querySelector('#sec-conformance .rp-sec-body tbody');
             if (conformSec && d.hydratedProgress) {
                 const renderEvThumbs = (item) => {
@@ -3116,7 +3066,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     const clause = displayCriterion(item, false);
                     const title = item.kbMatch ? item.kbMatch.title : '';
                     const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-                    return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:10px 14px;font-weight:700;">' + clause + '</td><td style="padding:10px 14px;">' + (title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)) + '</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">' + (htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks</span>') + renderEvThumbs(item) + '</td></tr>';
+                    return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:10px 14px;font-weight:700;">' + clause + '</td><td style="padding:10px 14px;">' + (title ? '<strong>' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + htmlEsc((req || '').substring(0, 180)) + (req && req.length > 180 ? '...' : '') + '</div>' : htmlEsc(req)) + '</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">' + (htmlEsc(fmtRemark(item.comment)) || noRemarkHtml(item)) + renderEvThumbs(item) + '</td></tr>';
                 }).join('') || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No conformance evidence recorded</td></tr>';
             }
 
@@ -3128,7 +3078,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             btn.style.opacity = '1';
 
             const totalRefined = (d.hydratedProgress?.filter(i => i._originalComment || i._aiGenerated)?.length || 0) + (d.report.ncrs?.filter(n => n._originalDescription)?.length || 0);
-            window.showNotification(`AI polished ${totalRefined} auditor notes into professional language!`, 'success');
+            window.showNotification(`AI polished ${totalRefined} auditor note${totalRefined === 1 ? '' : 's'}.` + (unwritten ? ` ${unwritten} Conform row${unwritten === 1 ? ' has' : 's have'} no remark; Polish doesn't write evidence, so add a line in the checklist for ${unwritten === 1 ? 'it' : 'each'}.` : ''), unwritten ? 'info' : 'success');
 
             // Allow re-polish after 3 seconds
             setTimeout(() => {
@@ -3632,7 +3582,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return '<tr style="background:' + (idx % 2 ? '#f5f3ff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + htmlEsc(req) + '</div>' : htmlEsc(req)) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f5f3ff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + htmlEsc(req) + '</div>' : htmlEsc(req)) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (htmlEsc(fmtRemark(item.comment)) || noRemarkHtml(item)) + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
         // OFI rows for PDF (Opportunities for Improvement only)
@@ -3640,7 +3590,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const clause = displayCriterion(item);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return '<tr style="background:' + (idx % 2 ? '#f0fbff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + htmlEsc(req) + '</div>' : htmlEsc(req)) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f0fbff' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + htmlEsc(req) + '</div>' : htmlEsc(req)) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (htmlEsc(fmtRemark(item.comment)) || noRemarkHtml(item)) + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
         // Conformance rows for PDF (items with comments or evidence)
@@ -3648,7 +3598,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const clause = displayCriterion(item, false);
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + htmlEsc(req) + '</div>' : htmlEsc(req)) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (htmlEsc(fmtRemark(item.comment)) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + htmlEsc(title) + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + htmlEsc(req) + '</div>' : htmlEsc(req)) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (htmlEsc(fmtRemark(item.comment)) || noRemarkHtml(item)) + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
         // Build clause/area performance analysis from ReportStats.byClauseArea —
