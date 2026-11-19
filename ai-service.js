@@ -2473,7 +2473,7 @@ window.finalizeAndPublish = function (reportId) {
         try {
             await window.SupabaseClient.db.update('audit_reports', String(reportId), {
                 status: report.status,
-                data: report
+                data: Object.assign({}, report, { _evidenceIndexBuilt: undefined })
             });
             if (typeof window.saveData === 'function') window.saveData();
             window.showNotification('Audit Report successfully finalized and published!', 'success');
