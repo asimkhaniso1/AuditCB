@@ -535,7 +535,12 @@ function _introducedNumericTokens(raw, proposed) {
 // text, the auditor's remark, the question or the requirement is removed and
 // flagged, and so is any conformity wording. Nothing here writes to a
 // checklist answer; the result is a draft record for the auditor to review.
-const EVIDENCE_PROMPT_VERSION = 'ev1';
+// ev2 (pilot fixes, 2026-11-19): every figure the AI mentions must be quoted;
+// one-line descriptions; an explicit check of each part of the question;
+// nothing read from an unreadable image; no assessment from a remark alone.
+const EVIDENCE_PROMPT_VERSION = 'ev2';
+const EVIDENCE_MAX_QUOTES = 20;
+const EVIDENCE_CHECK_FINDINGS = ['shown', 'partly_shown', 'not_shown', 'differs'];
 const EVIDENCE_IMAGE_MAX_PX = 1280;
 const EVIDENCE_IMAGE_QUALITY = 0.7;
 const EVIDENCE_MAX_IMAGES = 6;
@@ -562,8 +567,17 @@ function _evidenceInputHash(input, model) {
     return EVIDENCE_PROMPT_VERSION + '-' + _fnv1a(JSON.stringify({ q: i.question || '', c: i.clause || '', r: i.requirements || [], m: i.remark || '', i: images, model: model || '' }));
 }
 
+// Sentences, without splitting at an initial or a common abbreviation: the
+// pilot cut "Approved: M. Chen, 02-Oct-2026" at "M." and then dropped the rest.
+const EVIDENCE_NO_SPLIT_RE = /(?:^|\s)(?:[A-Z]|Rev|No|Nos|Dr|Mr|Mrs|Ms|St|vs|approx|Ref|Fig|e\.g|i\.e|etc|Inc|Ltd|Co|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.$/i;
 function _evidenceSentences(text) {
-    return String(text == null ? '' : text).split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+    const pieces = String(text == null ? '' : text).split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+    const out = [];
+    pieces.forEach((p) => {
+        if (out.length && EVIDENCE_NO_SPLIT_RE.test(out[out.length - 1])) out[out.length - 1] += ' ' + p;
+        else out.push(p);
+    });
+    return out;
 }
 
 // Figures and document names in a sentence that its sources don't contain.
@@ -591,7 +605,7 @@ function _evidenceClean(text, source, where, flags) {
         }
         const unsupported = _evidenceUnsupported(sentence, srcLower, srcNumbers);
         if (unsupported.length) {
-            flags.push(where + ': removed a sentence naming ' + unsupported.map((u) => '"' + u + '"').join(', ') + ', which is not in the screenshots\' quoted text, the remark, the question or the requirement.');
+            flags.push(where + ': removed a sentence naming ' + unsupported.map((u) => '"' + u + '"').join(', ') + ', which the AI did not quote from a screenshot and is not in the remark, the question or the requirement. Check it against the screenshot.');
             return;
         }
         kept.push(sentence);
@@ -607,7 +621,7 @@ function _evidencePrompt(input, sent) {
         : 'Not resolved for this question — rely on the audit question.';
     const imageList = sent.length
         ? 'The ' + sent.length + ' image(s) follow this prompt in this order: ' + sent.map((s, n) => 'Image ' + (n + 1) + ' = ' + s.evId).join('; ') + '.'
-        : 'No images were sent. Explain only from the auditor\'s remark and return "images": [].';
+        : 'No images were sent. Explain only what the auditor\'s remark states, return "images": [] and set suggestedAssessment to "cannot_determine".';
     return `You help a certification body auditor review audit evidence. Describe what the attached screenshots actually show and how they relate to the audit question. You do not decide conformity; the auditor does.
 
 AUDIT QUESTION${i.clause ? ' (' + i.clause + ')' : ''}:
@@ -623,17 +637,17 @@ IMAGES:
 ${imageList}
 
 Rules:
-1. Describe only what is visible. If text is too small or blurred to read, set relevance "unreadable" and do not guess what it says.
-2. visibleText: copy up to 8 short pieces of text exactly as they appear in that image (titles, document names and numbers, dates, names, figures). Copy; never paraphrase, correct or complete them.
-3. In "shows", "explanation", "gaps" and "assessmentReason", any document name or number, date, figure, person or system name must be one you copied into visibleText, or one in the auditor's remark, the question or the requirement. Never introduce one.
-4. explanation: 2-3 factual sentences on how the evidence relates to the audit question, referring to images as "Image 1", "Image 2".
-5. gaps: short phrases for the parts of the audit question that the images and remark do not show. [] if none.
+1. Describe only what is visible. If an image's text is too small or blurred to read, set its relevance "unreadable", its shows to "Text not legible." and its visibleText to []. Never take a title or any wording from the question to describe an unreadable image.
+2. shows: ONE short sentence (at most 25 words) saying what the image is, e.g. "A quarterly access review list for Active Directory." Do not list its rows or cells.
+3. visibleText: copy up to ${EVIDENCE_MAX_QUOTES} short pieces of text exactly as they appear in that image. Copy; never paraphrase, correct or complete them. EVERY document name or number, date, figure, person or system name you mention anywhere in your answer must also be copied into the visibleText of the image it comes from (unless it is in the auditor's remark, the question or the requirement).
+4. checks: split the audit question into its separate parts. For each part, look at every image again and compare: "shown" (an image clearly shows it), "partly_shown", "not_shown" (no image or remark shows it), or "differs" (an image shows something that does not match what the question expects, e.g. a date or value that differs). A column heading or value that shows the part counts as shown. In "evidence", cite the image and the exact row or value.
+5. explanation: 2-3 factual sentences on how the evidence relates to the audit question, referring to images as "Image 1", "Image 2". Mention any "differs" result.
 6. relevance of each image to the question: relevant | partial | irrelevant | unreadable.
 7. suggestedAssessment, about the evidence only: supports | partially_supports | insufficient | cannot_determine. Never write "conform", "conformity", "nonconformity", "compliant", "compliance" or any certification judgement anywhere.
 8. Do not infer frequency, completeness, approval, ownership or effectiveness unless an image shows it.
 
 Return JSON only, in this shape:
-{"images":[{"evId":"","shows":"","visibleText":[""],"relevance":""}],"explanation":"","gaps":[""],"suggestedAssessment":"","assessmentReason":""}`;
+{"images":[{"evId":"","shows":"","visibleText":[""],"relevance":""}],"checks":[{"part":"","finding":"","evidence":""}],"explanation":"","suggestedAssessment":"","assessmentReason":""}`;
 }
 
 function _evidenceUsage(u) {
@@ -940,8 +954,14 @@ Return a raw JSON array with 'id' and 'text' fields only:
             let id = String((im && im.evId) || '').trim();
             if (sentIds.indexOf(id) === -1) id = sentIds[n];
             if (!id || byId.has(id)) return;
-            const visibleText = (Array.isArray(im && im.visibleText) ? im.visibleText : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 12);
             const relevance = EVIDENCE_RELEVANCE.indexOf(im && im.relevance) !== -1 ? im.relevance : 'partial';
+            // Nothing is read from an unreadable image: the pilot's blurred
+            // screenshot came back titled "Event Log", a phrase from the question.
+            if (relevance === 'unreadable') {
+                byId.set(id, { evId: id, shows: 'Text not legible.', visibleText: [], relevance });
+                return;
+            }
+            const visibleText = (Array.isArray(im && im.visibleText) ? im.visibleText : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, EVIDENCE_MAX_QUOTES);
             byId.set(id, { evId: id, shows: String((im && im.shows) || '').trim(), visibleText, relevance });
         });
         sentIds.forEach((id) => {
@@ -955,15 +975,36 @@ Return a raw JSON array with 'id' and 'text' fields only:
         const quotes = Array.from(byId.values()).map((x) => x.visibleText.join('\n')).join('\n');
         const images = sentIds.map((id) => {
             const im = byId.get(id);
-            return Object.assign({}, im, { shows: _evidenceClean(im.shows, im.visibleText.join('\n') + '\n' + base, id, flags) });
+            if (im.relevance === 'unreadable') return im;
+            // One sentence: the pilot's descriptions listed every cell.
+            const shows = _evidenceClean(im.shows, im.visibleText.join('\n') + '\n' + base, id, flags);
+            const first = _evidenceSentences(shows)[0] || '';
+            return Object.assign({}, im, { shows: first.length > 240 ? first.slice(0, 237).replace(/\s+\S*$/, '') + '…' : first });
         });
         const source = quotes + '\n' + base;
         const explanation = _evidenceClean(p.explanation, source, 'Explanation', flags);
-        const gaps = (Array.isArray(p.gaps) ? p.gaps : []).map((g) => _evidenceClean(String(g == null ? '' : g), source, 'Gap', flags)).filter(Boolean).slice(0, 8);
-        const assessment = EVIDENCE_ASSESSMENTS.indexOf(p.suggestedAssessment) !== -1 ? p.suggestedAssessment : 'cannot_determine';
-        const assessmentReason = _evidenceClean(p.assessmentReason, source, 'Assessment reason', flags);
+        // Each part of the question against the evidence. Gaps and differences
+        // come from these checks, so the list of what is missing can't
+        // disagree with what the checks found shown.
+        const checks = (Array.isArray(p.checks) ? p.checks : []).map((c) => {
+            const part = _evidenceClean(String((c && c.part) || ''), source, 'Check', flags);
+            if (!part) return null;
+            const finding = EVIDENCE_CHECK_FINDINGS.indexOf(c && c.finding) !== -1 ? c.finding : 'not_shown';
+            return { part, finding, evidence: _evidenceClean(String((c && c.evidence) || ''), source, 'Check', flags) };
+        }).filter(Boolean).slice(0, 12);
+        const gaps = checks.filter((c) => c.finding === 'not_shown' || c.finding === 'partly_shown').map((c) => c.part + (c.finding === 'partly_shown' ? ' (partly shown)' : ''));
+        const differences = checks.filter((c) => c.finding === 'differs').map((c) => c.part + (c.evidence ? ': ' + c.evidence : ''));
+        let assessment = EVIDENCE_ASSESSMENTS.indexOf(p.suggestedAssessment) !== -1 ? p.suggestedAssessment : 'cannot_determine';
+        let assessmentReason = _evidenceClean(p.assessmentReason, source, 'Assessment reason', flags);
+        // No screenshot sent: the remark is the auditor's own account, not
+        // evidence the AI has seen, so it never suggests "supports" from it.
+        const basis = sentIds.length ? 'evidence' : 'remark_only';
+        if (basis === 'remark_only') {
+            assessment = 'cannot_determine';
+            assessmentReason = 'No screenshot is attached; this summarises the auditor\'s remark only.';
+        }
         if (!explanation) flags.push('The explanation was empty after the checks; write it yourself.');
-        return { result: { images, explanation, gaps, suggestedAssessment: assessment, assessmentReason }, flags };
+        return { result: { images, checks, explanation, gaps, differences, suggestedAssessment: assessment, assessmentReason, basis }, flags };
     },
 
     /**
