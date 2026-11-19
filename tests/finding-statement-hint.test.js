@@ -106,6 +106,28 @@ describe('the Finding Details panel', () => {
         expect(box.value.slice(box.selectionStart, box.selectionEnd)).toBe('[What was not fulfilled]');
     });
 
+    it('puts the remark in as the evidence (OFI), leaving only the judgement blank', () => {
+        const id = render({ ncrType: 'ofi', comment: 'Three separate risk assessment procedures are maintained (20000-1, 22301, 27001)' });
+        const box = document.getElementById('ncr-desc-' + id);
+        expect(window.insertFindingTemplate(id)).toBe(true);
+        expect(box.value).toBe('Clause 6.1.1 / 6.1 requires that ' + RISK_REQ_TEXT + '. This is met: Three separate risk assessment procedures are maintained (20000-1, 22301, 27001). [What could be more effective, and why].');
+        expect(box.value.slice(box.selectionStart, box.selectionEnd)).toBe('[What could be more effective, and why]');
+    });
+
+    it('uses the remark as it is now, not as it was loaded, and as objective evidence for an NC', () => {
+        const id = render({ ncrType: 'minor', comment: 'old' });
+        document.getElementById('comment-' + id).value = '  Risk register  last reviewed in 2024.  ';
+        window.insertFindingTemplate(id);
+        expect(document.getElementById('ncr-desc-' + id).value).toBe('Clause 6.1.1 / 6.1 requires that ' + RISK_REQ_TEXT + '. [What was not fulfilled]. Objective evidence: Risk register last reviewed in 2024.');
+    });
+
+    it('an observation keeps the risk blank; a remark with "&" or "$&" goes in as typed', () => {
+        const H2 = window.FindingStatementHint;
+        const hint = H2.forType('observation', '8.1', 'Operational planning and control.');
+        expect(H2.withEvidence(hint, 'R&D change log has gaps; see $& note')).toBe('Clause 8.1 requires: operational planning and control. [What was seen]. Objective evidence: R&D change log has gaps; see $& note. This is not a nonconformity yet, but [the risk if it continues].');
+        expect(H2.withEvidence(hint, '   ')).toBe(hint.template);
+    });
+
     it('never overwrites a statement already written', () => {
         const id = render({ ncrType: 'minor', ncrDescription: 'My own statement.' });
         window.showNotification = vi.fn();

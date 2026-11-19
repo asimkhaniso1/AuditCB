@@ -93,6 +93,22 @@ window.FindingStatementHint = (function () {
     function example(hint) { return 'e.g. ' + hint.template; }
     function hasBlanks(text) { return BLANK_RE.test(String(text == null ? '' : text)); }
 
+    // The template with the question's remark put in as the evidence, so the
+    // auditor doesn't type what they saw twice (PC Connection, 2026-11-19).
+    // An OFI's remark is the evidence that the requirement is met; for a
+    // nonconformity or observation it becomes the objective-evidence sentence.
+    // The judgement blanks stay for the auditor to write.
+    function sentence(s) {
+        const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+        return t && !/[.!?…]$/.test(t) ? t + '.' : t;
+    }
+    function withEvidence(hint, remark) {
+        const ev = sentence(remark);
+        if (!ev) return hint.template;
+        if (hint.kind === 'ofi') return hint.template.replace('[evidence that it is met].', () => ev);
+        return hint.template.replace(', as shown by [record, interview or observation].', () => '. Objective evidence: ' + ev);
+    }
+
     // Redraw the label and example for the grade now chosen.
     function apply(uniqueId) {
         if (typeof document === 'undefined') return;
@@ -117,7 +133,8 @@ window.FindingStatementHint = (function () {
             return false;
         }
         const hint = forType(sel ? sel.value : '', box.getAttribute('data-clause'), box.getAttribute('data-req'));
-        box.value = hint.template;
+        const remark = document.getElementById('comment-' + uniqueId);
+        box.value = withEvidence(hint, remark ? remark.value : '');
         // Programmatic edits raise no input event; autosave listens for one.
         box.dispatchEvent(new Event('input', { bubbles: true }));
         box.focus();
@@ -134,7 +151,7 @@ window.FindingStatementHint = (function () {
         });
     }
 
-    return { forType, example, requirementPhrase, hasBlanks, apply, insert, BLANKS };
+    return { forType, example, requirementPhrase, hasBlanks, withEvidence, apply, insert, BLANKS };
 })();
 window.insertFindingTemplate = function (uniqueId) { return window.FindingStatementHint.insert(uniqueId); };
 
@@ -1218,7 +1235,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                              <div style="margin-bottom: 0.75rem;">
                                  <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;">
                                      <label for="ncr-desc-${uniqueId}" style="font-size: 0.8rem; margin: 0;"><span id="ncr-desc-title-${uniqueId}">${_execEscText(stmtHint.title)}</span> <span id="ncr-desc-help-${uniqueId}" style="color:#64748b;font-weight:400;">(${_execEscText(stmtHint.help)})</span></label>
-                                     <button type="button" class="btn btn-sm btn-link" style="padding: 0; font-size: 0.75rem; white-space: nowrap;" data-action="insertFindingTemplate" data-arg1="${_execEscText(uniqueId)}" title="Fill the box with a statement built from this question's clause and requirement; then replace the [bracketed] parts">Insert template</button>
+                                     <button type="button" class="btn btn-sm btn-link" style="padding: 0; font-size: 0.75rem; white-space: nowrap;" data-action="insertFindingTemplate" data-arg1="${_execEscText(uniqueId)}" title="Fill the box with a statement built from this question's clause, requirement and your remark (as the evidence); then replace the [bracketed] parts">Insert template</button>
                                  </div>
                                  <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="3" data-clause="${_execEscText(item.clause || '')}" data-req="${_execEscText(requirementText)}" placeholder="${_execEscText(window.FindingStatementHint.example(stmtHint))}">${_execEscText(saved.ncrDescription || '')}</textarea>
                              </div>
