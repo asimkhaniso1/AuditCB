@@ -2636,6 +2636,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         });
     };
 
+    // Report-time copies built from an answer's screenshots; a save never keeps them.
+    const DERIVED_EVIDENCE_KEYS = new Set(['evidenceThumbs', 'evidenceImageThumb', '_evIds', '_origEvKeys', 'kbMatch']);
     window.saveChecklist = function (reportId, opts) {
         const quiet = !!(opts && opts.quiet);
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
@@ -2781,6 +2783,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (prev && prev.criterionRef && !item.criterionRef) {
                     item.criterionRef = prev.criterionRef;
                     item.criterionSource = prev.criterionSource;
+                }
+                // Every other field the screen has no input for is kept as it
+                // was: an approved evidence statement (clientEvidenceStatement),
+                // an AI sign-off (_auditorConfirmed), an AI evidence explanation
+                // (aiEvidence), a suggested criterion, a CAPA due date. Listing
+                // them one by one lost each new one on the next ordinary save.
+                // Fields the screen does own are already on `item`, so this
+                // never overrides what the auditor just changed.
+                if (prev) {
+                    Object.keys(prev).forEach((k) => {
+                        // Derived from the evidence on screen: never carried, or
+                        // a deleted screenshot's thumbnail could print.
+                        if (DERIVED_EVIDENCE_KEYS.has(k)) return;
+                        if (!Object.prototype.hasOwnProperty.call(item, k)) item[k] = prev[k];
+                    });
                 }
             });
 

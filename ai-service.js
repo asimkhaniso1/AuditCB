@@ -526,6 +526,130 @@ function _introducedNumericTokens(raw, proposed) {
     return proposedTokens.filter(t => !rawTokens.has(t));
 }
 
+// ---------- AI evidence explanation (phase 1, 2026-11-19) ----------
+// One call per audit question with all its screenshots: what each image
+// shows (with exact quotes of visible text), how the evidence relates to the
+// question, what it does not show, and a suggested assessment of the evidence
+// — never a conformity conclusion. Checked before anyone sees it: a sentence
+// that names a figure, date or document not found in the screenshots' quoted
+// text, the auditor's remark, the question or the requirement is removed and
+// flagged, and so is any conformity wording. Nothing here writes to a
+// checklist answer; the result is a draft record for the auditor to review.
+const EVIDENCE_PROMPT_VERSION = 'ev1';
+const EVIDENCE_IMAGE_MAX_PX = 1280;
+const EVIDENCE_IMAGE_QUALITY = 0.7;
+const EVIDENCE_MAX_IMAGES = 6;
+const EVIDENCE_ASSESSMENTS = ['supports', 'partially_supports', 'insufficient', 'cannot_determine'];
+const EVIDENCE_RELEVANCE = ['relevant', 'partial', 'irrelevant', 'unreadable'];
+const EVIDENCE_CONCLUSION_RE = /\b(non-?conform\w*|conform(?:s|ed|ing|ity|ance)?|compliant|non-?compliant|compliance)\b/i;
+const EVIDENCE_DOC_NAME_RE = /\b(?:[A-Z][\w&/-]*\s+){1,5}(?:Policy|Procedure|Register|Plan|Report|Log|Matrix|Manual|Standard|SOP|Records?|Schedule|Minutes)\b/g;
+
+function _fnv1a(str) {
+    let h = 0x811c9dc5;
+    const s = String(str == null ? '' : str);
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return ('0000000' + h.toString(16)).slice(-8);
+}
+
+// Same inputs, same hash: a question is only sent again when its question,
+// requirement, remark, screenshots, model or this prompt version changed.
+function _evidenceInputHash(input, model) {
+    const i = input || {};
+    const images = (Array.isArray(i.images) ? i.images : []).map((im) => String((im && im.evId) || '') + ':' + _fnv1a(String((im && (im.src || im.dataUrl)) || '')));
+    return EVIDENCE_PROMPT_VERSION + '-' + _fnv1a(JSON.stringify({ q: i.question || '', c: i.clause || '', r: i.requirements || [], m: i.remark || '', i: images, model: model || '' }));
+}
+
+function _evidenceSentences(text) {
+    return String(text == null ? '' : text).split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+}
+
+// Figures and document names in a sentence that its sources don't contain.
+// "Image 2" and evidence IDs are the AI's own references, not facts.
+function _evidenceUnsupported(sentence, sourceLower, sourceNumbers) {
+    const s = String(sentence).replace(/\bImage\s+\d+\b/gi, '').replace(/\bEV-\d+\b/gi, '');
+    const out = [];
+    _extractNumericTokens(s).forEach((t) => { if (!sourceNumbers.has(t)) out.push(t); });
+    (s.match(EVIDENCE_DOC_NAME_RE) || []).forEach((d) => {
+        const core = d.trim().replace(/^(?:The|A|An|This|That|These|Those|Its|Their)\s+/, '').toLowerCase();
+        if (core && sourceLower.indexOf(core) === -1) out.push(d.trim());
+    });
+    return out;
+}
+
+function _evidenceClean(text, source, where, flags) {
+    const src = String(source || '');
+    const srcLower = src.toLowerCase();
+    const srcNumbers = new Set(_extractNumericTokens(src));
+    const kept = [];
+    _evidenceSentences(text).forEach((sentence) => {
+        if (EVIDENCE_CONCLUSION_RE.test(sentence)) {
+            flags.push(where + ': removed a sentence with conformity wording ("' + sentence.slice(0, 80) + '").');
+            return;
+        }
+        const unsupported = _evidenceUnsupported(sentence, srcLower, srcNumbers);
+        if (unsupported.length) {
+            flags.push(where + ': removed a sentence naming ' + unsupported.map((u) => '"' + u + '"').join(', ') + ', which is not in the screenshots\' quoted text, the remark, the question or the requirement.');
+            return;
+        }
+        kept.push(sentence);
+    });
+    return kept.join(' ');
+}
+
+function _evidencePrompt(input, sent) {
+    const i = input || {};
+    const reqs = Array.isArray(i.requirements) ? i.requirements : [];
+    const reqText = reqs.length
+        ? reqs.map((r) => '- ' + [r.standard, r.clause ? 'clause ' + r.clause : '', r.title].filter(Boolean).join(' — ') + ': ' + (r.text || '')).join('\n')
+        : 'Not resolved for this question — rely on the audit question.';
+    const imageList = sent.length
+        ? 'The ' + sent.length + ' image(s) follow this prompt in this order: ' + sent.map((s, n) => 'Image ' + (n + 1) + ' = ' + s.evId).join('; ') + '.'
+        : 'No images were sent. Explain only from the auditor\'s remark and return "images": [].';
+    return `You help a certification body auditor review audit evidence. Describe what the attached screenshots actually show and how they relate to the audit question. You do not decide conformity; the auditor does.
+
+AUDIT QUESTION${i.clause ? ' (' + i.clause + ')' : ''}:
+${i.question || 'Not recorded.'}
+
+REQUIREMENT(S):
+${reqText}
+
+AUDITOR'S REMARK:
+${i.remark ? '"' + i.remark + '"' : 'None recorded.'}
+
+IMAGES:
+${imageList}
+
+Rules:
+1. Describe only what is visible. If text is too small or blurred to read, set relevance "unreadable" and do not guess what it says.
+2. visibleText: copy up to 8 short pieces of text exactly as they appear in that image (titles, document names and numbers, dates, names, figures). Copy; never paraphrase, correct or complete them.
+3. In "shows", "explanation", "gaps" and "assessmentReason", any document name or number, date, figure, person or system name must be one you copied into visibleText, or one in the auditor's remark, the question or the requirement. Never introduce one.
+4. explanation: 2-3 factual sentences on how the evidence relates to the audit question, referring to images as "Image 1", "Image 2".
+5. gaps: short phrases for the parts of the audit question that the images and remark do not show. [] if none.
+6. relevance of each image to the question: relevant | partial | irrelevant | unreadable.
+7. suggestedAssessment, about the evidence only: supports | partially_supports | insufficient | cannot_determine. Never write "conform", "conformity", "nonconformity", "compliant", "compliance" or any certification judgement anywhere.
+8. Do not infer frequency, completeness, approval, ownership or effectiveness unless an image shows it.
+
+Return JSON only, in this shape:
+{"images":[{"evId":"","shows":"","visibleText":[""],"relevance":""}],"explanation":"","gaps":[""],"suggestedAssessment":"","assessmentReason":""}`;
+}
+
+function _evidenceUsage(u) {
+    const usage = u || {};
+    const details = Array.isArray(usage.promptTokensDetails) ? usage.promptTokensDetails : [];
+    const by = (m) => details.filter((d) => d && String(d.modality).toUpperCase() === m).reduce((n, d) => n + (Number(d.tokenCount) || 0), 0);
+    return {
+        promptTokens: Number(usage.promptTokenCount) || 0,
+        imageTokens: by('IMAGE'),
+        textTokens: by('TEXT'),
+        outputTokens: Number(usage.candidatesTokenCount) || 0,
+        thinkingTokens: Number(usage.thoughtsTokenCount) || 0,
+        totalTokens: Number(usage.totalTokenCount) || 0
+    };
+}
+
 const AI_SERVICE = {
 
     // Main function to generate agenda
@@ -741,6 +865,156 @@ Return a raw JSON array with 'id' and 'text' fields only:
             console.error("AI Conformance Text Error:", error);
             return findings; // Return original on failure
         }
+    },
+
+    // ---------- AI evidence explanation (phase 1) ----------
+    evidenceInputHash: _evidenceInputHash,
+
+    /**
+     * The question, its requirement(s) from its own standard, the remark and
+     * the screenshots of one checklist answer. Reads only; never changes it.
+     */
+    evidenceInputFor: (item, report) => {
+        const it = item || {};
+        const U = window.UTILS || {};
+        const dec = (v) => (U.decodeEntities ? U.decodeEntities(String(v == null ? '' : v)) : String(v == null ? '' : v));
+        let question = it.requirement || '';
+        if (!question && window.KB_HELPERS && typeof window.KB_HELPERS.resolveChecklistClause === 'function') {
+            try { question = window.KB_HELPERS.resolveChecklistClause(it, (window.state && window.state.checklists) || []).reqText || ''; } catch (_e) { question = ''; }
+        }
+        const ref = String(it.criterionRef || it.clause || '').trim();
+        const standard = (report && report.standard) || '';
+        const requirements = [];
+        const RS = window.ReportStats;
+        if (ref && RS && typeof RS.resolveFindingStandard === 'function' && window.KB_HELPERS && typeof window.KB_HELPERS.lookupKBRequirement === 'function') {
+            const res = RS.resolveFindingStandard({ clause: it.clause, criterionRef: it.criterionRef }, standard);
+            const stds = res.standard ? [res.standard] : (res.basis === 'common' ? (res.standards || []) : []);
+            stds.forEach((s) => {
+                const kb = window.KB_HELPERS.lookupKBRequirement(ref, s);
+                if (kb && kb.requirement) requirements.push({ standard: s, clause: kb.clause || '', title: kb.title || '', text: kb.requirement });
+            });
+        }
+        const srcs = (Array.isArray(it.evidenceImages) && it.evidenceImages.length ? it.evidenceImages : (it.evidenceImage ? [it.evidenceImage] : [])).filter(Boolean);
+        const evIds = Array.isArray(it._evIds) ? it._evIds : [];
+        return {
+            clause: ref,
+            question: dec(question),
+            requirements,
+            remark: dec(it.comment || ''),
+            standard,
+            images: srcs.map((src, n) => ({ evId: evIds[n] || ('Image ' + (n + 1)), src }))
+        };
+    },
+
+    /** Downscale each screenshot (1280 px JPEG) and base64 it; at most 6. */
+    prepareEvidenceImages: async (images) => {
+        const sent = [];
+        const failed = [];
+        const EU = window.EvidenceUtils;
+        for (const im of (Array.isArray(images) ? images : [])) {
+            const evId = String((im && im.evId) || ('Image ' + (sent.length + failed.length + 1)));
+            if (sent.length >= EVIDENCE_MAX_IMAGES) { failed.push({ evId, reason: 'More than ' + EVIDENCE_MAX_IMAGES + ' images; not sent.' }); continue; }
+            try {
+                let src = String((im && (im.src || im.dataUrl)) || '');
+                if (/^idb:\/\//.test(src)) src = (window._EvidenceDB && await window._EvidenceDB.get(src)) || '';
+                if (!src) throw new Error('image not found');
+                const jpeg = (EU && typeof EU.compress === 'function') ? await EU.compress(src, { maxPx: EVIDENCE_IMAGE_MAX_PX, quality: EVIDENCE_IMAGE_QUALITY }) : src;
+                const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(String(jpeg));
+                if (!m) throw new Error('could not be converted');
+                sent.push({ evId, mimeType: m[1], data: m[2] });
+            } catch (e) {
+                failed.push({ evId, reason: 'Could not be loaded (' + ((e && e.message) || 'error') + '); not sent.' });
+            }
+        }
+        return { sent, failed };
+    },
+
+    /** Normalise the model's JSON and apply the checks above. */
+    validateEvidenceExplanation: (parsed, input, prep) => {
+        const flags = [];
+        const i = input || {};
+        const sentIds = ((prep && prep.sent) || []).map((s) => s.evId);
+        const p = (parsed && typeof parsed === 'object') ? parsed : {};
+        const byId = new Map();
+        (Array.isArray(p.images) ? p.images : []).forEach((im, n) => {
+            let id = String((im && im.evId) || '').trim();
+            if (sentIds.indexOf(id) === -1) id = sentIds[n];
+            if (!id || byId.has(id)) return;
+            const visibleText = (Array.isArray(im && im.visibleText) ? im.visibleText : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 12);
+            const relevance = EVIDENCE_RELEVANCE.indexOf(im && im.relevance) !== -1 ? im.relevance : 'partial';
+            byId.set(id, { evId: id, shows: String((im && im.shows) || '').trim(), visibleText, relevance });
+        });
+        sentIds.forEach((id) => {
+            if (!byId.has(id)) {
+                byId.set(id, { evId: id, shows: '', visibleText: [], relevance: 'unreadable' });
+                flags.push(id + ': the AI did not describe this image.');
+            }
+        });
+        const reqText = (Array.isArray(i.requirements) ? i.requirements : []).map((r) => [r.clause, r.title, r.text].filter(Boolean).join(' ')).join('\n');
+        const base = [i.remark || '', i.question || '', i.clause || '', reqText].join('\n');
+        const quotes = Array.from(byId.values()).map((x) => x.visibleText.join('\n')).join('\n');
+        const images = sentIds.map((id) => {
+            const im = byId.get(id);
+            return Object.assign({}, im, { shows: _evidenceClean(im.shows, im.visibleText.join('\n') + '\n' + base, id, flags) });
+        });
+        const source = quotes + '\n' + base;
+        const explanation = _evidenceClean(p.explanation, source, 'Explanation', flags);
+        const gaps = (Array.isArray(p.gaps) ? p.gaps : []).map((g) => _evidenceClean(String(g == null ? '' : g), source, 'Gap', flags)).filter(Boolean).slice(0, 8);
+        const assessment = EVIDENCE_ASSESSMENTS.indexOf(p.suggestedAssessment) !== -1 ? p.suggestedAssessment : 'cannot_determine';
+        const assessmentReason = _evidenceClean(p.assessmentReason, source, 'Assessment reason', flags);
+        if (!explanation) flags.push('The explanation was empty after the checks; write it yourself.');
+        return { result: { images, explanation, gaps, suggestedAssessment: assessment, assessmentReason }, flags };
+    },
+
+    /**
+     * Explain one question's evidence. input: from evidenceInputFor, or
+     * { clause, question, requirements:[{standard,clause,title,text}], remark,
+     *   standard, images:[{evId, src}] }. opts.cached: an earlier record — returned
+     *   as it is, with no call, while the inputs are unchanged (opts.force re-runs).
+     * Returns a draft record; it never writes to a checklist answer.
+     */
+    explainEvidence: async (input, opts = {}) => {
+        const o = opts || {};
+        const inputHash = _evidenceInputHash(input, EVIDENCE_PROMPT_VERSION);
+        const cached = o.cached;
+        if (cached && cached.inputHash === inputHash && cached.status !== 'rejected' && !o.force) {
+            return Object.assign({}, cached, { fromCache: true });
+        }
+        const prep = await AI_SERVICE.prepareEvidenceImages((input && input.images) || []);
+        if (!prep.sent.length && !String((input && input.remark) || '').trim()) {
+            return { status: 'nothing', inputHash, fromCache: false, imagesFailed: prep.failed, result: null, flags: ['No readable screenshot and no remark: nothing to explain.'] };
+        }
+        const prompt = _evidencePrompt(input, prep.sent);
+        const started = Date.now();
+        const resp = await AI_SERVICE.callProxyAPI(prompt, {
+            images: prep.sent.map((s) => ({ mimeType: s.mimeType, data: s.data })),
+            json: true,
+            withUsage: true,
+            feature: 'evidence-explanation',
+            maxTokens: 4096,
+            temperature: 0.1
+        });
+        const latencyMs = Date.now() - started;
+        let parsed;
+        try {
+            parsed = JSON.parse(String(resp.text || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim());
+        } catch (_e) { parsed = null; }
+        const checked = AI_SERVICE.validateEvidenceExplanation(parsed, input, prep);
+        if (!parsed) checked.flags.unshift('The AI reply was not valid JSON.');
+        return {
+            status: 'draft',
+            inputHash,
+            promptVersion: EVIDENCE_PROMPT_VERSION,
+            model: resp.model,
+            createdAt: new Date().toISOString(),
+            fromCache: false,
+            latencyMs,
+            imagesSent: prep.sent.map((s) => s.evId),
+            imagesFailed: prep.failed,
+            usage: _evidenceUsage(resp.usage),
+            result: checked.result,
+            flags: checked.flags
+        };
     },
 
     // Exact sentence the UI must show verbatim when suggestFindingClause()
@@ -1591,7 +1865,10 @@ Example:
                 const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: await AI_SERVICE.proxyHeaders(),
-                    body: JSON.stringify({ prompt, model, maxTokens })
+                    body: JSON.stringify(Object.assign({ prompt, model, maxTokens },
+                        Array.isArray(options.images) && options.images.length ? { images: options.images } : {},
+                        options.json ? { json: true } : {},
+                        options.temperature != null ? { temperature: options.temperature } : {}))
                 });
 
                 if (response.status === 401) {
@@ -1628,15 +1905,17 @@ Example:
                 if (window.APIUsageTracker) {
                     const usage = data.usage || {};
                     window.APIUsageTracker.logUsage({
-                        feature: 'ai-generation',
+                        feature: options.feature || 'ai-generation',
                         inputTokens: usage.promptTokenCount || window.APIUsageTracker.estimateTokens(prompt),
-                        outputTokens: usage.candidatesTokenCount || 0,
+                        // Thinking tokens are billed as output.
+                        outputTokens: (usage.candidatesTokenCount || 0) + (usage.thoughtsTokenCount || 0),
                         success: true,
                         model: model
                     });
                 }
 
-                return AI_SERVICE.extractTextFromResponse(data);
+                const text = AI_SERVICE.extractTextFromResponse(data);
+                return options.withUsage ? { text, usage: data.usage || {}, model } : text;
 
             } catch (error) {
                 if (error.authRequired) throw error;
@@ -1649,6 +1928,12 @@ Example:
                     break; // Stop trying proxy, fall through to direct API
                 }
             }
+        }
+
+        // Evidence images go only through the server proxy, never the
+        // browser-key fallback below.
+        if (Array.isArray(options.images) && options.images.length) {
+            throw lastError || new Error('The AI service is not available.');
         }
 
         // Determine if we should try fallback
