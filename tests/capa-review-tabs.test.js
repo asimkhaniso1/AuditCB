@@ -86,7 +86,7 @@ describe('register forms redraw the screen they were opened from', () => {
         // Left: the two already-guarded redraws and the one inside refreshNCRViews.
         expect(afterSave).toHaveLength(3);
         expect(NCR_SRC).toContain("if (document.getElementById('exec-capa-register')) {");
-        expect((NCR_SRC.match(/refreshNCRViews\(\);/g) || []).length).toBe(7); // + reviewPreviousNCR
+        expect((NCR_SRC.match(/refreshNCRViews\(\);/g) || []).length).toBe(8); // + reviewPreviousNCR, uploadCARResponses
     });
 });
 

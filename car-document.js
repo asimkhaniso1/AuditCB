@@ -21,6 +21,10 @@
 //   CarDocument.fileName(ctx, ext)         -> download file name
 //   window.printCAR(ncrId)                 -> opens the PDF preview window
 //   window.downloadCARWord(ncrId)          -> downloads the .docx
+//   CarDocument.buildBatchHtml([ctx])      -> one document, a CAR per page (pure)
+//   CarDocument.buildDocxZip([ctx], logo?) -> .zip of one .docx per CAR (pure)
+//   window.printCARs('85,86,90')           -> every CAR of an audit in one PDF preview
+//   window.downloadCARsWord('85,86,90')    -> the .zip
 
 (function (global) {
     'use strict';
@@ -203,7 +207,7 @@
         return '<tr class="pd-keep"><td class="k">' + h(label) + '</td><td class="' + (v ? '' : (fill || 'fill')) + '">' + h(v) + '</td></tr>';
     }
 
-    function buildHtml(c) {
+    function carBody(c) {
         const ps = PS();
         const meta = '<table class="car-meta"><tbody>'
             + '<tr><td class="k">NCR number</td><td><strong>' + h(c.ref) + '</strong></td>'
@@ -250,21 +254,62 @@
             + '</tbody></table>';
 
         const contact = [c.brand.email, c.brand.phone, c.brand.website].filter(Boolean).join(' · ');
-        const body = ps.masthead({
+        return ps.masthead({
             brandName: c.brand.name, logoUrl: c.brand.logoUrl,
             title: 'Corrective Action Request',
             subtitle: [c.ref, c.clientName].filter(Boolean).join(' · ')
         })
             + (c.brand.accreditation || contact ? '<div style="font-size:8pt;color:#64748b;margin:-6px 0 10px">' + h([c.brand.accreditation, contact].filter(Boolean).join(' · ')) + '</div>' : '')
             + meta + partA + note + partB + partC;
+    }
 
+    function buildHtml(c) {
+        const ps = PS();
         return ps.buildDocument({
             title: fileName(c, '').replace(/\.$/, ''),
-            bodyHtml: body,
+            bodyHtml: carBody(c),
             extraCss: ps.MASTHEAD_CSS + '\n' + CSS,
             header: { left: c.brand.name, center: c.clientName, right: c.ref + ' · ' + c.grade },
             footer: { left: c.classification || 'Corrective Action Request', center: 'Issued ' + date(c.issuedOn) }
         });
+    }
+
+    /** Every CAR of one audit in one document, each starting on a new page. */
+    function buildBatchHtml(list) {
+        const ps = PS();
+        const cs = arr(list).filter(Boolean);
+        if (!cs.length) return '';
+        const first = cs[0];
+        const body = cs.map(function (c, i) {
+            return '<section class="car-one"' + (i ? ' style="break-before:page;page-break-before:always"' : '') + '>' + carBody(c) + '</section>';
+        }).join('');
+        return ps.buildDocument({
+            title: batchName(cs, ''),
+            bodyHtml: body,
+            extraCss: ps.MASTHEAD_CSS + '\n' + CSS,
+            header: { left: first.brand.name, center: first.clientName, right: 'Corrective Action Requests (' + cs.length + ')' },
+            footer: { left: first.classification || 'Corrective Action Requests', center: 'Issued ' + date(first.issuedOn) }
+        });
+    }
+
+    function batchName(cs, ext) {
+        const c = cs[0] || {};
+        const base = ('CARs ' + (c.clientName || '') + (c.auditDate ? ' - ' + date(c.auditDate) : ''))
+            .replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '');
+        return ext ? base + '.' + ext : base;
+    }
+
+    /** One .docx per CAR, zipped; each file named so the returned copy matches its NCR. */
+    function buildDocxZip(list, logo) {
+        const enc = new TextEncoder();
+        const seen = {};
+        return zipStore(arr(list).filter(Boolean).map(function (c) {
+            let name = fileName(c, 'docx');
+            if (seen[name]) name = name.replace(/\.docx$/, ' (' + (++seen[name]) + ').docx'); else seen[name] = 1;
+            return { name: name, data: buildDocx(c, logo) };
+        }).concat([{ name: 'README.txt', data: enc.encode(
+            'Corrective Action Requests\r\n\r\nOne Word file per nonconformity. Complete Part B of each and return it with your evidence, '
+            + 'keeping the NCR number in the file name.\r\n') }]));
     }
 
     function fileName(c, ext) {
@@ -571,23 +616,52 @@
         return win;
     };
 
-    global.downloadCARWord = async function (ncrId) {
-        const ncr = findNCR(ncrId);
-        if (!ncr) { notify('That nonconformity could not be found in the register.', 'error'); return; }
-        const c = context(ncr);
-        const bytes = buildDocx(c, await loadLogo(c.brand.logoUrl));
-        const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-        const url = URL.createObjectURL(blob);
+    function saveBytes(bytes, type, name) {
+        const url = URL.createObjectURL(new Blob([bytes], { type: type }));
         const a = document.createElement('a');
         a.href = url;
-        a.download = fileName(c, 'docx');
+        a.download = name;
         document.body.appendChild(a);
         a.click();
         a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    }
+
+    global.downloadCARWord = async function (ncrId) {
+        const ncr = findNCR(ncrId);
+        if (!ncr) { notify('That nonconformity could not be found in the register.', 'error'); return; }
+        const c = context(ncr);
+        saveBytes(buildDocx(c, await loadLogo(c.brand.logoUrl)), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileName(c, 'docx'));
     };
 
-    const API = { context: context, buildHtml: buildHtml, buildDocx: buildDocx, fileName: fileName, crc32: crc32 };
+    /** Register records for a comma-separated id list, in register order; Major/Minor only. */
+    function findNCRs(idList) {
+        const ids = String(idList == null ? '' : idList).split(',').map(str).filter(Boolean);
+        return ids.map(findNCR).filter(function (n) {
+            return n && /^(major|minor)/i.test(str(n.severity || n.type)) && str(n.status) !== 'Withdrawn';
+        });
+    }
+
+    global.printCARs = function (idList) {
+        if (!PS() || !DF()) { notify('The print module is not loaded. Reload the page and try again.', 'warning'); return null; }
+        const ncrs = findNCRs(idList);
+        if (!ncrs.length) { notify('There are no Major or Minor nonconformities to issue.', 'info'); return null; }
+        const win = PS().open(buildBatchHtml(ncrs.map(function (n) { return context(n); })));
+        if (!win) notify('Allow pop-ups for this site to open the CARs.', 'warning');
+        return win;
+    };
+
+    global.downloadCARsWord = async function (idList) {
+        const ncrs = findNCRs(idList);
+        if (!ncrs.length) { notify('There are no Major or Minor nonconformities to issue.', 'info'); return; }
+        const cs = ncrs.map(function (n) { return context(n); });
+        saveBytes(buildDocxZip(cs, await loadLogo(cs[0].brand.logoUrl)), 'application/zip', batchName(cs, 'zip'));
+    };
+
+    const API = {
+        context: context, buildHtml: buildHtml, buildBatchHtml: buildBatchHtml, buildDocx: buildDocx, buildDocxZip: buildDocxZip,
+        fileName: fileName, batchName: batchName, crc32: crc32
+    };
     global.CarDocument = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
     if (global.Logger && global.Logger.debug) global.Logger.debug('Modules', 'car-document.js loaded successfully.');

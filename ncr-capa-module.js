@@ -1112,7 +1112,10 @@ function renderNCRTable(ncrs) {
             <tbody>
                 ${groups.map(g => `
                     <tr class="ncr-group-row" style="background: #f1f5f9;">
-                        <td colspan="7" style="font-weight: 600; color: #334155;">${esc(g.label)}<span style="font-weight: 400; color: var(--text-secondary);"> &middot; ${sevCount(g.items, 'major')} Major &middot; ${sevCount(g.items, 'minor')} Minor</span></td>
+                        <td colspan="7" style="font-weight: 600; color: #334155;"><div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                            <span>${esc(g.label)}<span style="font-weight: 400; color: var(--text-secondary);"> &middot; ${sevCount(g.items, 'major')} Major &middot; ${sevCount(g.items, 'minor')} Minor</span></span>
+                            ${carBulkButtonsHTML(g.items)}
+                        </div></td>
                     </tr>
                     ${g.items.map(rowHTML).join('')}
                 `).join('')}
@@ -2238,6 +2241,129 @@ function carButtonsHTML(ncr, style) {
         </div>`;
 }
 window.NCRModule.carButtonsHTML = carButtonsHTML;
+
+/** Ids of the saved, active Major/Minor records in a list, comma-joined. */
+function carIdList(ncrs) {
+    return (ncrs || []).filter(n => n && n.id != null && n.id !== '' && isActiveNCR(n)).map(n => String(n.id)).join(',');
+}
+
+/** Bulk CAR actions for one audit's group in the register. */
+function carBulkButtonsHTML(ncrs) {
+    const ids = carIdList(ncrs);
+    if (!ids) return '';
+    const n = ids.split(',').length;
+    const a = window.UTILS.escapeHtml(ids);
+    const btn = 'class="btn btn-sm btn-secondary" style="padding: 0.2rem 0.55rem; font-size: 0.78rem; font-weight: 500;"';
+    return `<span style="display: inline-flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+            <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.8rem;">All ${n} CAR${n === 1 ? '' : 's'}:</span>
+            <button type="button" ${btn} data-action="printCARs" data-arg1="${a}" title="Every CAR of this audit in one PDF, one per page"><i class="fa-solid fa-file-pdf" style="margin-right: 0.3rem; color: #b91c1c;"></i>PDF</button>
+            <button type="button" ${btn} data-action="downloadCARsWord" data-arg1="${a}" title="A .zip with one Word CAR per nonconformity, for the client to fill in"><i class="fa-solid fa-file-zipper" style="margin-right: 0.3rem; color: #1d4ed8;"></i>Word (.zip)</button>
+            <button type="button" ${btn} data-action="uploadCARResponses" data-arg1="${a}" title="Upload the returned CARs and evidence; each file is matched to its NCR"><i class="fa-solid fa-upload" style="margin-right: 0.3rem; color: #059669;"></i>Upload responses</button>
+        </span>`;
+}
+window.NCRModule.carBulkButtonsHTML = carBulkButtonsHTML;
+
+/**
+ * The NCR a returned file belongs to, from the "NCR-090" its name carries
+ * (the downloaded CARs are named that way). '' when the name names none of
+ * `ncrs`, or more than one.
+ */
+function matchResponseFile(fileName, ncrs) {
+    const ids = new Set((ncrs || []).map(n => String(n.id)));
+    const found = new Set();
+    const re = /NCR[\s_-]*0*(\d+)/gi;
+    let m;
+    while ((m = re.exec(String(fileName || '')))) { if (ids.has(m[1])) found.add(m[1]); }
+    return found.size === 1 ? [...found][0] : '';
+}
+window.NCRModule.matchResponseFile = matchResponseFile;
+
+/**
+ * Upload several returned CARs and evidence files at once. Each file is
+ * matched to its NCR by name, and the auditor confirms or corrects the match
+ * before anything is uploaded. Attaching files records the response; it does
+ * not close or verify anything — that stays with Review.
+ */
+window.uploadCARResponses = function (idList) {
+    const ids = String(idList || '').split(',').map(s => s.trim()).filter(Boolean);
+    const ncrs = ids.map(id => (window.state.ncrs || []).find(n => String(n.id) === id)).filter(Boolean);
+    if (!ncrs.length) { window.showNotification('There are no nonconformities to attach responses to.', 'info'); return; }
+    const esc = (s) => window.UTILS.escapeHtml(s == null ? '' : String(s));
+    const ref = (n) => 'NCR-' + String(n.id).padStart(3, '0');
+    const options = (selected) => '<option value="">— choose the NCR —</option>' + ncrs.map(n =>
+        `<option value="${esc(n.id)}" ${String(n.id) === String(selected) ? 'selected' : ''}>${esc(ref(n))} · ${esc(String(n.description || '').slice(0, 60))}</option>`).join('');
+
+    document.getElementById('modal-title').textContent = 'Upload returned CARs';
+    document.getElementById('modal-body').innerHTML = `
+        <p style="margin: 0 0 0.75rem; color: var(--text-secondary); font-size: 0.9rem;">Choose the files the organisation sent back — the filled-in CARs and their evidence (PDF, Word, Excel or images, up to 10 MB each). Files named with their NCR number (as the downloaded CARs are) are matched automatically; choose the NCR for any other file.</p>
+        <input type="file" id="car-bulk-files" class="form-control" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
+        <table id="car-bulk-table" style="width: 100%; margin-top: 0.75rem; font-size: 0.85rem; display: none;">
+            <thead><tr><th style="text-align: left;">File</th><th style="text-align: left; width: 55%;">Attach to</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <p style="margin: 0.75rem 0 0; font-size: 0.8rem; color: var(--text-secondary);">Attaching files records the response on each NCR. Review each one to record the outcome.</p>
+        <div id="car-bulk-error" role="alert" style="display: none; color: var(--danger-color); font-size: 0.85rem; margin-top: 0.5rem;"></div>`;
+
+    let files = [];
+    const input = document.getElementById('car-bulk-files');
+    const table = document.getElementById('car-bulk-table');
+    input.addEventListener('change', () => {
+        files = Array.from(input.files || []);
+        table.style.display = files.length ? '' : 'none';
+        table.querySelector('tbody').innerHTML = files.map((f, i) => `
+            <tr><td style="padding: 0.3rem 0.4rem 0.3rem 0; word-break: break-all;">${esc(f.name)}</td>
+                <td><select class="form-control car-bulk-target" data-index="${i}" style="padding: 0.25rem 0.4rem; font-size: 0.82rem;">${options(matchResponseFile(f.name, ncrs))}</select></td></tr>`).join('');
+    });
+
+    // NCRs whose files are already attached in this dialog: a retry after a
+    // partial failure sends only the rest.
+    const attached = new Set();
+    const uploadedOnly = new Set();
+    const save = document.getElementById('modal-save');
+    save.style.display = 'block';
+    save.onclick = async () => {
+        const showError = (msg) => { const e = document.getElementById('car-bulk-error'); if (e) { e.textContent = msg; e.style.display = 'block'; } };
+        if (!files.length) { showError('Choose the files to upload.'); return; }
+        const targets = Array.from(table.querySelectorAll('.car-bulk-target')).map(s => s.value);
+        const missing = files.filter((_f, i) => !targets[i]);
+        if (missing.length) { showError('Choose the NCR for: ' + missing.map(f => f.name).join(', ')); return; }
+        const problem = checkResponseFiles(files);
+        if (problem) { showError(problem); return; }
+
+        const ctx = { by: (window.state.currentUser && window.state.currentUser.name) || 'Auditor', today: new Date().toISOString().split('T')[0] };
+        const byNcr = new Map();
+        files.forEach((f, i) => { const k = targets[i]; if (!byNcr.has(k)) byNcr.set(k, []); byNcr.get(k).push(f); });
+        save.disabled = true;
+        const done = []; const failed = [];
+        for (const [id, list] of byNcr) {
+            const ncr = ncrs.find(n => String(n.id) === id);
+            if (attached.has(id)) { done.push(ref(ncr)); continue; }
+            try {
+                // Files stored but the record not saved last time: save again, do not re-upload.
+                if (!uploadedOnly.has(id)) {
+                    const uploaded = await uploadAuditeeResponseFiles(ncr, list, ctx);
+                    ncr.auditeeResponseFiles = (Array.isArray(ncr.auditeeResponseFiles) ? ncr.auditeeResponseFiles : []).concat(uploaded);
+                    uploadedOnly.add(id);
+                }
+                if (await persistNCR(ncr) === false) throw new Error('the record could not be saved');
+                uploadedOnly.delete(id);
+                attached.add(id);
+                done.push(ref(ncr));
+            } catch (e) {
+                failed.push(ref(ncr) + ' (' + e.message + ')');
+            }
+        }
+        save.disabled = false;
+        if (failed.length) {
+            showError((done.length ? 'Attached to ' + done.join(', ') + '. ' : '') + 'Not attached: ' + failed.join('; ') + '.');
+            return;
+        }
+        window.closeModal();
+        window.showNotification(`${files.length} file${files.length === 1 ? '' : 's'} attached to ${done.join(', ')}.`, 'success');
+        refreshNCRViews();
+    };
+    window.openModal();
+};
 
 /** The auditee's returned CAR and evidence, as links that open a signed URL. */
 function responseFilesHTML(ncr) {
