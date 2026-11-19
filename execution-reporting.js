@@ -259,6 +259,9 @@
         return 'RPT-' + String((d && d.report && d.report.id) || '').substring(0, 8);
     };
     window._reportRef = reportRef;
+    // A closing-meeting field nobody filled in says so; it is never filled
+    // with an assumed outcome.
+    const CLOSING_NOT_RECORDED = '<span style="color:#94a3b8;font-style:italic;">Not recorded.</span>';
 
     // Effectiveness defaults for the Management System Effectiveness table.
     // Delegates to ReportStats (the canonical findings source) so preview and
@@ -387,8 +390,59 @@
         return '<span style="color:#991b1b;">Open — corrective action not yet verified ('
             + window.UTILS.escapeHtml(raw) + ')</span>';
     };
-    const prevFollowUpForNC = (prevReport, nc) => prevFollowUpLabel(
-        ((prevReport.findingStatus || {})[String(nc.clause || '') + '|' + String(nc.department || '')] || {}).status);
+    // The NCR register record raised for a previous report's NC (state.ncrs),
+    // matched by its source checklist question within that audit. The closure
+    // state lives there; prevReport.findingStatus is rarely written, so every
+    // previous NC printed "previous record not available to verify closure"
+    // while NCR-053 and NCR-021 sat in the register (PC Connection, 2026-11-19).
+    const prevRegisterRecord = (prevReport, nc) => {
+        const ncrs = (window.state && Array.isArray(window.state.ncrs)) ? window.state.ncrs : [];
+        if (!nc || nc.checklistId == null || nc.itemIdx == null) return null;
+        const auditId = prevReport && prevReport.planId != null ? String(prevReport.planId) : null;
+        return ncrs.find((n) => n
+            && String(n.sourceChecklistId) === String(nc.checklistId)
+            && String(n.sourceItemIdx) === String(nc.itemIdx)
+            && (!auditId || String(n.auditId || '') === auditId)
+            && String(n.status || '').toLowerCase() !== 'withdrawn') || null;
+    };
+    // Register state in the follow-up label's terms: closed only when the
+    // register says so (status Closed, or the CAR closed/effective).
+    const registerFollowUpState = (rec) => {
+        if (!rec) return '';
+        const st = String(rec.status || '').trim();
+        const car = String(rec.carStatus || '').trim();
+        if (/^closed$/i.test(st) || /^(closed|effective)$/i.test(car)) return 'closed';
+        return car || st || 'Open';
+    };
+    const prevFollowUpForNC = (prevReport, nc) => {
+        const recorded = ((prevReport.findingStatus || {})[String(nc.clause || '') + '|' + String(nc.department || '')] || {}).status;
+        return prevFollowUpLabel(recorded || registerFollowUpState(prevRegisterRecord(prevReport, nc)));
+    };
+    // The reference and criterion a previous NC is known by: the register's
+    // NCR number and criterion when it has a record, never an internal
+    // FOCUS/ORG/DOC working reference.
+    const prevNcRef = (prevReport, nc, i) => {
+        const rec = prevRegisterRecord(prevReport, nc);
+        if (rec && rec.id != null && rec.id !== '') {
+            return (window.ReportStats && typeof window.ReportStats.registerRefLabel === 'function') ? window.ReportStats.registerRefLabel(rec.id) : 'NCR-' + rec.id;
+        }
+        return 'PREV-' + (i + 1);
+    };
+    const prevNcCriterion = (prevReport, nc) => {
+        const rec = prevRegisterRecord(prevReport, nc);
+        const fromRec = rec && String(rec.criterionRef || '').trim();
+        if (fromRec) return htmlEsc(fromRec);
+        const ref = String(nc.criterionRef || '').trim() || String(nc.clauseRef || nc.clause || '').trim();
+        if (/^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i.test(ref)) {
+            const recClause = rec && String(rec.clause || '').trim();
+            if (recClause && !/^(FOCUS|SURV|ORG|DOC)([.\s]|$)/i.test(recClause)) return htmlEsc(recClause);
+            return '<span style="color:#94a3b8;font-style:italic;">Criterion not recorded</span>';
+        }
+        return htmlEsc(ref);
+    };
+    window._prevRegisterRecord = prevRegisterRecord;
+    window._prevNcRef = prevNcRef;
+    window._prevNcCriterion = prevNcCriterion;
     window._prevFollowUpLabel = prevFollowUpLabel;
     window._prevFollowUpForNC = prevFollowUpForNC;
 
@@ -1421,6 +1475,7 @@
         overlay.id = 'report-preview-overlay';
         overlay.innerHTML = `
         <style>
+            #rp-unresolved:empty:before{content:attr(data-placeholder);color:#94a3b8;font-style:italic;}
             #report-preview-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;background:rgba(15,23,42,0.7);display:flex;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
             .rp-modal{background:#f8fafc;border-radius:16px;width:100%;max-width:1280px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.3);}
             .rp-header{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:white;padding:20px 28px;}
@@ -2295,7 +2350,7 @@
                             }
                             let rows = '';
                             prevNCs.forEach(function (nc, i) {
-                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + htmlEsc(nc.clauseRef || nc.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(nc.ncrType || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
+                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">' + htmlEsc(prevNcRef(prevReport, nc, i)) + '</td><td>' + prevNcCriterion(prevReport, nc) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(nc.ncrType || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
                             });
                             prevNCRs.forEach(function (ncr, i) {
                                 rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + htmlEsc(ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(ncr.type || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpLabel(ncr.status) + '</td></tr>';
@@ -2438,7 +2493,7 @@
                             return '<div style="margin-bottom:14px;padding:14px;background:#fef2f2;border-radius:10px;border-left:4px solid #dc2626;"><div style="font-size:0.82rem;font-weight:700;color:#991b1b;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>RISK AREAS IDENTIFIED</div><div style="font-size:0.85rem;color:#7f1d1d;line-height:1.6;">The following clause areas have been identified as requiring management attention due to non-conformity findings: <strong>' + htmlEsc(allRiskClauses.join(', ')) + '</strong>. These areas should be prioritized for corrective action and root cause analysis to prevent recurrence.</div></div>';
                         })()}
                         <div id="rp-conclusion" class="rp-edit" contenteditable="true">${richHtml(d.report.conclusion || ('Based on the audit findings, the audit team concludes that the organization\'s management system has been assessed against the applicable standard requirements. ' + (d.stats.rs && d.stats.rs.recommendation ? d.stats.rs.recommendation : d.stats.recommendation || '') + ' Click to edit this conclusion.'))}</div>
-                        <div style="margin-top:14px;"><strong style="color:#334155;font-size:0.85rem;">Unresolved Issues / Diverging Opinions:</strong> <span id="rp-unresolved" class="rp-edit" contenteditable="true" style="margin-left:6px;">${htmlEsc(d.report.unresolvedIssues || 'None. All findings were acknowledged by the auditee at the closing meeting.')}</span></div>
+                        <div style="margin-top:14px;"><strong style="color:#334155;font-size:0.85rem;">Unresolved Issues / Diverging Opinions:</strong> <span id="rp-unresolved" class="rp-edit" contenteditable="true" data-placeholder="Record any unresolved issues or diverging opinions from the closing meeting, or &quot;None&quot;." style="margin-left:6px;display:inline-block;min-width:240px;">${htmlEsc(d.report.unresolvedIssues || '')}</span></div>
                         <p style="font-style:italic;font-size:0.78rem;color:#64748b;margin-top:12px;">This audit was conducted through a sampling process of the available information. Consequently, nonconformities may exist which have not been identified within this report.</p>
                     </div>
                 </div>
@@ -3289,7 +3344,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // status (never a blank/invented default) — same precedence as the preview box.
         let editedPrevFindings = document.getElementById('rp-prev-findings')?.innerText || d.report.previousFindingsStatus || _derivePreviousFindingsStatus(d);
         editedPrevFindings = editedPrevFindings.replace(/Click to edit[^.]*\.?/gi, '').trim();
-        const editedUnresolved = document.getElementById('rp-unresolved')?.innerText || d.report.unresolvedIssues || 'None. All findings were acknowledged by the auditee at the closing meeting.';
+        // The report used to print "None. All findings were acknowledged by the auditee at the closing meeting." by default, with the closing
+        // meeting itself not recorded (PC Connection draft, 2026-11-19). Only
+        // what the auditor wrote is printed.
+        const editedUnresolved = String(document.getElementById('rp-unresolved')?.innerText || d.report.unresolvedIssues || '').trim();
         // Effectiveness defaults derive from the validated findings, so the table
         // cannot declare a process conforming while an NC stands against its
         // clause. An auditor's own wording still wins.
@@ -3732,7 +3790,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
 
             let rows = '';
             prevNCs.forEach(function (nc, i) {
-                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + htmlEsc(nc.clauseRef || nc.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(nc.ncrType || 'Minor') + '</span></td><td>' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
+                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">' + htmlEsc(prevNcRef(prevReport, nc, i)) + '</td><td>' + prevNcCriterion(prevReport, nc) + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(nc.ncrType || 'Minor') + '</span></td><td>' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
             });
             prevNCRs.forEach(function (ncr, i) {
                 rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + htmlEsc(ncr.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(ncr.type || 'Minor') + '</span></td><td>' + prevFollowUpLabel(ncr.status) + '</td></tr>';
@@ -4423,7 +4481,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     return '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (rec.primary === 'Recommended' ? 'background:#ecfdf5;color:#15803d;' : rec.primary === 'Not Recommended' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + htmlEsc(rec.wording) + '</span></div>';
                 })()
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + formatRichText(editedConclusion) + '</div>'
-                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1d4ed8;"><strong style="color:#1d4ed8;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + htmlEsc(d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return htmlEsc(att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'); return htmlEsc(String(att)); })() + '</td></tr><tr><td>Summary</td><td>' + (htmlEsc(fmtRemark(editedClosingSummary)) || '—') + '</td></tr><tr><td>Unresolved Issues / Diverging Opinions</td><td>' + htmlEsc(editedUnresolved) + '</td></tr></table></div>'
+                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1d4ed8;"><strong style="color:#1d4ed8;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date ? htmlEsc(d.report.closingMeeting.date) : CLOSING_NOT_RECORDED) + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att || (Array.isArray(att) && !att.length)) return CLOSING_NOT_RECORDED; if (Array.isArray(att)) return htmlEsc(att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'); return htmlEsc(String(att)); })() + '</td></tr><tr><td>Summary</td><td>' + (htmlEsc(fmtRemark(editedClosingSummary)) || CLOSING_NOT_RECORDED) + '</td></tr><tr><td>Unresolved Issues / Diverging Opinions</td><td>' + (editedUnresolved ? htmlEsc(editedUnresolved) : CLOSING_NOT_RECORDED) + '</td></tr></table></div>'
                 + '<p style="font-style:italic;font-size:0.8rem;color:#64748b;margin-top:16px;">This audit was conducted through a sampling process of the available information. Consequently, nonconformities may exist which have not been identified within this report.</p>'
                 + (function () {
                     // Client-rep signature line only when the CB's own scheme actually requires
