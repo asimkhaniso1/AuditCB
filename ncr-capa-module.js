@@ -562,6 +562,8 @@ window.fetchNCRs = async function () {
                 sourceItemIdx: row.source_item_idx != null ? row.source_item_idx : null,
                 evidence: row.evidence || []
             };
+            // Absent until ADD_NCR_AUDITEE_RESPONSE_FILES.sql runs; then [] by default.
+            if (Array.isArray(row.auditee_response_files)) mapped.auditeeResponseFiles = row.auditee_response_files;
             const prev = prevById.get(String(row.id));
             if (prev) {
                 if (mapped.criterionRef == null && prev.criterionRef !== undefined) mapped.criterionRef = prev.criterionRef;
@@ -582,6 +584,7 @@ window.fetchNCRs = async function () {
                 // fresh duplicate NCR. Preserving it locally the same way as the
                 // fields above closes that hole.
                 if (prev._sourceKey) mapped._sourceKey = prev._sourceKey;
+                if (mapped.auditeeResponseFiles === undefined && Array.isArray(prev.auditeeResponseFiles)) mapped.auditeeResponseFiles = prev.auditeeResponseFiles;
                 // Supersede trail from the duplicate review (no DB column yet;
                 // the Withdrawn status itself is persisted).
                 ['_supersededBy', 'withdrawnReason', 'withdrawnDate'].forEach(k => {
@@ -682,6 +685,9 @@ async function persistNCR(ncr) {
         risk_impact: ncr.riskImpact != null ? ncr.riskImpact : null,
         evidence: ncr.evidence || []
     };
+    // Sent only once a record carries response files, so every other save
+    // keeps working before ADD_NCR_AUDITEE_RESPONSE_FILES.sql is run.
+    if (Array.isArray(ncr.auditeeResponseFiles)) dbPayload.auditee_response_files = ncr.auditeeResponseFiles;
 
     try {
         if (ncr.id) {
@@ -722,10 +728,16 @@ async function persistNCR(ncr) {
         if (document.getElementById('ncr-content')) {
             renderNCRCAPAModuleContent(window.state.ncrContextClientId);
         }
+        return true;
 
     } catch (error) {
         console.error('Failed to sync NCR:', error);
+        if (/auditee_response_files/.test(String(error && error.message))) {
+            window.showNotification('The NCR table has no column for auditee response files yet. Run migrations/ADD_NCR_AUDITEE_RESPONSE_FILES.sql in Supabase, then save the review again.', 'error');
+            return false;
+        }
         window.showNotification('Failed to sync NCR changes to database: ' + error.message, 'error');
+        return false;
     }
 }
 
@@ -1076,6 +1088,7 @@ function renderNCRTable(ncrs) {
                         <td style="white-space: nowrap;">
                             <button class="btn btn-sm btn-icon" data-action="viewNCRDetails" data-id="${ncr.id}" title="View details" aria-label="View"><i class="fa-solid fa-eye" style="color: var(--primary-color);"></i></button>
                             <button class="btn btn-sm btn-icon" data-action="editNCR" data-id="${ncr.id}" title="Edit" aria-label="Edit"><i class="fa-solid fa-pen-to-square" style="color: var(--primary-color);"></i></button>
+                            ${carButtonsHTML(ncr, 'icon')}
                             ${canAdd ? `<button class="btn btn-sm btn-icon" data-action="openAddCAPAModal" data-id="${ncr.id}" title="Add CAPA (correction, root cause, corrective action)" aria-label="Add CAPA"><i class="fa-solid fa-circle-plus" style="color: #10b981;"></i></button>` : ''}
                             ${canVerify ? `<button class="btn btn-sm btn-icon" data-action="verifyCAPA" data-id="${ncr.id}" title="Verify CAPA (Effective closes the NCR)" aria-label="Verify CAPA"><i class="fa-solid fa-circle-check" style="color: #3b82f6;"></i></button>` : ''}
                             <button class="btn btn-sm btn-icon" data-action="deleteNCR" data-id="${ncr.id}" title="Withdraw" aria-label="Withdraw"><i class="fa-solid fa-trash" style="color: #ef4444;"></i></button>
@@ -2206,6 +2219,38 @@ function resolveNCRContext(ncr) {
 }
 window.NCRModule.resolveNCRContext = resolveNCRContext;
 
+/**
+ * Download buttons for the Corrective Action Request (car-document.js).
+ * 'icon' for register rows, 'full' for the NCR dialogs. Major/Minor only:
+ * observations and OFIs need no corrective action.
+ */
+function carButtonsHTML(ncr, style) {
+    if (!ncr || ncr.id == null || ncr.id === '' || !isMajorMinorNCR(ncr)) return '';
+    const id = window.UTILS.escapeHtml(String(ncr.id));
+    if (style === 'icon') {
+        return `<button class="btn btn-sm btn-icon" data-action="printCAR" data-id="${id}" title="Corrective Action Request — PDF to send to the client" aria-label="CAR PDF"><i class="fa-solid fa-file-pdf" style="color: #b91c1c;"></i></button>`
+            + `<button class="btn btn-sm btn-icon" data-action="downloadCARWord" data-id="${id}" title="Corrective Action Request — Word, for the client to fill in" aria-label="CAR Word"><i class="fa-solid fa-file-word" style="color: #1d4ed8;"></i></button>`;
+    }
+    return `<div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">Corrective Action Request:</span>
+            <button type="button" class="btn btn-sm btn-secondary" data-action="printCAR" data-id="${id}"><i class="fa-solid fa-file-pdf" style="margin-right: 0.3rem; color: #b91c1c;"></i>PDF</button>
+            <button type="button" class="btn btn-sm btn-secondary" data-action="downloadCARWord" data-id="${id}"><i class="fa-solid fa-file-word" style="margin-right: 0.3rem; color: #1d4ed8;"></i>Word</button>
+        </div>`;
+}
+window.NCRModule.carButtonsHTML = carButtonsHTML;
+
+/** The auditee's returned CAR and evidence, as links that open a signed URL. */
+function responseFilesHTML(ncr) {
+    const files = Array.isArray(ncr && ncr.auditeeResponseFiles) ? ncr.auditeeResponseFiles : [];
+    if (!files.length) return '';
+    const esc = (s) => window.UTILS.escapeHtml(s == null ? '' : String(s));
+    return '<ul style="margin: 0.25rem 0 0; padding-left: 1.1rem;">' + files.map(f =>
+        `<li><a href="#" data-action="openStoredDocument" data-arg1="${esc(f.path)}"><i class="fa-solid fa-paperclip" style="margin-right: 0.3rem;"></i>${esc(f.name)}</a>`
+        + `<span style="color: var(--text-secondary); font-size: 0.8rem;"> — ${esc([f.uploadedBy, f.uploadedAt ? window.UTILS.formatDate(f.uploadedAt) : ''].filter(Boolean).join(', '))}</span></li>`
+    ).join('') + '</ul>';
+}
+window.NCRModule.responseFilesHTML = responseFilesHTML;
+
 window.viewNCRDetails = function (ncrId) {
     const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
     if (!ncr) return;
@@ -2229,6 +2274,8 @@ window.viewNCRDetails = function (ncrId) {
             <div><strong>Root Cause:</strong> ${window.UTILS.escapeHtml(ncr.rootCause || 'N/A')}</div>
             <div><strong>Corrective Action:</strong> ${window.UTILS.escapeHtml(ncr.correctiveAction || 'N/A')}</div>
             <div><strong>Verification:</strong> ${window.UTILS.escapeHtml(ncr.verificationMethod || 'N/A')}</div>
+            ${responseFilesHTML(ncr) ? `<div style="margin-top: 0.5rem;"><strong>Auditee response on file:</strong>${responseFilesHTML(ncr)}</div>` : ''}
+            ${carButtonsHTML(ncr, 'full') ? `<hr>${carButtonsHTML(ncr, 'full')}` : ''}
         </div>
     `;
     document.getElementById('modal-save').style.display = 'none';
@@ -2783,6 +2830,41 @@ function applyPreviousNCRReview(ncr, input, ctx) {
     return { ok: true };
 }
 window.NCRModule.applyPreviousNCRReview = applyPreviousNCRReview;
+
+// The auditee's returned CAR and its evidence. Stored in the private
+// 'documents' bucket (opened through short-lived signed URLs only) under
+// ncr-responses/<client>/<ncr>/, and listed on the record in
+// auditeeResponseFiles (audit_ncrs.auditee_response_files,
+// migrations/ADD_NCR_AUDITEE_RESPONSE_FILES.sql).
+const NCR_RESPONSE_MAX_BYTES = 10 * 1024 * 1024;
+const NCR_RESPONSE_EXT = /\.(pdf|docx?|xlsx?|png|jpe?g)$/i;
+
+/** First problem with the chosen files, or '' when they can be uploaded. */
+function checkResponseFiles(files) {
+    for (const f of files || []) {
+        if (!NCR_RESPONSE_EXT.test(String(f.name || ''))) return `${f.name}: only PDF, Word, Excel, PNG or JPEG files can be attached.`;
+        if (f.size > NCR_RESPONSE_MAX_BYTES) return `${f.name} is larger than 10 MB.`;
+    }
+    return '';
+}
+
+async function uploadAuditeeResponseFiles(ncr, files, ctx) {
+    if (!files || !files.length) return [];
+    const supa = window.SupabaseClient;
+    if (!supa || !supa.isInitialized || !supa.client) throw new Error('files can only be uploaded while connected to the cloud');
+    const seg = (v) => String(v == null || v === '' ? 'unassigned' : v).replace(/[^a-zA-Z0-9-]/g, '_');
+    const out = [];
+    for (const file of files) {
+        const safeName = String(file.name || 'file').replace(/[^a-zA-Z0-9.-]/g, '_');
+        const path = `ncr-responses/${seg(ncr.clientId)}/${seg(ncr.id)}/${Date.now()}_${safeName}`;
+        const { data, error } = await supa.client.storage.from('documents').upload(path, file, { cacheControl: '3600', upsert: false });
+        if (error) throw new Error(`${file.name}: ${error.message || 'upload failed'}`);
+        out.push({ name: file.name, path: (data && data.path) || path, size: file.size, type: file.type || null, uploadedAt: (ctx && ctx.today) || null, uploadedBy: (ctx && ctx.by) || null });
+    }
+    return out;
+}
+window.NCRModule.checkResponseFiles = checkResponseFiles;
+window.NCRModule.uploadAuditeeResponseFiles = uploadAuditeeResponseFiles;
 window.NCRModule.PREV_REVIEW_OUTCOMES = PREV_REVIEW_OUTCOMES;
 
 window.reviewPreviousNCR = function (ncrId) {
@@ -2812,7 +2894,11 @@ window.reviewPreviousNCR = function (ncrId) {
                 <div style="font-size: 0.8rem; color: var(--text-secondary);">${esc(resolveAuditRef(ncr))}</div>
                 <div style="margin-top: 0.35rem;">${esc(ncr.description || '')}</div>
             </div>
+            <div style="margin-bottom: 1rem;">${carButtonsHTML(ncr, 'full')}</div>
             <h4 style="font-size: 0.95rem; margin: 0 0 0.5rem;">What the organisation did</h4>
+            <div class="form-group"><label>Auditee response <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.8rem;">(the returned CAR and its evidence — PDF, Word, Excel or images, up to 10 MB each)</span></label>
+                ${responseFilesHTML(ncr)}
+                <input type="file" id="prev-review-files" class="form-control" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" style="margin-top: 0.35rem;"></div>
             <div class="form-group"><label>Correction</label>
                 <small style="display: block; color: var(--text-secondary); margin-bottom: 0.25rem;">The immediate fix to this nonconformity. Write N/A if none was possible.</small>
                 <textarea id="prev-review-correction" class="form-control" rows="2">${esc(ncr.correction)}</textarea></div>
@@ -2838,7 +2924,11 @@ window.reviewPreviousNCR = function (ncrId) {
     save.onclick = async () => {
         const val = (id) => (document.getElementById(id) || {}).value || '';
         const picked = document.querySelector('input[name="prev-review-outcome"]:checked');
-        const res = applyPreviousNCRReview(ncr, {
+        const showError = (msg) => {
+            const err = document.getElementById('prev-review-error');
+            if (err) { err.textContent = msg; err.style.display = 'block'; }
+        };
+        const input = {
             outcome: picked ? picked.value : '',
             correction: val('prev-review-correction'),
             rootCause: val('prev-review-rootcause'),
@@ -2846,13 +2936,34 @@ window.reviewPreviousNCR = function (ncrId) {
             implementedDate: val('prev-review-implemented'),
             evidence: val('prev-review-evidence'),
             targetDate: val('prev-review-target')
-        }, { by: (window.state.currentUser && window.state.currentUser.name) || 'Auditor', today: new Date().toISOString().split('T')[0] });
-        if (!res.ok) {
-            const err = document.getElementById('prev-review-error');
-            if (err) { err.textContent = res.error; err.style.display = 'block'; }
-            return;
+        };
+        const by = (window.state.currentUser && window.state.currentUser.name) || 'Auditor';
+        const ctx = { by, today: new Date().toISOString().split('T')[0] };
+        // Check the review on a copy first: nothing is uploaded for a review
+        // that cannot be saved.
+        const check = applyPreviousNCRReview(Object.assign({}, ncr), input, ctx);
+        if (!check.ok) { showError(check.error); return; }
+        const fileInput = document.getElementById('prev-review-files');
+        const files = Array.from((fileInput && fileInput.files) || []);
+        const fileProblem = checkResponseFiles(files);
+        if (fileProblem) { showError(fileProblem); return; }
+        let uploaded = [];
+        if (files.length) {
+            save.disabled = true;
+            try {
+                uploaded = await uploadAuditeeResponseFiles(ncr, files, ctx);
+            } catch (e) {
+                save.disabled = false;
+                showError('Upload failed — ' + e.message + '. Nothing was saved.');
+                return;
+            }
+            save.disabled = false;
         }
-        await persistNCR(ncr);
+        applyPreviousNCRReview(ncr, input, ctx);
+        if (uploaded.length) ncr.auditeeResponseFiles = (Array.isArray(ncr.auditeeResponseFiles) ? ncr.auditeeResponseFiles : []).concat(uploaded);
+        // false = the database refused it (persistNCR has said why); keep the
+        // dialog open rather than report a review that was not saved.
+        if (await persistNCR(ncr) === false) return;
         window.closeModal();
         window.showNotification(ref + ' reviewed: ' + (ncr.status === 'Closed' ? 'closed' : ncr.carStatus === 'Ineffective' ? 'not effective' : 'still open') + '.', ncr.status === 'Closed' ? 'success' : 'warning');
         refreshNCRViews();

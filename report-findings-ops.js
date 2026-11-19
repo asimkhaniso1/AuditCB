@@ -196,13 +196,32 @@
     // Build a clause -> [capa records] index for fast per-finding lookup.
     function buildCapaIndex(d) {
         var idx = {};
+        // The record raised from a given checklist question, keyed
+        // "<checklistId>|<itemIdx>". Non-enumerable so clause lookups and
+        // callers iterating the index are unaffected.
+        var bySource = {};
+        Object.defineProperty(idx, 'bySource', { value: bySource, enumerable: false });
         linkedCapaRecordsLocal(d).forEach(function (rec) {
-            if (!rec || !rec.clause) return;
+            if (!rec) return;
+            if (rec.sourceChecklistId != null && rec.sourceItemIdx != null) {
+                bySource[String(rec.sourceChecklistId) + '|' + String(rec.sourceItemIdx)] = rec;
+            }
+            if (!rec.clause) return;
             var key = String(rec.clause).trim();
             if (!idx[key]) idx[key] = [];
             idx[key].push(rec);
         });
         return idx;
+    }
+
+    /** The register record for a checklist finding: its own record first, else the clause's newest. */
+    function capaForItem(capaIndex, item) {
+        var src = capaIndex && capaIndex.bySource;
+        if (src && item && item.checklistId != null && item.itemIdx != null) {
+            var own = src[String(item.checklistId) + '|' + String(item.itemIdx)];
+            if (own) return own;
+        }
+        return bestCapaFor(capaIndex, item && item.clause);
     }
 
     // Pick the most relevant CAPA record for a given clause (most recently raised).
@@ -570,13 +589,21 @@
     }
 
     function buildOneCarForm(d, item, index, capaIndex) {
-        var carNo = 'CAR-' + String(index + 1).padStart(2, '0');
-        var capa = bestCapaFor(capaIndex, item.clause);
+        var capa = capaForItem(capaIndex, item);
+        // The register number the client quotes back; CAR-nn only when this
+        // finding has no register record yet.
+        var carNo = capa && capa.id != null && capa.id !== '' ? 'NCR-' + String(capa.id).padStart(3, '0') : 'CAR-' + String(index + 1).padStart(2, '0');
         var classification = String(item.ncrType || '').toLowerCase() === 'major' ? 'Major' : 'Minor';
         var reportRef = (d && d.report && (d.report.reportNumber || d.report.id)) || '—';
         var reportDate = fmtDate(d && d.report && d.report.date);
+        var cb = (d && d.cbSettings) || {};
+        var cbName = cb.cbName || ((cb.cbSites || [])[0] || {}).name || cb.name || 'Certification Body';
+        // Name only, no logo: these pages sit inside the report, whose cover
+        // already carries it, and a logo per CAR page inflated the PDF.
         var header = '<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px;">'
-            + '<div style="display:flex;align-items:center;gap:12px;"><div><div style="font-size:16px;font-weight:800;letter-spacing:0.5px;">AUDIT360 — CORRECTIVE ACTION REQUEST</div>'
+            + '<div style="display:flex;align-items:center;gap:12px;">'
+            + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--b4-muted,#666);">' + esc(cbName) + '</div>'
+            + '<div style="font-size:16px;font-weight:800;letter-spacing:0.5px;">CORRECTIVE ACTION REQUEST</div>'
             + '<div style="font-size:11px;color:var(--b4-muted,#666);">Report ' + esc(String(reportRef)) + ' · ' + reportDate + '</div></div></div>'
             + '<div style="text-align:right;"><div style="font-weight:700;">' + esc(carNo) + '</div>' + badge(classification, classification === 'Major' ? 'bad' : 'warn') + '</div>'
             + '</div>';
