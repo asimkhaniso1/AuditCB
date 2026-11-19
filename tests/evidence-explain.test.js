@@ -139,6 +139,84 @@ describe('the reply is checked before anyone sees it', () => {
     });
 });
 
+// Fixes from the phase 1 pilot (prompt ev2).
+describe('pilot fixes', () => {
+    const access = { clause: 'A.5.18', question: 'Verify access was removed on the leaving date and the periodic access review was performed.', requirements: [], remark: 'Q3 review seen', images: [{ evId: 'EV-12', src: 'https://x/review.png' }, { evId: 'EV-13', src: 'https://x/leavers.png' }] };
+    const run = async (input, obj) => { AI.callProxyAPI = vi.fn(async () => reply(obj)); return AI.explainEvidence(input); };
+
+    it('the prompt asks for every cited figure to be quoted, one-line descriptions and a check per part', async () => {
+        const out = await run(access, { images: [], checks: [], explanation: 'x.', suggestedAssessment: 'supports' });
+        const prompt = AI.callProxyAPI.mock.calls[0][0];
+        expect(prompt).toMatch(/EVERY document name or number, date, figure, person or system name you mention/);
+        expect(prompt).toMatch(/ONE short sentence/);
+        expect(prompt).toMatch(/"differs"/);
+        expect(prompt).toMatch(/Never take a title or any wording from the question to describe an unreadable image/);
+        expect(out.promptVersion).toBe('ev2');
+    });
+
+    it('a sentence is not cut at an initial ("M. Chen")', async () => {
+        const out = await run(access, {
+            images: [{ evId: 'EV-12', shows: 'An access review approved by M. Chen on 02-Oct-2026.', visibleText: ['Approved: M. Chen, 02-Oct-2026'], relevance: 'relevant' }],
+            checks: [], explanation: 'Image 1 was approved by M. Chen on 02-Oct-2026.', suggestedAssessment: 'partially_supports'
+        });
+        expect(out.result.explanation).toBe('Image 1 was approved by M. Chen on 02-Oct-2026.');
+        expect(out.result.images[0].shows).toBe('An access review approved by M. Chen on 02-Oct-2026.');
+        expect(out.flags.filter((f) => /EV-12|Explanation/.test(f))).toEqual([]);
+    });
+
+    it('nothing is read from an unreadable image, even a title it "quoted"', async () => {
+        const out = await run(access, {
+            images: [{ evId: 'EV-12', shows: 'A table titled Event Log.', visibleText: ['Event Log'], relevance: 'unreadable' }],
+            checks: [], explanation: 'Image 1 is an Event Log.', suggestedAssessment: 'cannot_determine'
+        });
+        expect(out.result.images[0]).toEqual({ evId: 'EV-12', shows: 'Text not legible.', visibleText: [], relevance: 'unreadable' });
+    });
+
+    it('a description is cut to one sentence', async () => {
+        const out = await run(access, {
+            images: [{ evId: 'EV-12', shows: 'A quarterly access review list. It has four users. Two are retained.', visibleText: [], relevance: 'relevant' }],
+            checks: [], explanation: 'x.', suggestedAssessment: 'supports'
+        });
+        expect(out.result.images[0].shows).toBe('A quarterly access review list.');
+    });
+
+    it('gaps and differences come from the per-part checks, so they never contradict them', async () => {
+        const out = await run(access, {
+            images: [{ evId: 'EV-13', shows: 'A leavers report.', visibleText: ['T. Brown', '22-Aug-2026', '25-Aug-2026'], relevance: 'relevant' }],
+            checks: [
+                { part: 'Periodic access review performed', finding: 'shown', evidence: 'Image 1 review list' },
+                { part: 'Access removed on the leaving date', finding: 'differs', evidence: 'Image 2: T. Brown left 22-Aug-2026, account disabled 25-Aug-2026' },
+                { part: 'Privileged accounts justified', finding: 'not_shown', evidence: '' },
+                { part: 'Role approval for joiners', finding: 'probably', evidence: '' }
+            ],
+            explanation: 'Image 2 shows T. Brown\'s account was disabled on 25-Aug-2026, after leaving on 22-Aug-2026.',
+            suggestedAssessment: 'partially_supports'
+        });
+        expect(out.result.checks.map((c) => c.finding)).toEqual(['shown', 'differs', 'not_shown', 'not_shown']);
+        expect(out.result.gaps).toEqual(['Privileged accounts justified', 'Role approval for joiners']);
+        expect(out.result.differences).toEqual(['Access removed on the leaving date: Image 2: T. Brown left 22-Aug-2026, account disabled 25-Aug-2026']);
+        expect(out.result.explanation).toContain('25-Aug-2026');
+    });
+
+    it('a check citing an unquoted date is removed and flagged for checking against the screenshot', async () => {
+        const out = await run(access, {
+            images: [{ evId: 'EV-13', shows: 'A leavers report.', visibleText: ['T. Brown'], relevance: 'relevant' }],
+            checks: [{ part: 'Access removed on the leaving date', finding: 'differs', evidence: 'Image 2: disabled 25-Aug-2026' }],
+            explanation: 'Image 2 lists leavers.', suggestedAssessment: 'partially_supports'
+        });
+        expect(out.result.checks[0].evidence).toBe('');
+        expect(out.flags.join(' ')).toMatch(/Check it against the screenshot/);
+    });
+
+    it('a remark alone never yields "supports"', async () => {
+        const out = await run({ clause: '9.3', question: 'Verify management reviews were held.', requirements: [], remark: 'March minutes reviewed', images: [] },
+            { images: [], checks: [], explanation: 'The auditor reviewed the March minutes.', suggestedAssessment: 'supports', assessmentReason: 'Minutes reviewed.' });
+        expect(out.result.suggestedAssessment).toBe('cannot_determine');
+        expect(out.result.basis).toBe('remark_only');
+        expect(out.result.assessmentReason).toMatch(/No screenshot is attached/);
+    });
+});
+
 describe('caching', () => {
     const input = { clause: 'A.5.18', question: 'Q', requirements: [], remark: 'seen', images: [{ evId: 'EV-1', src: 'https://x/a.png' }] };
 
