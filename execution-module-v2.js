@@ -1745,7 +1745,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (!reqText && item.requirement && !isBadValue(item.requirement)) reqText = item.requirement;
 
                 // KB Lookup: Get actual ISO Standard requirement text from Knowledge Base
-                const kbMatch = window.KB_HELPERS.lookupKBRequirement(clauseText, report.standard);
+                // From the finding's own standard on an integrated report.
+                const kbMatch = (typeof window._kbRequirementFor === 'function')
+                    ? window._kbRequirementFor({ clause: clauseText, criterionRef: item.criterionRef }, report.standard)
+                    : window.KB_HELPERS.lookupKBRequirement(clauseText, report.standard);
 
                 allFindings.push({
                     id: `checklist-${originalIdx}`,

@@ -445,8 +445,15 @@
         if (fc && fc.kind === 'unverified') {
             return '<div>' + esc(real) + '</div>';
         }
-        const stdPrefix = standard ? esc(standard) + ' — ' : '';
-        return '<div>' + stdPrefix + 'Clause ' + esc(real) + '</div>';
+        // An integrated report passes all its standards; name only the one
+        // this finding belongs to, or none when that isn't recorded.
+        const own = (window.ReportStats && typeof window.ReportStats.resolveFindingStandard === 'function')
+            ? window.ReportStats.resolveFindingStandard(finding, standard).standard
+            : standard;
+        const stdPrefix = own ? esc(own) + ' — ' : '';
+        // With the standard named, its tag ("8.2.2 (22301)") would say it twice.
+        const shown = own ? String(real).replace(/\s*\(\s*(?:ISO(?:\/IEC)?\s*)?\d{4,5}(?:[-:]\d+)?\s*\)/i, '') : real;
+        return '<div>' + stdPrefix + 'Clause ' + esc(shown) + '</div>';
     };
     window._formalCriterionCell = formalCriterionCell;
 
@@ -810,6 +817,18 @@
         } catch (_e) { return false; }
     };
 
+    // The Knowledge Base requirement for a finding, from its own standard.
+    function kbRequirementFor(finding, reportStandard) {
+        const KB = window.KB_HELPERS;
+        if (!KB || typeof KB.lookupKBRequirement !== 'function') return null;
+        const ref = (finding.criterionRef || finding.clause || '').toString();
+        const RS = window.ReportStats;
+        if (!RS || typeof RS.resolveFindingStandard !== 'function') return KB.lookupKBRequirement(ref, reportStandard);
+        const own = RS.resolveFindingStandard(finding, reportStandard).standard;
+        return own ? KB.lookupKBRequirement(ref, own) : null;
+    }
+    window._kbRequirementFor = kbRequirementFor;
+
     window.generateAuditReport = async function (reportId) {
         const report = window.DataService.findAuditReport(reportId);
         if (!report) {
@@ -829,8 +848,11 @@
                 if (resolved.reqText) requirement = resolved.reqText;
             }
 
-            // ALWAYS look up KB standard requirement (not just as fallback)
-            const kbMatch = window.KB_HELPERS.lookupKBRequirement(clause, report.standard);
+            // The requirement comes from the finding's own standard. An
+            // integrated report used to look every clause up in one standard
+            // (27001's "risk assessment" printed beside a 22301 BIA finding);
+            // with no single standard recorded, the question's own text stands.
+            const kbMatch = kbRequirementFor({ clause, criterionRef: item.criterionRef }, report.standard);
 
             return {
                 ...item,

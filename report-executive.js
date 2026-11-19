@@ -581,7 +581,23 @@ ${data.forwardOutlook ? `
         const last = parts.pop();
         const countsText = parts.length ? parts.join(', ') + ' and ' + last : last;
 
-        let sentence = `The audit assessed ${total} checklist item${total === 1 ? '' : 's'} within the sampled scope: ${countsText}.`;
+        // Assessed and applicable are different numbers once anything is left
+        // unanswered or not sampled: "assessed 109" was printed for 69 of 109
+        // (PC Connection draft, 2026-11-19). Both come from ReportStats.
+        let inputs = null;
+        try {
+            if (window.ReportStats && typeof window.ReportStats.build === 'function') {
+                const ds = window.ReportStats.build(d || {});
+                if (ds && ds.coverageInputs && ds.coverageInputs.applicable) inputs = ds.coverageInputs;
+            }
+        } catch (_e) { inputs = null; }
+        if (inputs && inputs.assessed < inputs.applicable) {
+            const a = inputs.assessed;
+            const p = inputs.applicable;
+            return `Of ${p} applicable checklist item${p === 1 ? '' : 's'}, ${a} ${a === 1 ? 'was' : 'were'} assessed within the sampled scope: ${countsText}.`
+                + (coveragePct != null ? ` Audit coverage across applicable items was ${coveragePct}%.` : '');
+        }
+        let sentence = `The audit assessed ${inputs ? inputs.assessed : total} checklist item${(inputs ? inputs.assessed : total) === 1 ? '' : 's'} within the sampled scope: ${countsText}.`;
         if (coveragePct != null && coveragePct < 100) {
             // computeCoveragePct is items-assessed/applicable — the canonical
             // "Audit Coverage" metric (window.ReportStats.build().coveragePct).
@@ -665,12 +681,16 @@ ${data.forwardOutlook ? `
         const conclusion = buildFactualConclusion(d, stats);
 
         let strengths = dedupeCap(data.strengths, 3).map(s => truncate(cleanFindingText(s, 140), 140));
-        if (!strengths.length) strengths = ['No specific strengths were separately highlighted during this surveillance audit.'];
+        if (!strengths.length) strengths = ['No specific strengths were separately highlighted during this audit.'];
 
         let findings = buildKeyFindingsSummary(d, stats);
         if (!findings.length) findings = ['No nonconformities were identified during this audit.'];
 
-        const previousFindingsStatus = (report.previousFindingsStatus && String(report.previousFindingsStatus).trim()) || '—';
+        // Same source as the facts table on page 3 (an auditor's entry wins,
+        // otherwise derived from the previous audit), never a bare dash.
+        const previousFindingsStatus = (typeof window._derivePreviousFindingsStatus === 'function')
+            ? window._derivePreviousFindingsStatus(d)
+            : ((report.previousFindingsStatus && String(report.previousFindingsStatus).trim()) || '—');
 
         const correctiveAction = buildCorrectiveActionText(stats);
 
