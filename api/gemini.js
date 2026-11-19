@@ -189,10 +189,12 @@ export default async function handler(req, res) {
             totalTokenCount: 0
         };
 
-        // Return data with usage metadata at top level for easy access
+        // Return data with usage metadata at top level for easy access, and the
+        // model actually called (callers send a legacy name the map resolves).
         return res.status(200).json({
             ...data,
-            usage: usageMetadata
+            usage: usageMetadata,
+            model: resolveModel(body.model)
         });
 
     } catch (error) {

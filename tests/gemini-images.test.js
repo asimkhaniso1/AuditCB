@@ -66,6 +66,7 @@ describe('the proxy request', () => {
         expect(r.code).toBe(200);
         expect(sent.contents[0].parts).toEqual([{ text: 'Explain.' }, { inline_data: { mime_type: 'image/jpeg', data: 'QUJD' } }]);
         expect(sent.generationConfig.responseMimeType).toBe('application/json');
+        expect(r.body.model).toBe('gemini-2.5-flash-lite');
         expect(r.body.usage.promptTokensDetails).toEqual([{ modality: 'TEXT', tokenCount: 300 }, { modality: 'IMAGE', tokenCount: 1000 }]);
     });
 

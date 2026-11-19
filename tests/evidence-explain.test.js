@@ -217,6 +217,32 @@ describe('pilot fixes', () => {
     });
 });
 
+// Model choice after the pilot (user decision 2026-11-19): Gemini 2.5 Flash,
+// by the legacy name the proxy maps to it, with no silent fall back to Lite.
+describe('model', () => {
+    const input = { clause: 'A.5.18', question: 'Q', requirements: [], remark: 'seen', images: [{ evId: 'EV-1', src: 'https://x/a.png' }] };
+
+    it('asks for 2.5 Flash only, with room for its thinking tokens, and records the model used', async () => {
+        AI.callProxyAPI = vi.fn(async () => Object.assign(reply({ images: [], checks: [], explanation: 'x.', suggestedAssessment: 'supports' }), { model: 'gemini-2.5-flash' }));
+        const out = await AI.explainEvidence(input);
+        const opts = AI.callProxyAPI.mock.calls[0][1];
+        expect(opts.models).toEqual(['gemini-2.0-flash-lite']);
+        expect(opts.maxTokens).toBe(8192);
+        expect(out.model).toBe('gemini-2.5-flash');
+    });
+
+    it('a check that only repeats the whole question is dropped', async () => {
+        AI.callProxyAPI = vi.fn(async () => reply({ images: [], explanation: 'x.', suggestedAssessment: 'insufficient', checks: [
+            { part: 'Verify access was removed on the leaving date and the review was performed.', finding: 'not_shown' },
+            { part: 'Access removed on the leaving date', finding: 'shown' },
+            { part: 'Review performed', finding: 'not_shown' }
+        ] }));
+        const out = await AI.explainEvidence(Object.assign({}, input, { question: 'Verify access was removed on the leaving date and the review was performed.' }));
+        expect(out.result.checks.map((c) => c.part)).toEqual(['Access removed on the leaving date', 'Review performed']);
+        expect(out.result.gaps).toEqual(['Review performed']);
+    });
+});
+
 describe('caching', () => {
     const input = { clause: 'A.5.18', question: 'Q', requirements: [], remark: 'seen', images: [{ evId: 'EV-1', src: 'https://x/a.png' }] };
 
@@ -261,6 +287,27 @@ describe('callProxyAPI options', () => {
         expect(body).toMatchObject({ prompt: 'p', json: true, temperature: 0.1, images: [{ mimeType: 'image/jpeg', data: 'QUJD' }] });
         expect(out).toMatchObject({ text: '{"a":1}', usage: { promptTokenCount: 10 } });
         expect(window.APIUsageTracker.logUsage).toHaveBeenCalledWith(expect.objectContaining({ feature: 'evidence-explanation', inputTokens: 10, outputTokens: 5 }));
+        delete globalThis.fetch;
+    });
+
+    it('a caller-named model list is the only one tried: no silent downgrade', async () => {
+        loadScript('./ai-service.js', { params: { module: undefined } });
+        const A = window.AI_SERVICE;
+        A.proxyHeaders = async () => ({ 'Content-Type': 'application/json' });
+        const asked = [];
+        globalThis.fetch = vi.fn(async (url, opts) => { asked.push(JSON.parse(opts.body).model); return { ok: false, status: 500, statusText: 'x', text: async () => '{"error":"AI model request failed"}' }; });
+        await expect(A.callProxyAPI('p', { images: [{ mimeType: 'image/jpeg', data: 'QUJD' }], models: ['gemini-2.0-flash-lite'] })).rejects.toThrow();
+        expect(asked).toEqual(['gemini-2.0-flash-lite']);
+        delete globalThis.fetch;
+    });
+
+    it('returns the model the proxy reports it used', async () => {
+        loadScript('./ai-service.js', { params: { module: undefined } });
+        const A = window.AI_SERVICE;
+        A.proxyHeaders = async () => ({ 'Content-Type': 'application/json' });
+        globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{}' }] }, finishReason: 'STOP' }], usage: {}, model: 'gemini-2.5-flash' }) }));
+        const out = await A.callProxyAPI('p', { withUsage: true, models: ['gemini-2.0-flash-lite'] });
+        expect(out.model).toBe('gemini-2.5-flash');
         delete globalThis.fetch;
     });
 });
