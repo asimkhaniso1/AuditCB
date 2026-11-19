@@ -36,6 +36,19 @@ describe('a row with no written remark', () => {
     });
 });
 
+describe('"AI Auto-Classify & Polish" is gone', () => {
+    // It classified nothing, wrote AI text over the checklist remark with no
+    // original kept, and saved the whole checklist around the stale-tab guard.
+    it('has no button on the review tab and no handler', async () => {
+        const fs = await import('fs');
+        const src = fs.readFileSync('execution-module-v2.js', 'utf8');
+        expect(src).not.toContain('btn-ai-classify');
+        expect(src).not.toContain('data-action="runFollowUpAIAnalysis"');
+        expect(window.runFollowUpAIAnalysis).toBeUndefined();
+        expect(typeof window.polishNotesWithAI).toBe('function');
+    });
+});
+
 describe('Polish Notes with AI', () => {
     beforeEach(() => {
         window.state = { auditReports: [], clients: [], auditPlans: [] };

@@ -31,7 +31,7 @@
 //                          auditStatus, statusColor, recommendation, recColor}
 //
 // AI WRAPPER REUSED: window.AI_SERVICE.callProxyAPI(prompt, options) — the exact same low-level call used by
-// polishNotesWithAI / runFollowUpAIAnalysis / polishSingleNote / draftExecutiveSummary in ai-service.js and
+// polishNotesWithAI / polishSingleNote / draftExecutiveSummary in ai-service.js and
 // execution-reporting.js. It POSTs to /api/gemini (server-side Gemini proxy, model fallback list built in),
 // with a direct-Gemini fallback using a client-stored key (window.state.settings.geminiApiKey /
 // localStorage 'geminiApiKey') if the proxy is unreachable. We call it exactly the same way (raw prompt
