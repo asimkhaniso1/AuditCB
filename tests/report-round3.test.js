@@ -6,7 +6,7 @@
 //  3. "Unassigned / Cross-functional" was printed as if it were a department;
 //  4. previous NCs printed internal FOCUS refs and "previous record not
 //     available" while their NCR register records existed.
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { loadScript } from './helpers/load-script.js';
 import fs from 'fs';
 
@@ -74,7 +74,12 @@ describe('2. Closing meeting', () => {
             today: '19/11/2026'
         };
         window.DataService = { syncAuditReport: () => {} };
+        // The preview starts a 300 ms chart timer; one left pending fires after
+        // the test environment is gone ("window is not defined", flaky CI).
+        vi.useFakeTimers();
         window.showReportPreviewModal();
+        vi.clearAllTimers();
+        vi.useRealTimers();
         const box = document.getElementById('rp-unresolved');
         expect(box.textContent).toBe('');
         expect(box.getAttribute('data-placeholder')).toMatch(/unresolved issues or diverging opinions/);
