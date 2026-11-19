@@ -541,6 +541,12 @@ function _introducedNumericTokens(raw, proposed) {
 const EVIDENCE_PROMPT_VERSION = 'ev2';
 const EVIDENCE_MAX_QUOTES = 20;
 const EVIDENCE_CHECK_FINDINGS = ['shown', 'partly_shown', 'not_shown', 'differs'];
+// Gemini 2.5 Flash, by the legacy name /api/gemini maps to it. In the pilot
+// the default (2.5 Flash-Lite) called a late account removal "matching" and
+// missed columns a register showed; 2.5 Flash got every comparison right
+// (about $0.30 an audit against $0.02; user decision 2026-11-19). Only this
+// model is tried: a silent fall back to Lite would hide the quality drop.
+const EVIDENCE_MODEL = 'gemini-2.0-flash-lite';
 const EVIDENCE_IMAGE_MAX_PX = 1280;
 const EVIDENCE_IMAGE_QUALITY = 0.7;
 const EVIDENCE_MAX_IMAGES = 6;
@@ -991,7 +997,15 @@ Return a raw JSON array with 'id' and 'text' fields only:
             if (!part) return null;
             const finding = EVIDENCE_CHECK_FINDINGS.indexOf(c && c.finding) !== -1 ? c.finding : 'not_shown';
             return { part, finding, evidence: _evidenceClean(String((c && c.evidence) || ''), source, 'Check', flags) };
-        }).filter(Boolean).slice(0, 12);
+        }).filter(Boolean).filter((c, n, all) => {
+            // A "part" that is just the whole question again adds nothing
+            // and turned the entire question into one gap (pilot ev2).
+            if (all.length < 2) return true;
+            const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+            const part = norm(c.part);
+            const question = norm(i.question);
+            return !(question && part.length >= question.length * 0.8 && (question.indexOf(part) !== -1 || part.indexOf(question) !== -1));
+        }).slice(0, 12);
         const gaps = checks.filter((c) => c.finding === 'not_shown' || c.finding === 'partly_shown').map((c) => c.part + (c.finding === 'partly_shown' ? ' (partly shown)' : ''));
         const differences = checks.filter((c) => c.finding === 'differs').map((c) => c.part + (c.evidence ? ': ' + c.evidence : ''));
         let assessment = EVIDENCE_ASSESSMENTS.indexOf(p.suggestedAssessment) !== -1 ? p.suggestedAssessment : 'cannot_determine';
@@ -1016,7 +1030,7 @@ Return a raw JSON array with 'id' and 'text' fields only:
      */
     explainEvidence: async (input, opts = {}) => {
         const o = opts || {};
-        const inputHash = _evidenceInputHash(input, EVIDENCE_PROMPT_VERSION);
+        const inputHash = _evidenceInputHash(input, EVIDENCE_MODEL);
         const cached = o.cached;
         if (cached && cached.inputHash === inputHash && cached.status !== 'rejected' && !o.force) {
             return Object.assign({}, cached, { fromCache: true });
@@ -1032,7 +1046,9 @@ Return a raw JSON array with 'id' and 'text' fields only:
             json: true,
             withUsage: true,
             feature: 'evidence-explanation',
-            maxTokens: 4096,
+            models: [EVIDENCE_MODEL],
+            // Thinking tokens count against this limit on 2.5 Flash.
+            maxTokens: 8192,
             temperature: 0.1
         });
         const latencyMs = Date.now() - started;
@@ -1891,7 +1907,9 @@ Example:
     // Call Vercel Serverless Function with Fallback Logic
     callProxyAPI: async (prompt, options = {}) => {
         // Model fallback list — use current, supported models only
-        const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+        // options.models: a caller that needs a particular model (evidence
+        // explanation) names its own list and gets no silent downgrade.
+        const models = Array.isArray(options.models) && options.models.length ? options.models : ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
         let lastError;
         let proxyFailed = false;
         const maxTokens = options.maxTokens || 32768;
@@ -1956,7 +1974,7 @@ Example:
                 }
 
                 const text = AI_SERVICE.extractTextFromResponse(data);
-                return options.withUsage ? { text, usage: data.usage || {}, model } : text;
+                return options.withUsage ? { text, usage: data.usage || {}, model: data.model || model } : text;
 
             } catch (error) {
                 if (error.authRequired) throw error;
