@@ -2169,16 +2169,55 @@ async function saveNewNCR() {
 // HOWEVER, updateCAPAProgress and verifyCAPA call persistNCR, which I fixed above.
 // EDIT NCR needs to be checked.
 
+/**
+ * The standard and requirement text behind a register record, for display.
+ * Older records were saved without `standard`, so fall back to the audit
+ * plan's, then the client's. The requirement is the checklist question the
+ * record was raised from (sourceChecklistId/sourceItemIdx), with any plan
+ * override applied; '' when the record has no source question.
+ */
+function resolveNCRContext(ncr) {
+    const s = window.state || {};
+    const str = (v) => (v == null ? '' : String(v)).trim();
+    const plan = (s.auditPlans || []).find(p => p && ncr && String(p.id) === String(ncr.auditId)) || null;
+    const client = (s.clients || []).find(c => c && ncr && (String(c.id) === String(ncr.clientId) || (ncr.clientName && c.name === ncr.clientName))) || null;
+    const standard = str(ncr && ncr.standard) || str(plan && plan.standard) || str(client && client.standard);
+
+    let requirement = '';
+    const clId = ncr && ncr.sourceChecklistId;
+    const idx = str(ncr && ncr.sourceItemIdx);
+    if (clId != null && idx) {
+        const override = plan && plan.selectedChecklistOverrides && plan.selectedChecklistOverrides[clId] && plan.selectedChecklistOverrides[clId][idx];
+        const cl = (s.checklists || []).find(c => c && String(c.id) === String(clId));
+        let item = null;
+        if (cl) {
+            const m = /^(.+)-(\d+)$/.exec(idx);
+            if (m && Array.isArray(cl.clauses) && cl.clauses.length) {
+                const main = cl.clauses.find(c => c && String(c.mainClause) === m[1]);
+                item = main && Array.isArray(main.subClauses) ? main.subClauses[Number(m[2])] : null;
+            } else if (/^\d+$/.test(idx) && Array.isArray(cl.items)) {
+                item = cl.items[Number(idx)];
+            }
+        }
+        const nested = item && Array.isArray(item.items) && item.items[0] ? (item.items[0].requirement || item.items[0].text || item.items[0].title) : '';
+        requirement = str(override) || str(item && (item.requirement || item.text || item.title || item.requirement_text)) || str(nested);
+    }
+    return { standard, requirement };
+}
+window.NCRModule.resolveNCRContext = resolveNCRContext;
+
 window.viewNCRDetails = function (ncrId) {
     const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
     if (!ncr) return;
+    const ctx = resolveNCRContext(ncr);
 
     document.getElementById('modal-title').textContent = `NCR Details`;
     document.getElementById('modal-body').innerHTML = `
         <div style="padding: 1rem;">
             <h4>${window.UTILS.escapeHtml(ncr.description)}</h4>
+            ${ctx.requirement ? `<div style="margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: #f8fafc; border-left: 3px solid var(--primary-color); border-radius: 4px;"><strong>Requirement:</strong> ${window.UTILS.escapeHtml(ctx.requirement)}</div>` : ''}
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-                <div><strong>Standard:</strong> ${window.UTILS.escapeHtml(ncr.standard)}</div>
+                <div><strong>Standard:</strong> ${window.UTILS.escapeHtml(ctx.standard || '-')}</div>
                 <div><strong>Clause:</strong> ${window.UTILS.escapeHtml(resolveClauseDisplay(ncr).text)}</div>
                 <div><strong>Severity:</strong> ${window.UTILS.escapeHtml(ncr.severity)}</div>
                 <div><strong>Status:</strong> ${window.UTILS.escapeHtml(ncr.status)}</div>
@@ -2186,6 +2225,7 @@ window.viewNCRDetails = function (ncrId) {
             </div>
             <hr>
             <h5>CAPA Status</h5>
+            <div><strong>Correction:</strong> ${window.UTILS.escapeHtml(ncr.correction || 'N/A')}</div>
             <div><strong>Root Cause:</strong> ${window.UTILS.escapeHtml(ncr.rootCause || 'N/A')}</div>
             <div><strong>Corrective Action:</strong> ${window.UTILS.escapeHtml(ncr.correctiveAction || 'N/A')}</div>
             <div><strong>Verification:</strong> ${window.UTILS.escapeHtml(ncr.verificationMethod || 'N/A')}</div>
@@ -2602,7 +2642,7 @@ window.printNCRRegister = function () {
                             <td>NCR-${String(n.id).padStart(3, '0')}</td>
                             <td>${window.UTILS.escapeHtml(n.clientName || '-')}</td>
                             <td>${window.UTILS.escapeHtml(resolveAuditRef(n))}</td>
-                            <td>${window.UTILS.escapeHtml(n.standard || '-')}</td>
+                            <td>${window.UTILS.escapeHtml(resolveNCRContext(n).standard || '-')}</td>
                             <td>${window.UTILS.escapeHtml(resolveClauseDisplay(n).text)}</td>
                             <td>${window.UTILS.escapeHtml(n.severity)}</td>
                             <td>${window.UTILS.escapeText(n.description)}</td>
@@ -2711,6 +2751,9 @@ function applyPreviousNCRReview(ncr, input, ctx) {
     if (outcome !== 'open' && !evidence) {
         return { ok: false, error: 'Record the evidence you reviewed — records sampled, people interviewed, what you saw.' };
     }
+    if (outcome === 'closed' && !v('correction')) {
+        return { ok: false, error: 'To close it, record the correction (the immediate fix), or write N/A if none was possible.' };
+    }
 
     ncr.correction = v('correction');
     ncr.rootCause = v('rootCause');
@@ -2771,10 +2814,12 @@ window.reviewPreviousNCR = function (ncrId) {
             </div>
             <h4 style="font-size: 0.95rem; margin: 0 0 0.5rem;">What the organisation did</h4>
             <div class="form-group"><label>Correction</label>
+                <small style="display: block; color: var(--text-secondary); margin-bottom: 0.25rem;">The immediate fix to this nonconformity. Write N/A if none was possible.</small>
                 <textarea id="prev-review-correction" class="form-control" rows="2">${esc(ncr.correction)}</textarea></div>
             <div class="form-group"><label>Root cause</label>
                 <textarea id="prev-review-rootcause" class="form-control" rows="2">${esc(ncr.rootCause)}</textarea></div>
             <div class="form-group"><label>Corrective action</label>
+                <small style="display: block; color: var(--text-secondary); margin-bottom: 0.25rem;">What removes the root cause so it does not happen again.</small>
                 <textarea id="prev-review-action" class="form-control" rows="2">${esc(ncr.correctiveAction)}</textarea></div>
             <div class="form-group"><label>Implemented on</label>
                 <input type="date" id="prev-review-implemented" class="form-control" value="${esc(ncr.capaImplementedDate)}"></div>

@@ -57,6 +57,7 @@ describe('applyPreviousNCRReview', () => {
         expect(NM.applyPreviousNCRReview(ncr, { outcome: 'closed', correctiveAction: 'y', evidence: 'x' }, TODAY).ok).toBe(false);
         expect(NM.applyPreviousNCRReview(ncr, { outcome: 'closed', correctiveAction: 'y', implementedDate: '2026-06-30' }, TODAY).error).toMatch(/evidence/);
         expect(NM.applyPreviousNCRReview(ncr, { outcome: '' }, TODAY).error).toMatch(/outcome/);
+        expect(NM.applyPreviousNCRReview(ncr, { outcome: 'closed', correctiveAction: 'y', implementedDate: '2026-06-30', evidence: 'x' }, TODAY).error).toMatch(/correction/);
         expect(JSON.stringify(ncr)).toBe(before);
     });
 
@@ -101,7 +102,21 @@ describe('the Review form', () => {
         expect(window.closeModal).not.toHaveBeenCalled();
     });
 
+    it('asks for the correction before closing; N/A is accepted', async () => {
+        set('prev-review-action', 'Trained auditors');
+        set('prev-review-implemented', '2026-06-30');
+        set('prev-review-evidence', 'IA report');
+        document.querySelector('input[value="closed"]').checked = true;
+        await document.getElementById('modal-save').onclick();
+        expect(document.getElementById('prev-review-error').textContent).toMatch(/correction/);
+        expect(ncr.status).toBe('Open');
+        set('prev-review-correction', 'N/A');
+        await document.getElementById('modal-save').onclick();
+        expect(ncr.status).toBe('Closed');
+    });
+
     it('saves a closure in one step', async () => {
+        set('prev-review-correction', 'ISO 22301 internal audit scheduled');
         set('prev-review-action', 'Two internal auditors trained; ISO 22301 internal audit completed');
         set('prev-review-implemented', '2026-06-30');
         set('prev-review-evidence', 'IA-2026-04 report and closure log');
@@ -109,6 +124,40 @@ describe('the Review form', () => {
         await document.getElementById('modal-save').onclick();
         expect(ncr).toMatchObject({ status: 'Closed', carStatus: 'Closed', effectiveness: 'Effective', verifiedBy: 'Cara Auditor' });
         expect(window.closeModal).toHaveBeenCalled();
+    });
+});
+
+describe('NCR Details', () => {
+    beforeEach(() => {
+        base();
+        document.body.innerHTML = '<h3 id="modal-title"></h3><div id="modal-body"></div><button id="modal-save"></button>';
+    });
+
+    it('falls back to the plan standard and shows the checklist requirement and correction', () => {
+        window.state = {
+            auditPlans: [{ id: 'p1', standard: 'ISO 9001:2015' }],
+            clients: [{ id: 'c1', name: 'PC Connection', standard: 'ISO 27001' }],
+            checklists: [{ id: 'cl-1', clauses: [{ mainClause: '7', subClauses: [{ clause: '7.5', requirement: 'Changes to documented information shall be controlled.' }] }] }],
+            ncrs: [{ id: 7, auditId: 'p1', clientId: 'c1', clause: '7.5', severity: 'minor', status: 'Open', description: 'Change request section missing', correction: 'Form re-issued', sourceChecklistId: 'cl-1', sourceItemIdx: '7-0' }]
+        };
+        const NM = loadNCR();
+        window.viewNCRDetails(7);
+        const text = document.getElementById('modal-body').textContent;
+        expect(text).toContain('Standard: ISO 9001:2015');
+        expect(text).toContain('Requirement: Changes to documented information shall be controlled.');
+        expect(text).toContain('Correction: Form re-issued');
+        // No plan standard: the client's.
+        window.state.auditPlans = [];
+        expect(NM.resolveNCRContext(window.state.ncrs[0]).standard).toBe('ISO 27001');
+    });
+
+    it('omits the requirement line when the record has no source question', () => {
+        window.state = { auditPlans: [], clients: [], checklists: [], ncrs: [{ id: 8, standard: 'ISO 14001', description: 'x' }] };
+        loadNCR();
+        window.viewNCRDetails(8);
+        const text = document.getElementById('modal-body').textContent;
+        expect(text).toContain('Standard: ISO 14001');
+        expect(text).not.toContain('Requirement:');
     });
 });
 
