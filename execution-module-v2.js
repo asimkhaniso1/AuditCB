@@ -4240,6 +4240,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     </button>
                 </div>`;
     })()}
+            ${(function () {
+        // One screen for every finding that still needs the auditor's words
+        // (fix-findings.js): missing statements, missing evidence, template
+        // blanks and raw field notes printed as evidence.
+        const r = state.auditReports.find(x => String(x.id) === String(reportId));
+        const rows = (r && window.FixFindings) ? window.FixFindings.collect(r) : [];
+        if (!rows.length) return '';
+        const n = rows.reduce((s, x) => s + x.fields.length, 0);
+        return `<div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:0.9rem;">
+                    <div style="flex:1;min-width:220px;font-size:0.85rem;color:#334155;"><strong>${n} text${n === 1 ? '' : 's'} to write</strong> across ${rows.length} finding${rows.length === 1 ? '' : 's'}: statements, objective evidence and field notes. Write them all on one screen.</div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="openFixFindings" data-id="${esc(String(reportId))}" aria-label="Fix findings">
+                        <i class="fa-solid fa-pen-to-square" style="margin-right: 0.3rem;"></i>Fix findings
+                    </button>
+                </div>`;
+    })()}
             ${allItems.length ? `
             <div style="display: flex; flex-direction: column; gap: 0.6rem;">
                 ${allItems.map(it => {
@@ -4270,7 +4285,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // an applicability conflict only an explicit auditor decision can
         // resolve. Its id is the fixed literal 'W13'.
         const showConfirm83 = String((it && it.id) || '') === 'W13';
-        const fixBtn = showSetCriterion ? `
+        // Sixth: W6 (unapproved AI-drafted text) had no control to approve it.
+        const showApproveAi = /^W6-/.test(String((it && it.id) || ''));
+        const fixBtn = showApproveAi ? `
+                        <button type="button" class="btn btn-sm btn-outline-primary" style="margin-top: 0.45rem;"
+                            data-action="approveAiText" data-id="${esc(String(reportId))}"
+                            aria-label="Review and approve AI-drafted text">
+                            <i class="fa-solid fa-user-check" style="margin-right: 0.3rem;"></i>Review &amp; approve AI text
+                        </button>` : showSetCriterion ? `
                         <button type="button" class="btn btn-sm btn-outline-primary" style="margin-top: 0.45rem;"
                             data-action="setFindingCriterion"
                             data-report-id="${esc(String(reportId))}"
