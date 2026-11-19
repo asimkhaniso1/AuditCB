@@ -801,8 +801,11 @@ function collectUnconfirmedCriteria(report, opts) {
             // A major/minor NC with no criterion is what B1/B14 block issuance
             // on; an observation, OFI or conforming item is attribution quality,
             // not a gate. Sorting on it puts the ones that actually stop the
-            // report from issuing at the top of the review.
-            blocksIssuance: item.status === 'nc' && isRegisterSeverity(item.ncrType),
+            // report from issuing at the top of the review. Once a criterion
+            // is assigned, B1 no longer fires, so an assigned finding never
+            // blocks (PC Connection, 2026-11-19: "5 of them block issuance"
+            // with 0 unassigned).
+            blocksIssuance: !effectiveRef && item.status === 'nc' && isRegisterSeverity(item.ncrType),
             currentRef: effectiveRef,
             assigned: !!effectiveRef
         });
@@ -4586,10 +4589,20 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         const esc = window.UTILS.escapeHtml;
         const blocking = entries.filter(e => e.blocksIssuance).length;
-        // Rows the heuristic left with nothing — the only ones "Suggest
-        // clauses with AI" is allowed to touch (rows that already carry a
-        // heuristic proposal keep it; AI never overwrites one).
-        const aiTargets = entries.map((e, i) => i).filter(i => !entries[i].suggestedRef);
+        // Rows the heuristic left with nothing AND that have no criterion yet —
+        // the only ones "Suggest clauses with AI" is allowed to touch. A row
+        // with a heuristic proposal keeps it, and an assigned criterion is the
+        // auditor's: an AI proposal there plus "use all AI proposals" would
+        // replace it with one tick.
+        const aiTargets = entries.map((e, i) => i).filter(i => !entries[i].suggestedRef && !entries[i].assigned);
+        const assignedCount = entries.length - unassignedCount;
+        const introHtml = unassignedCount
+            ? esc(unassignedCount + (unassignedCount === 1 ? ' finding carries' : ' findings carry')
+                + ' an internal working reference (FOCUS/ORG/DOC) or none, not a clause of the audited standard.')
+                + (blocking ? ' <strong style="color:#991b1b;">' + blocking + ' of them block issuance</strong> and are listed first.' : '')
+                + (assignedCount ? esc(' The ' + assignedCount + ' with a criterion already follow, for review.') : '')
+                + ' A suggestion is only ever a proposal from the question’s own wording — confirm or correct each one. Leave a row blank to skip it.'
+            : 'Every finding already has a criterion, so nothing blocks issuance here. Review the list and change a criterion only if it is wrong; a row left as it is stays unchanged.';
 
         const rows = entries.map((e, i) => {
             const sevLabel = e.blocksIssuance
@@ -4597,7 +4610,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 : '<span style="background:#eff6ff;color:#1d4ed8;font-size:0.68rem;font-weight:600;padding:1px 7px;border-radius:9px;">' + esc((e.status === 'nc' ? (e.ncrType || 'finding') : (e.status || 'not assessed'))) + '</span>';
             return `
             <tr style="border-bottom:1px solid #e2e8f0;">
-                <td style="padding:0.55rem 0.5rem;vertical-align:top;white-space:nowrap;font-family:monospace;font-weight:700;font-size:0.82rem;">${esc(e.clause)}</td>
+                <td style="padding:0.55rem 0.5rem;vertical-align:top;width:7.5rem;max-width:7.5rem;white-space:normal;overflow-wrap:anywhere;font-family:monospace;font-weight:700;font-size:0.82rem;">${esc(e.clause)}</td>
                 <td style="padding:0.55rem 0.5rem;vertical-align:top;">
                     <div style="font-size:0.82rem;color:#334155;line-height:1.45;">${esc(e.requirement.slice(0, 220))}${e.requirement.length > 220 ? '…' : ''}</div>
                     <div style="margin-top:0.3rem;display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">${e.currentRef ? '<span style="background:#f1f5f9;color:#334155;font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9px;font-family:monospace;" title="What the report prints today">current: ' + esc(e.currentRef) + '</span>' : ''}${sevLabel}<span class="rac-conf-badge" data-row="${i}">${criterionConfidenceBadge(e)}</span></div>
@@ -4615,14 +4628,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         }).join('');
 
         window.DataService.openFormModal('Review Criteria — ' + unassignedCount + ' unassigned, ' + (entries.length - unassignedCount) + ' to review', `
-            <div style="font-size:0.85rem;color:#475569;margin-bottom:0.75rem;line-height:1.5;">
-                These findings carry an internal working reference (FOCUS/ORG/DOC), not a clause of the audited standard.
-                ${blocking ? '<strong style="color:#991b1b;">' + blocking + ' of them block issuance</strong> and are listed first. ' : ''}
-                A suggestion is only ever a proposal from the question’s own wording — confirm or correct each one.
-                Leave a row blank to skip it.
-            </div>
+            <div id="rac-intro" style="font-size:0.85rem;color:#475569;margin-bottom:0.75rem;line-height:1.5;">${introHtml}</div>
             <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;padding:0.6rem 0.8rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;">
-                <button type="button" id="rac-ai-suggest-btn" class="btn btn-sm" style="background:linear-gradient(135deg,#a855f7 0%,#7c3aed 100%);color:white;border:none;" ${aiTargets.length ? '' : 'disabled title="Every row already has a suggestion — nothing for AI to fill in."'}>
+                <button type="button" id="rac-ai-suggest-btn" class="btn btn-sm" style="background:linear-gradient(135deg,#a855f7 0%,#7c3aed 100%);color:white;border:none;" ${aiTargets.length ? 'title="Proposes a clause for findings with no criterion and no suggestion. A criterion you already chose is never touched."' : 'disabled title="' + (unassignedCount ? 'Every finding without a criterion already has a suggestion.' : 'Every finding already has a criterion. AI only proposes one where there is none.') + '"'}>
                     <i class="fa-solid fa-wand-magic-sparkles" style="margin-right:0.35rem;"></i>Suggest clauses with AI${aiTargets.length ? ' (' + aiTargets.length + ')' : ''}
                 </button>
                 <span id="rac-ai-progress" style="font-size:0.78rem;color:#6d28d9;"></span>
@@ -4707,7 +4715,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const row = box.getAttribute('data-row');
                 const input = document.querySelector('.rac-input[data-row="' + row + '"]');
                 if (!input) return;
-                input.value = box.checked ? (box.getAttribute('data-suggested') || '') : '';
+                // Unticking puts back what the row had, not a blank box.
+                input.value = box.checked ? (box.getAttribute('data-suggested') || '') : (input.getAttribute('data-current') || '');
             });
         }
 
