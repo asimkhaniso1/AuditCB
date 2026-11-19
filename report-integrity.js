@@ -2169,7 +2169,8 @@
         }
     }
 
-    global.ReportIntegrity = { check, checkById };
+    // looksLikeRawNote: the E1 test, shared with fix-findings.js.
+    global.ReportIntegrity = { check, checkById, looksLikeRawNote };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = global.ReportIntegrity;
