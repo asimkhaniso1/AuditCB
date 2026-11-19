@@ -185,6 +185,12 @@
     });
 
     const UNASSIGNED_LABEL = 'Unassigned / Cross-functional';
+    // A finding with no department recorded: name the clause alone. The label
+    // is a grouping key, not a department, and printed as one it read
+    // "Clause 4.4 (Unassigned / Cross-functional)" and "non-conformities within
+    // Unassigned / Cross-functional areas" (PC Connection draft, 2026-11-19).
+    const isUnassignedDept = (dept) => !dept || dept === UNASSIGNED_LABEL;
+    const deptNote = (dept, prefix) => (isUnassignedDept(dept) ? '' : ' (' + (prefix || '') + dept + ')');
     const getDepartments = (d) => {
         const depts = {};
         safeArr(d && d.hydratedProgress).forEach(item => {
@@ -311,10 +317,10 @@
         // risks/forwardOutlook/findings/concerns may draw on below — v.nc > 0
         // means the department carries at least one actual nc-status item
         // (major, minor, observation, or ofi), i.e. a real finding record.
-        const findingDeptList = Object.entries(depts).filter(([, v]) => v.nc > 0).map(([n]) => n).join(', ');
+        const findingDeptList = Object.entries(depts).filter(([n, v]) => v.nc > 0 && !isUnassignedDept(n)).map(([n]) => n).join(', ');
 
         const ncLines = realNCs.slice(0, 25).map((i, idx) =>
-            `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseText(i)}${clauseTitle(i) ? ' — ' + clauseTitle(i) : ''} (Dept: ${normalizeDept(i.department)})`
+            `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseText(i)}${clauseTitle(i) ? ' — ' + clauseTitle(i) : ''}${deptNote(normalizeDept(i.department), 'Dept: ')}`
         ).join('\n');
 
         return `
@@ -668,7 +674,7 @@ ${data.forwardOutlook ? `
             if (!entries.length) return;
             const count = sev === 'major' ? (stats.majorNC || entries.length) : (stats.minorNC || entries.length);
             const noun = count === 1 ? 'nonconformity' : 'nonconformities';
-            const clauseList = joinProse(entries.map((e) => `${e.label} (${e.dept})`));
+            const clauseList = joinProse(entries.map((e) => e.label + deptNote(e.dept)));
             sentences.push(`${count} ${sev} ${noun} identified: ${clauseList}.`);
         });
         return sentences;
@@ -1301,7 +1307,7 @@ ${intel.missingEvidence.length ? `
         const realNCs = getRealNCs(d);
         const depts = getDepartments(d);
         const deptSummary = Object.entries(depts).map(([n, v]) => `${n}: total ${v.total}, conform ${v.conform}, major ${v.major}, minor ${v.minor}`).join('; ');
-        const ncLines = realNCs.slice(0, 20).map((i, idx) => `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseText(i)} (${normalizeDept(i.department)})`).join('\n');
+        const ncLines = realNCs.slice(0, 20).map((i, idx) => `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseText(i)}${deptNote(normalizeDept(i.department))}`).join('\n');
 
         const recurrenceData = computeGenuineRecurrence(d);
         let priorAuditLines = 'Not available — no prior finalized audit found for this client/standard.';
@@ -1529,7 +1535,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
         if (/overdue/.test(q) && /capa|corrective|action/.test(q)) {
             const overdue = overdueCapas(d);
             if (!overdue.length) return 'No overdue corrective actions found.';
-            return `${overdue.length} overdue corrective action(s): ` + overdue.map(i => `${clauseText(i)} (${normalizeDept(i.department)}, due ${i.caDueDate})`).join('; ');
+            return `${overdue.length} overdue corrective action(s): ` + overdue.map(i => `${clauseText(i)} (${isUnassignedDept(normalizeDept(i.department)) ? '' : normalizeDept(i.department) + ', '}due ${i.caDueDate})`).join('; ');
         }
         if (/department/.test(q) && /(attention|worst|risk|concern)/.test(q)) {
             const depts = getDepartments(d);
@@ -1544,7 +1550,7 @@ Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
         if (/major/.test(q) && /nc|non.?conform/.test(q)) {
             const majors = getRealNCs(d).filter(i => (i.ncrType || '').toLowerCase() === 'major');
             if (!majors.length) return 'No major non-conformities were raised in this audit.';
-            return `${majors.length} major non-conformity(ies): ` + majors.map(i => `${clauseText(i)} (${normalizeDept(i.department)})`).join('; ');
+            return `${majors.length} major non-conformity(ies): ` + majors.map(i => clauseText(i) + deptNote(normalizeDept(i.department))).join('; ');
         }
         return `I can answer questions about this audit's non-conformities, observations, departments, evidence coverage, and CAPA due dates. Try: "summarize this audit", "top five risks", "overdue CAPAs", or "which department needs attention".`;
     }

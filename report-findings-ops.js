@@ -588,13 +588,29 @@
             + '</div>';
     }
 
+    var NOT_RECORDED = '<em style="color:var(--b4-muted,#666);">Not recorded.</em>';
+    // Stored text is entity-encoded; clean it the same way Finding Details does.
+    function carText(v) {
+        var RS = global.ReportStats;
+        var t = String(v == null ? '' : v).trim();
+        if (!t) return '';
+        return RS && typeof RS.cleanEvidenceText === 'function' ? RS.cleanEvidenceText(t) : t;
+    }
+    function evidenceCount(item) {
+        return safeArr(item.evidenceImages).filter(Boolean).length || (item.evidenceImage ? 1 : 0);
+    }
+
     function buildOneCarForm(d, item, index, capaIndex) {
         var capa = capaForItem(capaIndex, item);
         // The register number the client quotes back; CAR-nn only when this
         // finding has no register record yet.
         var carNo = capa && capa.id != null && capa.id !== '' ? 'NCR-' + String(capa.id).padStart(3, '0') : 'CAR-' + String(index + 1).padStart(2, '0');
         var classification = String(item.ncrType || '').toLowerCase() === 'major' ? 'Major' : 'Minor';
-        var reportRef = (d && d.report && (d.report.reportNumber || d.report.id)) || '—';
+        // The reference printed on the report itself (AR-…), not the record's
+        // database id ("Report 1794902180881", PC Connection, 2026-11-19).
+        var reportRef = (d && d.report && d.report.reportNumber)
+            || (typeof global._reportRef === 'function' ? global._reportRef(d) : '')
+            || (d && d.report && d.report.id) || '—';
         var reportDate = fmtDate(d && d.report && d.report.date);
         var cb = (d && d.cbSettings) || {};
         var cbName = cb.cbName || ((cb.cbSites || [])[0] || {}).name || cb.name || 'Certification Body';
@@ -613,8 +629,12 @@
             + '<tbody>'
             + '<tr><td style="font-weight:700;width:160px;">Criterion</td><td>' + criterionCell(item) + '</td></tr>'
             + '<tr><td style="font-weight:700;">Requirement</td><td>' + esc(item.requirement || '—') + '</td></tr>'
-            + '<tr><td style="font-weight:700;">Statement of Nonconformity</td><td>' + esc(item.comment || '—') + '</td></tr>'
-            + '<tr><td style="font-weight:700;">Objective Evidence</td><td>' + esc((safeArr(item.evidenceImages).length || item.evidenceImage) ? (safeArr(item.evidenceImages).length || 1) + ' evidence item(s) attached (see Evidence Traceability section)' : 'See auditor notes') + '</td></tr>'
+            // The statement is the auditor's NC statement and the evidence is
+            // what they recorded, as in Finding Details. The form printed the
+            // remark as the statement and only a photo count as the evidence.
+            + '<tr><td style="font-weight:700;">Statement of Nonconformity</td><td>' + (carText(item.ncrDescription) ? esc(carText(item.ncrDescription)) : NOT_RECORDED) + '</td></tr>'
+            + '<tr><td style="font-weight:700;">Objective Evidence</td><td>' + (carText(item.clientEvidenceStatement || item.comment) ? esc(carText(item.clientEvidenceStatement || item.comment)) : NOT_RECORDED)
+            + (evidenceCount(item) ? '<div style="font-size:11px;color:var(--b4-muted,#666);margin-top:2px;">' + evidenceCount(item) + ' evidence item(s) attached (see Evidence Traceability section)</div>' : '') + '</td></tr>'
             + '<tr><td style="font-weight:700;">Raised By / Date</td><td>' + esc((d && d.report && d.report.leadAuditor) || (capa && capa.raisedBy) || '—') + ' / ' + fmtDate((d && d.report && d.report.date) || (capa && capa.raisedDate)) + '</td></tr>'
             + '</tbody></table>';
 
