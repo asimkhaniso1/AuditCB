@@ -72,7 +72,7 @@
             const requirement = decode(item.requirement || requirementOf(item));
             const fields = [];
 
-            if (trim(comment) && rawNote(comment)) {
+            if (trim(comment) && !approvedEvidence && rawNote(comment)) {
                 fields.push({ key: 'comment', label: 'What you saw (printed as the objective evidence)', why: 'Reads as a field note, not a statement of what was reviewed and what it showed.', value: comment });
             } else if (reg && !trim(comment) && !approvedEvidence) {
                 fields.push({ key: 'comment', label: 'What you saw (printed as the objective evidence)', why: 'No objective evidence recorded; the report prints "No evidence recorded."', value: '' });

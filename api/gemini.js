@@ -25,6 +25,38 @@ const DEFAULT_MAX_TOKENS = 32768;
 const MAX_TOKENS_CAP = 65536;
 const MAX_PROMPT_CHARS = 1_000_000;
 
+// Evidence images sent with a prompt (AI evidence explanation). Kept small:
+// the caller downscales screenshots before sending, and Vercel caps a request
+// body at about 4.5 MB.
+const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_IMAGES = 6;
+const MAX_IMAGE_B64_CHARS = 1_500_000;
+const MAX_IMAGES_B64_TOTAL = 3_500_000;
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/**
+ * Validate body.images ([{ mimeType, data }], base64 without a data: prefix).
+ * Returns { parts } for the request, or { error } for a 400/413.
+ */
+export function imageParts(images) {
+    if (images == null) return { parts: [] };
+    if (!Array.isArray(images)) return { error: 'images must be an array', status: 400 };
+    if (images.length > MAX_IMAGES) return { error: `At most ${MAX_IMAGES} images per request`, status: 413 };
+    let total = 0;
+    const parts = [];
+    for (const img of images) {
+        const mimeType = img && String(img.mimeType || '').toLowerCase();
+        const data = img && typeof img.data === 'string' ? img.data : '';
+        if (!IMAGE_MIME_TYPES.has(mimeType)) return { error: 'Unsupported image type', status: 400 };
+        if (!data || !BASE64_RE.test(data)) return { error: 'Image data must be base64', status: 400 };
+        if (data.length > MAX_IMAGE_B64_CHARS) return { error: 'Image is too large', status: 413 };
+        total += data.length;
+        if (total > MAX_IMAGES_B64_TOTAL) return { error: 'Images are too large in total', status: 413 };
+        parts.push({ inline_data: { mime_type: mimeType, data } });
+    }
+    return { parts };
+}
+
 function resolveModel(requested) {
     const name = String(requested || 'gemini-2.0-flash');
     const mapped = MODEL_MAP[name] || name;
@@ -76,6 +108,10 @@ export default async function handler(req, res) {
             return res.status(413).json({ error: 'Prompt is too large' });
         }
     }
+    const imgs = mode === 'list' ? { parts: [] } : imageParts(body.images);
+    if (imgs.error) {
+        return res.status(imgs.status || 400).json({ error: imgs.error });
+    }
 
     try {
         let url;
@@ -115,12 +151,12 @@ export default async function handler(req, res) {
                         parts: [{ text: GUARDRAIL_SYSTEM_INSTRUCTION }]
                     },
                     contents: [{
-                        parts: [{ text: prompt }]
+                        parts: [{ text: prompt }].concat(imgs.parts)
                     }],
-                    generationConfig: {
+                    generationConfig: Object.assign({
                         maxOutputTokens: clampMaxTokens(body.maxTokens),
                         temperature: clampTemperature(body.temperature)
-                    }
+                    }, body.json === true ? { responseMimeType: 'application/json' } : {})
                 })
             };
         }

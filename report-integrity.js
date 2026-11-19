@@ -129,7 +129,7 @@
                 evidence: i.evidence,
                 evidenceImage: i.evidenceImage,
                 evidenceImages: i.evidenceImages,
-                comment: i.comment || i.ncrDescription,
+                comment: i.clientEvidenceStatement || i.comment || i.ncrDescription,
                 department: i.department,
                 riskLikelihood: i.riskLikelihood,
                 riskImpact: i.riskImpact,
@@ -812,7 +812,7 @@
     // Text an auditor wrote that is printed verbatim in the client report.
     function clientFacingComments(report) {
         return safeArr(report && report.checklistProgress)
-            .map((i) => trim(i && (i.comment || i.ncrDescription)))
+            .map((i) => trim(i && (i.clientEvidenceStatement || i.comment || i.ncrDescription)))
             .filter(Boolean);
     }
 
@@ -1316,7 +1316,8 @@
         let emitted = 0;
         safeArr(report && report.checklistProgress).forEach((i, idx) => {
             if (emitted >= EDITORIAL_SAMPLE_LIMIT) return;
-            const text = trim(i && (i.comment || i.ncrDescription));
+            // What prints: an approved evidence statement replaces the remark.
+            const text = trim(i && (i.clientEvidenceStatement || i.comment || i.ncrDescription));
             if (!looksLikeRawNote(text)) return;
             emitted++;
             results.editorial.push(item(
