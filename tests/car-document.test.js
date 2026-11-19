@@ -91,6 +91,31 @@ describe('CarDocument', () => {
         expect(c.brand).toMatchObject({ name: 'Company Certification International', email: 'capa@cci.example', accreditation: 'IAS · MSCB-123' });
     });
 
+    it('prints the audit\'s findings response date as Response due, and the CAPA deadline apart from it', () => {
+        const ncr = seedState({ dueDate: '2027-02-15' });
+        window.state.auditReports[0].findingsResponseDue = '2026-12-11';
+        const c = CD.context(ncr);
+        expect(c.responseDue).toBe('2026-12-11');
+        expect(c.actionDue).toBe('2027-02-15');
+        const text = DF.renderedText(CD.buildHtml(c));
+        expect(text).toMatch(/Response due\s*11 December 2026/);
+        expect(text).toContain('Corrective action due');
+        expect(text).toContain('by 11 December 2026, with the correction taken and your corrective action plan');
+        expect(text).toContain('implemented by 15 February 2027');
+        expect(PS.lint(CD.buildHtml(c))).toEqual([]);
+        const files = unzip(CD.buildDocx(c), CD);
+        const xml = new TextDecoder().decode(files['word/document.xml']);
+        expect(xml).toContain('11 December 2026');
+        expect(xml).toContain('Corrective action due');
+    });
+
+    it('falls back to the NCR due date, with no second deadline, when the audit has no response date', () => {
+        const c = CD.context(seedState({ dueDate: '2027-02-15' }));
+        expect(c.responseDue).toBe('2027-02-15');
+        expect(c.actionDue).toBe('');
+        expect(DF.renderedText(CD.buildHtml(c))).not.toContain('Corrective action due');
+    });
+
     it('never prints an internal FOCUS/SURV reference as the clause', () => {
         const c = CD.context(seedState({ clause: 'FOCUS.3', criterionRef: null }));
         expect(c.criterion).toBe('');

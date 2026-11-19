@@ -101,6 +101,13 @@
         try { auditRef = plan && global.UTILS && global.UTILS.getPlanRef ? str(global.UTILS.getPlanRef(plan)) : ''; } catch (_e) { auditRef = ''; }
         const report = reports[0] || null;
         const sev = str(ncr.severity || ncr.type).toLowerCase();
+        // Two different deadlines. The response (this form back, with the
+        // correction and the plan) is due on the date agreed for the audit's
+        // findings — set on the audit's Findings tab and printed on the
+        // findings summary. ncr.dueDate is the corrective action deadline from
+        // the CB's CAPA timeframes (e.g. 90 days for a minor).
+        const findingsDue = str((reports.find(function (r) { return str(r.findingsResponseDue); }) || {}).findingsResponseDue);
+        const actionDue = str(ncr.dueDate);
 
         return {
             ref: ncrRef(ncr),
@@ -118,7 +125,9 @@
             leadAuditor: plain((plan && plan.lead) || (report && report.leadAuditor)),
             raisedBy: plain(ncr.raisedBy),
             raisedDate: ncr.raisedDate || '',
-            responseDue: ncr.dueDate || '',
+            responseDue: findingsDue || actionDue,
+            // Shown separately only when it is a different date.
+            actionDue: findingsDue && actionDue && actionDue !== findingsDue ? actionDue : '',
             response: {
                 correction: plain(ncr.correction),
                 rootCause: plain(ncr.rootCause),
@@ -154,6 +163,11 @@
     function returnInstruction(c) {
         const to = c.brand.email ? ' to ' + c.brand.email : '';
         const by = c.responseDue ? ' by ' + date(c.responseDue) : ' by the response due date';
+        if (c.actionDue) {
+            return 'Complete Part B and return this form' + to + by
+                + ', with the correction taken and your corrective action plan. Send evidence that the corrective action is implemented by '
+                + date(c.actionDue) + '. Quote ' + c.ref + ' on everything you send.';
+        }
         return 'Complete Part B and return this form' + to + by
             + ', with evidence of the correction and the corrective action taken. Quote ' + c.ref + ' on everything you send.';
     }
@@ -199,6 +213,7 @@
             + '<tr><td class="k">Audit</td><td colspan="3">' + h(auditLine(c) || '—') + '</td></tr>'
             + '<tr><td class="k">Raised by</td><td>' + h([c.raisedBy || c.leadAuditor, date(c.raisedDate)].filter(Boolean).join(', ') || '—') + '</td>'
             + '<td class="k">Response due</td><td><strong>' + h(date(c.responseDue) || 'See audit report') + '</strong></td></tr>'
+            + (c.actionDue ? '<tr><td class="k">Corrective action due</td><td colspan="3">' + h(date(c.actionDue)) + ' — evidence of implementation</td></tr>' : '')
             + '</tbody></table>';
 
         const partA = '<div class="car-part">PART A — NONCONFORMITY <span>(completed by ' + h(c.brand.name) + ')</span></div>'
@@ -345,8 +360,10 @@
             '<w:tr>' + cell(run('Raised by', { bold: true }), { w: grid4[0], fill: 'F1F5F9' })
                 + cell(run([c.raisedBy || c.leadAuditor, date(c.raisedDate)].filter(Boolean).join(', ') || '—'), { w: grid4[1] })
                 + cell(run('Response due', { bold: true }), { w: grid4[2], fill: 'F1F5F9' })
-                + cell(run(date(c.responseDue) || 'See audit report', { bold: true }), { w: grid4[3] }) + '</w:tr>'
-        ], grid4);
+                + cell(run(date(c.responseDue) || 'See audit report', { bold: true }), { w: grid4[3] }) + '</w:tr>',
+            c.actionDue ? '<w:tr>' + cell(run('Corrective action due', { bold: true }), { w: grid4[0], fill: 'F1F5F9' })
+                + cell(run(date(c.actionDue) + ' — evidence of implementation'), { w: 7360, span: 3 }) + '</w:tr>' : ''
+        ].filter(Boolean), grid4);
 
         const body = [
             logo ? para(logoXml(logo), { after: 40 }) : '',
