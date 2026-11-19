@@ -91,6 +91,31 @@ describe('CarDocument', () => {
         expect(c.brand).toMatchObject({ name: 'Company Certification International', email: 'capa@cci.example', accreditation: 'IAS · MSCB-123' });
     });
 
+    it('prints the audit\'s findings response date as Response due, and the CAPA deadline apart from it', () => {
+        const ncr = seedState({ dueDate: '2027-02-15' });
+        window.state.auditReports[0].findingsResponseDue = '2026-12-11';
+        const c = CD.context(ncr);
+        expect(c.responseDue).toBe('2026-12-11');
+        expect(c.actionDue).toBe('2027-02-15');
+        const text = DF.renderedText(CD.buildHtml(c));
+        expect(text).toMatch(/Response due\s*11 December 2026/);
+        expect(text).toContain('Corrective action due');
+        expect(text).toContain('by 11 December 2026, with the correction taken and your corrective action plan');
+        expect(text).toContain('implemented by 15 February 2027');
+        expect(PS.lint(CD.buildHtml(c))).toEqual([]);
+        const files = unzip(CD.buildDocx(c), CD);
+        const xml = new TextDecoder().decode(files['word/document.xml']);
+        expect(xml).toContain('11 December 2026');
+        expect(xml).toContain('Corrective action due');
+    });
+
+    it('falls back to the NCR due date, with no second deadline, when the audit has no response date', () => {
+        const c = CD.context(seedState({ dueDate: '2027-02-15' }));
+        expect(c.responseDue).toBe('2027-02-15');
+        expect(c.actionDue).toBe('');
+        expect(DF.renderedText(CD.buildHtml(c))).not.toContain('Corrective action due');
+    });
+
     it('never prints an internal FOCUS/SURV reference as the clause', () => {
         const c = CD.context(seedState({ clause: 'FOCUS.3', criterionRef: null }));
         expect(c.criterion).toBe('');
@@ -160,6 +185,132 @@ describe('CarDocument', () => {
         window.open = vi.fn(() => ({ document: doc, addEventListener: vi.fn() }));
         window.printCAR('85');
         expect(doc.write.mock.calls[0][0]).toContain('NCR-085');
+    });
+});
+
+describe('Bulk CARs for an audit', () => {
+    let CD;
+    beforeEach(() => {
+        CD = load();
+        seedState();
+        window.state.ncrs.push(
+            { id: 89, auditId: 'p1', clientId: 'c1', clause: '8.2.2', severity: 'minor', status: 'Open', description: 'Service Desk RTO 24 Hour & RPO', dueDate: '2027-02-15' },
+            { id: 90, auditId: 'p1', clientId: 'c1', clause: '8.6.2', severity: 'minor', status: 'Withdrawn', description: 'Withdrawn duplicate' }
+        );
+    });
+
+    it('puts every CAR in one lint-clean document, each on its own page', () => {
+        const html = CD.buildBatchHtml(window.state.ncrs.slice(0, 2).map(n => CD.context(n)));
+        expect(PS.lint(html)).toEqual([]);
+        expect((html.match(/<section class="car-one"/g) || []).length).toBe(2);
+        expect((html.match(/break-before:page/g) || []).length).toBe(1);
+        const text = DF.renderedText(html);
+        expect(text).toContain('NCR-085');
+        expect(text).toContain('NCR-089');
+        expect(html).toContain('<title>CARs PC CONNECTION, INC. - 17 November 2026</title>');
+    });
+
+    it('zips one .docx per CAR, each named with its NCR number', () => {
+        const files = unzip(CD.buildDocxZip(window.state.ncrs.slice(0, 2).map(n => CD.context(n))), CD);
+        const names = Object.keys(files);
+        expect(names).toEqual(expect.arrayContaining(['CAR NCR-085 - PC CONNECTION, INC.docx', 'CAR NCR-089 - PC CONNECTION, INC.docx', 'README.txt']));
+        // Each inner .docx is itself a valid package.
+        const inner = unzip(files['CAR NCR-089 - PC CONNECTION, INC.docx'], CD);
+        expect(new TextDecoder().decode(inner['word/document.xml'])).toContain('Service Desk RTO 24 Hour &amp; RPO');
+    });
+
+    it('printCARs skips withdrawn records and opens one window', () => {
+        const doc = { write: vi.fn(), close: vi.fn(), open: vi.fn(), images: [], querySelector: () => null };
+        window.open = vi.fn(() => ({ document: doc, addEventListener: vi.fn() }));
+        window.printCARs('85,89,90');
+        expect(window.open).toHaveBeenCalledTimes(1);
+        const html = doc.write.mock.calls[0][0];
+        expect(html).toContain('NCR-085');
+        expect(html).toContain('NCR-089');
+        expect(html).not.toContain('NCR-090');
+    });
+
+    it('offers the bulk actions on an audit group with its active records only', () => {
+        const html = window.NCRModule.carBulkButtonsHTML(window.state.ncrs);
+        expect(html).toContain('All 2 CARs:');
+        expect(html).toContain('data-action="printCARs" data-arg1="85,89"');
+        expect(html).toContain('data-action="downloadCARsWord"');
+        expect(html).toContain('data-action="uploadCARResponses"');
+        expect(window.NCRModule.carBulkButtonsHTML([{ severity: 'Minor' }])).toBe('');
+    });
+
+    it('matches a returned file to its NCR by the number in its name', () => {
+        const m = window.NCRModule.matchResponseFile;
+        const ncrs = window.state.ncrs;
+        expect(m('CAR NCR-085 - PC CONNECTION, INC (filled).docx', ncrs)).toBe('85');
+        expect(m('ncr_089 evidence.pdf', ncrs)).toBe('89');
+        expect(m('NCR85.pdf', ncrs)).toBe('85');
+        expect(m('evidence.pdf', ncrs)).toBe('');
+        expect(m('NCR-085 and NCR-089.pdf', ncrs)).toBe('');   // ambiguous
+        expect(m('NCR-123.pdf', ncrs)).toBe('');                // not in this audit
+    });
+});
+
+describe('Bulk upload of returned CARs', () => {
+    let upload, update;
+    beforeEach(() => {
+        load();
+        document.body.innerHTML = '<h3 id="modal-title"></h3><div id="modal-body"></div><button id="modal-save"></button>';
+        window.closeModal = vi.fn();
+        window.openModal = vi.fn();
+        upload = vi.fn(async (path) => ({ data: { path }, error: null }));
+        update = vi.fn(() => ({ eq: async () => ({ error: null }) }));
+        window.SupabaseClient = {
+            isInitialized: true,
+            client: { storage: { from: vi.fn(() => ({ upload })) } },
+            from: vi.fn(() => ({ update, select: () => ({ order: async () => ({ data: null, error: null }) }) }))
+        };
+        seedState();
+        window.state.ncrs.push({ id: 89, auditId: 'p1', clientId: 'c1', clause: '8.2.2', severity: 'minor', status: 'Open', description: 'Service Desk RTO' });
+        window.state.currentUser = { name: 'Cara Auditor' };
+    });
+
+    function choose(names) {
+        const input = document.getElementById('car-bulk-files');
+        Object.defineProperty(input, 'files', { value: names.map(n => new File(['x'], n, { type: 'application/pdf' })), configurable: true });
+        input.dispatchEvent(new Event('change'));
+    }
+
+    it('matches files by name, asks for the rest, then attaches each to its NCR', async () => {
+        const [r85, r89] = [85, 89].map(id => window.state.ncrs.find(n => n.id === id));
+        window.uploadCARResponses('85,89');
+        choose(['CAR NCR-085 - PC CONNECTION, INC.docx', 'NCR-089 evidence.pdf', 'scan.pdf']);
+        const selects = document.querySelectorAll('.car-bulk-target');
+        expect([...selects].map(s => s.value)).toEqual(['85', '89', '']);
+
+        await document.getElementById('modal-save').onclick();
+        expect(document.getElementById('car-bulk-error').textContent).toContain('Choose the NCR for: scan.pdf');
+        expect(upload).not.toHaveBeenCalled();
+
+        selects[2].value = '85';
+        await document.getElementById('modal-save').onclick();
+        expect(upload).toHaveBeenCalledTimes(3);
+        expect(r85.auditeeResponseFiles.map(f => f.name)).toEqual(['CAR NCR-085 - PC CONNECTION, INC.docx', 'scan.pdf']);
+        expect(r89.auditeeResponseFiles.map(f => f.name)).toEqual(['NCR-089 evidence.pdf']);
+        expect(update).toHaveBeenCalledTimes(2);
+        expect(r85.status).toBe('Open'); // attaching is not a review
+        expect(window.closeModal).toHaveBeenCalled();
+    });
+
+    it('on a failed save keeps the dialog open and does not upload again on retry', async () => {
+        let fail = true;
+        update.mockImplementation(() => ({ eq: async () => ({ error: fail ? { message: 'network down' } : null }) }));
+        const r85 = window.state.ncrs.find(n => n.id === 85);
+        window.uploadCARResponses('85');
+        choose(['CAR NCR-085.pdf']);
+        await document.getElementById('modal-save').onclick();
+        expect(document.getElementById('car-bulk-error').textContent).toContain('Not attached: NCR-085');
+        expect(window.closeModal).not.toHaveBeenCalled();
+        fail = false;
+        await document.getElementById('modal-save').onclick();
+        expect(upload).toHaveBeenCalledTimes(1);
+        expect(r85.auditeeResponseFiles).toHaveLength(1);
+        expect(window.closeModal).toHaveBeenCalled();
     });
 });
 

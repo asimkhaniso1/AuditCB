@@ -39,8 +39,9 @@ describe('NCR register grouped and compact', () => {
     it('one heading per audit, newest first, with Major/Minor counts', () => {
         const g = groups();
         expect(g).toHaveLength(2);
-        expect(g[0]).toMatch(/^Recertification — .* · 1 Major · 0 Minor$/);
-        expect(g[1]).toMatch(/^Surveillance — .* · 0 Major · 2 Minor$/);
+        // Each heading ends with the audit's bulk CAR actions.
+        expect(g[0]).toMatch(/^Recertification — .* · 1 Major · 0 Minor All 1 CAR: PDF Word \(\.zip\) Upload responses$/);
+        expect(g[1]).toMatch(/^Surveillance — .* · 0 Major · 2 Minor All 2 CARs: PDF Word \(\.zip\) Upload responses$/);
     });
 
     it('drops the Level, Client and Audit columns', () => {
