@@ -300,6 +300,80 @@
         return { kind: 'standard', ref };
     }
 
+    // ─── Which of the report's standards a finding belongs to ───────────────
+    // An integrated report (ISO 20000-1, 27001 and 22301 together) looked every
+    // clause up in one standard and printed all three names beside every NC:
+    // PC Connection's RTO/RPO finding at 22301 8.2.2 (business impact analysis)
+    // printed 27001's "information security risk assessment", and Annex A
+    // controls were attributed to 22301 and 20000-1 too (2026-11-19).
+    // Resolution, first that applies:
+    //   1. a standard tag on the criterion or clause: "8.2.2 (22301)";
+    //   2. an Annex A control (A.5.9) belongs to ISO/IEC 27001;
+    //   3. the only one of the report's standards whose clause list (Knowledge
+    //      Base) has this exact clause;
+    //   4. the same clause with the same title in every standard that has it
+    //      ("7.5 Documented information") is common to them: basis 'common';
+    //   otherwise 'ambiguous' — never guessed.
+    // A single-standard report always resolves to that standard.
+    function splitStandards(value) {
+        return String(value == null ? '' : value).split(/\s*[,;+]\s*|\s+&\s+|\s+and\s+/i).map(trim).filter(Boolean);
+    }
+    function standardNumber(name) {
+        const m = String(name == null ? '' : name).match(/(\d{4,5})(?:-\d+)?/);
+        return m ? m[1] : '';
+    }
+    function clauseNumberOf(ref) {
+        const m = trim(ref).replace(/^(clause|section)\s+/i, '').match(/^([A-Za-z]\.)?\d+(?:\.\d+)*/);
+        return m ? m[0] : '';
+    }
+    function normTitle(t) { return trim(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+
+    // { standardName: { clause: title } } for the report's standards, from the
+    // Knowledge Base (window.state.knowledgeBase) unless opts.inventory is given.
+    function standardInventory(standards, opts) {
+        if (opts && opts.inventory) return opts.inventory;
+        const kb = global.state && global.state.knowledgeBase;
+        const docs = (kb && Array.isArray(kb.standards)) ? kb.standards.filter((s) => s && s.status === 'ready' && Array.isArray(s.clauses) && s.clauses.length) : [];
+        const out = {};
+        standards.forEach((name) => {
+            const num = standardNumber(name);
+            const doc = num && docs.find((s) => standardNumber(s.name) === num);
+            if (!doc) return;
+            const map = {};
+            doc.clauses.forEach((c) => { if (c && c.clause) map[trim(c.clause)] = c.title || ''; });
+            out[name] = map;
+        });
+        return out;
+    }
+
+    function resolveFindingStandard(finding, reportStandard, opts) {
+        const f = finding || {};
+        const standards = splitStandards(reportStandard);
+        if (standards.length <= 1) return { standard: standards[0] || '', basis: standards.length ? 'single' : 'none', standards };
+        const ref = trim(f.criterionRef) || trim(f.clause);
+        if (/\(\s*integrated\s*\)/i.test(trim(f.criterionRef) || trim(f.clause))) return { standard: '', basis: 'common', standards };
+        const tagged = (trim(f.criterionRef) + ' ' + trim(f.clause)).match(/\(\s*(?:ISO(?:\/IEC)?\s*)?(\d{4,5})(?:[-:]\d+)?\s*\)/i);
+        if (tagged) {
+            const s = standards.find((x) => standardNumber(x) === tagged[1]);
+            if (s) return { standard: s, basis: 'tag', standards };
+        }
+        if (/^A\.\d/i.test(ref)) {
+            const s = standards.find((x) => standardNumber(x) === '27001');
+            if (s) return { standard: s, basis: 'annex-a', standards };
+        }
+        const num = clauseNumberOf(ref);
+        const inv = standardInventory(standards, opts);
+        const having = num ? standards.filter((s) => inv[s] && Object.prototype.hasOwnProperty.call(inv[s], num)) : [];
+        // Only decide from the clause lists when every standard has one.
+        const allKnown = standards.every((s) => inv[s]);
+        if (allKnown && having.length === 1) return { standard: having[0], basis: 'inventory', standards };
+        if (allKnown && having.length > 1) {
+            const titles = having.map((s) => normTitle(inv[s][num]));
+            if (titles.every((t) => t && t === titles[0])) return { standard: '', basis: 'common', standards: having };
+        }
+        return { standard: '', basis: 'ambiguous', standards };
+    }
+
     function formatCriterion(finding, opts) {
         const f = finding || {};
         const showInternal = !!(opts && opts.showInternal);
@@ -1859,6 +1933,8 @@
         certificationHistory,
         formatCriterion,
         classifyCriterion,
+        resolveFindingStandard,
+        splitStandards,
         cleanEvidenceText,
         effectivenessStatements,
         computeClauseAreaBreakdown,

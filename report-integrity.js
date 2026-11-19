@@ -371,6 +371,33 @@
             ));
         });
 
+        // W34: on an integrated report, a Major/Minor NC on a clause that more
+        // than one certified standard has (with different requirements: 4.4,
+        // 8.2.2) prints without a standard and without the requirement text,
+        // because guessing printed the wrong standard's requirement.
+        const RSW = global.ReportStats;
+        if (RSW && typeof RSW.resolveFindingStandard === 'function') {
+            const reportStd = (report && report.standard) || (auditPlan && auditPlan.standard) || '';
+            if (RSW.splitStandards(reportStd).length > 1) {
+                safeArr(report && report.checklistProgress).forEach((i) => {
+                    if (!i || i.status !== 'nc' || !['major', 'minor'].includes(lower(i.ncrType))) return;
+                    const res = RSW.resolveFindingStandard(i, reportStd);
+                    if (res.basis !== 'ambiguous') return;
+                    const ref = trim(i.criterionRef || i.clause) || 'not stated';
+                    const num = (ref.match(/^[A-Za-z]?\.?\d+(?:\.\d+)*/) || [ref])[0];
+                    results.warnings.push(item(
+                        'W34',
+                        'warning',
+                        'findings',
+                        `The ${lower(i.ncrType)} nonconformity at clause ${ref} doesn't say which standard it is against; the report prints it without a standard or its requirement text.`,
+                        'checklistProgress[].criterionRef',
+                        `In Review Criteria, set its criterion with the standard, e.g. "${num} (22301)", "${num} (27001)" or "${num} (20000)". Then Save.`,
+                        { list: 'checklistProgress', checklistId: i.checklistId, itemIdx: i.itemIdx }
+                    ));
+                });
+            }
+        }
+
         // W33: a statement inserted from the template with a [bracketed]
         // blank still in it would print half-written.
         const FSH = global.FindingStatementHint;
