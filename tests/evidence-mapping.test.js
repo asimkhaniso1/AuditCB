@@ -286,7 +286,8 @@ describe('the review screen', () => {
 
     it('says what will be sent, and sends nothing until the auditor starts it', () => {
         window.openEvidenceMapping('r1');
-        expect(document.body.textContent).toContain('4 screenshots on 3 questions will be sent to the AI service, in 3 requests');
+        expect(document.body.textContent).toContain('4 screenshots on 3 questions will be sent to the AI service twice, in 6 requests. It takes about 1 minute.');
+        expect(document.body.textContent).toContain('A move that both checks agree on is marked Strong');
         expect(document.body.textContent).toContain('Nothing moves unless you choose it and press Save.');
         expect(window.__save).toBeNull();
         expect(AI.mapEvidence).not.toHaveBeenCalled();
@@ -295,7 +296,7 @@ describe('the review screen', () => {
     it('every proposal starts as "Leave where it is"; Save with nothing chosen writes nothing', async () => {
         await start();
         expect(document.getElementById('t').textContent).toBe('Evidence mapping — 1 to review');
-        expect(document.body.textContent).toContain('4 screenshots checked: 3 fit the question they are under, 1 may belong with another question.');
+        expect(document.body.textContent).toContain('4 screenshots checked: 3 fit the question they are under, 1 may belong with another question (1 strong).');
         const choice = document.querySelector('.em-choice');
         expect(choice.value).toBe('');
         expect(Array.from(choice.options).map((o) => o.textContent)).toEqual(['Leave where it is', 'Move to item 2 · 8.5.1', 'Also attach to item 2 · 8.5.1', 'Also attach to item 3 · A.8.32']);
@@ -371,6 +372,127 @@ describe('the review screen', () => {
         report.checklistProgress.forEach((i) => { delete i.evidenceImages; delete i.evidenceImage; });
         window.openEvidenceMapping('r1');
         expect(window.showNotification).toHaveBeenCalledWith('No screenshots are attached to this checklist.', 'info');
+    });
+});
+
+describe('two checks of every screenshot', () => {
+    const move = (to, extra) => Object.assign({ evId: 'Image 1', shows: 'A Change Requests list.', here: 'none', fit: 'fits_better_elsewhere', betterItem: to, alsoItems: [], reason: 'It lists changes.' }, extra);
+    const fits = (evId, also) => ({ evId, shows: 'A dashboard.', here: 'direct', fit: 'fits', betterItem: null, alsoItems: also || [], reason: '' });
+    // What each of the two readings says about item 1's screenshot; the rest fit.
+    const twice = (first, second) => {
+        let seen = 0;
+        window.AI_SERVICE.mapEvidence = vi.fn(async (input) => {
+            if (input.current.n !== 1) return { images: input.images.map((i) => fits(i.evId)), imagesFailed: [], flags: [] };
+            const reading = seen++ === 0 ? first : second;
+            if (reading instanceof Error) throw reading;
+            return { images: [reading], imagesFailed: [], flags: [] };
+        });
+    };
+    const row1 = async () => (await window.EvidenceMapping.check(report, { passes: 2, concurrency: 1 })).rows[0];
+
+    it('asks twice, every screenshot once before any is read again', async () => {
+        twice(move(2), move(2));
+        const res = await window.EvidenceMapping.check(report, { passes: 2, concurrency: 1 });
+        expect(res.calls).toBe(6);
+        expect(res.passes).toBe(2);
+        expect(window.AI_SERVICE.mapEvidence.mock.calls.map((c) => c[0].current.n)).toEqual([1, 2, 4, 1, 2, 4]);
+        expect(res.rows).toHaveLength(4);
+    });
+
+    it('a move both checks agree on is strong', async () => {
+        twice(move(2), move(2));
+        expect(await row1()).toMatchObject({ fit: 'fits_better_elsewhere', strength: 'strong', doubt: '', alt: null, to: { key: 'cl1-A-1' } });
+    });
+
+    it('a move only one check proposes is possible, and says why', async () => {
+        twice(move(2), fits('Image 1'));
+        expect(await row1()).toMatchObject({ fit: 'fits_better_elsewhere', strength: 'possible', doubt: 'Not every check proposed a move.' });
+        twice(fits('Image 1'), move(2));
+        expect(await row1()).toMatchObject({ fit: 'fits_better_elsewhere', strength: 'possible', to: { key: 'cl1-A-1' } });
+    });
+
+    it('two different questions: possible, with the other one kept as an alternative', async () => {
+        twice(move(2), move(3));
+        expect(await row1()).toMatchObject({ strength: 'possible', doubt: 'The checks proposed different questions.', to: { key: 'cl1-A-1' }, alt: { key: 'cl1-A-2' } });
+    });
+
+    it('one check failed: a single reading is never strong', async () => {
+        twice(move(2), new Error('quota'));
+        expect(await row1()).toMatchObject({ fit: 'fits_better_elsewhere', strength: 'possible', doubt: 'Only one check gave a reading.' });
+        twice(new Error('quota'), new Error('quota'));
+        expect(await row1()).toMatchObject({ fit: 'unchecked', error: 'quota' });
+    });
+
+    it('both say it fits: it fits, and a question both named as also supported is marked', async () => {
+        twice(fits('Image 1', [3]), fits('Image 1', [3, 5]));
+        const row = await row1();
+        expect(row.fit).toBe('fits');
+        expect(row.also.map((p) => p.key + ':' + p.agreed)).toEqual(['cl1-A-2:true', 'custom-0:false']);
+    });
+
+    it('a single check carries no strength at all', async () => {
+        twice(move(2), move(2));
+        const res = await window.EvidenceMapping.check(report, { concurrency: 1 });
+        expect(res.calls).toBe(3);
+        expect(res.rows[0].strength).toBe('');
+        expect(window.EvidenceMapping.proposals(res.rows).strong).toHaveLength(0);
+    });
+
+    describe('on the review screen', () => {
+        const start = async () => {
+            window.openEvidenceMapping('r1');
+            document.getElementById('em-start').click();
+            await vi.waitFor(() => expect(document.querySelector('.em-choice')).not.toBeNull());
+        };
+
+        it('strong rows come first with a badge, and "Accept all strong" sets only those to Move', async () => {
+            // Item 1: both checks agree. Item 4: only the first proposes a move.
+            const seen = {};
+            window.AI_SERVICE.mapEvidence = vi.fn(async (input) => {
+                const n = input.current.n;
+                seen[n] = (seen[n] || 0) + 1;
+                if (n === 1) return { images: [move(2)], imagesFailed: [], flags: [] };
+                if (n === 4) return { images: [seen[n] === 1 ? move(5, { shows: 'A policy.' }) : fits('Image 1')], imagesFailed: [], flags: [] };
+                return { images: input.images.map((i) => fits(i.evId)), imagesFailed: [], flags: [] };
+            });
+            await start();
+            expect(document.body.textContent).toContain('2 may belong with another question (1 strong)');
+            expect(document.body.textContent).toContain('Strong means every check proposed the same question.');
+            const rows = Array.from(document.querySelectorAll('.em-row'));
+            expect(rows.map((r) => r.querySelector('.em-strength').textContent)).toEqual(['STRONG', 'POSSIBLE']);
+            expect(rows[1].textContent).toContain('Not every check proposed a move.');
+            const choices = rows.map((r) => r.querySelector('.em-choice'));
+            expect(choices.map((c) => c.value)).toEqual(['', '']);
+            const accept = document.getElementById('em-accept-strong');
+            expect(accept.textContent).toBe('Accept all strong (1)');
+            accept.click();
+            expect(choices.map((c) => c.value)).toEqual(['move:cl1-A-1', '']);
+            expect(document.getElementById('em-accepted').textContent).toBe('1 set to Move. Press Save to apply them.');
+            // The "left empty" warning follows the bulk choice too.
+            expect(document.getElementById('em-hollow').textContent).toContain('item 1 (A.5.26, no remark either)');
+            // Nothing has moved yet.
+            expect(report.checklistProgress[0].evidenceImages).toEqual([img('chg')]);
+            document.getElementById('em-clear').click();
+            expect(choices.map((c) => c.value)).toEqual(['', '']);
+            accept.click();
+            window.__save();
+            expect(report.checklistProgress[0].evidenceImages).toEqual([]);
+            expect(report.checklistProgress[3].evidenceImage).toBe(img('policy'));
+            expect(window.showNotification).toHaveBeenCalledWith('Screenshots: moved 1.', 'success');
+        });
+
+        it('offers the other check’s question when the two differ, and no Accept button without a strong row', async () => {
+            let seen = 0;
+            window.AI_SERVICE.mapEvidence = vi.fn(async (input) => {
+                if (input.current.n !== 1) return { images: input.images.map((i) => fits(i.evId)), imagesFailed: [], flags: [] };
+                return { images: [move(seen++ === 0 ? 2 : 3)], imagesFailed: [], flags: [] };
+            });
+            await start();
+            expect(document.getElementById('em-accept-strong')).toBeNull();
+            const choice = document.querySelector('.em-choice');
+            expect(Array.from(choice.options).map((o) => o.textContent)).toEqual(['Leave where it is', 'Move to item 2 · 8.5.1', 'Also attach to item 2 · 8.5.1', 'Move to item 3 · A.8.32']);
+            expect(document.querySelector('.em-row').textContent).toContain('The checks proposed different questions. The other was item 3 · A.8.32.');
+        });
     });
 });
 
