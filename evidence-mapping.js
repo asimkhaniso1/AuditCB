@@ -10,6 +10,10 @@
 // The check sends the screenshots of one question at a time, with the list of
 // every question on the checklist, and asks where each belongs
 // (AI_SERVICE.mapEvidence). Nothing here writes on the auditor's behalf:
+//  - every screenshot is read twice; a move both readings agree on is marked
+//    Strong, and one button sets all of those to Move (2026-11-20: the user
+//    asked for less reading per audit, and single runs disagreed with each
+//    other on the borderline cases);
 //  - a proposal is a row on a review screen, set to "Leave where it is";
 //  - the auditor picks Move or Also attach per screenshot, then Save;
 //  - Save moves only those, keeps each capture time with its screenshot,
@@ -23,6 +27,11 @@
     const DERIVED = ['evidenceThumbs', 'evidenceImageThumb', '_evIds', '_origEvKeys'];
     const CONCURRENCY = 3;
     const ALSO_PER_QUESTION = 2;
+    // Each screenshot is read twice, so the moves both readings agree on can
+    // be told from the ones that come and go between runs.
+    const PASSES = 2;
+    // Measured live: 48 requests, three at a time, took about 230 seconds.
+    const SECONDS_PER_REQUEST = 4.8;
 
     function decode(v) {
         const U = global.UTILS || {};
@@ -100,10 +109,60 @@
 
     const cache = {};
 
+    // One row from every reading of one screenshot. On the same 118 screenshots
+    // three single runs proposed 26, 24 and 29 moves: the clear misfiles came
+    // back every time, the borderline ones came and went. So with two or more
+    // readings a move is 'strong' only when every reading proposes the same
+    // question; anything less is 'possible' and says why.
+    function combine(entry, passes) {
+        const row = { src: entry.src, from: entry.from, shows: '', here: '', fit: 'unchecked', to: null, alt: null, also: [], strength: '', doubt: '', reason: '', flags: [], error: '' };
+        const ok = entry.reads.filter((r) => r.ok);
+        if (!ok.length) return Object.assign(row, { error: (entry.reads.find((r) => r.error) || {}).error || 'Not checked.' });
+        const readable = ok.filter((r) => r.fit !== 'unreadable');
+        if (!readable.length) return Object.assign(row, { fit: 'unreadable', here: 'unreadable', shows: ok[0].shows || '' });
+        const first = (list, field) => (list.find((r) => r[field]) || {})[field] || '';
+        const flags = Array.from(new Set([].concat.apply([], readable.map((r) => r.flags || []))));
+        const places = (skip) => {
+            const seen = new Set(skip.filter(Boolean).map((x) => x.key));
+            const out = [];
+            readable.forEach((r) => (r.also || []).forEach((x) => { if (x && !seen.has(x.key)) { seen.add(x.key); out.push(x); } }));
+            return out;
+        };
+        const moves = readable.filter((r) => r.fit === 'fits_better_elsewhere' && r.to);
+        if (moves.length) {
+            const to = moves[0].to;
+            const other = moves.find((m) => m.to.key !== to.key);
+            const agreed = passes > 1 && moves.length === passes && !other;
+            let doubt = '';
+            if (passes > 1 && !agreed) {
+                doubt = other ? 'The checks proposed different questions.'
+                    : (ok.length < passes ? 'Only one check gave a reading.' : 'Not every check proposed a move.');
+            }
+            return Object.assign(row, {
+                fit: 'fits_better_elsewhere', here: 'none', to, alt: other ? other.to : null,
+                strength: passes > 1 ? (agreed ? 'strong' : 'possible') : '', doubt,
+                shows: first(moves, 'shows') || first(readable, 'shows'), reason: first(moves, 'reason'),
+                also: places([to, other && other.to]), flags
+            });
+        }
+        if (readable.every((r) => r.fit === 'unrelated')) return Object.assign(row, { fit: 'unrelated', here: 'none', shows: first(readable, 'shows'), flags });
+        // Fits where it is. An "also supports" question every reading named is the surer one.
+        const counts = new Map();
+        readable.forEach((r) => new Set((r.also || []).filter(Boolean).map((x) => x.key)).forEach((k) => counts.set(k, (counts.get(k) || 0) + 1)));
+        return Object.assign(row, {
+            fit: 'fits', here: readable.some((r) => r.here === 'direct') ? 'direct' : first(readable, 'here'),
+            shows: first(readable, 'shows'), reason: first(readable, 'reason'),
+            also: places([]).map((x) => Object.assign({}, x, { agreed: passes > 1 && counts.get(x.key) === passes })), flags
+        });
+    }
+
     /**
-     * Run the check. Returns { rows, calls, failedCalls, stopped }; one row
-     * per screenshot: { src, from, shows, fit, to, also, reason, flags, error }.
-     * opts.onProgress(done, total); opts.shouldStop() ends it early.
+     * Run the check. Returns { rows, calls, failedCalls, stopped, passes }; one
+     * row per screenshot: { src, from, shows, here, fit, to, alt, also,
+     * strength, doubt, reason, flags, error }.
+     * opts.passes: how many times each screenshot is read (default 1); see
+     * combine() for what 'strong' means. opts.onProgress(done, total);
+     * opts.shouldStop() ends it early.
      */
     async function check(report, opts) {
         const o = opts || {};
@@ -112,7 +171,11 @@
         const questions = questionIndex(report);
         const byN = new Map(questions.map((q) => [q.n, q]));
         const work = batches(report);
-        const rows = [];
+        const passes = Math.max(1, parseInt(o.passes, 10) || 1);
+        // Every screenshot once before any is read a second time, so a run
+        // that is stopped part-way still has a reading of each.
+        const jobs = [];
+        for (let pass = 0; pass < passes; pass++) work.forEach((b) => jobs.push(b));
         let done = 0;
         let failedCalls = 0;
         let next = 0;
@@ -121,13 +184,15 @@
         // supports it is worth offering.
         const withImages = new Set(progressOf(report).filter((item) => imagesOf(item).length).map(keyOf));
         const place = (q) => (q ? { n: q.n, key: q.key, clause: q.clause, text: q.text, status: q.status, empty: !withImages.has(q.key) } : null);
+        const entries = new Map();
+        const entryOf = (b, im) => b.key + '|' + im.evId + '|' + im.src;
+        work.forEach((b) => b.images.forEach((im) => entries.set(entryOf(b, im), { src: im.src, from: place(byN.get(b.n)), reads: [] })));
 
         async function worker() {
-            while (next < work.length) {
+            while (next < jobs.length) {
                 if (typeof o.shouldStop === 'function' && o.shouldStop()) { stopped = true; return; }
-                const b = work[next++];
+                const b = jobs[next++];
                 const from = place(byN.get(b.n));
-                const base = (im, extra) => Object.assign({ src: im.src, from, shows: '', here: '', fit: 'unchecked', to: null, also: [], reason: '', flags: [], error: '' }, extra);
                 try {
                     const res = await AI.mapEvidence({
                         current: { n: from.n, clause: from.clause, text: from.text },
@@ -138,8 +203,8 @@
                     const failed = new Map((res.imagesFailed || []).map((f) => [f.evId, f.reason]));
                     b.images.forEach((im) => {
                         const r = byId.get(im.evId);
-                        if (!r) { rows.push(base(im, { error: failed.get(im.evId) || 'Not checked.' })); return; }
-                        rows.push(base(im, {
+                        entries.get(entryOf(b, im)).reads.push(r ? {
+                            ok: true,
                             shows: r.shows,
                             here: r.here || '',
                             fit: r.fit,
@@ -147,20 +212,21 @@
                             also: (r.alsoItems || []).map((n) => place(byN.get(n))).filter(Boolean),
                             reason: r.reason,
                             flags: (res.flags || []).filter((f) => f.indexOf(im.evId + ':') === 0 || f.indexOf(im.evId + ' reason:') === 0)
-                        }));
+                        } : { ok: false, error: failed.get(im.evId) || 'Not checked.' });
                     });
                 } catch (err) {
                     failedCalls++;
-                    b.images.forEach((im) => rows.push(base(im, { error: (err && err.message) || 'The AI call failed.' })));
-                    if (err && err.authRequired) { stopped = true; next = work.length; }
+                    b.images.forEach((im) => entries.get(entryOf(b, im)).reads.push({ ok: false, error: (err && err.message) || 'The AI call failed.' }));
+                    if (err && err.authRequired) { stopped = true; next = jobs.length; }
                 }
                 done++;
-                if (typeof o.onProgress === 'function') o.onProgress(done, work.length);
+                if (typeof o.onProgress === 'function') o.onProgress(done, jobs.length);
             }
         }
-        await Promise.all(Array.from({ length: Math.min(o.concurrency || CONCURRENCY, work.length) }, worker));
-        rows.sort((a, b) => a.from.n - b.from.n);
-        return { rows, calls: work.length, failedCalls, stopped };
+        await Promise.all(Array.from({ length: Math.min(o.concurrency || CONCURRENCY, jobs.length) }, worker));
+        const rows = Array.from(entries.values()).map((e) => combine(e, passes));
+        rows.sort((x, y) => x.from.n - y.from.n);
+        return { rows, calls: jobs.length, failedCalls, stopped, passes };
     }
 
     // A question that has no screenshot and is not set aside (not sampled, not
@@ -179,19 +245,25 @@
         const byTarget = new Map();
         list.filter((r) => r.fit === 'fits').forEach((r) => {
             (r.also || []).filter(needsEvidence).forEach((p) => {
-                const g = byTarget.get(p.key) || { target: p, rows: [] };
+                const g = byTarget.get(p.key) || { target: p, rows: [], sure: new Set() };
                 g.rows.push(r);
+                if (p.agreed) g.sure.add(r);
                 byTarget.set(p.key, g);
             });
         });
-        const rank = (r) => (r.here === 'direct' ? 0 : 1);
-        const gaps = Array.from(byTarget.values()).sort((a, b) => a.target.n - b.target.n).map((g) => ({
-            target: g.target,
-            total: g.rows.length,
-            rows: g.rows.slice().sort((a, b) => rank(a) - rank(b) || a.from.n - b.from.n).slice(0, ALSO_PER_QUESTION)
-        }));
+        const gaps = Array.from(byTarget.values()).sort((a, b) => a.target.n - b.target.n).map((g) => {
+            const rank = (r) => (g.sure.has(r) ? 0 : 2) + (r.here === 'direct' ? 0 : 1);
+            return {
+                target: g.target,
+                total: g.rows.length,
+                rows: g.rows.slice().sort((a, b) => rank(a) - rank(b) || a.from.n - b.from.n).slice(0, ALSO_PER_QUESTION)
+            };
+        });
+        const move = list.filter((r) => r.fit === 'fits_better_elsewhere' && r.to)
+            .sort((a, b) => (a.strength === 'strong' ? 0 : 1) - (b.strength === 'strong' ? 0 : 1) || a.from.n - b.from.n);
         return {
-            move: list.filter((r) => r.fit === 'fits_better_elsewhere' && r.to),
+            move,
+            strong: move.filter((r) => r.strength === 'strong'),
             gaps,
             unrelated: list.filter((r) => r.fit === 'unrelated'),
             unreadable: list.filter((r) => r.fit === 'unreadable'),
@@ -308,27 +380,35 @@
         if (kind === 'move') {
             options.push('<option value="move:' + esc(row.to.key) + '">Move to ' + esc(placeLabel(row.to)) + '</option>');
             options.push('<option value="copy:' + esc(row.to.key) + '">Also attach to ' + esc(placeLabel(row.to)) + '</option>');
+            // The other reading's question, when the two differed.
+            if (row.alt) options.push('<option value="move:' + esc(row.alt.key) + '">Move to ' + esc(placeLabel(row.alt)) + '</option>');
             (row.also || []).forEach((p) => options.push('<option value="copy:' + esc(p.key) + '">Also attach to ' + esc(placeLabel(p)) + '</option>'));
         } else {
             options.push('<option value="copy:' + esc(gap.key) + '">Also attach to ' + esc(placeLabel(gap)) + '</option>');
         }
         const target = kind === 'move' ? row.to : null;
+        const strong = kind === 'move' && row.strength === 'strong';
+        const badge = kind !== 'move' || !row.strength ? ''
+            : (strong
+                ? '<span class="em-strength" title="Both checks proposed the same question" style="background:#dcfce7;color:#166534;font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9px;margin-right:0.4rem;">STRONG</span>'
+                : '<span class="em-strength" title="' + esc(row.doubt) + '" style="background:#f1f5f9;color:#475569;font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9px;margin-right:0.4rem;">POSSIBLE</span>');
         return `
             <div class="em-row" style="border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.8rem;display:flex;gap:0.8rem;align-items:flex-start;">
                 ${thumbHtml(row.src)}
                 <div style="flex:1;min-width:0;font-size:0.8rem;line-height:1.45;color:#334155;">
-                    <div><strong>${esc(row.shows || 'No description: look at the screenshot.')}</strong></div>
+                    <div>${badge}<strong>${esc(row.shows || 'No description: look at the screenshot.')}</strong></div>
                     <div style="color:#64748b;">Filed under <span style="font-family:monospace;">${esc(placeLabel(row.from))}</span>: ${esc(short(row.from.text, 110))}</div>
                     ${target ? `<div style="color:#1d4ed8;">May belong with <span style="font-family:monospace;">${esc(placeLabel(target))}</span>: ${esc(short(target.text, 110))}</div>` : ''}
                     ${row.reason ? `<div style="color:#64748b;">Why: ${esc(row.reason)}</div>` : ''}
-                    <select class="form-control form-control-sm em-choice" data-row="${r}" aria-label="What to do with this screenshot" style="margin-top:0.35rem;max-width:26rem;font-size:0.8rem;">${options.join('')}</select>
+                    ${kind === 'move' && row.doubt ? `<div style="color:#94a3b8;">${esc(row.doubt)}${row.alt ? ' The other was ' + esc(placeLabel(row.alt)) + '.' : ''}</div>` : ''}
+                    <select class="form-control form-control-sm em-choice" data-row="${r}"${strong ? ' data-strong="1"' : ''} aria-label="What to do with this screenshot" style="margin-top:0.35rem;max-width:26rem;font-size:0.8rem;">${options.join('')}</select>
                 </div>
             </div>`;
     }
 
     function summaryText(p, total) {
         const parts = [p.fits.length + ' fit the question they are under'];
-        if (p.move.length) parts.push(p.move.length + ' may belong with another question');
+        if (p.move.length) parts.push(p.move.length + ' may belong with another question' + (p.strong.length ? ' (' + p.strong.length + ' strong)' : ''));
         if (p.unrelated.length) parts.push(p.unrelated.length + ' ' + (p.unrelated.length === 1 ? 'does' : 'do') + ' not look like evidence for any question');
         if (p.unreadable.length) parts.push(p.unreadable.length + ' could not be read');
         if (p.unchecked.length) parts.push(p.unchecked.length + ' could not be checked');
@@ -352,8 +432,14 @@
             <div style="font-size:0.85rem;color:#475569;margin-bottom:0.6rem;line-height:1.5;">
                 ${esc(summaryText(p, result.rows.length))}
                 ${shown.length ? 'Each proposal below is the AI\'s reading of the screenshot. Nothing moves unless you choose it here and press Save.' : 'There is nothing to move.'}
+                ${result.passes > 1 && p.move.length ? 'Each screenshot was checked ' + (result.passes === 2 ? 'twice' : result.passes + ' times') + ': <strong>Strong</strong> means every check proposed the same question.' : ''}
                 ${result.stopped ? '<strong>The check was stopped before it finished.</strong>' : ''}
             </div>
+            ${p.strong.length ? `<div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem;">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="em-accept-strong">Accept all strong (${p.strong.length})</button>
+                <button type="button" class="btn btn-sm btn-link" id="em-clear" style="padding:0;font-size:0.78rem;">Clear choices</button>
+                <span id="em-accepted" style="font-size:0.78rem;color:#64748b;"></span>
+            </div>` : ''}
             <div id="em-hollow" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;color:#92400e;margin-bottom:0.6rem;"></div>
             <div id="em-list" style="display:flex;flex-direction:column;gap:0.6rem;max-height:54vh;overflow:auto;">
                 ${p.move.length ? '<div style="font-size:0.75rem;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:0.03em;">May belong with another question</div>' : ''}
@@ -402,6 +488,21 @@
                     : '';
             });
         }
+        // One click sets every Strong row to Move; Save still applies them.
+        const accept = document.getElementById('em-accept-strong');
+        const said = document.getElementById('em-accepted');
+        const setAll = (pick) => {
+            let n = 0;
+            document.querySelectorAll('.em-choice').forEach((el) => { const v = pick(el); if (v != null && el.value !== v) { el.value = v; n++; } });
+            if (list) list.dispatchEvent(new Event('change'));
+            return n;
+        };
+        if (accept) accept.addEventListener('click', () => {
+            setAll((el) => (el.getAttribute('data-strong') === '1' ? el.options[1].value : null));
+            if (said) said.textContent = p.strong.length + ' set to Move. Press Save to apply them.';
+        });
+        const clear = document.getElementById('em-clear');
+        if (clear) clear.addEventListener('click', () => { setAll(() => ''); if (said) said.textContent = ''; });
         const again = document.getElementById('em-again');
         if (again) again.addEventListener('click', () => { delete cache[String(reportId)]; global.openEvidenceMapping(reportId); });
         if (typeof global.resolveAllIdbThumbs === 'function') global.resolveAllIdbThumbs();
@@ -409,10 +510,10 @@
 
     async function run(reportId, report) {
         let stop = false;
-        const t = totals(report);
+        const requests = batches(report).length * PASSES;
         global.DataService.openFormModal('Evidence mapping — checking', `
             <div style="font-size:0.9rem;color:#334155;line-height:1.6;">
-                <div id="em-progress">Checking ${t.images} screenshot${t.images === 1 ? '' : 's'}…</div>
+                <div id="em-progress">Checked 0 of ${requests} requests… The first results take about 15 seconds.</div>
                 <div style="height:8px;background:#e2e8f0;border-radius:4px;margin:0.6rem 0;overflow:hidden;"><div id="em-bar" style="height:100%;width:0;background:#2563eb;transition:width 0.3s;"></div></div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="em-stop">Stop</button>
             </div>`, null);
@@ -422,11 +523,12 @@
         let result;
         try {
             result = await check(report, {
+                passes: PASSES,
                 shouldStop: () => stop,
                 onProgress: (done, total) => {
                     const label = document.getElementById('em-progress');
                     const bar = document.getElementById('em-bar');
-                    if (label) label.textContent = 'Checked ' + done + ' of ' + total + ' question group' + (total === 1 ? '' : 's') + '…';
+                    if (label) label.textContent = 'Checked ' + done + ' of ' + total + ' request' + (total === 1 ? '' : 's') + '…';
                     if (bar) bar.style.width = Math.round(done / total * 100) + '%';
                 }
             });
@@ -448,12 +550,14 @@
         if (!AI || typeof AI.mapEvidence !== 'function') { notify('AI is not available.', 'warning'); return; }
         const kept = cache[String(reportId)];
         if (kept && kept.sig === signature(report)) { showResults(reportId, report, kept.result); return; }
-        const calls = batches(report).length;
+        const calls = batches(report).length * PASSES;
+        const minutes = Math.max(1, Math.ceil(calls * SECONDS_PER_REQUEST / 60));
         global.DataService.openFormModal('Evidence mapping', `
             <div style="font-size:0.88rem;color:#334155;line-height:1.6;">
                 <p style="margin:0 0 0.6rem;">This checks that each screenshot is filed under the question it supports, and proposes a better question where it is not.</p>
                 <ul style="margin:0 0 0.8rem 1.1rem;padding:0;">
-                    <li><strong>${t.images} screenshot${t.images === 1 ? '' : 's'}</strong> on ${t.questions} question${t.questions === 1 ? '' : 's'} will be sent to the AI service, in ${calls} request${calls === 1 ? '' : 's'}. It takes a few minutes.</li>
+                    <li><strong>${t.images} screenshot${t.images === 1 ? '' : 's'}</strong> on ${t.questions} question${t.questions === 1 ? '' : 's'} will be sent to the AI service twice, in ${calls} requests. It takes about ${minutes} minute${minutes === 1 ? '' : 's'}.</li>
+                    <li>A move that both checks agree on is marked <strong>Strong</strong>, and you can accept all of those with one click.</li>
                     <li>You get a list of proposals. <strong>Nothing moves unless you choose it and press Save.</strong></li>
                     <li>Results and remarks are not changed.</li>
                 </ul>
