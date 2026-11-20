@@ -4272,6 +4272,19 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     </button>
                 </div>`;
     })()}
+            ${(function () {
+        // Is each screenshot filed under the question it supports
+        // (evidence-mapping.js)? Proposals only; the auditor chooses each move.
+        const r = state.auditReports.find(x => String(x.id) === String(reportId));
+        const t = (r && window.EvidenceMapping) ? window.EvidenceMapping.totals(r) : { images: 0, questions: 0 };
+        if (!t.images) return '';
+        return `<div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:0.9rem;">
+                    <div style="flex:1;min-width:220px;font-size:0.85rem;color:#334155;"><strong>${t.images} screenshot${t.images === 1 ? '' : 's'}</strong> on ${t.questions} question${t.questions === 1 ? '' : 's'}. Check that each is filed under the question it supports; you choose what moves.</div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="openEvidenceMapping" data-id="${esc(String(reportId))}" aria-label="Check evidence mapping">
+                        <i class="fa-solid fa-images" style="margin-right: 0.3rem;"></i>Check evidence mapping
+                    </button>
+                </div>`;
+    })()}
             ${allItems.length ? `
             <div style="display: flex; flex-direction: column; gap: 0.6rem;">
                 ${allItems.map(it => {

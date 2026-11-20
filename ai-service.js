@@ -670,6 +670,150 @@ function _evidenceUsage(u) {
     };
 }
 
+// ---------- Evidence mapping check (2026-11-20) ----------
+// On the PC Connection recert, 19 of 118 screenshots sat under a different
+// question from the one they supported (the change register under the incident
+// review, the remote-work policies under budgeting), which left "conform"
+// answers with no evidence of their own. This asks, for the screenshots on one
+// question, whether each belongs there or under another question on the same
+// checklist. It proposes; the auditor decides, and nothing is moved here.
+// em2 (first live run, 2026-11-20): asked only "fits or fits better elsewhere",
+// the model proposed 51 moves of 118 where a hand check found 19: it moved an
+// image whenever another question matched a little better. It now rates how
+// well the image supports the question it is under and names the one question
+// it is the most direct evidence for; a move is proposed only when the rating
+// is "none". Item numbers came back as clause numbers ("4.4") and as strings.
+const EVIDENCE_MAP_PROMPT_VERSION = 'em2';
+const EVIDENCE_MAP_HERE = ['direct', 'partial', 'none', 'unreadable'];
+const EVIDENCE_MAP_QUESTION_CHARS = 170;
+const EVIDENCE_MAP_MAX_ALSO = 2;
+
+function _evidenceMapPrompt(input, sent) {
+    const i = input || {};
+    const cur = i.current || {};
+    const list = (Array.isArray(i.questions) ? i.questions : [])
+        .map((q) => q.n + ' | ' + (q.clause || '-') + ' | ' + String(q.text || '').replace(/\s+/g, ' ').slice(0, EVIDENCE_MAP_QUESTION_CHARS))
+        .join('\n');
+    return `You help a certification body auditor check that each screenshot is filed under the right audit question. You do not decide conformity; the auditor does.
+
+THESE SCREENSHOTS ARE FILED UNDER item ${cur.n}${cur.clause ? ' (' + cur.clause + ')' : ''}:
+${cur.text || 'Not recorded.'}
+
+EVERY QUESTION ON THE CHECKLIST (item number | clause | question):
+${list}
+
+IMAGES:
+The ${sent.length} image(s) follow this prompt in this order: ${sent.map((s, n) => 'Image ' + (n + 1) + ' = ' + s.evId).join('; ')}.
+
+Rules:
+1. shows: ONE short sentence (at most 25 words) saying what the image is, from what is visible only. If its text is too small or blurred to read, set here "unreadable", shows "Text not legible." and visibleText [].
+2. visibleText: copy up to 8 short pieces of text exactly as they appear in the image (its title, headings, system or document name). Every document, system or person name and every figure you mention must be copied here.
+3. here: how well the image supports the question it is filed under. "direct": it is evidence of what that question asks the auditor to verify. "partial": it is related to that question, though it is mainly evidence of something else. "none": an auditor answering that question would not use this image.
+4. Be conservative with "none": use it only for a clear mismatch. If the image plausibly supports the question it is filed under, answer "direct" or "partial".
+5. bestItem: the item number of the ONE question in the list that this image is the most direct evidence for. It may be the item it is filed under. Use null when the image is not audit evidence for any question (for example a meeting invitation or a blank screen).
+6. alsoItems: up to ${EVIDENCE_MAP_MAX_ALSO} other item numbers that this image is direct evidence for; otherwise [].
+7. An item number is the whole number in the first column of the list. Never give a clause number such as "7.5" or "A.8.3".
+8. reason: one sentence (at most 25 words) naming what in the image ties it to bestItem. Never write "conform", "nonconformity", "compliant", "compliance" or any certification judgement.
+
+Return JSON only, in this shape:
+{"images":[{"evId":"","shows":"","visibleText":[""],"here":"","bestItem":null,"alsoItems":[],"reason":""}]}`;
+}
+
+// ---------- Draft from evidence, for Fix findings (2026-11-20) ----------
+// "Polish" rewrites the text in a box, so it can do nothing for the empty
+// "What you saw" box of a finding whose only records are a two-word note and a
+// screenshot. This drafts that box from what the auditor did record: the note,
+// the finding note, who it was recorded with, when the screenshots were taken
+// and what the screenshots show. A fact none of those gives is left as
+// "[To write: …]" for the auditor, and Fix findings will not save a box that
+// still has one. Every name, date and figure in the draft must come from a
+// quoted screenshot or the auditor's own record, or its sentence is removed.
+// fd2 (live samples, 2026-11-20): fd1 put quotation marks round every name
+// and date, gave the person's name beside the role, restated the question's
+// pre-audit note, said what the evidence "did not show", wrote "the auditor
+// noted", left no blank where the note only named an issue ("Document Data
+// Control issue"), and took a requirement from the wrong standard when the
+// finding's standard was not set.
+// fd3: the question's planning notes ("Pre-audit gap: no documented
+// information was on file…") were written up as if the auditor had found
+// them, so they are cut from the question before it is sent or used as a
+// source; quotation marks the model still put round names are removed.
+const FINDING_DRAFT_PROMPT_VERSION = 'fd3';
+// What the checklist builder appends to a question for the auditor's planning.
+const FINDING_DRAFT_PLANNING_RE = /\s*(?:Documented information on file|Pre-audit gap\s*:|No validated supporting document mapped)[\s\S]*$/i;
+function _findingDraftInput(input) {
+    const i = input || {};
+    return Object.assign({}, i, { question: String(i.question || '').replace(FINDING_DRAFT_PLANNING_RE, '').trim() });
+}
+// "Workflow" → Workflow. An apostrophe inside a word is not a quotation mark.
+function _findingDraftUnquote(text) {
+    return String(text || '')
+        .replace(/["\u201C\u201D]([^"\u201C\u201D]{1,90})["\u201C\u201D]/g, '$1')
+        .replace(/(^|[\s(])['\u2018]([^'\u2018\u2019]{1,90})['\u2019](?=[\s.,;:)\]]|$)/g, '$1$2');
+}
+const FINDING_DRAFT_TO_WRITE_RE = /\[To write:[^\]]*\]/gi;
+// The auditor decides the result; an evidence paragraph never states one.
+// ("compliance" alone is left: it is in document names such as a Compliance Register.)
+const FINDING_DRAFT_JUDGEMENT_RE = /\b(non-?conform\w*|conform(?:s|ed|ing|ity|ance)?|(?:is|are|was|were|not|fully)\s+compliant|non-?compliant)\b/i;
+const FINDING_DRAFT_GRADES = { major: 'Major nonconformity', minor: 'Minor nonconformity', observation: 'Observation', ofi: 'Opportunity for improvement' };
+
+function _findingDraftPrompt(input, sent) {
+    const i = input || {};
+    const reqs = Array.isArray(i.requirements) ? i.requirements : [];
+    const reqText = reqs.length
+        ? reqs.map((r) => '- ' + [r.standard, r.clause ? 'clause ' + r.clause : '', r.title].filter(Boolean).join(' — ') + ': ' + (r.text || '')).join('\n')
+        : 'Not resolved for this question — rely on the audit question.';
+    const grade = String(i.grade || '').toLowerCase();
+    const result = FINDING_DRAFT_GRADES[grade] || (grade === 'conform' ? 'Conforming' : 'Not stated');
+    const imageList = sent.length
+        ? 'The ' + sent.length + ' screenshot(s) the auditor captured follow this prompt in this order: ' + sent.map((s, n) => 'Image ' + (n + 1)).join('; ') + '.'
+        : 'No screenshots were sent. Use the auditor\'s notes only.';
+    const middle = grade === 'ofi'
+        ? 'what could be more effective'
+        : (grade === 'observation' ? 'what was seen and the risk if it continues' : 'what was not fulfilled');
+    const task = i.kind === 'statement'
+        ? `Write the finding statement in three parts, 2 to 4 sentences in all:
+(1) what clause ${i.clause || 'the requirement'} requires, in one sentence. Take it from the AUDIT QUESTION; use the REQUIREMENT(S) text only when it is clearly about the same subject as the question. Refer to the clause exactly as written here.
+(2) ${middle}, only from the auditor's notes. If the notes do not say it, write [To write: ${middle}] in its place.
+(3) one sentence starting "Evidence:" naming what showed it, from the notes and the screenshots.
+Write the statement itself, not a report of it.`
+        : `Write the "objective evidence" paragraph: what was reviewed, and what it showed. 2 to 4 sentences, past tense, plain audit-report English, for example "The <document> was reviewed with the <role> on <date>. It <what it shows>."
+Do not say whether the requirement is met: never write "conform", "nonconformity", "compliant" or any certification judgement.
+Do not restate the audit question, and do not say what the evidence fails to show beyond what the auditor's notes say.`;
+    return `You help a certification body lead auditor write up what the auditor recorded for one audit question. You never add facts, and you never decide the result: the auditor has recorded it.
+
+AUDIT QUESTION${i.clause ? ' (' + i.clause + ')' : ''}:
+${i.question || 'Not recorded.'}
+
+REQUIREMENT(S):
+${reqText}
+
+RESULT RECORDED BY THE AUDITOR: ${result}
+AUDITOR'S NOTE: ${i.remark ? '"' + i.remark + '"' : 'None recorded.'}
+AUDITOR'S FINDING NOTE: ${i.statement ? '"' + i.statement + '"' : 'None recorded.'}
+RECORDED WITH: ${[i.auditee, i.designation].filter(Boolean).join(', ') || 'Not recorded.'}
+SCREENSHOTS CAPTURED ON: ${(Array.isArray(i.dates) && i.dates.length) ? i.dates.join('; ') : 'Not recorded.'}
+
+IMAGES:
+${imageList}
+
+TASK:
+${task}
+
+Rules:
+1. Use only the auditor's notes, the facts above and what is visible in the screenshots. Name documents, systems and records exactly as they appear.
+2. quotes: copy into "quotes", exactly as it appears, every document, system or person name, date and figure you take from a screenshot.
+3. Where the text needs a fact that neither the notes nor the screenshots give (what exactly was missing, which record was sampled, what a person said), do not guess. Write [To write: what is needed] in that place. Use at most 3.
+4. The auditor's notes are short. When a note names an issue without saying what it was (for example "document control issue"), give the note's point and add [To write: what the issue was].
+5. When a role is recorded, write the role (the Process & Quality Manager) and never the person's name.
+6. Write names, dates and figures as plain text, with no quotation marks round them.
+7. Do not infer frequency, completeness, approval, ownership or effectiveness unless a screenshot shows it. Ignore a screenshot whose text cannot be read.
+8. The auditor is the writer: never write "the auditor noted", "the auditor stated", "the review identified" or "an opportunity was identified".
+
+Return JSON only, in this shape:
+{"text":"","quotes":[""]}`;
+}
+
 const AI_SERVICE = {
 
     // Main function to generate agenda
@@ -1070,6 +1214,213 @@ Return a raw JSON array with 'id' and 'text' fields only:
             imagesFailed: prep.failed,
             usage: _evidenceUsage(resp.usage),
             result: checked.result,
+            flags: checked.flags
+        };
+    },
+
+    // ---------- Evidence mapping check ----------
+    EVIDENCE_MAX_IMAGES: EVIDENCE_MAX_IMAGES,
+
+    /**
+     * Normalise the model's reply for one question's screenshots into
+     * fit: fits | fits_better_elsewhere | unrelated | unreadable. A move
+     * (fits_better_elsewhere + betterItem) needs the image rated "none" where
+     * it is and a best question that is on the checklist and is a different
+     * one; anything less leaves the image where it is.
+     */
+    validateEvidenceMapping: (parsed, input, prep) => {
+        const flags = [];
+        const i = input || {};
+        const cur = i.current || {};
+        const questions = Array.isArray(i.questions) ? i.questions : [];
+        const byN = new Map(questions.map((q) => [Number(q.n), q]));
+        const sentIds = ((prep && prep.sent) || []).map((s) => s.evId);
+        const p = (parsed && typeof parsed === 'object') ? parsed : {};
+        const seen = new Map();
+        (Array.isArray(p.images) ? p.images : []).forEach((im, n) => {
+            let id = String((im && im.evId) || '').trim();
+            if (sentIds.indexOf(id) === -1) id = sentIds[n];
+            if (!id || seen.has(id)) return;
+            seen.set(id, im || {});
+        });
+        const oneSentence = (text) => {
+            const first = _evidenceSentences(text)[0] || '';
+            return first.length > 240 ? first.slice(0, 237).replace(/\s+\S*$/, '') + '…' : first;
+        };
+        // A whole item number from the list; "13" counts, a clause number does not.
+        const onList = (v) => {
+            if (v == null || v === '') return null;
+            const n = Number(v);
+            return Number.isInteger(n) && byN.has(n) ? n : null;
+        };
+        const here = Number(cur.n);
+        const images = sentIds.map((id) => {
+            const im = seen.get(id);
+            if (!im) {
+                flags.push(id + ': the AI did not describe this image.');
+                return { evId: id, shows: '', visibleText: [], here: 'unreadable', fit: 'unreadable', betterItem: null, alsoItems: [], reason: '' };
+            }
+            // No rating given: treated as fitting, so nothing is proposed.
+            const rating = EVIDENCE_MAP_HERE.indexOf(im.here) !== -1 ? im.here : 'direct';
+            if (rating === 'unreadable') return { evId: id, shows: 'Text not legible.', visibleText: [], here: rating, fit: 'unreadable', betterItem: null, alsoItems: [], reason: '' };
+            const visibleText = (Array.isArray(im.visibleText) ? im.visibleText : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 8);
+            const best = onList(im.bestItem);
+            const named = im.bestItem != null && im.bestItem !== '';
+            // A move is proposed only for an image rated "none" where it is.
+            let fit = 'fits';
+            let betterItem = null;
+            if (rating === 'none') {
+                if (best != null && best !== here) { fit = 'fits_better_elsewhere'; betterItem = best; }
+                else if (!named) fit = 'unrelated';
+                else if (best == null) flags.push(id + ': the AI proposed a question that is not on this checklist; left where it is.');
+            }
+            const alsoItems = [];
+            const also = (n) => {
+                if (n != null && n !== here && n !== betterItem && alsoItems.indexOf(n) === -1 && alsoItems.length < EVIDENCE_MAP_MAX_ALSO + 1) alsoItems.push(n);
+            };
+            // Fits where it is, and is the most direct evidence for another question too.
+            if (fit === 'fits') also(best);
+            (Array.isArray(im.alsoItems) ? im.alsoItems : []).forEach((v) => also(onList(v)));
+            const target = betterItem != null ? byN.get(betterItem) : null;
+            const source = [visibleText.join('\n'), cur.text || '', cur.clause || '', target ? target.text + ' ' + (target.clause || '') : '',
+                alsoItems.map((n) => byN.get(n).text + ' ' + (byN.get(n).clause || '')).join('\n')].join('\n');
+            return {
+                evId: id,
+                shows: oneSentence(_evidenceClean(String(im.shows || ''), source, id, flags)),
+                visibleText,
+                here: rating,
+                fit,
+                betterItem,
+                alsoItems,
+                reason: oneSentence(_evidenceClean(String(im.reason || ''), source, id + ' reason', flags))
+            };
+        });
+        return { images, flags };
+    },
+
+    /**
+     * Check the screenshots filed under one question against every question
+     * on the checklist. input: { current: {n, clause, text},
+     * questions: [{n, clause, text}], images: [{evId, src}] } with at most
+     * EVIDENCE_MAX_IMAGES images (the caller splits larger sets).
+     * Returns proposals only; it never changes a checklist answer.
+     */
+    mapEvidence: async (input) => {
+        const prep = await AI_SERVICE.prepareEvidenceImages((input && input.images) || []);
+        if (!prep.sent.length) {
+            return { status: 'nothing', promptVersion: EVIDENCE_MAP_PROMPT_VERSION, imagesSent: [], imagesFailed: prep.failed, images: [], flags: ['No screenshot could be loaded: nothing was sent.'] };
+        }
+        const started = Date.now();
+        const prompt = _evidenceMapPrompt(input, prep.sent);
+        let resp;
+        let parsed = null;
+        // In the live run 2 of 48 replies were cut off (thinking tokens count
+        // against the limit) and could not be parsed. One more try, then the
+        // caller is told: an unread reply must not look like unreadable images.
+        for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
+            resp = await AI_SERVICE.callProxyAPI(prompt, {
+                images: prep.sent.map((s) => ({ mimeType: s.mimeType, data: s.data })),
+                json: true,
+                withUsage: true,
+                feature: 'evidence-mapping',
+                models: [EVIDENCE_MODEL],
+                maxTokens: 16384,
+                temperature: 0.1
+            });
+            try {
+                parsed = JSON.parse(String(resp.text || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim());
+            } catch (_e) { parsed = null; }
+            if (!parsed || typeof parsed !== 'object') parsed = null;
+        }
+        if (!parsed) throw new Error('The AI reply could not be read.');
+        const checked = AI_SERVICE.validateEvidenceMapping(parsed, input, prep);
+        return {
+            status: 'draft',
+            promptVersion: EVIDENCE_MAP_PROMPT_VERSION,
+            model: resp.model,
+            latencyMs: Date.now() - started,
+            imagesSent: prep.sent.map((s) => s.evId),
+            imagesFailed: prep.failed,
+            usage: _evidenceUsage(resp.usage),
+            images: checked.images,
+            flags: checked.flags
+        };
+    },
+
+    // ---------- Draft from evidence (Fix findings) ----------
+    FINDING_DRAFT_TO_WRITE_RE: new RegExp(FINDING_DRAFT_TO_WRITE_RE.source, 'i'),
+
+    /**
+     * Check a drafted text sentence by sentence. A sentence is removed when it
+     * names a document or gives a figure that is not in the quoted screenshot
+     * text or the auditor's own record, or (evidence paragraph only) states a
+     * conformity judgement. "[To write: …]" blanks are kept as they are.
+     */
+    validateFindingDraft: (parsed, input) => {
+        const flags = [];
+        const i = _findingDraftInput(input);
+        const p = (parsed && typeof parsed === 'object') ? parsed : {};
+        const quotes = (Array.isArray(p.quotes) ? p.quotes : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 40);
+        const reqText = (Array.isArray(i.requirements) ? i.requirements : []).map((r) => [r.standard, r.clause, r.title, r.text].filter(Boolean).join(' ')).join('\n');
+        const source = [quotes.join('\n'), i.remark || '', i.statement || '', i.question || '', i.clause || '', reqText, i.auditee || '', i.designation || '', (i.dates || []).join('\n')].join('\n');
+        const srcLower = source.toLowerCase();
+        const srcNumbers = new Set(_extractNumericTokens(source));
+        const kept = [];
+        _evidenceSentences(_findingDraftUnquote(p.text).replace(/\s+/g, ' ').trim()).forEach((sentence) => {
+            // What sits inside a blank is an instruction to the auditor, not a fact.
+            const facts = sentence.replace(FINDING_DRAFT_TO_WRITE_RE, ' ');
+            if (i.kind !== 'statement' && FINDING_DRAFT_JUDGEMENT_RE.test(facts)) {
+                flags.push('Removed a sentence that stated a result ("' + sentence.slice(0, 80) + '"); the result is yours to record.');
+                return;
+            }
+            const unsupported = _evidenceUnsupported(facts, srcLower, srcNumbers);
+            if (unsupported.length) {
+                flags.push('Removed a sentence naming ' + unsupported.map((u) => '"' + u + '"').join(', ') + ', which is not in your notes and was not quoted from a screenshot.');
+                return;
+            }
+            kept.push(sentence);
+        });
+        const text = kept.join(' ');
+        if (!text) flags.push('Nothing was left after the checks; write it yourself.');
+        return { text, flags, blanks: (text.match(FINDING_DRAFT_TO_WRITE_RE) || []).length };
+    },
+
+    /**
+     * Draft the text of one Fix findings box from what the auditor recorded.
+     * input: evidenceInputFor(item, report) plus { kind: 'evidence'|'statement',
+     * grade, statement, auditee, designation, dates }. Returns
+     * { status, text, blanks, flags }; it never writes to a checklist answer.
+     */
+    draftFindingText: async (input) => {
+        const i = _findingDraftInput(input);
+        const prep = await AI_SERVICE.prepareEvidenceImages(i.images || []);
+        if (!prep.sent.length && !String(i.remark || '').trim() && !String(i.statement || '').trim()) {
+            return { status: 'nothing', text: '', blanks: 0, imagesSent: [], imagesFailed: prep.failed, flags: ['No note and no readable screenshot is recorded for this question: there is nothing to draft from.'] };
+        }
+        const resp = await AI_SERVICE.callProxyAPI(_findingDraftPrompt(i, prep.sent), {
+            images: prep.sent.map((s) => ({ mimeType: s.mimeType, data: s.data })),
+            json: true,
+            withUsage: true,
+            feature: 'finding-draft',
+            models: [EVIDENCE_MODEL],
+            maxTokens: 8192,
+            temperature: 0.1
+        });
+        let parsed;
+        try {
+            parsed = JSON.parse(String(resp.text || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim());
+        } catch (_e) { parsed = null; }
+        if (!parsed || typeof parsed !== 'object') throw new Error('The AI reply could not be read.');
+        const checked = AI_SERVICE.validateFindingDraft(parsed, i);
+        return {
+            status: 'draft',
+            promptVersion: FINDING_DRAFT_PROMPT_VERSION,
+            model: resp.model,
+            text: checked.text,
+            blanks: checked.blanks,
+            imagesSent: prep.sent.map((s) => s.evId),
+            imagesFailed: prep.failed,
+            usage: _evidenceUsage(resp.usage),
             flags: checked.flags
         };
     },
