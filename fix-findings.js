@@ -11,8 +11,12 @@
 //    remark as the evidence, and the judgement left as a [blank] to write;
 //  - "Polish" rewrites only text already in the box, and the result stays
 //    editable (Undo puts the auditor's version back);
-//  - Save writes only boxes the auditor changed, refuses a statement with a
-//    [blank] still in it, and keeps the original note of a rewritten remark.
+//  - "Draft from evidence" (2026-11-20) proposes the text of a box from the
+//    auditor's own record of that question: the note, the finding note, who it
+//    was recorded with and what the attached screenshots show. What none of
+//    those says is left as "[To write: …]". It fills the box, never the answer;
+//  - Save writes only boxes the auditor changed, refuses a box with a [blank]
+//    still in it, and keeps the original note of a rewritten remark.
 // It saves through window.saveChecklist, the same path as Review Criteria.
 (function (global) {
     'use strict';
@@ -50,6 +54,39 @@
     function hasBlanks(text) {
         const H = global.FindingStatementHint;
         return !!(H && H.hasBlanks(text));
+    }
+    // A blank left by "Draft from evidence": never saved, in either box.
+    const TO_WRITE_RE = /\[To write:[^\]]*\]/i;
+    const hasToWrite = (text) => TO_WRITE_RE.test(String(text == null ? '' : text));
+
+    // "17 November 2026": the form the drafted text uses, so its dates can be
+    // checked against what was recorded.
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    function captureDates(item) {
+        const list = (Array.isArray(item.evidenceCapturedAtList) && item.evidenceCapturedAtList.length ? item.evidenceCapturedAtList : [item.evidenceCapturedAt]).filter(Boolean);
+        const out = [];
+        list.forEach((iso) => {
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return;
+            const text = d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+            if (out.indexOf(text) === -1) out.push(text);
+        });
+        return out;
+    }
+
+    /** What "Draft from evidence" may use for one box: only the auditor's record of that question. */
+    function draftInputFor(row, key, report) {
+        const AI = global.AI_SERVICE;
+        const item = row.item || {};
+        const base = AI && typeof AI.evidenceInputFor === 'function' ? AI.evidenceInputFor(item, report) : { clause: row.clause, question: row.question, requirements: [], remark: decode(item.comment || ''), images: [] };
+        return Object.assign({}, base, {
+            kind: key === 'ncrDescription' ? 'statement' : 'evidence',
+            grade: item.status === 'nc' ? lower(item.ncrType) : lower(item.status),
+            statement: decode(item.ncrDescription || ''),
+            auditee: decode(item.personnel || ''),
+            designation: decode(item.designation || ''),
+            dates: captureDates(item)
+        });
     }
 
     // The question's own text, from the checklist when the answer doesn't carry it.
@@ -108,13 +145,17 @@
             <div style="margin-top:0.5rem;">
                 <div style="display:flex;align-items:baseline;gap:0.5rem;flex-wrap:wrap;">
                     <label for="ff-${r}-${k}" style="font-size:0.78rem;font-weight:600;color:#334155;margin:0;">${esc(f.label)}</label>
-                    <span style="font-size:0.72rem;color:#b45309;flex:1;">${esc(f.why)}</span>
-                    <button type="button" class="btn btn-sm btn-link ff-polish" data-box="ff-${r}-${k}" style="padding:0;font-size:0.72rem;" title="Rewrite only the text in this box in report language; you can edit or undo it">Polish</button>
-                    <button type="button" class="btn btn-sm btn-link ff-undo" data-box="ff-${r}-${k}" style="padding:0;font-size:0.72rem;display:none;">Undo</button>
+                    <span style="font-size:0.72rem;color:#b45309;flex:1;min-width:14rem;">${esc(f.why)}</span>
+                    <span style="display:flex;gap:0.4rem;margin-left:auto;white-space:nowrap;">
+                        <button type="button" class="btn btn-sm btn-link ff-draft" data-box="ff-${r}-${k}" style="padding:0;font-size:0.72rem;" title="Propose this text from your note and the screenshots on this question; what is not recorded is left as [To write: …] for you">Draft from evidence</button>
+                        <button type="button" class="btn btn-sm btn-link ff-polish" data-box="ff-${r}-${k}" style="padding:0;font-size:0.72rem;" title="Rewrite only the text in this box in report language; you can edit or undo it">Polish</button>
+                        <button type="button" class="btn btn-sm btn-link ff-undo" data-box="ff-${r}-${k}" style="padding:0;font-size:0.72rem;display:none;">Undo</button>
+                    </span>
                 </div>
                 <textarea id="ff-${r}-${k}" class="form-control form-control-sm ff-box" rows="${f.key === 'ncrDescription' ? 3 : 2}"
                     data-row="${r}" data-index="${row.index}" data-key="${f.key}" data-template="${f.template ? '1' : ''}"
                     style="font-size:0.82rem;">${esc(f.value)}</textarea>
+                <div class="ff-note" data-box="ff-${r}-${k}" style="display:none;color:#64748b;font-size:0.72rem;margin-top:0.15rem;"></div>
                 <div class="ff-warning" data-box="ff-${r}-${k}" style="display:none;color:#dc2626;font-size:0.72rem;margin-top:0.15rem;"></div>
             </div>`).join('');
         return `
@@ -147,7 +188,7 @@
         boxes.forEach((b) => {
             const value = trim(b.value);
             if (!value || value === trim(b.initial)) return;
-            if (b.key === 'ncrDescription' && hasBlanks(value)) { blocked.push(b); return; }
+            if ((b.key === 'ncrDescription' && hasBlanks(value)) || hasToWrite(value)) { blocked.push(b); return; }
             pending.push(Object.assign({}, b, { value }));
         });
         if (blocked.length) return { applied: 0, blocked };
@@ -172,7 +213,8 @@
         global.DataService.openFormModal('Fix findings — ' + count + ' to write', `
             <div style="font-size:0.85rem;color:#475569;margin-bottom:0.75rem;line-height:1.5;">
                 Write what you saw and what was not fulfilled. A missing statement starts from the template with your remark as the evidence; replace the part in [brackets].
-                "Polish" rewrites only the text in that box, and you can edit or undo it. Boxes you leave as they are stay unchanged. Save writes them all at once.
+                "Draft from evidence" proposes the text from your note and the screenshots on that question, and leaves what is not recorded as [To write: …] for you.
+                "Polish" rewrites only the text in that box. You can edit or undo either. Boxes you leave as they are stay unchanged. Save writes them all at once.
             </div>
             <div id="ff-list" style="display:flex;flex-direction:column;gap:0.6rem;max-height:58vh;overflow:auto;">${rows.map(rowHtml).join('')}</div>
         `, () => {
@@ -210,12 +252,44 @@
                 undo.style.display = 'none';
                 return;
             }
+            const draft = e.target.closest('.ff-draft');
+            if (draft) {
+                const target = document.getElementById(draft.getAttribute('data-box'));
+                const AIS = global.AI_SERVICE;
+                if (!target) return;
+                if (!AIS || typeof AIS.draftFindingText !== 'function') { if (global.showNotification) global.showNotification('AI is not available.', 'warning'); return; }
+                const note = list.querySelector('.ff-note[data-box="' + target.id + '"]');
+                const say = (text) => { if (note) { note.textContent = text; note.style.display = text ? 'block' : 'none'; } };
+                draft.disabled = true;
+                draft.textContent = 'Drafting…';
+                say('');
+                try {
+                    const out = await AIS.draftFindingText(draftInputFor(rows[parseInt(target.getAttribute('data-row'), 10)], target.getAttribute('data-key'), report));
+                    if (out.status === 'nothing' || !trim(out.text)) {
+                        say((out.flags || []).join(' ') || 'Nothing could be drafted.');
+                    } else {
+                        if (target.dataset.before == null) target.dataset.before = target.value;
+                        target.value = out.text;
+                        const u = list.querySelector('.ff-undo[data-box="' + target.id + '"]');
+                        if (u) u.style.display = '';
+                        const said = ['Drafted from ' + (out.imagesSent.length ? out.imagesSent.length + ' screenshot' + (out.imagesSent.length === 1 ? '' : 's') + ' and ' : '') + 'your notes. Check it against what you saw.'];
+                        if (out.blanks) said.push(out.blanks + ' part' + (out.blanks === 1 ? '' : 's') + ' marked [To write: …] for you.');
+                        say(said.concat(out.flags || []).join(' '));
+                    }
+                } catch (err) {
+                    if (global.showNotification) global.showNotification('Draft failed: ' + ((err && err.message) || 'unknown error'), 'error');
+                } finally {
+                    draft.disabled = false;
+                    draft.textContent = 'Draft from evidence';
+                }
+                return;
+            }
             if (!polish) return;
             const box = document.getElementById(polish.getAttribute('data-box'));
             if (!box) return;
             const text = trim(box.value);
             if (!text) { if (global.showNotification) global.showNotification('Write your note first; Polish only rewrites what is in the box.', 'info'); return; }
-            if (hasBlanks(text)) { if (global.showNotification) global.showNotification('Fill the [bracketed] part first, then Polish.', 'info'); return; }
+            if (hasBlanks(text) || hasToWrite(text)) { if (global.showNotification) global.showNotification('Fill the [bracketed] part first, then Polish.', 'info'); return; }
             const AI = global.AI_SERVICE;
             if (!AI || typeof AI.refineAuditNotes !== 'function') { if (global.showNotification) global.showNotification('AI is not available.', 'warning'); return; }
             const row = rows[parseInt(box.getAttribute('data-row'), 10)];
@@ -279,5 +353,5 @@
         });
     };
 
-    global.FixFindings = { collect, apply, pendingAi };
+    global.FixFindings = { collect, apply, pendingAi, draftInputFor };
 })(typeof window !== 'undefined' ? window : globalThis);
