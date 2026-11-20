@@ -140,6 +140,17 @@ describe('the reply is checked before it becomes a proposal', () => {
         expect(out.images.map((i) => i.evId + ':' + i.fit)).toEqual(['Image 1:fits_better_elsewhere', 'Image 2:fits']);
     });
 
+    it('keeps a description that names the document: a Non-Conformity Register is not a judgement', async () => {
+        const out = await run([
+            im('Image 1', 'none', 2, { shows: 'A Non-Conformity Register listing non-conformities and corrective action plans.', visibleText: ['Non-Conformity Register'], reason: 'It lists non-conformities with their corrective actions.' }),
+            im('Image 2', 'direct', 1, { shows: 'A dashboard headed Fully compliant devices.', visibleText: ['Fully compliant devices'] })
+        ]);
+        expect(out.images[0].shows).toBe('A Non-Conformity Register listing non-conformities and corrective action plans.');
+        expect(out.images[0].reason).toBe('It lists non-conformities with their corrective actions.');
+        expect(out.images[1].shows).toBe('A dashboard headed Fully compliant devices.');
+        expect(out.flags).toEqual([]);
+    });
+
     it('removes conformity wording and names the AI did not quote from the screenshot', async () => {
         const out = await run([
             im('Image 1', 'none', 2, { shows: 'The Access Control Policy is shown.', visibleText: ['Change Requests'], reason: 'This shows the process is compliant.' }),

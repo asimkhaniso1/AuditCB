@@ -82,7 +82,10 @@ describe('what the draft is given', () => {
         expect(prompt).toContain('do not guess. Write [To write: what is needed]');
         expect(prompt).toContain('never write "conform"');
         expect(prompt).toContain('never the person\'s name');
-        expect(prompt).toContain('add [To write: what the issue was]');
+        expect(prompt).toContain('add [To write: what was found]. Never explain it yourself');
+        expect(prompt).toContain('"a screenshot shows"');
+        expect(prompt).toContain('A note with a question mark is the auditor\'s open question');
+        expect(prompt).toContain('Do not list individual rows, dates or values from a table');
         expect(prompt).toContain('Do not restate the audit question');
     });
 
@@ -160,6 +163,50 @@ describe('the draft is checked before it reaches the box', () => {
         expect(AI.callProxyAPI.mock.calls[0][0]).toContain('Sample service requests.');
         expect(out.text).toBe('The MSD Support SOP was reviewed.');
         expect(out.flags.join(' ')).toContain('"16"');
+    });
+
+    it('a document’s own name is not a judgement: a Non-Conformity Register can be named', async () => {
+        const out = await run({ text: 'The Non-Conformity Register was reviewed. It lists non-conformities raised by the internal audit. The process is fully compliant.', quotes: ['Non-Conformity Register'] });
+        expect(out.text).toBe('The Non-Conformity Register was reviewed. It lists non-conformities raised by the internal audit.');
+        expect(out.flags).toHaveLength(1);
+    });
+
+    it('a note that only names an issue is never explained by the AI, and always ends in a blank', async () => {
+        const input = Object.assign({}, INPUT, { remark: 'Document Data Control issue', statement: '', dates: ['18 November 2026'] });
+        const out = await run({
+            text: 'The MSD Support SOP was reviewed on 18 November 2026. The review identified a Document Data Control issue as noted by the auditor. This issue was observed in the document\'s title, which included No Label.',
+            quotes: ['MSD Support SOP', 'No Label']
+        }, input);
+        expect(out.text).toBe('The MSD Support SOP was reviewed on 18 November 2026. The review identified a Document Data Control issue. [To write: what you found. Your note says: Document Data Control issue]');
+        expect(out.blanks).toBe(1);
+        expect(out.flags.join(' ')).toContain('explained an issue your note only names');
+    });
+
+    it('a task note ("check competency matrix") gets a blank for its result; a note that says what was found does not', async () => {
+        const task = await run({ text: 'The Competency Framework was reviewed.', quotes: ['Competency Framework'] }, Object.assign({}, INPUT, { remark: 'check competency matrix', statement: '' }));
+        expect(task.text).toBe('The Competency Framework was reviewed. [To write: what you found. Your note says: check competency matrix]');
+        const said = await run({ text: 'The MSD Support SOP was reviewed. No process map was available.', quotes: ['MSD Support SOP'] });
+        expect(said.text).toBe('The MSD Support SOP was reviewed. No process map was available.');
+        expect(said.blanks).toBe(0);
+        // The AI left its own blank: no second one is added.
+        const own = await run({ text: 'The MSD Support SOP was reviewed. [To write: what the issue was].', quotes: ['MSD Support SOP'] }, Object.assign({}, INPUT, { remark: 'Document Data Control issue', statement: '' }));
+        expect(own.blanks).toBe(1);
+    });
+
+    it('"The auditor noted that …" is written as the statement itself', async () => {
+        const out = await run({ text: 'The auditor noted that the competency matrix required an update.', quotes: [] }, Object.assign({}, INPUT, { remark: 'The competency matrix required an update.', statement: '' }));
+        expect(out.text).toBe('The competency matrix required an update.');
+    });
+
+    it('drops a sentence that only quotes the note back, and keeps the Evidence label', async () => {
+        const out = await run({
+            text: 'Clause 4.4 requires the processes and their interactions to be determined. A process map was missing. Evidence: The finding note recorded Process Map missing. The MSD Support SOP was presented on 17 November 2026.',
+            quotes: ['MSD Support SOP']
+        }, Object.assign({}, INPUT, { kind: 'statement' }));
+        expect(out.text).toBe('Clause 4.4 requires the processes and their interactions to be determined. A process map was missing. Evidence: The MSD Support SOP was presented on 17 November 2026.');
+        // With a blank in it the sentence stays: the auditor has to rewrite it anyway.
+        const kept = await run({ text: 'The auditor\'s note indicated a need to update the matrix [To write: what was found].', quotes: [] }, Object.assign({}, INPUT, { remark: 'Update Competency Matrix', statement: '' }));
+        expect(kept.text).toBe('The auditor\'s note indicated a need to update the matrix [To write: what was found].');
     });
 
     it('says so when nothing survives, or the reply cannot be read', async () => {

@@ -738,7 +738,68 @@ Return JSON only, in this shape:
 // information was on file…") were written up as if the auditor had found
 // them, so they are cut from the question before it is sent or used as a
 // source; quotation marks the model still put round names are removed.
-const FINDING_DRAFT_PROMPT_VERSION = 'fd3';
+// fd4 (first run in the deployed app, 2026-11-20): for the note "Document
+// Data Control issue" the draft explained the issue itself ("observed in the
+// document's title, which included No Label" — Word's sensitivity label).
+// A note that only names an issue or a task now always ends in a blank, and a
+// sentence that explains such an issue is removed. It also listed table
+// dates, wrote "a screenshot shows" and "as noted by the auditor".
+const FINDING_DRAFT_PROMPT_VERSION = 'fd4';
+
+// A judgement, as opposed to a document's own name. The first live run of
+// the mapping check lost the description of every screenshot of the
+// Non-Conformity Register, because "non-conformity" alone counted as one.
+const EVIDENCE_JUDGEMENT_RE = new RegExp([
+    '\\b(?:is|are|was|were|appears?|seems?|remains?|not|fully|partially)\\s+(?:non-?)?(?:conform(?:ing|ant)|compliant)\\b',
+    '\\b(?:conforms?|conformed|complies|complied)\\s+(?:to|with)\\b',
+    '\\b(?:demonstrat\\w+|show\\w*|confirm\\w*|evidenc\\w+|indicat\\w+|ensur\\w+)\\s+(?:full\\s+|continued\\s+)?(?:non-?)?(?:conformity|conformance|compliance)\\b',
+    '\\b(?:is|was|constitutes?|represents?)\\s+(?:an?|the)\\s+(?:minor\\s+|major\\s+)?non-?conform\\w+',
+    '\\b(?:requirement|clause|control)\\s+(?:is|was|has been)\\s+(?:not\\s+)?(?:met|fulfilled|satisfied)\\b'
+].join('|'), 'i');
+
+// Text quoted from a screenshot is taken out of a sentence before it is
+// tested for a judgement: a heading such as "Fully compliant" is a fact.
+function _evidenceWithoutQuoted(sentence, quotes) {
+    let s = String(sentence || '');
+    (Array.isArray(quotes) ? quotes : []).map((q) => String(q == null ? '' : q).trim()).filter((q) => q.length >= 4)
+        .sort((a, b) => b.length - a.length)
+        .forEach((q) => { s = s.replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), ' '); });
+    return s;
+}
+
+// Sentence by sentence: no judgement, and no document name or figure that is
+// not in `source`. Used for what the mapping check says about a screenshot.
+function _evidenceFactsClean(text, source, quotes, where, flags) {
+    const srcLower = String(source || '').toLowerCase();
+    const srcNumbers = new Set(_extractNumericTokens(source));
+    const kept = [];
+    _evidenceSentences(text).forEach((sentence) => {
+        if (EVIDENCE_JUDGEMENT_RE.test(_evidenceWithoutQuoted(sentence, quotes))) {
+            flags.push(where + ': removed a sentence that stated a result ("' + sentence.slice(0, 80) + '").');
+            return;
+        }
+        const unsupported = _evidenceUnsupported(sentence, srcLower, srcNumbers);
+        if (unsupported.length) {
+            flags.push(where + ': removed a sentence naming ' + unsupported.map((u) => '"' + u + '"').join(', ') + ', which the AI did not quote from the screenshot.');
+            return;
+        }
+        kept.push(sentence);
+    });
+    return kept.join(' ');
+}
+
+// A note that names an issue or a task without saying what was found:
+// "Document Data Control issue", "check competency matrix", "No CRM?".
+function _findingDraftVagueNote(note) {
+    const t = String(note || '').replace(/\s+/g, ' ').trim();
+    if (!t || t.split(' ').length > 8) return false;
+    return /\b(?:issues?|problems?|concerns?|gaps?)\b/i.test(t) || /\?/.test(t) || /^(?:check|update|review|verify|confirm|see|revise)\b/i.test(t);
+}
+// "The finding note recorded 'Process Map missing'": the note quoted back as
+// if it were evidence. Live drafts kept doing it whatever the prompt said.
+const FINDING_DRAFT_NOTE_ECHO_RE = /\b(?:the\s+)?(?:auditor'?s?\s+)?(?:finding\s+)?notes?\s+(?:stated|states|said|says|recorded|records|read|reads|indicated|indicates|mentioned|mentions)\b/i;
+// A sentence that says where such an issue was seen or what it consists of.
+const FINDING_DRAFT_EXPLAINS_RE = /\b(?:issues?|problems?|concerns?|gaps?)\b[^.]*\b(?:(?:was|were|is|are)\s+(?:observed|seen|found|identified|evident|noted|apparent)\s+(?:in|on|at|within|from)\b|which\s+(?:included|showed|contained|lacked|stated)\b|because\b|due\s+to\b|namely\b|specifically\b|as\s+(?:shown|seen|evidenced)\s+(?:by|in)\b)/i;
 // What the checklist builder appends to a question for the auditor's planning.
 const FINDING_DRAFT_PLANNING_RE = /\s*(?:Documented information on file|Pre-audit gap\s*:|No validated supporting document mapped)[\s\S]*$/i;
 function _findingDraftInput(input) {
@@ -752,9 +813,6 @@ function _findingDraftUnquote(text) {
         .replace(/(^|[\s(])['\u2018]([^'\u2018\u2019]{1,90})['\u2019](?=[\s.,;:)\]]|$)/g, '$1$2');
 }
 const FINDING_DRAFT_TO_WRITE_RE = /\[To write:[^\]]*\]/gi;
-// The auditor decides the result; an evidence paragraph never states one.
-// ("compliance" alone is left: it is in document names such as a Compliance Register.)
-const FINDING_DRAFT_JUDGEMENT_RE = /\b(non-?conform\w*|conform(?:s|ed|ing|ity|ance)?|(?:is|are|was|were|not|fully)\s+compliant|non-?compliant)\b/i;
 const FINDING_DRAFT_GRADES = { major: 'Major nonconformity', minor: 'Minor nonconformity', observation: 'Observation', ofi: 'Opportunity for improvement' };
 
 function _findingDraftPrompt(input, sent) {
@@ -804,11 +862,12 @@ Rules:
 1. Use only the auditor's notes, the facts above and what is visible in the screenshots. Name documents, systems and records exactly as they appear.
 2. quotes: copy into "quotes", exactly as it appears, every document, system or person name, date and figure you take from a screenshot.
 3. Where the text needs a fact that neither the notes nor the screenshots give (what exactly was missing, which record was sampled, what a person said), do not guess. Write [To write: what is needed] in that place. Use at most 3.
-4. The auditor's notes are short. When a note names an issue without saying what it was (for example "document control issue"), give the note's point and add [To write: what the issue was].
+4. The auditor's notes are short. When a note names an issue or a task without saying what was found (for example "document control issue", "check competency matrix"), repeat the note's point in a few words and add [To write: what was found]. Never explain it yourself: do not say where it was seen, what caused it or what it consists of. A note with a question mark is the auditor's open question, not a finding: do not answer it; add [To write: your conclusion on <the question>].
 5. When a role is recorded, write the role (the Process & Quality Manager) and never the person's name.
 6. Write names, dates and figures as plain text, with no quotation marks round them.
 7. Do not infer frequency, completeness, approval, ownership or effectiveness unless a screenshot shows it. Ignore a screenshot whose text cannot be read.
-8. The auditor is the writer: never write "the auditor noted", "the auditor stated", "the review identified" or "an opportunity was identified".
+8. The auditor is the writer and the screenshots are the auditor's evidence: never write "the auditor noted", "as noted by the auditor", "the auditor's note", "the finding note", "the review identified", "an opportunity was identified" or "a screenshot shows". Name the document or record instead.
+9. Do not list individual rows, dates or values from a table: name the record and say what it shows. Leave out any name or number you cannot read with certainty.
 
 Return JSON only, in this shape:
 {"text":"","quotes":[""]}`;
@@ -1286,13 +1345,13 @@ Return a raw JSON array with 'id' and 'text' fields only:
                 alsoItems.map((n) => byN.get(n).text + ' ' + (byN.get(n).clause || '')).join('\n')].join('\n');
             return {
                 evId: id,
-                shows: oneSentence(_evidenceClean(String(im.shows || ''), source, id, flags)),
+                shows: oneSentence(_evidenceFactsClean(String(im.shows || ''), source, visibleText, id, flags)),
                 visibleText,
                 here: rating,
                 fit,
                 betterItem,
                 alsoItems,
-                reason: oneSentence(_evidenceClean(String(im.reason || ''), source, id + ' reason', flags))
+                reason: oneSentence(_evidenceFactsClean(String(im.reason || ''), source, visibleText, id + ' reason', flags))
             };
         });
         return { images, flags };
@@ -1366,11 +1425,31 @@ Return a raw JSON array with 'id' and 'text' fields only:
         const srcLower = source.toLowerCase();
         const srcNumbers = new Set(_extractNumericTokens(source));
         const kept = [];
-        _evidenceSentences(_findingDraftUnquote(p.text).replace(/\s+/g, ' ').trim()).forEach((sentence) => {
+        const vague = [i.remark, i.statement].map((n) => String(n || '').replace(/\s+/g, ' ').trim()).filter(_findingDraftVagueNote);
+        // The auditor is the writer: "…, as noted by the auditor" says nothing.
+        const plain = _findingDraftUnquote(p.text).replace(/\s+/g, ' ').trim()
+            .replace(/,?\s+as (?:noted|stated|recorded|observed|identified) by the auditor/gi, '')
+            .replace(/\bThe auditor (?:noted|stated|observed|recorded|identified) that\s+([a-z])/g, (m, c) => c.toUpperCase());
+        // "Evidence:" is carried to the next sentence when its own is removed.
+        let carryEvidence = false;
+        _evidenceSentences(plain).forEach((raw) => {
+            let sentence = raw;
+            if (carryEvidence && !/^Evidence:/i.test(sentence)) sentence = 'Evidence: ' + sentence;
+            carryEvidence = false;
             // What sits inside a blank is an instruction to the auditor, not a fact.
             const facts = sentence.replace(FINDING_DRAFT_TO_WRITE_RE, ' ');
-            if (i.kind !== 'statement' && FINDING_DRAFT_JUDGEMENT_RE.test(facts)) {
+            // With a blank in it the sentence stays: the auditor rewrites it anyway.
+            if (FINDING_DRAFT_NOTE_ECHO_RE.test(facts) && facts === sentence) {
+                carryEvidence = /^Evidence:/i.test(sentence);
+                return;
+            }
+            if (i.kind !== 'statement' && EVIDENCE_JUDGEMENT_RE.test(_evidenceWithoutQuoted(facts, quotes))) {
                 flags.push('Removed a sentence that stated a result ("' + sentence.slice(0, 80) + '"); the result is yours to record.');
+                return;
+            }
+            // The note only names an issue: what it was is the auditor's to say.
+            if (vague.length && FINDING_DRAFT_EXPLAINS_RE.test(facts)) {
+                flags.push('Removed a sentence that explained an issue your note only names ("' + sentence.slice(0, 80) + '"); say what it was yourself.');
                 return;
             }
             const unsupported = _evidenceUnsupported(facts, srcLower, srcNumbers);
@@ -1380,8 +1459,12 @@ Return a raw JSON array with 'id' and 'text' fields only:
             }
             kept.push(sentence);
         });
-        const text = kept.join(' ');
+        let text = kept.join(' ');
         if (!text) flags.push('Nothing was left after the checks; write it yourself.');
+        // A note that names an issue or a task never yields a finished text.
+        if (text && vague.length && !(text.match(FINDING_DRAFT_TO_WRITE_RE) || []).length) {
+            text += ' [To write: what you found. Your note says: ' + vague[0].replace(/[[\]]/g, '') + ']';
+        }
         return { text, flags, blanks: (text.match(FINDING_DRAFT_TO_WRITE_RE) || []).length };
     },
 
