@@ -871,3 +871,67 @@ describe('W25 — bare parent-clause citation against a KB clause inventory', ()
         expect(w25(result.warnings)).toHaveLength(0);
     });
 });
+
+// 2026-11-21: a drafted remark with blanks was about to be saved to a live
+// audit. Only Fix findings refused "[To write: …]"; in a checklist remark it
+// would have printed as written, and nothing stopped the report being issued.
+describe('B21 / W26 — an unfilled blank in text that prints', () => {
+    const check = (report) => window.ReportIntegrity.check({ report, auditPlan: { auditType: 'Surveillance' }, client: baseClient({ certificates: [{ id: 'cert-1' }] }) });
+    const ids = (list, prefix) => list.filter((x) => x.id.startsWith(prefix)).map((x) => x.id);
+
+    it('the app\'s own blank in a remark blocks issuing, and says where and what', () => {
+        const result = check(baseReport({ checklistProgress: [
+            { status: 'conform', clause: '9.2', comment: 'Internal audit programme seen.' },
+            { status: 'conform', clause: '8.1', comment: 'The Service Desk process was walked with the manager. [To write: what you found on escalation]' }
+        ] }));
+        expect(result.status).toBe('BLOCKED');
+        const hit = result.blockers.find((b) => b.id === 'B21-item-1-comment');
+        expect(hit.message).toBe('Checklist item 2 (8.1): the remark still has an unfilled blank: "[To write: what you found on escalation]".');
+        expect(hit.ref).toEqual({ kind: 'checklist', index: 1, field: 'comment' });
+        expect(ids(result.blockers, 'B21')).toHaveLength(1);
+    });
+
+    it('covers the finding statement, the evidence statement, a manual finding and the narrative', () => {
+        const result = check(baseReport({
+            executiveSummary: 'The audit covered the service desk. [To write: the overall conclusion]',
+            checklistProgress: [
+                { status: 'nc', ncrType: 'minor', clause: '7.5', criterionRef: '7.5.3', evidence: 'Register seen.', department: 'Quality', ncrDescription: '[to write: the requirement that was not met]', clientEvidenceStatement: 'Seen. [To write: the record sampled' }
+            ],
+            ncrs: [{ type: 'minor', clause: '9.2', description: 'Audit programme incomplete. [To write: which audits were missed]', evidence: 'Programme seen.', department: 'Quality' }]
+        }));
+        expect(ids(result.blockers, 'B21').sort()).toEqual(['B21-executiveSummary', 'B21-item-0-clientEvidenceStatement', 'B21-item-0-ncrDescription', 'B21-ncr-0']);
+        // The unclosed blank is still caught, and the criterion is named with the item.
+        expect(result.blockers.find((b) => b.id === 'B21-item-0-clientEvidenceStatement').message).toContain('Checklist item 1 (7.5.3): the evidence statement still has an unfilled blank: "[To write: the record sampled".');
+    });
+
+    it('a bracketed phrase of three or more words only warns', () => {
+        const result = check(baseReport({ checklistProgress: [
+            { status: 'conform', clause: '4.3', comment: 'Scope discussed with the Director. [The scope document you saw: title, version and date.]' }
+        ] }));
+        expect(ids(result.blockers, 'B21')).toEqual([]);
+        const hit = result.warnings.find((w) => w.id === 'W26-item-0-comment');
+        expect(hit.message).toBe('Checklist item 1 (4.3): the remark has bracketed text that reads like an unfilled blank: "[The scope document you saw: title, version and date.]".');
+        expect(hit.suggestion).toContain('If the brackets are meant, no change is needed.');
+    });
+
+    it('short bracketed text and filled remarks are left alone', () => {
+        const result = check(baseReport({
+            positiveObservations: 'Strong document control [see DOC-014].',
+            checklistProgress: [
+                { status: 'conform', clause: '7.5', comment: 'Procedure DOC-014 [rev 3] sighted; quoted as written [sic].' },
+                { status: 'conform', clause: '9.2', comment: 'Audit programme for 2026 seen, 12 audits planned and 11 complete.' },
+                { status: 'not_sampled', clause: 'A.7.1', comment: '' }
+            ]
+        }));
+        expect(ids(result.blockers, 'B21')).toEqual([]);
+        expect(ids(result.warnings, 'W26')).toEqual([]);
+    });
+
+    it('a long blank is shortened in the message', () => {
+        const long = '[To write: ' + 'what you saw on the day and who showed it to you, '.repeat(4) + ']';
+        const result = check(baseReport({ checklistProgress: [{ status: 'conform', clause: '8.1', comment: long }] }));
+        const hit = result.blockers.find((b) => b.id === 'B21-item-0-comment');
+        expect(hit.message.length).toBeLessThan(180);
+        expect(hit.message).toContain('…');
+    });
+});
