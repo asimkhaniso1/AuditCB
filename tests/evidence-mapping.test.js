@@ -327,11 +327,15 @@ describe('the review screen', () => {
         choice.value = 'move:cl1-A-1';
         choice.dispatchEvent(new Event('change', { bubbles: true }));
         expect(document.getElementById('em-hollow').textContent).toBe('After these moves, item 1 (A.5.26, no remark either) would have no screenshot of its own.');
+        const was = JSON.parse(JSON.stringify(report.checklistProgress));
         window.__save();
         expect(report.checklistProgress[0].evidenceImages).toEqual([]);
         expect(report.checklistProgress[1].evidenceImages).toContain(img('chg'));
         expect(window.saveChecklist).toHaveBeenCalledTimes(1);
-        expect(window.saveChecklist).toHaveBeenCalledWith('r1');
+        // The save is told what the answers were before the move, so it can
+        // record a checklist revision and merge with a newer cloud copy.
+        expect(window.saveChecklist).toHaveBeenCalledWith('r1', { changedFrom: was });
+        expect(window.saveChecklist.mock.calls[0][1].changedFrom[0].evidenceImages).toEqual([img('chg')]);
         expect(window.runReportIntegrityCheck).toHaveBeenCalledWith('r1');
         expect(window.showNotification).toHaveBeenCalledWith('Screenshots: moved 1.', 'success');
     });

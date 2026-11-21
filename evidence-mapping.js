@@ -624,11 +624,15 @@
         global.DataService.openFormModal('Evidence mapping — ' + p.move.length + ' to review', body, shown.length ? () => {
             const decisions = decisionsNow();
             if (!decisions.length) { notify('Nothing was chosen, so nothing was moved.', 'info'); return; }
+            // What the answers were before the moves: the save records a
+            // checklist revision and, if the cloud copy is newer than this
+            // tab, merges with it so that only the moves made here win.
+            const before = JSON.parse(JSON.stringify(progressOf(report)));
             const res = apply(report, decisions);
             delete cache[String(reportId)];
             if (typeof global.closeModal === 'function') global.closeModal();
             if (res.moved || res.copied) {
-                if (typeof global.saveChecklist === 'function') global.saveChecklist(reportId);
+                if (typeof global.saveChecklist === 'function') global.saveChecklist(reportId, { changedFrom: before });
                 if (typeof global.runReportIntegrityCheck === 'function') global.runReportIntegrityCheck(reportId);
             }
             const said = [];

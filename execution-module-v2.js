@@ -273,7 +273,12 @@ window.ChecklistMerge = (function () {
     // mine: the questions as on screen; base: what this view was drawn from;
     // theirs: the newer saved copy. Per question and per field, a value changed
     // on this screen wins; every other value comes from theirs.
-    function merge(baseItems, mine, theirs) {
+    // opts.allFields: `mine` is this tab's memory, changed away from the
+    // checklist screen (Evidence mapping moves screenshots from the
+    // Finalization tab). Then any field this tab changed since `base` wins,
+    // not only the ones the checklist screen has inputs for.
+    function merge(baseItems, mine, theirs, opts) {
+        const allFields = !!(opts && opts.allFields);
         const baseMap = {}; (baseItems || []).forEach(p => { baseMap[keyOf(p)] = p; });
         const theirMap = {}; (theirs || []).forEach(p => { theirMap[keyOf(p)] = p; });
         const seen = new Set();
@@ -284,8 +289,15 @@ window.ChecklistMerge = (function () {
             if (!t) return m;
             const b = baseMap[k] || {};
             const r = Object.assign(clone(t), { checklistId: m.checklistId, itemIdx: m.itemIdx, isCustom: m.isCustom, clause: m.clause || t.clause, requirement: m.requirement || t.requirement });
-            FIELDS.forEach(f => { if (norm(m[f]) !== norm(b[f])) r[f] = m[f]; });
-            if (images(m) !== images(b)) EVIDENCE.forEach(f => { r[f] = m[f]; });
+            if (allFields) {
+                new Set(Object.keys(m).concat(Object.keys(b))).forEach(f => {
+                    if (JSON.stringify(m[f]) === JSON.stringify(b[f])) return;
+                    if (m[f] === undefined) delete r[f]; else r[f] = clone(m[f]);
+                });
+            } else {
+                FIELDS.forEach(f => { if (norm(m[f]) !== norm(b[f])) r[f] = m[f]; });
+                if (images(m) !== images(b)) EVIDENCE.forEach(f => { r[f] = m[f]; });
+            }
             if (r.status !== 'nc' && norm(m.status) !== norm(b.status)) r.ncrType = '';
             if (!same(r, m)) kept++;
             return r;
@@ -2659,6 +2671,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         let baseUsed = null;
         let knownRevs = 0;
         let mergedKept = -1;
+        let offScreen = false;
 
         // Only update checklistProgress if we are on a screen that has checklist inputs
         if (statusInputs.length > 0) {
@@ -2843,6 +2856,30 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     saveBtn.parentElement.appendChild(span);
                 }
             }
+        } else if (opts && Array.isArray(opts.changedFrom)) {
+            // Answers changed away from the checklist screen: Evidence mapping
+            // moves screenshots from the Finalization tab and passes what the
+            // answers were before. This save used to write memory straight to
+            // the cloud with no revision entry, so another open tab's
+            // stale-view guard could not tell the cloud copy had moved on and
+            // wrote the old screenshot positions back (found 2026-11-21, when
+            // 19 moves were applied to a live audit). It now counts as a
+            // checklist save: a revision is recorded, and a newer cloud copy
+            // is merged in before the write, with this tab's changes winning.
+            offScreen = true;
+            domData = report.checklistProgress || [];
+            baseUsed = { items: opts.changedFrom };
+            if (!report.checklistRevisions) report.checklistRevisions = [];
+            knownRevs = report.checklistRevisions.length;
+            report.checklistRevisions.push({
+                rev: knownRevs + 1,
+                timestamp: new Date().toISOString(),
+                itemCount: domData.length,
+                ncCount: domData.filter(d => d.status === 'nc').length,
+                conformCount: domData.filter(d => d.status === 'conform').length,
+                naCount: domData.filter(d => d.status === 'na').length
+            });
+            window.ChecklistMerge.setBase(reportId, report);
         }
 
         // Handle Review & Submit Tab classifications if present
@@ -2889,7 +2926,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (domData) {
                     const remote = await window.ChecklistMerge.fetchRemote(reportId);
                     if (remote && remote.revisions.length > knownRevs) {
-                        const r = window.ChecklistMerge.merge(baseUsed ? baseUsed.items : [], domData, remote.items);
+                        const r = window.ChecklistMerge.merge(baseUsed ? baseUsed.items : [], domData, remote.items, { allFields: offScreen });
                         const ours = report.checklistRevisions[report.checklistRevisions.length - 1] || {};
                         report.checklistProgress = r.items;
                         report.checklistRevisions = remote.revisions.concat([Object.assign({}, ours, {
