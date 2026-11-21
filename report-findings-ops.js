@@ -481,7 +481,7 @@
             { header: '<th>Dept</th>', cell: function (r) { return '<td>' + esc(r.item.department || '—') + '</td>'; } },
             { header: '<th style="text-align:center;">Severity</th>', cell: function (r) { return '<td style="text-align:center;">' + badge(r.severity, ncrTypeSeverity(r.severity)) + '</td>'; } },
             { header: '<th style="text-align:center;">Status</th>', cell: function (r) { return '<td style="text-align:center;">' + badge(LIFECYCLE_LABELS[r.status] || r.status, LIFECYCLE_SEVERITY[r.status] || 'neutral') + '</td>'; } },
-            { header: '<th>CAPA Ref</th>', cell: function (r) { return '<td>' + esc(r.capa && r.capa.id != null ? String(r.capa.id) : '—') + '</td>'; } },
+            { header: '<th>CAPA Ref</th>', cell: function (r) { return '<td>' + esc(r.capa && r.capa.id != null && r.capa.id !== '' ? 'NCR-' + String(r.capa.id).padStart(3, '0') : '—') + '</td>'; } },
             { header: '<th>Due Date</th>', cell: function (r) { return '<td>' + fmtDate(r.item.caDueDate || (r.capa && r.capa.dueDate)) + '</td>'; } }
         ];
         var table = buildSuppressedTable(lifecycleCols, rowInfo);
@@ -554,11 +554,11 @@
         var evidenceCols = [
             { header: '<th>Ref</th>', cell: function (r) { return '<td style="font-weight:700;">' + esc(r.ref) + (r.isPending ? ' ' + badge('Pending Classification', 'info') : '') + '</td>'; } },
             { header: '<th>Clause</th>', cell: function (r) { return '<td>' + criterionCell(r.item) + '</td>'; } },
-            { header: '<th>Requirement</th>', cell: function (r) { return '<td>' + esc(truncate(r.item.requirement, 90) || '—') + '</td>'; } },
+            { header: '<th>Requirement</th>', cell: function (r) { return '<td>' + esc(truncate(reqText(r.item.requirement), 90) || '—') + '</td>'; } },
             { header: '<th>Dept</th>', cell: function (r) { return '<td>' + esc(r.item.department || '—') + '</td>'; } },
             { header: '<th>Evidence</th>', cell: function (r) { return '<td>' + r.evidenceCell + '</td>'; } },
-            { header: '<th>Auditor Note</th>', cell: function (r) { return '<td>' + esc(truncate(r.item.comment, 80) || '—') + '</td>'; } },
-            { header: '<th>CAPA ID</th>', cell: function (r) { return '<td>' + esc(r.capa && r.capa.id != null ? String(r.capa.id) : '—') + '</td>'; } },
+            { header: '<th>Auditor Note</th>', cell: function (r) { return '<td>' + esc(truncate(carText(r.item.comment), 80) || '—') + '</td>'; } },
+            { header: '<th>CAPA ID</th>', cell: function (r) { return '<td>' + esc(r.capa && r.capa.id != null && r.capa.id !== '' ? 'NCR-' + String(r.capa.id).padStart(3, '0') : '—') + '</td>'; } },
             { header: '<th>Source</th>', cell: function (r) { return '<td>' + esc(r.source) + '</td>'; } }
         ];
         var table = buildSuppressedTable(evidenceCols, rowInfo);
@@ -590,6 +590,14 @@
 
     var NOT_RECORDED = '<em style="color:var(--b4-muted,#666);">Not recorded.</em>';
     // Stored text is entity-encoded; clean it the same way Finding Details does.
+    // The requirement without the auditor's planning notes (see
+    // ReportStats.clientRequirement), with stored entities decoded.
+    function reqText(v) {
+        var RS = global.ReportStats;
+        var t = String(v == null ? '' : v);
+        if (RS && typeof RS.clientRequirement === 'function') t = RS.clientRequirement(t);
+        return carText(t);
+    }
     function carText(v) {
         var RS = global.ReportStats;
         var t = String(v == null ? '' : v).trim();
@@ -611,7 +619,15 @@
         var reportRef = (d && d.report && d.report.reportNumber)
             || (typeof global._reportRef === 'function' ? global._reportRef(d) : '')
             || (d && d.report && d.report.id) || '—';
-        var reportDate = fmtDate(d && d.report && d.report.date);
+        // The audit's dates, first to last day, and the day the findings were
+        // presented (closing meeting, else the last audit day). Every form used
+        // to carry the first day, also for a finding made on the third.
+        var auditDatesInfo = (global.ReportStats && typeof global.ReportStats.auditDates === 'function')
+            ? global.ReportStats.auditDates(d && d.report, d && d.auditPlan) : null;
+        var reportDate = (auditDatesInfo && auditDatesInfo.text) ? esc(auditDatesInfo.text) : fmtDate(d && d.report && d.report.date);
+        var raisedOn = (d && d.report && d.report.closingMeeting && d.report.closingMeeting.date)
+            || (auditDatesInfo && (auditDatesInfo.end || auditDatesInfo.start))
+            || (d && d.report && d.report.date) || (capa && capa.raisedDate);
         var cb = (d && d.cbSettings) || {};
         var cbName = cb.cbName || ((cb.cbSites || [])[0] || {}).name || cb.name || 'Certification Body';
         // Name only, no logo: these pages sit inside the report, whose cover
@@ -628,14 +644,14 @@
             + '<table class="b4-tbl" style="margin-bottom:var(--b4-s4);">'
             + '<tbody>'
             + '<tr><td style="font-weight:700;width:160px;">Criterion</td><td>' + criterionCell(item) + '</td></tr>'
-            + '<tr><td style="font-weight:700;">Requirement</td><td>' + esc(item.requirement || '—') + '</td></tr>'
+            + '<tr><td style="font-weight:700;">Requirement</td><td>' + esc(reqText(item.requirement) || '—') + '</td></tr>'
             // The statement is the auditor's NC statement and the evidence is
             // what they recorded, as in Finding Details. The form printed the
             // remark as the statement and only a photo count as the evidence.
             + '<tr><td style="font-weight:700;">Statement of Nonconformity</td><td>' + (carText(item.ncrDescription) ? esc(carText(item.ncrDescription)) : NOT_RECORDED) + '</td></tr>'
             + '<tr><td style="font-weight:700;">Objective Evidence</td><td>' + (carText(item.clientEvidenceStatement || item.comment) ? esc(carText(item.clientEvidenceStatement || item.comment)) : NOT_RECORDED)
             + (evidenceCount(item) ? '<div style="font-size:11px;color:var(--b4-muted,#666);margin-top:2px;">' + evidenceCount(item) + ' evidence item(s) attached (see Evidence Traceability section)</div>' : '') + '</td></tr>'
-            + '<tr><td style="font-weight:700;">Raised By / Date</td><td>' + esc((d && d.report && d.report.leadAuditor) || (capa && capa.raisedBy) || '—') + ' / ' + fmtDate((d && d.report && d.report.date) || (capa && capa.raisedDate)) + '</td></tr>'
+            + '<tr><td style="font-weight:700;">Raised By / Date</td><td>' + esc((d && d.report && d.report.leadAuditor) || (capa && capa.raisedBy) || '—') + ' / ' + fmtDate(raisedOn) + '</td></tr>'
             + '</tbody></table>';
 
         var partB = '<h4 class="b4-subhead">PART B — ROOT CAUSE &amp; CORRECTION</h4>'
