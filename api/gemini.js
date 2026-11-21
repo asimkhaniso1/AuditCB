@@ -57,6 +57,23 @@ export function imageParts(images) {
     return { parts };
 }
 
+// Gemini statuses that mean "try again later": rate limit, server error,
+// model overloaded, upstream timeout.
+const BUSY_STATUSES = new Set([429, 500, 503, 504]);
+
+/**
+ * Seconds Gemini asks the caller to wait (google.rpc.RetryInfo, "26s"), or 0.
+ * Capped: a daily-quota answer can ask for hours.
+ */
+export function retryAfterSeconds(data) {
+    const details = data && data.error && Array.isArray(data.error.details) ? data.error.details : [];
+    for (const d of details) {
+        const m = /^(\d+(?:\.\d+)?)s$/.exec(String((d && d.retryDelay) || ''));
+        if (m) return Math.min(Math.ceil(Number(m[1])), 300);
+    }
+    return 0;
+}
+
 function resolveModel(requested) {
     const name = String(requested || 'gemini-2.0-flash');
     const mapped = MODEL_MAP[name] || name;
@@ -170,7 +187,15 @@ export default async function handler(req, res) {
             // Log the upstream detail server-side; the caller only needs to know
             // to try the next model in its fallback chain.
             console.error('Gemini upstream error:', response.status, data?.error?.message);
-            return res.status(502).json({ error: 'AI model request failed' });
+            // The status code (not Gemini's message) goes back too: a rate
+            // limit or an overloaded model is worth waiting for and trying
+            // again, a rejected request is not. Live, 2026-11-21, a run of
+            // about 70 evidence requests was rejected for minutes at a time
+            // and the caller could not tell why.
+            return res.status(502).json(Object.assign(
+                { error: 'AI model request failed', upstreamStatus: response.status, busy: BUSY_STATUSES.has(response.status) },
+                retryAfterSeconds(data) ? { retryAfterSeconds: retryAfterSeconds(data) } : {}
+            ));
         }
 
         if (mode === 'list') {
