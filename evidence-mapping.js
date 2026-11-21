@@ -273,6 +273,60 @@
     }
 
     /**
+     * Evidence for the questions that have no screenshot, looked for on its
+     * own rather than read off what the mapping calls happened to mention.
+     * Step 1 matches each such question against the description of every
+     * screenshot; step 2 shows the AI the candidate images with that one
+     * question, and only "direct" evidence is kept (at most ALSO_PER_QUESTION).
+     * Returns { gaps: [{target, total, rows}], none: [place], error }, or null
+     * when the AI service cannot do it. A question a proposed move would
+     * already fill is left to that move.
+     */
+    async function findGapEvidence(report, rows, opts) {
+        const o = opts || {};
+        const AI = global.AI_SERVICE;
+        if (!AI || typeof AI.matchEvidenceToQuestions !== 'function' || typeof AI.verifyEvidenceFor !== 'function') return null;
+        const list = Array.isArray(rows) ? rows : [];
+        const withImages = new Set(progressOf(report).filter((item) => imagesOf(item).length).map(keyOf));
+        const moveTargets = new Set();
+        list.filter((r) => r.fit === 'fits_better_elsewhere').forEach((r) => { if (r.to) moveTargets.add(r.to.key); if (r.alt) moveTargets.add(r.alt.key); });
+        const place = (q) => ({ n: q.n, key: q.key, clause: q.clause, text: q.text, status: q.status, empty: true });
+        const targets = questionIndex(report).filter((q) => q.text && !withImages.has(q.key) && !moveTargets.has(q.key) && needsEvidence(place(q)));
+        const usable = list.filter((r) => r.shows && (r.fit === 'fits' || r.fit === 'fits_better_elsewhere'));
+        if (!targets.length || !usable.length) return { gaps: [], none: targets.map(place), error: '' };
+        const catalogue = usable.map((r, k) => ({ id: 'S' + (k + 1), item: r.from.n, clause: r.from.clause, shows: r.shows }));
+        const byId = new Map(catalogue.map((c, k) => [c.id, usable[k]]));
+        let matched;
+        try {
+            matched = await AI.matchEvidenceToQuestions({ questions: targets.map((q) => ({ n: q.n, clause: q.clause, text: q.text })), screenshots: catalogue });
+        } catch (err) {
+            return { gaps: [], none: [], error: (err && err.message) || 'The AI call failed.' };
+        }
+        const byN = new Map(targets.map((q) => [q.n, q]));
+        // A screenshot is not evidence for the question it is already under.
+        const jobs = (matched.matches || []).map((m) => ({ q: byN.get(m.n), ids: (m.ids || []).filter((id) => byId.has(id) && byId.get(id).from.n !== m.n) })).filter((j) => j.q && j.ids.length);
+        const found = new Map();
+        let next = 0;
+        let done = 0;
+        async function worker() {
+            while (next < jobs.length) {
+                if (typeof o.shouldStop === 'function' && o.shouldStop()) return;
+                const job = jobs[next++];
+                try {
+                    const res = await AI.verifyEvidenceFor({ question: { n: job.q.n, clause: job.q.clause, text: job.q.text }, images: job.ids.map((id) => ({ evId: id, src: byId.get(id).src })) });
+                    const direct = (res.images || []).filter((im) => im.support === 'direct' && byId.has(im.evId));
+                    if (direct.length) found.set(job.q.n, direct.map((im) => Object.assign({}, byId.get(im.evId), { reason: im.reason })));
+                } catch (_e) { /* this question simply gets no offer */ }
+                done++;
+                if (typeof o.onProgress === 'function') o.onProgress(done, jobs.length);
+            }
+        }
+        await Promise.all(Array.from({ length: Math.min(o.concurrency || CONCURRENCY, jobs.length) }, worker));
+        const gaps = targets.filter((q) => found.has(q.n)).map((q) => ({ target: place(q), total: found.get(q.n).length, rows: found.get(q.n).slice(0, ALSO_PER_QUESTION) }));
+        return { gaps, none: targets.filter((q) => !found.has(q.n)).map(place), error: '' };
+    }
+
+    /**
      * Questions that have screenshots now and would have none once the chosen
      * moves are made. decisions: [{src, fromKey, toKey, mode}].
      */
@@ -423,7 +477,11 @@
     function showResults(reportId, report, result) {
         const p = proposals(result.rows);
         const shown = p.move.map((row) => ({ row, kind: 'move' }));
-        const gapsHtml = p.gaps.map((g) => {
+        // Searched for on their own (findGapEvidence); the "also supports"
+        // by-product of the mapping calls is only the fallback.
+        const searched = result.gapEvidence && !result.gapEvidence.error ? result.gapEvidence : null;
+        const gaps = searched ? searched.gaps : p.gaps;
+        const gapsHtml = gaps.map((g) => {
             const more = g.total > g.rows.length ? ' <span style="color:#94a3b8;">(' + g.rows.length + ' of ' + g.total + ' shown)</span>' : '';
             const head = '<div style="font-size:0.8rem;color:#334155;margin-top:0.2rem;"><span style="font-family:monospace;font-weight:700;">' + esc(placeLabel(g.target)) + '</span> has no screenshot of its own: ' + esc(short(g.target.text, 120)) + more + '</div>';
             return head + g.rows.map((row) => { shown.push({ row, kind: 'also' }); return rowHtml(row, shown.length - 1, 'also', g.target); }).join('');
@@ -444,12 +502,13 @@
             <div id="em-list" style="display:flex;flex-direction:column;gap:0.6rem;max-height:54vh;overflow:auto;">
                 ${p.move.length ? '<div style="font-size:0.75rem;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:0.03em;">May belong with another question</div>' : ''}
                 ${p.move.map((row, i) => rowHtml(row, i, 'move')).join('')}
-                ${p.gaps.length ? '<div style="font-size:0.75rem;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:0.03em;margin-top:0.3rem;">Questions with no screenshot that one filed elsewhere also supports</div>' : ''}
+                ${gaps.length ? '<div style="font-size:0.75rem;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:0.03em;margin-top:0.3rem;">Questions with no screenshot: evidence found under another question</div>' : ''}
                 ${gapsHtml}
             </div>
             ${listHtml('Not evidence for any question', p.unrelated)}
             ${listHtml('Could not be read', p.unreadable)}
             ${listHtml('Could not be checked', p.unchecked)}
+            ${searched && searched.none.length ? `<div id="em-none" style="font-size:0.78rem;color:#64748b;margin-top:0.5rem;"><strong>No screenshot in this audit supports:</strong> ${searched.none.map((x) => esc(placeLabel(x))).join('; ')}</div>` : ''}
             <div style="margin-top:0.6rem;"><button type="button" class="btn btn-sm btn-link" id="em-again" style="padding:0;font-size:0.78rem;">Check again</button></div>`;
 
         const decisionsNow = () => Array.from(document.querySelectorAll('.em-choice')).map((el) => {
@@ -537,6 +596,20 @@
             notify('Evidence mapping failed: ' + ((err && err.message) || 'unknown error'), 'error');
             return;
         }
+        if (!result.stopped) {
+            const label = document.getElementById('em-progress');
+            const bar = document.getElementById('em-bar');
+            if (label) label.textContent = 'Looking for evidence for the questions with no screenshot…';
+            try {
+                result.gapEvidence = await findGapEvidence(report, result.rows, {
+                    shouldStop: () => stop,
+                    onProgress: (done, total) => {
+                        if (label) label.textContent = 'Checked the evidence found for ' + done + ' of ' + total + ' question' + (total === 1 ? '' : 's') + ' with no screenshot…';
+                        if (bar) bar.style.width = Math.round(done / total * 100) + '%';
+                    }
+                });
+            } catch (_e) { result.gapEvidence = null; }
+        }
         if (!result.stopped && signature(report) === sig) cache[String(reportId)] = { sig, result };
         showResults(reportId, report, result);
     }
@@ -558,6 +631,7 @@
                 <ul style="margin:0 0 0.8rem 1.1rem;padding:0;">
                     <li><strong>${t.images} screenshot${t.images === 1 ? '' : 's'}</strong> on ${t.questions} question${t.questions === 1 ? '' : 's'} will be sent to the AI service twice, in ${calls} requests. It takes about ${minutes} minute${minutes === 1 ? '' : 's'}.</li>
                     <li>A move that both checks agree on is marked <strong>Strong</strong>, and you can accept all of those with one click.</li>
+                    <li>Each question with no screenshot is then searched for across all of them, and what is found is checked against the image.</li>
                     <li>You get a list of proposals. <strong>Nothing moves unless you choose it and press Save.</strong></li>
                     <li>Results and remarks are not changed.</li>
                 </ul>
@@ -573,5 +647,5 @@
         else delete cache[String(reportId)];
     }
 
-    global.EvidenceMapping = { questionIndex, batches, totals, check, proposals, hollowAfter, apply, signature, forget };
+    global.EvidenceMapping = { questionIndex, batches, totals, check, proposals, findGapEvidence, hollowAfter, apply, signature, forget };
 })(typeof window !== 'undefined' ? window : globalThis);
