@@ -467,6 +467,20 @@ function getAllFindings(report) {
 }
 
 // Overview tab content
+// One rule for "upcoming" everywhere: the dashboard's UpcomingAudits model.
+// Upcoming = open (not completed/cancelled) and not yet over — in progress
+// today or starting later, judged by endDate for multi-day plans. Plans whose
+// dates have passed but were never closed, and undated plans, are reported
+// separately and never counted as upcoming.
+function clientUpcomingAudits(plans) {
+    const model = window.UpcomingAudits.build(plans, {
+        auditors: window.state.auditors || [],
+        isCompleted: window.DataService.isPlanCompleted
+    });
+    const upcoming = model.items.filter(it => it.bucket !== 'overdue' && it.bucket !== 'unscheduled');
+    return { count: model.count, upcoming, overdue: model.counts.overdue, undated: model.counts.unscheduled };
+}
+
 function renderClientOverview(client) {
     const clientPlans = (window.state.auditPlans || []).filter(p => matchesClient(p, client));
     const clientCerts = (window.state.certifications || []).filter(c => matchesClient(c, client));
@@ -479,10 +493,11 @@ function renderClientOverview(client) {
     // Same derivation the dashboard and the Audit Plans table use, so the
     // "Completed" figure here can't drift from either of those views.
     const completedAudits = window.DataService.getPlanCompletionStats(clientPlans).completed;
-    // Plans are Draft/Validated/Scheduled until started; 'Planned'/'Approved'
-    // are never set, so this always read 0. Same rule as UpcomingAudits.build.
-    const upcomingAudits = clientPlans.filter(p => !window.DataService.isPlanCompleted(p)
-        && !/^(in progress|cancelled)$/i.test(String(p.status || ''))).length;
+    // Same model as the dashboard panel: only today-or-later audits count;
+    // a Scheduled plan whose dates passed is "past date, not closed".
+    const clientUpcoming = clientUpcomingAudits(clientPlans);
+    const upcomingAudits = clientUpcoming.count;
+    const pastOpenAudits = clientUpcoming.overdue;
     // Valid Certs counts the client's own certificate register (client.certificates —
     // the store Settings edits and the cycle cards read), not the global decision
     // register, which is only populated by the Certifications module and uses a
@@ -559,7 +574,7 @@ function renderClientOverview(client) {
             </div>
 
             <!-- Alerts Section -->
-            ${openNCs > 0 || upcomingAudits > 0 ? `
+            ${openNCs > 0 || upcomingAudits > 0 || pastOpenAudits > 0 ? `
             <div style="margin-bottom: 1.5rem;">
                 ${openNCs > 0 ? `
                 <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
@@ -570,6 +585,11 @@ function renderClientOverview(client) {
                 <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; display: flex; justify-content: space-between; align-items: center;">
                     <div><i class="fa-solid fa-calendar-alt" style="color: #3b82f6; margin-right: 0.5rem;"></i><strong>${upcomingAudits} Upcoming Audit${upcomingAudits !== 1 ? 's' : ''}</strong></div>
                     <button class="btn btn-sm" style="background: #3b82f6; color: white; border: none;" data-hash="client/${client.id}/plans">View</button>
+                </div>` : ''}
+                ${pastOpenAudits > 0 ? `
+                <div style="background: #f1f5f9; border-left: 4px solid #94a3b8; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div><i class="fa-solid fa-calendar-xmark" style="color: #64748b; margin-right: 0.5rem;"></i><strong>${pastOpenAudits} Audit${pastOpenAudits !== 1 ? 's' : ''} past date, not closed</strong> - complete or reschedule</div>
+                    <button class="btn btn-sm" style="background: #64748b; color: white; border: none;" data-hash="client/${client.id}/plans">View</button>
                 </div>` : ''}
             </div>` : ''}
 
@@ -651,20 +671,16 @@ function renderClientOverview(client) {
                 <div class="card">
                     <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-calendar-days" style="margin-right: 0.5rem; color: #6366f1;"></i>Upcoming Audit Timeline</h3>
                     ${(function () {
-            const upcoming = clientPlans
-                .filter(p => ['Scheduled', 'Planned', 'Approved', 'In Progress'].includes(p.status))
-                .sort((a, b) => new Date(a.date) - new Date(b.date))
-                .slice(0, 5);
+            // Upcoming only (soonest first); passed-but-open plans get their own alert above.
+            const upcoming = clientUpcoming.upcoming.slice(0, 5);
             if (upcoming.length === 0) return '<p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No upcoming audits</p>';
-            return '<div style="display: flex; flex-direction: column; gap: 0.75rem;">' + upcoming.map((p, _i) => {
-                const daysUntil = Math.ceil((new Date(p.date) - new Date()) / 86400000);
-                const urgency = daysUntil < 0 ? '#ef4444' : daysUntil <= 7 ? '#f59e0b' : daysUntil <= 30 ? '#3b82f6' : '#10b981';
-                const label = daysUntil < 0 ? Math.abs(daysUntil) + 'd overdue' : daysUntil === 0 ? 'Today' : daysUntil + 'd away';
+            return '<div style="display: flex; flex-direction: column; gap: 0.75rem;">' + upcoming.map(it => {
+                const urgency = it.bucket === 'now' || it.bucket === 'week' ? '#f59e0b' : it.bucket === 'month' ? '#3b82f6' : '#10b981';
                 return '<div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border-left: 3px solid ' + urgency + ';">'
-                    + '<div style="min-width: 80px; font-weight: 600; font-size: 0.85rem; color: #1e293b;">' + (p.date || '-') + '</div>'
-                    + '<div style="flex: 1;"><div style="font-weight: 500; font-size: 0.85rem;">' + window.UTILS.escapeHtml(p.type || 'Audit') + '</div>'
-                    + '<div style="font-size: 0.75rem; color: var(--text-secondary);">' + window.UTILS.escapeHtml(p.standard || '') + '</div></div>'
-                    + '<span style="background: ' + urgency + '20; color: ' + urgency + '; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;">' + label + '</span>'
+                    + '<div style="min-width: 80px; font-weight: 600; font-size: 0.85rem; color: #1e293b;">' + window.UTILS.escapeHtml(window.UpcomingAudits.formatRange(it.start, it.end)) + '</div>'
+                    + '<div style="flex: 1;"><div style="font-weight: 500; font-size: 0.85rem;">' + window.UTILS.escapeHtml(it.auditType) + '</div>'
+                    + '<div style="font-size: 0.75rem; color: var(--text-secondary);">' + window.UTILS.escapeHtml(it.standards.join(', ')) + '</div></div>'
+                    + '<span style="background: ' + urgency + '20; color: ' + urgency + '; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;">' + window.UTILS.escapeHtml(it.relative) + '</span>'
                     + '</div>';
             }).join('') + '</div>';
         })()}
@@ -1522,8 +1538,10 @@ function renderClientPlans(client) {
     const totalPlans = plans.length;
     const completedPlans = window.DataService.getPlanCompletionStats(plans).completed;
     const inProgressPlans = plans.filter(p => p.status === 'In Progress').length;
-    const upcomingPlans = plans.filter(p => !window.DataService.isPlanCompleted(p)
-        && !/^(in progress|cancelled)$/i.test(String(p.status || ''))).length;
+    // Today-or-later only (dashboard rule), minus plans already counted in the
+    // In Progress card beside it.
+    const upcomingPlans = clientUpcomingAudits(plans).upcoming
+        .filter(it => !/^in progress$/i.test(it.status)).length;
 
     if (plans.length === 0) {
         return `

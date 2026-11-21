@@ -2112,6 +2112,39 @@ textarea:focus:invalid {
     opacity: 0.7;
 }
 
+/* Secondary groups (undated, dates passed): collapsed under the upcoming list. */
+.ua-secondary {
+    border-top: 1px dashed var(--border-color);
+    padding-top: 0.6rem;
+}
+
+.ua-secondary > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.ua-secondary > summary::-webkit-details-marker {
+    display: none;
+}
+
+.ua-secondary > summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+}
+
+.ua-secondary[open] > summary::before {
+    content: '▾';
+}
+
+.ua-secondary[open] > summary {
+    margin-bottom: 0.6rem;
+}
+
+.ua-list > .ua-empty {
+    padding: 1.25rem 1rem;
+}
+
 .ua-row {
     display: grid;
     grid-template-columns: 3.25rem minmax(0, 1fr) auto;

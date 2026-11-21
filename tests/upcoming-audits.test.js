@@ -21,7 +21,8 @@ describe('which plans count as upcoming', () => {
             plan('f', null, { status: 'Scheduled' })
         ], { today: TODAY });
         expect(model.items.map(i => i.id)).toEqual(['a', 'e', 'f']);
-        expect(model.count).toBe(3);
+        expect(model.openCount).toBe(3);
+        expect(model.count).toBe(2); // the undated plan is open but not "upcoming"
     });
 
     it('uses the injected completion rule (DataService.isPlanCompleted)', () => {
@@ -32,15 +33,17 @@ describe('which plans count as upcoming', () => {
         expect(model.items.map(i => i.id)).toEqual(['b']);
     });
 
-    it('count always equals the number of listed items and the bucket totals', () => {
+    it('openCount equals the listed items and bucket totals; count is the upcoming part only', () => {
         const model = UA.build([
             plan('a', '2026-09-01'), plan('b', TODAY), plan('c', '2026-10-25'),
             plan('d', '2026-11-10'), plan('e', '2027-03-01'), plan('f', '')
         ], { today: TODAY });
         const inBuckets = model.buckets.reduce((s, b) => s + b.items.length, 0);
-        expect(model.count).toBe(6);
+        expect(model.openCount).toBe(6);
         expect(inBuckets).toBe(6);
         expect(Object.values(model.counts).reduce((s, n) => s + n, 0)).toBe(6);
+        expect(model.count).toBe(4); // today, +6, +22, next year
+        expect(model.count + model.counts.overdue + model.counts.unscheduled).toBe(model.openCount);
     });
 });
 
@@ -58,7 +61,7 @@ describe('bucketing and ordering', () => {
         expect(UA.bucketOf({ start: null, end: null }, TODAY)).toBe('unscheduled');
     });
 
-    it('lists soonest first: passed-but-open, in progress, then by start date, undated last', () => {
+    it('lists upcoming soonest first (in progress, then by start date), then undated, then passed-but-open', () => {
         const model = UA.build([
             plan('later', '2027-01-10'),
             plan('undated', null),
@@ -67,8 +70,9 @@ describe('bucketing and ordering', () => {
             plan('running', '2026-10-18', { endDate: '2026-10-20' }),
             plan('passed', '2026-08-03', { endDate: '2026-08-05' })
         ], { today: TODAY });
-        expect(model.items.map(i => i.id)).toEqual(['passed', 'running', 'week1', 'week2', 'later', 'undated']);
-        expect(model.buckets.map(b => b.key)).toEqual(['overdue', 'now', 'week', 'later', 'unscheduled']);
+        expect(model.items.map(i => i.id)).toEqual(['running', 'week1', 'week2', 'later', 'undated', 'passed']);
+        expect(model.buckets.map(b => b.key)).toEqual(['now', 'week', 'later', 'unscheduled', 'overdue']);
+        expect(model.buckets.filter(b => b.secondary).map(b => b.key)).toEqual(['unscheduled', 'overdue']);
     });
 
     it('breaks start-date ties by end date, then client name', () => {
@@ -224,7 +228,7 @@ describe('panel rendering', () => {
         expect(html).not.toContain('<img');
         expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
         expect(html).toContain('data-id="p&quot;1"');
-        expect(html).toContain('Upcoming Audits <span class="ua-count">2</span>');
+        expect(html).toContain('Upcoming Audits <span class="ua-count">1</span>');
     });
 
     it('opens in the calendar view when that is the viewer\'s saved choice, still escaped', () => {
@@ -257,7 +261,63 @@ describe('panel rendering', () => {
 
     it('shows an empty state with a route to planning when nothing is open', () => {
         const html = UA.panelHtml(UA.build([], { today: TODAY }));
-        expect(html).toContain('No open audits are scheduled.');
+        expect(html).toContain('No upcoming audits are scheduled.');
         expect(html).toContain('data-id="audit-planning"');
+    });
+});
+
+// Live report 2026-11-21: the card opened on "Dates passed — not closed 8" with
+// a badge of 8 because every open plan was overdue and the overdue group was
+// listed first and counted as "upcoming". Upcoming must lead and own the count.
+describe('upcoming audits lead; dates-passed plans are secondary', () => {
+    const NOW = '2026-11-21';
+    const plans = [
+        plan('shanghai', '2026-01-08', { status: 'Scheduled' }),
+        plan('ktd', '2026-08-14', { status: 'Scheduled' }),
+        plan('pcc', '2026-11-17', { endDate: '2026-11-19', status: 'In Progress' }), // multi-day, ended 2 days ago
+        plan('today', NOW, { status: 'Scheduled' }),
+        plan('spanning', '2026-11-20', { endDate: '2026-11-23', status: 'In Progress' }), // started yesterday, endDate in future
+        plan('soon', '2026-11-25', { endDate: '2026-11-26' }),
+        plan('next-month', '2026-12-15'),
+        plan('done', '2026-12-01', { status: 'Completed' })
+    ];
+
+    beforeEach(() => { window.localStorage.clear(); });
+
+    it('counts only today-or-later audits, using endDate for multi-day plans', () => {
+        const model = UA.build(plans, { today: NOW });
+        expect(model.count).toBe(4);
+        expect(model.counts.overdue).toBe(3);
+        expect(model.openCount).toBe(7);
+        expect(model.items.map(i => i.id)).toEqual(['spanning', 'today', 'soon', 'next-month', 'pcc', 'ktd', 'shanghai']);
+        expect(model.items.find(i => i.id === 'pcc').bucket).toBe('overdue');
+        expect(model.items.find(i => i.id === 'spanning').bucket).toBe('now');
+        expect(model.items.find(i => i.id === 'today').bucket).toBe('now');
+    });
+
+    it('renders upcoming rows before a collapsed dates-passed group', () => {
+        const html = UA.panelHtml(UA.build(plans, { today: NOW }));
+        expect(html).toContain('Upcoming Audits <span class="ua-count">4</span>');
+        expect(html).not.toContain('No upcoming audits are scheduled.');
+        const firstRow = html.indexOf('ua-row');
+        const passed = html.indexOf('Dates passed — not closed');
+        expect(firstRow).toBeGreaterThan(-1);
+        expect(passed).toBeGreaterThan(html.indexOf('data-id="next-month"'));
+        expect(html).toMatch(/<details class="ua-group ua-secondary ua-secondary-overdue">\s*<summary/);
+        expect(html).not.toMatch(/<details[^>]*\bopen\b/);
+    });
+
+    it('shows an upcoming empty state first when every open plan is past, keeping them below', () => {
+        const past = plans.filter(p => ['shanghai', 'ktd', 'pcc'].includes(p.id));
+        const model = UA.build(past, { today: NOW });
+        expect(model.count).toBe(0);
+        expect(model.openCount).toBe(3);
+        const html = UA.panelHtml(model);
+        expect(html).toContain('Upcoming Audits <span class="ua-count">0</span>');
+        const empty = html.indexOf('No upcoming audits are scheduled.');
+        expect(empty).toBeGreaterThan(-1);
+        expect(empty).toBeLessThan(html.indexOf('Dates passed — not closed'));
+        expect(html).toContain('data-id="shanghai"');
+        expect(html).toContain('Ended 2 days ago');
     });
 });
