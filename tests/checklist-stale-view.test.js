@@ -142,3 +142,98 @@ describe('the checklist is drawn from the live report', () => {
         expect(window.ChecklistMerge.getBase('r1').revs).toBe(5);
     });
 });
+
+// 2026-11-21: 19 screenshots were moved in a live audit from the Finalization
+// tab. That save wrote memory straight to the cloud with no revision entry, so
+// another open tab's guard above could not tell the cloud copy had moved on,
+// and the save itself never looked at the cloud copy.
+describe('a save made away from the checklist screen (Evidence mapping)', () => {
+    const SHOT = 'https://x/ims-0.jpg';
+    // The screenshot under IMS-0 is moved to IMS-1, as EvidenceMapping.apply does it.
+    const moveShot = () => {
+        const before = JSON.parse(JSON.stringify(report.checklistProgress));
+        const [from, to] = report.checklistProgress;
+        Object.assign(from, { evidenceImages: [], evidenceImage: '' });
+        delete from.evidenceThumbs;
+        Object.assign(to, { evidenceImages: [SHOT], evidenceImage: SHOT, evidenceRemapLog: [{ at: '2026-11-21T11:31:25Z', by: 'Lead Auditor', mode: 'move', from: 'cl1-IMS-0' }] });
+        return before;
+    };
+    const offScreen = () => { document.getElementById('tab-content').innerHTML = ''; };
+
+    it('merge, all fields: what this tab changed wins, the rest comes from the newer copy', () => {
+        setup();
+        const base = dayOne();
+        base[0].evidenceThumbs = ['thumb'];
+        const mine = JSON.parse(JSON.stringify(base));
+        Object.assign(mine[0], { evidenceImages: [], evidenceImage: '' });
+        delete mine[0].evidenceThumbs;
+        Object.assign(mine[1], { evidenceImages: [SHOT], evidenceImage: SHOT, evidenceRemapLog: [{ mode: 'move' }] });
+        const theirs = JSON.parse(JSON.stringify(base));
+        theirs[0].comment = 'edited in another tab';
+        theirs[1].personnel = 'Rob Pace';
+        const r = window.ChecklistMerge.merge(base, mine, theirs, { allFields: true });
+        expect(r.items[0]).toMatchObject({ comment: 'edited in another tab', evidenceImages: [], evidenceImage: '' });
+        expect(r.items[0].evidenceThumbs).toBeUndefined();
+        expect(r.items[1]).toMatchObject({ personnel: 'Rob Pace', status: 'nc', ncrType: 'minor', evidenceImages: [SHOT], evidenceRemapLog: [{ mode: 'move' }] });
+        // Without allFields the move record is not carried: only screen fields are.
+        expect(window.ChecklistMerge.merge(base, mine, theirs).items[1].evidenceRemapLog).toBeUndefined();
+    });
+
+    it('records a checklist revision and saves the move', async () => {
+        setup({ drawnFrom: dayOne(), drawnRevs: 3 });
+        remote = { checklist_progress: dayOne(), revisions: revs(3) };
+        offScreen();
+        const before = moveShot();
+        window.saveChecklist('r1', { quiet: true, changedFrom: before });
+        await flush();
+        const row = saved();
+        expect(item(row, 'IMS-0').evidenceImages).toEqual([]);
+        expect(item(row, 'IMS-1')).toMatchObject({ evidenceImages: [SHOT], status: 'nc', ncrType: 'minor' });
+        expect(row.data.checklistRevisions).toHaveLength(4);
+        expect(row.data.checklistRevisions[3]).toMatchObject({ rev: 4, itemCount: 2, ncCount: 1, conformCount: 1 });
+        expect(notes.filter(([t]) => t === 'warning')).toHaveLength(0);
+    });
+
+    it('the cloud copy is newer than this tab: its answers are kept and the move is added', async () => {
+        setup({ drawnFrom: dayOne(), drawnRevs: 3 });
+        const cloud = dayOne();
+        cloud[0].comment = 'Remark written in another tab';
+        cloud[1].ncrDescription = 'Reworded in another tab';
+        remote = { checklist_progress: cloud, revisions: revs(5) };
+        offScreen();
+        const before = moveShot();
+        window.saveChecklist('r1', { quiet: true, changedFrom: before });
+        await flush();
+        const row = saved();
+        expect(item(row, 'IMS-0')).toMatchObject({ comment: 'Remark written in another tab', evidenceImages: [] });
+        expect(item(row, 'IMS-1')).toMatchObject({ ncrDescription: 'Reworded in another tab', evidenceImages: [SHOT] });
+        expect(item(row, 'IMS-1').evidenceRemapLog).toHaveLength(1);
+        expect(row.data.checklistRevisions).toHaveLength(6);
+        expect(notes.some(([t, m]) => t === 'warning' && /also saved in another tab/.test(m))).toBe(true);
+    });
+
+    it('another tab, still showing the old screenshots, keeps the move when it next saves', async () => {
+        // This tab drew the checklist before the move was saved elsewhere.
+        setup({ drawnFrom: dayOne(), drawnRevs: 3 });
+        const cloud = dayOne();
+        Object.assign(cloud[0], { evidenceImages: [], evidenceImage: '' });
+        Object.assign(cloud[1], { evidenceImages: [SHOT], evidenceImage: SHOT });
+        remote = { checklist_progress: cloud, revisions: revs(4) }; // the revision the move recorded
+        document.getElementById('comment-cl1-IMS-0').value = 'Typed here afterwards';
+        window.saveChecklist('r1', { quiet: true });
+        await flush();
+        const row = saved();
+        expect(item(row, 'IMS-0')).toMatchObject({ comment: 'Typed here afterwards', evidenceImages: [] });
+        expect(item(row, 'IMS-1').evidenceImages).toEqual([SHOT]);
+    });
+
+    it('an ordinary save away from the checklist screen is unchanged: no revision, no merge', async () => {
+        setup({ drawnFrom: dayOne(), drawnRevs: 3 });
+        remote = { checklist_progress: dayOne(), revisions: revs(9) };
+        offScreen();
+        window.saveChecklist('r1', { quiet: true });
+        await flush();
+        expect(saved().data.checklistRevisions).toHaveLength(3);
+        expect(notes.filter(([t]) => t === 'warning')).toHaveLength(0);
+    });
+});
