@@ -746,7 +746,10 @@ describe('a busy AI service', () => {
         await vi.waitFor(() => expect(document.getElementById('em-again')).not.toBeNull());
         expect(seen.hook).toBe('function');
         expect(AI.evidenceBusy).toBeNull();
-        expect(document.body.textContent).toContain('1 screenshot was read once only because a request to the AI service failed, so it cannot be Strong.');
+        expect(document.body.textContent).toContain('1 screenshot has been read once only, so it cannot be Strong yet.');
+        // The failed request can be sent again on its own.
+        expect(document.getElementById('em-pending').textContent).toContain('1 of 6 requests to the AI service failed.');
+        expect(document.getElementById('em-resume').textContent).toBe('Check the rest (1 request)');
     });
 
     it('a search that fails says so; Search again runs only the search and keeps the choices made', async () => {
@@ -783,6 +786,135 @@ describe('a busy AI service', () => {
         expect(document.getElementById('em-gap-retry')).not.toBeNull();
         // Item 5 was searched and nothing fits; item 3 is not said to be unsupported.
         expect(document.getElementById('em-none').textContent).toBe('No screenshot in this audit supports: item 5 · A.6.7');
+    });
+});
+
+// Deployed run, 2026-11-21: Gemini rate-limited the key after 33 of 96
+// requests and was still refusing 12 minutes later. Every remaining request
+// was going to wait five minutes before giving up, and starting again meant
+// sending all 96 once more.
+describe('a rate limit that does not lift: stop, keep what was read, check the rest later', () => {
+    const busy = () => Object.assign(new Error('The AI service is busy (a rate limit or an overloaded model). Try again in a few minutes.'), { busy: true, upstreamStatus: 429 });
+    const reading = (input) => ({ images: input.images.map((image) => ({ evId: image.evId, shows: 'Screenshot of item ' + input.current.n + '.', here: 'direct', fit: 'fits', betterItem: null, alsoItems: [], reason: 'Its own question.' })), imagesFailed: [], flags: [] });
+    // The fixture has 3 requests per reading (items 1, 2 and 4), so 6 in all.
+    const busyOnCall = (n) => { let calls = 0; return vi.fn(async (input) => { if (++calls === n) throw busy(); return reading(input); }); };
+
+    it('a request that stays busy through every wait ends the check; the rest is not sent', async () => {
+        AI.mapEvidence = busyOnCall(3);
+        const res = await EM.check(report, { passes: 2, concurrency: 1 });
+        expect(AI.mapEvidence).toHaveBeenCalledTimes(3);
+        expect(res).toMatchObject({ stopped: true, stoppedBusy: true, calls: 6, pending: 4 });
+        // What was read is in the result; the rest is unchecked, with no error of its own.
+        expect(res.rows.map((r) => [r.from.n, r.fit, r.reads])).toEqual([[1, 'fits', 1], [2, 'fits', 1], [2, 'fits', 1], [4, 'unchecked', 0]]);
+        // The state a later run needs is not part of the result's data.
+        expect(Object.keys(res)).not.toContain('_state');
+    });
+
+    it('checking the rest sends only the requests not answered before', async () => {
+        AI.mapEvidence = busyOnCall(3);
+        const first = await EM.check(report, { passes: 2, concurrency: 1 });
+        AI.mapEvidence = vi.fn(async (input) => reading(input));
+        const progress = [];
+        const res = await EM.check(report, { passes: 2, concurrency: 1, resume: first, onProgress: (done, total) => progress.push(done + '/' + total) });
+        expect(AI.mapEvidence.mock.calls.map((c) => c[0].current.n)).toEqual([4, 1, 2, 4]);
+        expect(progress).toEqual(['3/6', '4/6', '5/6', '6/6']);
+        expect(res).toMatchObject({ stopped: false, stoppedBusy: false, pending: 0 });
+        expect(res.rows.map((r) => [r.from.n, r.fit, r.reads])).toEqual([[1, 'fits', 2], [2, 'fits', 2], [2, 'fits', 2], [4, 'fits', 2]]);
+    });
+
+    it('an earlier result is not reused once a screenshot has moved', async () => {
+        AI.mapEvidence = busyOnCall(3);
+        const first = await EM.check(report, { passes: 2, concurrency: 1 });
+        report.checklistProgress[2].evidenceImages = report.checklistProgress[1].evidenceImages.splice(1, 1);
+        AI.mapEvidence = vi.fn(async (input) => reading(input));
+        const res = await EM.check(report, { passes: 2, concurrency: 1, resume: first });
+        expect(AI.mapEvidence).toHaveBeenCalledTimes(8);
+        expect(res.pending).toBe(0);
+    });
+
+    it('the search stops the same way, and searching again asks only about what was not checked', async () => {
+        AI.mapEvidence = vi.fn(async (input) => reading(input));
+        const rows = (await EM.check(report, { concurrency: 1 })).rows;
+        AI.matchEvidenceToQuestions = vi.fn(async (input) => ({ matches: input.questions.map((q) => ({ n: q.n, ids: ['S1'] })) }));
+        let calls = 0;
+        AI.verifyEvidenceFor = vi.fn(async (input) => { if (++calls === 2) throw busy(); return { images: input.images.map((image) => ({ evId: image.evId, support: 'direct', reason: 'It lists changes with approvals.' })) }; });
+        const first = await EM.findGapEvidence(report, rows, { concurrency: 1 });
+        expect(first.gaps.map((g) => g.target.n)).toEqual([3]);
+        expect(first.failed.map((x) => x.n)).toEqual([5]);
+        AI.verifyEvidenceFor = vi.fn(async (input) => ({ images: input.images.map((image) => ({ evId: image.evId, support: 'partial', reason: '' })) }));
+        const second = await EM.findGapEvidence(report, rows, { concurrency: 1, previous: first });
+        expect(AI.matchEvidenceToQuestions.mock.calls[1][0].questions.map((q) => q.n)).toEqual([5]);
+        expect(AI.verifyEvidenceFor).toHaveBeenCalledTimes(1);
+        // What the first search found is kept; item 5 is now known to have nothing.
+        expect(second.gaps.map((g) => g.target.n)).toEqual([3]);
+        expect(second.none.map((x) => x.n)).toEqual([5]);
+        expect(second.failed).toEqual([]);
+    });
+
+    it('a busy search stops at the first question that stays busy', async () => {
+        AI.mapEvidence = vi.fn(async (input) => reading(input));
+        const rows = (await EM.check(report, { concurrency: 1 })).rows;
+        AI.matchEvidenceToQuestions = vi.fn(async (input) => ({ matches: input.questions.map((q) => ({ n: q.n, ids: ['S1'] })) }));
+        AI.verifyEvidenceFor = vi.fn(async () => { throw busy(); });
+        const res = await EM.findGapEvidence(report, rows, { concurrency: 1 });
+        expect(AI.verifyEvidenceFor).toHaveBeenCalledTimes(1);
+        expect(res.failed.map((x) => x.n)).toEqual([3, 5]);
+    });
+
+    it('on the screen: says why it stopped, keeps the result, and Check the rest finishes it', async () => {
+        // Three requests go out together; the first stays busy, the other two are answered.
+        AI.mapEvidence = busyOnCall(1);
+        window.openEvidenceMapping('r1');
+        document.getElementById('em-start').click();
+        await vi.waitFor(() => expect(document.getElementById('em-resume')).not.toBeNull());
+        expect(document.getElementById('em-pending').textContent).toContain('The AI service stayed busy (a rate limit) through every wait, so the check stopped after 2 of 6 requests.');
+        expect(document.getElementById('em-pending').textContent).toContain('only the remaining 4 requests are sent');
+        expect(document.getElementById('em-resume').textContent).toBe('Check the rest (4 requests)');
+        expect(document.body.textContent).toContain('not checked yet');
+        expect(document.body.textContent).not.toContain('could not be checked');
+        // Opening the check again shows what was kept, not the start screen.
+        window.openEvidenceMapping('r1');
+        expect(document.getElementById('em-start')).toBeNull();
+        expect(document.getElementById('em-resume')).not.toBeNull();
+        AI.mapEvidence = vi.fn(async (input) => reading(input));
+        AI.matchEvidenceToQuestions = vi.fn(async (input) => ({ matches: input.questions.map((q) => ({ n: q.n, ids: q.n === 3 ? ['S1'] : [] })) }));
+        AI.verifyEvidenceFor = vi.fn(async (input) => ({ images: input.images.map((image) => ({ evId: image.evId, support: 'direct', reason: 'It lists changes with approvals.' })) }));
+        document.getElementById('em-resume').click();
+        expect(document.getElementById('em-progress').textContent).toContain('Checked 2 of 6 requests');
+        await vi.waitFor(() => { expect(document.getElementById('em-again')).not.toBeNull(); expect(document.getElementById('em-pending')).toBeNull(); });
+        expect(AI.mapEvidence).toHaveBeenCalledTimes(4);
+        // The search for questions with no screenshot ran once the check was complete.
+        expect(AI.matchEvidenceToQuestions).toHaveBeenCalledTimes(1);
+        expect(document.body.textContent).toContain('item 3 · A.8.32 has no screenshot of its own');
+        expect(document.body.textContent).toContain('4 screenshots checked: 4 fit the question they are under.');
+    });
+
+    it('a check the auditor stopped can be finished the same way', async () => {
+        AI.mapEvidence = vi.fn(async (input) => { document.getElementById('em-stop').click(); return reading(input); });
+        window.openEvidenceMapping('r1');
+        document.getElementById('em-start').click();
+        await vi.waitFor(() => expect(document.getElementById('em-resume')).not.toBeNull());
+        expect(document.getElementById('em-pending').textContent).toContain('The check was stopped after 1 of 6 requests.');
+        expect(document.getElementById('em-pending').textContent).toContain('searched for once the check is complete');
+        expect(document.getElementById('em-resume').textContent).toBe('Check the rest (5 requests)');
+    });
+
+    it('the wait is counted down on the progress line', async () => {
+        let line = '';
+        let n = 0;
+        AI.mapEvidence = vi.fn(async (input) => {
+            if (++n === 1) {
+                AI.evidenceBusy.onWait(90);
+                line = document.getElementById('em-progress').textContent;
+                await new Promise((resolve) => setTimeout(resolve, 1100));
+                line += ' | ' + document.getElementById('em-progress').textContent;
+            }
+            return reading(input);
+        });
+        window.openEvidenceMapping('r1');
+        document.getElementById('em-start').click();
+        await vi.waitFor(() => expect(document.getElementById('em-again')).not.toBeNull(), { timeout: 4000 });
+        expect(line).toMatch(/The AI service is busy: trying again in 90 seconds\..* \| .*trying again in (89|88) seconds\./);
     });
 });
 

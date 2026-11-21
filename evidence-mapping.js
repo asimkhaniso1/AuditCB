@@ -177,23 +177,37 @@
         // Every screenshot once before any is read a second time, so a run
         // that is stopped part-way still has a reading of each.
         const jobs = [];
-        for (let pass = 0; pass < passes; pass++) work.forEach((b) => jobs.push(b));
-        let done = 0;
+        for (let pass = 0; pass < passes; pass++) work.forEach((b) => jobs.push({ b, id: jobs.length }));
+        // opts.resume: an earlier result for the same screenshots. Requests
+        // that were answered then are not sent again; only the rest are.
+        const sig = signature(report);
+        const prior = o.resume && o.resume._state && o.resume._state.sig === sig && o.resume.passes === passes ? o.resume._state : null;
+        const doneIds = new Set(prior ? prior.doneIds : []);
+        const todo = jobs.filter((j) => !doneIds.has(j.id));
+        let done = doneIds.size;
         let failedCalls = 0;
         let next = 0;
         let stopped = false;
+        let stoppedBusy = false;
         // empty: the question has no screenshot of its own, so one that also
         // supports it is worth offering.
         const withImages = new Set(progressOf(report).filter((item) => imagesOf(item).length).map(keyOf));
         const place = (q) => (q ? { n: q.n, key: q.key, clause: q.clause, text: q.text, status: q.status, empty: !withImages.has(q.key) } : null);
         const entries = new Map();
         const entryOf = (b, im) => b.key + '|' + im.evId + '|' + im.src;
-        work.forEach((b) => b.images.forEach((im) => entries.set(entryOf(b, im), { src: im.src, from: place(byN.get(b.n)), reads: [] })));
+        work.forEach((b) => b.images.forEach((im) => {
+            const key = entryOf(b, im);
+            // Readings from requests that were answered before; a failed
+            // request's placeholder readings are dropped, it is sent again.
+            const kept = prior && prior.entries.get(key) ? prior.entries.get(key).reads.filter((r) => doneIds.has(r.job)) : [];
+            entries.set(key, { src: im.src, from: place(byN.get(b.n)), reads: kept });
+        }));
 
         async function worker() {
-            while (next < jobs.length) {
+            while (next < todo.length) {
                 if (typeof o.shouldStop === 'function' && o.shouldStop()) { stopped = true; return; }
-                const b = jobs[next++];
+                const job = todo[next++];
+                const b = job.b;
                 const from = place(byN.get(b.n));
                 try {
                     const res = await AI.mapEvidence({
@@ -207,6 +221,7 @@
                         const r = byId.get(im.evId);
                         entries.get(entryOf(b, im)).reads.push(r ? {
                             ok: true,
+                            job: job.id,
                             shows: r.shows,
                             here: r.here || '',
                             fit: r.fit,
@@ -214,21 +229,45 @@
                             also: (r.alsoItems || []).map((n) => place(byN.get(n))).filter(Boolean),
                             reason: r.reason,
                             flags: (res.flags || []).filter((f) => f.indexOf(im.evId + ':') === 0 || f.indexOf(im.evId + ' reason:') === 0)
-                        } : { ok: false, error: failed.get(im.evId) || 'Not checked.' });
+                        } : { ok: false, job: job.id, error: failed.get(im.evId) || 'Not checked.' });
                     });
+                    doneIds.add(job.id);
                 } catch (err) {
                     failedCalls++;
-                    b.images.forEach((im) => entries.get(entryOf(b, im)).reads.push({ ok: false, error: (err && err.message) || 'The AI call failed.' }));
-                    if (err && err.authRequired) { stopped = true; next = jobs.length; }
+                    // A stopped wait is not a failure of this screenshot.
+                    if (!(err && err.stopped)) b.images.forEach((im) => entries.get(entryOf(b, im)).reads.push({ ok: false, job: job.id, error: (err && err.message) || 'The AI call failed.' }));
+                    // Signed out, or the AI service stayed busy through every
+                    // wait: the remaining requests would only do the same.
+                    // (Live, 2026-11-21: a rate limit lasted over 12 minutes,
+                    // and 63 requests were each going to wait 5 minutes.)
+                    if (err && (err.authRequired || err.busy)) { stopped = true; stoppedBusy = !!err.busy; next = todo.length; }
                 }
                 done++;
-                if (typeof o.onProgress === 'function') o.onProgress(done, jobs.length);
+                if (typeof o.onProgress === 'function') o.onProgress(Math.min(done, jobs.length), jobs.length);
             }
         }
-        await Promise.all(Array.from({ length: Math.min(o.concurrency || CONCURRENCY, jobs.length) }, worker));
+        await whileHalting(() => stopped, () => Promise.all(Array.from({ length: Math.min(o.concurrency || CONCURRENCY, todo.length) }, worker)));
         const rows = Array.from(entries.values()).map((e) => combine(e, passes));
         rows.sort((x, y) => x.from.n - y.from.n);
-        return { rows, calls: jobs.length, failedCalls, stopped, passes };
+        const result = { rows, calls: jobs.length, pending: jobs.length - doneIds.size, failedCalls, stopped, stoppedBusy, passes };
+        // What a later run needs to send only the rest (not part of the result's data).
+        Object.defineProperty(result, '_state', { value: { sig, entries, doneIds }, enumerable: false });
+        return result;
+    }
+
+    // While fn runs, a request that is waiting for a busy AI service gives up
+    // its wait as soon as halted() is true (the run was stopped, or another
+    // request has already found the service busy for too long).
+    async function whileHalting(halted, fn) {
+        const AI = global.AI_SERVICE;
+        const outer = AI ? AI.evidenceBusy : null;
+        if (AI) {
+            AI.evidenceBusy = {
+                onWait: (seconds) => { if (outer && typeof outer.onWait === 'function') outer.onWait(seconds); },
+                cancelled: () => halted() || !!(outer && typeof outer.cancelled === 'function' && outer.cancelled())
+            };
+        }
+        try { return await fn(); } finally { if (AI) AI.evidenceBusy = outer || null; }
     }
 
     // A question that has no screenshot and is not set aside (not sampled, not
@@ -280,9 +319,11 @@
      * Step 1 matches each such question against the description of every
      * screenshot; step 2 shows the AI the candidate images with that one
      * question, and only "direct" evidence is kept (at most ALSO_PER_QUESTION).
-     * Returns { gaps: [{target, total, rows}], none: [place], error }, or null
-     * when the AI service cannot do it. A question a proposed move would
-     * already fill is left to that move.
+     * Returns { gaps: [{target, total, rows}], none: [place], failed: [place],
+     * error }, or null when the AI service cannot do it. A question a proposed
+     * move would already fill is left to that move. failed: questions whose
+     * candidates could not be checked. opts.previous: an earlier result; only
+     * its failed questions are searched again and the rest is kept.
      */
     async function findGapEvidence(report, rows, opts) {
         const o = opts || {};
@@ -293,15 +334,26 @@
         const moveTargets = new Set();
         list.filter((r) => r.fit === 'fits_better_elsewhere').forEach((r) => { if (r.to) moveTargets.add(r.to.key); if (r.alt) moveTargets.add(r.alt.key); });
         const place = (q) => ({ n: q.n, key: q.key, clause: q.clause, text: q.text, status: q.status, empty: true });
-        const targets = questionIndex(report).filter((q) => q.text && !withImages.has(q.key) && !moveTargets.has(q.key) && needsEvidence(place(q)));
+        const prev = o.previous && !o.previous.error && (o.previous.failed || []).length ? o.previous : null;
+        const again = prev ? new Set(prev.failed.map((x) => x.key)) : null;
+        const targets = questionIndex(report).filter((q) => q.text && !withImages.has(q.key) && !moveTargets.has(q.key) && needsEvidence(place(q)) && (!again || again.has(q.key)));
         const usable = list.filter((r) => r.shows && (r.fit === 'fits' || r.fit === 'fits_better_elsewhere'));
-        if (!targets.length || !usable.length) return { gaps: [], none: targets.map(place), failed: [], error: '' };
+        const byItem = (x, y) => x.n - y.n;
+        // With an earlier result, what it found and ruled out is kept.
+        const merged = (res) => (prev ? {
+            gaps: prev.gaps.concat(res.gaps).sort((x, y) => x.target.n - y.target.n),
+            none: prev.none.concat(res.none).sort(byItem),
+            failed: res.failed,
+            error: ''
+        } : res);
+        if (!targets.length || !usable.length) return merged({ gaps: [], none: targets.map(place), failed: [], error: '' });
         const catalogue = usable.map((r, k) => ({ id: 'S' + (k + 1), item: r.from.n, clause: r.from.clause, shows: r.shows }));
         const byId = new Map(catalogue.map((c, k) => [c.id, usable[k]]));
         let matched;
         try {
             matched = await AI.matchEvidenceToQuestions({ questions: targets.map((q) => ({ n: q.n, clause: q.clause, text: q.text })), screenshots: catalogue });
         } catch (err) {
+            if (prev) return merged({ gaps: [], none: [], failed: prev.failed, error: '' });
             return { gaps: [], none: [], failed: [], error: (err && err.message) || 'The AI call failed.' };
         }
         const byN = new Map(targets.map((q) => [q.n, q]));
@@ -313,28 +365,33 @@
         const unchecked = new Set(jobs.map((j) => j.q.n));
         let next = 0;
         let done = 0;
+        let halted = false;
         async function worker() {
             while (next < jobs.length) {
-                if (typeof o.shouldStop === 'function' && o.shouldStop()) return;
+                if (typeof o.shouldStop === 'function' && o.shouldStop()) { halted = true; return; }
                 const job = jobs[next++];
                 try {
                     const res = await AI.verifyEvidenceFor({ question: { n: job.q.n, clause: job.q.clause, text: job.q.text }, images: job.ids.map((id) => ({ evId: id, src: byId.get(id).src })) });
                     const direct = (res.images || []).filter((im) => im.support === 'direct' && byId.has(im.evId));
                     if (direct.length) found.set(job.q.n, direct.map((im) => Object.assign({}, byId.get(im.evId), { reason: im.reason })));
                     unchecked.delete(job.q.n);
-                } catch (_e) { /* stays unchecked */ }
+                } catch (err) {
+                    // Stays unchecked. Signed out, or busy through every wait:
+                    // the other questions would only do the same.
+                    if (err && (err.authRequired || err.busy)) { halted = true; next = jobs.length; }
+                }
                 done++;
                 if (typeof o.onProgress === 'function') o.onProgress(done, jobs.length);
             }
         }
-        await Promise.all(Array.from({ length: Math.min(o.concurrency || CONCURRENCY, jobs.length) }, worker));
+        await whileHalting(() => halted, () => Promise.all(Array.from({ length: Math.min(o.concurrency || CONCURRENCY, jobs.length) }, worker)));
         const gaps = targets.filter((q) => found.has(q.n)).map((q) => ({ target: place(q), total: found.get(q.n).length, rows: found.get(q.n).slice(0, ALSO_PER_QUESTION) }));
-        return {
+        return merged({
             gaps,
             none: targets.filter((q) => !found.has(q.n) && !unchecked.has(q.n)).map(place),
             failed: targets.filter((q) => unchecked.has(q.n)).map(place),
             error: ''
-        };
+        });
     }
 
     /**
@@ -471,13 +528,13 @@
             </div>`;
     }
 
-    function summaryText(p, total) {
+    function summaryText(p, total, pending) {
         const parts = [p.fits.length + ' fit the question they are under'];
         if (p.move.length) parts.push(p.move.length + ' may belong with another question' + (p.strong.length ? ' (' + p.strong.length + ' strong)' : ''));
         if (p.unrelated.length) parts.push(p.unrelated.length + ' ' + (p.unrelated.length === 1 ? 'does' : 'do') + ' not look like evidence for any question');
         if (p.unreadable.length) parts.push(p.unreadable.length + ' could not be read');
-        if (p.unchecked.length) parts.push(p.unchecked.length + ' could not be checked');
-        return total + ' screenshot' + (total === 1 ? '' : 's') + ' checked: ' + parts.join(', ') + '.';
+        if (p.unchecked.length) parts.push(p.unchecked.length + (pending ? ' not checked yet' : ' could not be checked'));
+        return total + ' screenshot' + (total === 1 ? '' : 's') + (pending ? ': ' : ' checked: ') + parts.join(', ') + '.';
     }
 
     function listHtml(title, rows) {
@@ -487,6 +544,7 @@
 
     function showResults(reportId, report, result) {
         const p = proposals(result.rows);
+        const pending = result.pending || 0;
         const shown = p.move.map((row) => ({ row, kind: 'move' }));
         // Searched for on their own (findGapEvidence); the "also supports"
         // by-product of the mapping calls is only the fallback.
@@ -496,15 +554,26 @@
         // 2026-11-21: it failed twice and the screen showed the old lists as
         // if nothing had happened). Those lists stand in only when no search
         // was made at all (a stopped check, or an AI service without it).
-        const gaps = searched ? searched.gaps : (ge ? [] : p.gaps);
+        // Nor for a part-finished check: the search runs when it is complete.
+        const gaps = searched ? searched.gaps : (ge || (pending && result.stopped) ? [] : p.gaps);
         const unsearched = searched ? (searched.failed || []) : [];
         const gapNotice = ge && ge.error
             ? 'The search for evidence for the questions with no screenshot did not run: ' + ge.error
             : (unsearched.length
                 ? 'The search could not check ' + unsearched.length + ' question' + (unsearched.length === 1 ? '' : 's') + ' with no screenshot (' + unsearched.map(placeLabel).join('; ') + ').'
                 : '');
-        // Screenshots read fewer times than asked for: a request failed.
+        // Screenshots read fewer times than asked for: a request failed or was not sent.
         const readShort = result.passes > 1 ? result.rows.filter((r) => r.reads > 0 && r.reads < result.passes).length : 0;
+        // Requests not answered yet: the check was stopped, the AI service
+        // stayed busy, or a request failed. "Check the rest" sends only these.
+        const sent = result.calls - pending;
+        const pendingText = (result.stoppedBusy
+            ? 'The AI service stayed busy (a rate limit) through every wait, so the check stopped after ' + sent + ' of ' + result.calls + ' requests. Give it some time before going on.'
+            : (result.stopped
+                ? 'The check was stopped after ' + sent + ' of ' + result.calls + ' requests.'
+                : pending + ' of ' + result.calls + ' requests to the AI service failed.'))
+            + ' What was read is kept: only the remaining ' + (pending === 1 ? 'request is' : pending + ' requests are') + ' sent.'
+            + (result.stopped ? ' The questions with no screenshot are searched for once the check is complete.' : '');
         const gapsHtml = gaps.map((g) => {
             const more = g.total > g.rows.length ? ' <span style="color:#94a3b8;">(' + g.rows.length + ' of ' + g.total + ' shown)</span>' : '';
             const head = '<div style="font-size:0.8rem;color:#334155;margin-top:0.2rem;"><span style="font-family:monospace;font-weight:700;">' + esc(placeLabel(g.target)) + '</span> has no screenshot of its own: ' + esc(short(g.target.text, 120)) + more + '</div>';
@@ -512,12 +581,16 @@
         }).join('');
         const body = `
             <div style="font-size:0.85rem;color:#475569;margin-bottom:0.6rem;line-height:1.5;">
-                ${esc(summaryText(p, result.rows.length))}
+                ${esc(summaryText(p, result.rows.length, pending))}
                 ${shown.length ? 'Each proposal below is the AI\'s reading of the screenshot. Nothing moves unless you choose it here and press Save.' : 'There is nothing to move.'}
                 ${result.passes > 1 && p.move.length ? 'Each screenshot was checked ' + (result.passes === 2 ? 'twice' : result.passes + ' times') + ': <strong>Strong</strong> means every check proposed the same question.' : ''}
-                ${readShort ? esc(readShort + ' screenshot' + (readShort === 1 ? ' was' : 's were') + ' read once only because a request to the AI service failed, so ' + (readShort === 1 ? 'it' : 'they') + ' cannot be Strong.') : ''}
-                ${result.stopped ? '<strong>The check was stopped before it finished.</strong>' : ''}
+                ${readShort ? esc(readShort + ' screenshot' + (readShort === 1 ? ' has' : 's have') + ' been read once only, so ' + (readShort === 1 ? 'it' : 'they') + ' cannot be Strong' + (pending ? ' yet.' : '.')) : ''}
+                ${result.stopped && !pending ? '<strong>The check was stopped before it finished.</strong>' : ''}
             </div>
+            ${pending ? `<div id="em-pending" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;color:#1e3a8a;margin-bottom:0.6rem;display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+                <span style="flex:1;min-width:14rem;">${esc(pendingText)}</span>
+                <button type="button" class="btn btn-sm btn-primary" id="em-resume">Check the rest (${pending} request${pending === 1 ? '' : 's'})</button>
+            </div>` : ''}
             ${gapNotice ? `<div id="em-gap-failed" style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;color:#92400e;margin-bottom:0.6rem;display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
                 <span style="flex:1;min-width:14rem;">${esc(gapNotice)}</span>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="em-gap-retry">Search again</button>
@@ -536,7 +609,7 @@
             </div>
             ${listHtml('Not evidence for any question', p.unrelated)}
             ${listHtml('Could not be read', p.unreadable)}
-            ${listHtml('Could not be checked', p.unchecked)}
+            ${listHtml(pending ? 'Not checked yet' : 'Could not be checked', pending ? p.unchecked.map((r) => Object.assign({}, r, { error: '' })) : p.unchecked)}
             ${searched && searched.none.length ? `<div id="em-none" style="font-size:0.78rem;color:#64748b;margin-top:0.5rem;"><strong>No screenshot in this audit supports:</strong> ${searched.none.map((x) => esc(placeLabel(x))).join('; ')}</div>` : ''}
             <div style="margin-top:0.6rem;"><button type="button" class="btn btn-sm btn-link" id="em-again" style="padding:0;font-size:0.78rem;">Check again</button></div>`;
 
@@ -601,6 +674,7 @@
             let found;
             try {
                 found = await whileBusyShown((seconds) => { retry.textContent = 'The AI service is busy: trying again in ' + seconds + ' s…'; }, () => !retry.isConnected, () => findGapEvidence(report, result.rows, {
+                    previous: result.gapEvidence,
                     shouldStop: () => !retry.isConnected,
                     onProgress: (done, total) => { retry.textContent = 'Checked ' + done + ' of ' + total + '…'; }
                 }));
@@ -614,6 +688,8 @@
             const shownList = document.getElementById('em-list');
             if (shownList) shownList.dispatchEvent(new Event('change'));
         });
+        const resume = document.getElementById('em-resume');
+        if (resume) resume.addEventListener('click', () => { run(reportId, report, result); });
         const again = document.getElementById('em-again');
         if (again) again.addEventListener('click', () => { delete cache[String(reportId)]; global.openEvidenceMapping(reportId); });
         if (typeof global.resolveAllIdbThumbs === 'function') global.resolveAllIdbThumbs();
@@ -628,12 +704,15 @@
         try { return await fn(); } finally { if (AI) AI.evidenceBusy = before || null; }
     }
 
-    async function run(reportId, report) {
+    // earlier: a part-finished result for the same screenshots; only the
+    // requests it is missing are sent ("Check the rest").
+    async function run(reportId, report, earlier) {
         let stop = false;
         const requests = batches(report).length * PASSES;
+        const already = earlier && earlier.pending ? earlier.calls - earlier.pending : 0;
         global.DataService.openFormModal('Evidence mapping — checking', `
             <div style="font-size:0.9rem;color:#334155;line-height:1.6;">
-                <div id="em-progress">Checked 0 of ${requests} requests… The first results take about 15 seconds.</div>
+                <div id="em-progress">Checked ${already} of ${requests} requests… The first results take about 15 seconds.</div>
                 <div style="height:8px;background:#e2e8f0;border-radius:4px;margin:0.6rem 0;overflow:hidden;"><div id="em-bar" style="height:100%;width:0;background:#2563eb;transition:width 0.3s;"></div></div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="em-stop">Stop</button>
             </div>`, null);
@@ -641,15 +720,27 @@
         if (stopBtn) stopBtn.addEventListener('click', () => { stop = true; stopBtn.disabled = true; stopBtn.textContent = 'Stopping…'; });
         const sig = signature(report);
         let last = '';
-        const say = (text) => { last = text; const label = document.getElementById('em-progress'); if (label) label.textContent = text; };
-        const busy = (seconds) => {
+        let busyUntil = 0;
+        let ticker = null;
+        // The progress line, with the time left of a wait counted down.
+        const paint = () => {
             const label = document.getElementById('em-progress');
-            if (label) label.textContent = (last ? last + ' ' : '') + 'The AI service is busy: trying again in ' + seconds + ' seconds.';
+            const left = Math.ceil((busyUntil - Date.now()) / 1000);
+            if (label) label.textContent = left > 0 ? (last ? last + ' ' : '') + 'The AI service is busy: trying again in ' + left + ' second' + (left === 1 ? '' : 's') + '.' : last;
+            if (left <= 0 && ticker) { clearInterval(ticker); ticker = null; }
         };
+        const say = (text) => { last = text; paint(); };
+        const busy = (seconds) => {
+            busyUntil = Date.now() + seconds * 1000;
+            paint();
+            if (!ticker) ticker = setInterval(paint, 1000);
+        };
+        const quiet = () => { if (ticker) { clearInterval(ticker); ticker = null; } };
         let result;
         try {
             result = await whileBusyShown(busy, () => stop, () => check(report, {
                 passes: PASSES,
+                resume: earlier || null,
                 shouldStop: () => stop,
                 onProgress: (done, total) => {
                     const bar = document.getElementById('em-bar');
@@ -658,6 +749,7 @@
                 }
             }));
         } catch (err) {
+            quiet();
             if (typeof global.closeModal === 'function') global.closeModal();
             notify('Evidence mapping failed: ' + ((err && err.message) || 'unknown error'), 'error');
             return;
@@ -675,7 +767,10 @@
                 }));
             } catch (_e) { result.gapEvidence = null; }
         }
-        if (!result.stopped && signature(report) === sig) cache[String(reportId)] = { sig, result };
+        quiet();
+        // A part-finished result is kept too, so the rest can be checked later
+        // without sending what was already read.
+        if (signature(report) === sig) cache[String(reportId)] = { sig, result };
         showResults(reportId, report, result);
     }
 
@@ -697,6 +792,7 @@
                     <li><strong>${t.images} screenshot${t.images === 1 ? '' : 's'}</strong> on ${t.questions} question${t.questions === 1 ? '' : 's'} will be sent to the AI service twice, in ${calls} requests. It takes about ${minutes} minute${minutes === 1 ? '' : 's'}.</li>
                     <li>A move that both checks agree on is marked <strong>Strong</strong>, and you can accept all of those with one click.</li>
                     <li>Each question with no screenshot is then searched for across all of them, and what is found is checked against the image.</li>
+                    <li>If the AI service stays busy, or you press Stop, what was read is kept and you can check the rest later.</li>
                     <li>You get a list of proposals. <strong>Nothing moves unless you choose it and press Save.</strong></li>
                     <li>Results and remarks are not changed.</li>
                 </ul>
