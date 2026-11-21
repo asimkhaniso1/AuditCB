@@ -20,12 +20,20 @@ let report;
 let AI;
 let EM;
 let realMap;
+let realMatch;
+let realVerify;
 beforeEach(() => {
     AI = window.AI_SERVICE;
     EM = window.EvidenceMapping;
     EM.forget();
     realMap = realMap || AI.mapEvidence;
     AI.mapEvidence = realMap;
+    realMatch = realMatch || AI.matchEvidenceToQuestions;
+    realVerify = realVerify || AI.verifyEvidenceFor;
+    // The search for questions with no screenshot is off unless a test turns
+    // it on: the screen then falls back to the "also supports" lists.
+    AI.matchEvidenceToQuestions = vi.fn(async () => { throw new Error('off in this test'); });
+    AI.verifyEvidenceFor = vi.fn(async () => { throw new Error('off in this test'); });
     report = { id: 'r1', checklistProgress: [
         { checklistId: 'cl1', itemIdx: 'A-0', clause: 'A.5.26', status: 'conform', requirement: 'Review incidents and security events across the period.', comment: '',
             evidenceImages: [img('chg')], evidenceImage: img('chg'), evidenceCapturedAtList: ['2026-11-18T13:28:10.112Z'], evidenceCapturedAt: '2026-11-18T13:28:10.112Z' },
@@ -493,6 +501,140 @@ describe('two checks of every screenshot', () => {
             expect(Array.from(choice.options).map((o) => o.textContent)).toEqual(['Leave where it is', 'Move to item 2 · 8.5.1', 'Also attach to item 2 · 8.5.1', 'Move to item 3 · A.8.32']);
             expect(document.querySelector('.em-row').textContent).toContain('The checks proposed different questions. The other was item 3 · A.8.32.');
         });
+    });
+});
+
+describe('evidence for questions with no screenshot', () => {
+    const SHOTS = [
+        { id: 'S1', item: 1, clause: 'A.5.26', shows: 'A Change Requests list with approvals.' },
+        { id: 'S2', item: 2, clause: '8.5.1', shows: 'A list of Azure resources.' }
+    ];
+    const GAPS = [
+        { n: 3, clause: 'A.8.32', text: 'Sample A.8.32 Change management. Pre-audit gap: no documented information was on file.' },
+        { n: 5, clause: 'A.6.7', text: 'Sample A.6.7 Remote working.' }
+    ];
+
+    describe('step 1: which screenshots fit, from their descriptions', () => {
+        beforeEach(() => { AI.matchEvidenceToQuestions = realMatch; });
+
+        it('one text call with every such question and every screenshot, and no planning notes', async () => {
+            AI.callProxyAPI = vi.fn(async () => reply({ matches: [] }));
+            await AI.matchEvidenceToQuestions({ questions: GAPS, screenshots: SHOTS });
+            expect(AI.callProxyAPI).toHaveBeenCalledTimes(1);
+            const [prompt, opts] = AI.callProxyAPI.mock.calls[0];
+            expect(prompt).toContain('3 | A.8.32 | Sample A.8.32 Change management.');
+            expect(prompt).not.toContain('Pre-audit gap');
+            expect(prompt).toContain('S1 | filed under item 1 (A.5.26) | A Change Requests list with approvals.');
+            expect(prompt).toContain('Be strict.');
+            expect(opts.images).toBeUndefined();
+            expect(opts).toMatchObject({ json: true, feature: 'evidence-mapping', models: ['gemini-2.0-flash-lite'] });
+        });
+
+        it('keeps only questions that were asked and screenshots that exist, three at most', async () => {
+            AI.callProxyAPI = vi.fn(async () => reply({ matches: [
+                { item: 3, screenshots: ['S1', 'S9', 'S1', 'S2', 'S2'] },
+                { item: 42, screenshots: ['S1'] },
+                { item: '5', screenshots: 'S2' }
+            ] }));
+            const out = await AI.matchEvidenceToQuestions({ questions: GAPS, screenshots: SHOTS });
+            expect(out.matches).toEqual([{ n: 3, ids: ['S1', 'S2'] }, { n: 5, ids: [] }]);
+        });
+
+        it('makes no call with nothing to match, and says so when the reply cannot be read', async () => {
+            AI.callProxyAPI = vi.fn(async () => ({ text: 'oops', usage: {}, model: 'm' }));
+            expect((await AI.matchEvidenceToQuestions({ questions: [], screenshots: SHOTS })).matches).toEqual([]);
+            expect(AI.callProxyAPI).not.toHaveBeenCalled();
+            await expect(AI.matchEvidenceToQuestions({ questions: GAPS, screenshots: SHOTS })).rejects.toThrow('could not be read');
+        });
+    });
+
+    describe('step 2: each candidate against the image', () => {
+        beforeEach(() => { AI.verifyEvidenceFor = realVerify; });
+        const input = { question: GAPS[0], images: [{ evId: 'S1', src: img('chg') }, { evId: 'S2', src: img('ops1') }] };
+
+        it('sends the one question with the candidate images', async () => {
+            AI.callProxyAPI = vi.fn(async () => reply({ images: [] }));
+            await AI.verifyEvidenceFor(input);
+            const [prompt, opts] = AI.callProxyAPI.mock.calls[0];
+            expect(prompt).toContain('QUESTION — item 3 (A.8.32):');
+            expect(prompt).not.toContain('Pre-audit gap');
+            expect(prompt).toContain('Image 1 = S1; Image 2 = S2');
+            expect(prompt).toContain('only if an auditor answering this question would attach it');
+            expect(opts.images).toHaveLength(2);
+        });
+
+        it('an image that is not rated, or rated oddly, counts as none; a judgement is not kept as the reason', async () => {
+            AI.callProxyAPI = vi.fn(async () => reply({ images: [
+                { evId: 'S1', support: 'direct', visibleText: ['Change Requests'], reason: 'It lists Change Requests with their approval status.' }
+            ] }));
+            let out = await AI.verifyEvidenceFor(input);
+            expect(out.images).toEqual([{ evId: 'S1', support: 'direct', reason: 'It lists Change Requests with their approval status.' }, { evId: 'S2', support: 'none', reason: '' }]);
+            AI.callProxyAPI = vi.fn(async () => reply({ images: [
+                { evId: '', support: 'definitely', reason: 'x' },
+                { evId: '', support: 'partial', visibleText: [], reason: 'This shows the control is compliant.' }
+            ] }));
+            out = await AI.verifyEvidenceFor(input);
+            expect(out.images).toEqual([{ evId: 'S1', support: 'none', reason: 'x' }, { evId: 'S2', support: 'partial', reason: '' }]);
+        });
+    });
+
+    describe('the search', () => {
+        const rowsFor = async () => {
+            AI.mapEvidence = vi.fn(async (input) => ({ images: input.images.map((image) => ({ evId: image.evId, shows: 'Screenshot of item ' + input.current.n + '.', here: 'direct', fit: 'fits', betterItem: null, alsoItems: [], reason: '' })), imagesFailed: [], flags: [] }));
+            return (await EM.check(report, { concurrency: 1 })).rows;
+        };
+
+        it('asks only about assessed questions with no screenshot, and offers only direct evidence', async () => {
+            report.checklistProgress.push({ checklistId: 'cl1', itemIdx: 'A-9', clause: 'A.7.2', status: 'not_sampled', requirement: 'Sample A.7.2 Physical entry.' });
+            const rows = await rowsFor();
+            AI.matchEvidenceToQuestions = vi.fn(async (input) => ({ matches: input.questions.map((q) => ({ n: q.n, ids: q.n === 3 ? ['S1', 'S2'] : (q.n === 5 ? ['S4'] : []) })) }));
+            AI.verifyEvidenceFor = vi.fn(async (input) => ({ images: input.images.map((image) => ({ evId: image.evId, support: input.question.n === 3 && image.evId === 'S1' ? 'direct' : 'partial', reason: 'It lists changes with approvals.' })) }));
+            const res = await EM.findGapEvidence(report, rows);
+            // Item 3 (no status yet) and item 5 are asked about; the not-sampled item 6 is not.
+            expect(AI.matchEvidenceToQuestions.mock.calls[0][0].questions.map((q) => q.n)).toEqual([3, 5]);
+            expect(AI.matchEvidenceToQuestions.mock.calls[0][0].screenshots).toHaveLength(4);
+            expect(AI.verifyEvidenceFor).toHaveBeenCalledTimes(2);
+            expect(res.gaps).toHaveLength(1);
+            expect(res.gaps[0].target).toMatchObject({ n: 3, key: 'cl1-A-2' });
+            expect(res.gaps[0].rows.map((r) => [r.src, r.from.n, r.reason])).toEqual([[img('chg'), 1, 'It lists changes with approvals.']]);
+            // Item 5 had a candidate, but only partly fitting: nothing is offered.
+            expect(res.none.map((x) => x.n)).toEqual([5]);
+        });
+
+        it('leaves a question a proposed move would already fill to that move', async () => {
+            const rows = await rowsFor();
+            rows[0] = Object.assign({}, rows[0], { fit: 'fits_better_elsewhere', to: { n: 3, key: 'cl1-A-2', clause: 'A.8.32', text: 't' } });
+            AI.matchEvidenceToQuestions = vi.fn(async (input) => ({ matches: input.questions.map((q) => ({ n: q.n, ids: [] })) }));
+            await EM.findGapEvidence(report, rows);
+            expect(AI.matchEvidenceToQuestions.mock.calls[0][0].questions.map((q) => q.n)).toEqual([5]);
+        });
+
+        it('a failed search offers nothing and reports the error', async () => {
+            const rows = await rowsFor();
+            const res = await EM.findGapEvidence(report, rows);
+            expect(res).toEqual({ gaps: [], none: [], error: 'off in this test' });
+        });
+    });
+
+    it('on the review screen: the evidence found, why, and the questions nothing supports', async () => {
+        AI.mapEvidence = vi.fn(async (input) => ({ images: input.images.map((image) => ({ evId: image.evId, shows: 'Screenshot of item ' + input.current.n + '.', here: 'direct', fit: 'fits', betterItem: null, alsoItems: input.current.n === 2 ? [5] : [], reason: 'Its own question.' })), imagesFailed: [], flags: [] }));
+        AI.matchEvidenceToQuestions = vi.fn(async (input) => ({ matches: input.questions.map((q) => ({ n: q.n, ids: q.n === 3 ? ['S1'] : [] })) }));
+        AI.verifyEvidenceFor = vi.fn(async (input) => ({ images: input.images.map((image) => ({ evId: image.evId, support: 'direct', reason: 'It lists changes with approvals.' })) }));
+        window.openEvidenceMapping('r1');
+        expect(document.body.textContent).toContain('Each question with no screenshot is then searched for across all of them');
+        document.getElementById('em-start').click();
+        await vi.waitFor(() => expect(document.querySelector('.em-choice')).not.toBeNull());
+        expect(document.body.textContent).toContain('Questions with no screenshot: evidence found under another question');
+        expect(document.body.textContent).toContain('item 3 · A.8.32 has no screenshot of its own');
+        // The by-product "also supports" (item 2's screenshots for item 5) is no longer offered.
+        const rows = Array.from(document.querySelectorAll('.em-row'));
+        expect(rows).toHaveLength(1);
+        expect(rows[0].textContent).toContain('Why: It lists changes with approvals.');
+        expect(document.getElementById('em-none').textContent).toBe('No screenshot in this audit supports: item 5 · A.6.7');
+        rows[0].querySelector('.em-choice').value = 'copy:cl1-A-2';
+        window.__save();
+        expect(report.checklistProgress[2].evidenceImages).toEqual([img('chg')]);
+        expect(report.checklistProgress[0].evidenceImages).toEqual([img('chg')]);
     });
 });
 

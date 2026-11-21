@@ -719,6 +719,61 @@ Return JSON only, in this shape:
 {"images":[{"evId":"","shows":"","visibleText":[""],"here":"","bestItem":null,"alsoItems":[],"reason":""}]}`;
 }
 
+// ---------- Evidence for questions with no screenshot (2026-11-20) ----------
+// The mapping check offered such a question whatever screenshots had named it
+// as "also supports", a by-product of a call about a different question. Live,
+// that put the backup dashboard under 9.1 monitoring while five KPI dashboards
+// sat one question away, and the Document Control Policy under leadership.
+// Now each of these questions is searched for on its own: first against the
+// descriptions of every screenshot (one text call), then each candidate is
+// checked against the image itself, and only "direct" evidence is offered.
+const EVIDENCE_GAP_PROMPT_VERSION = 'eg1';
+const EVIDENCE_GAP_MAX_CANDIDATES = 3;
+const EVIDENCE_GAP_SUPPORT = ['direct', 'partial', 'none'];
+const EVIDENCE_GAP_QUESTION_CHARS = 320;
+const _evidenceGapQuestion = (text) => String(text || '').replace(FINDING_DRAFT_PLANNING_RE, '').replace(/\s+/g, ' ').trim();
+
+function _evidenceGapMatchPrompt(questions, screenshots) {
+    const qList = questions.map((q) => q.n + ' | ' + (q.clause || '-') + ' | ' + _evidenceGapQuestion(q.text).slice(0, EVIDENCE_GAP_QUESTION_CHARS)).join('\n');
+    const sList = screenshots.map((s) => s.id + ' | filed under item ' + s.item + (s.clause ? ' (' + s.clause + ')' : '') + ' | ' + String(s.shows || '').replace(/\s+/g, ' ')).join('\n');
+    return `You help a certification body auditor find evidence already captured during an audit. You do not decide conformity; the auditor does.
+
+These audit questions have no screenshot attached (item number | clause | question):
+${qList}
+
+These are the screenshots captured during the audit, each filed under another question (id | where it is filed | what it shows):
+${sList}
+
+For each question, list the ids of at most ${EVIDENCE_GAP_MAX_CANDIDATES} screenshots whose description shows what that question asks the auditor to verify.
+
+Rules:
+1. Be strict. A screenshot that only shares a topic with the question is not evidence for it. Most questions will have none or one.
+2. Prefer the screenshot that shows the record the question asks for (a register, a log, a dashboard of results) over one that shows a policy or a general overview.
+3. Use only ids from the list. Give an empty list when nothing fits.
+
+Return JSON only, in this shape:
+{"matches":[{"item":0,"screenshots":[""]}]}`;
+}
+
+function _evidenceGapVerifyPrompt(question, sent) {
+    const q = question || {};
+    return `You help a certification body auditor decide whether screenshots filed under other questions are also evidence for this one. You do not decide conformity; the auditor does.
+
+QUESTION — item ${q.n}${q.clause ? ' (' + q.clause + ')' : ''}:
+${_evidenceGapQuestion(q.text) || 'Not recorded.'}
+
+IMAGES:
+The ${sent.length} image(s) follow this prompt in this order: ${sent.map((s, n) => 'Image ' + (n + 1) + ' = ' + s.evId).join('; ')}.
+
+Rules:
+1. support: "direct" when the image shows what this question asks the auditor to verify. "partial" when it only relates to the same subject. "none" otherwise, or when its text cannot be read. Be strict: a candidate is "direct" only if an auditor answering this question would attach it.
+2. visibleText: copy up to 6 short pieces of text exactly as they appear in the image (its title, headings, system or document name).
+3. reason: one sentence (at most 25 words) naming what in the image shows it. Never write "conform", "nonconformity", "compliant", "compliance" or any certification judgement.
+
+Return JSON only, in this shape:
+{"images":[{"evId":"","support":"","visibleText":[""],"reason":""}]}`;
+}
+
 // ---------- Draft from evidence, for Fix findings (2026-11-20) ----------
 // "Polish" rewrites the text in a box, so it can do nothing for the empty
 // "What you saw" box of a finding whose only records are a two-word note and a
@@ -1404,6 +1459,97 @@ Return a raw JSON array with 'id' and 'text' fields only:
             images: checked.images,
             flags: checked.flags
         };
+    },
+
+    // ---------- Evidence for questions with no screenshot ----------
+    /**
+     * Step 1, text only: for each question with no screenshot, the screenshots
+     * whose description fits it. input: { questions: [{n, clause, text}],
+     * screenshots: [{id, item, clause, shows}] }. Returns { matches: [{n, ids}] }
+     * with only questions and ids that were sent, at most three ids each.
+     */
+    matchEvidenceToQuestions: async (input) => {
+        const questions = (input && Array.isArray(input.questions)) ? input.questions : [];
+        const screenshots = (input && Array.isArray(input.screenshots)) ? input.screenshots : [];
+        if (!questions.length || !screenshots.length) return { status: 'nothing', matches: [] };
+        const resp = await AI_SERVICE.callProxyAPI(_evidenceGapMatchPrompt(questions, screenshots), {
+            json: true,
+            withUsage: true,
+            feature: 'evidence-mapping',
+            models: [EVIDENCE_MODEL],
+            maxTokens: 16384,
+            temperature: 0.1
+        });
+        let parsed;
+        try {
+            parsed = JSON.parse(String(resp.text || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim());
+        } catch (_e) { parsed = null; }
+        if (!parsed || typeof parsed !== 'object') throw new Error('The AI reply could not be read.');
+        const asked = new Set(questions.map((q) => Number(q.n)));
+        const known = new Set(screenshots.map((s) => String(s.id)));
+        const byN = new Map();
+        (Array.isArray(parsed.matches) ? parsed.matches : []).forEach((m) => {
+            const n = Number(m && m.item);
+            if (!Number.isInteger(n) || !asked.has(n) || byN.has(n)) return;
+            const ids = [];
+            (Array.isArray(m.screenshots) ? m.screenshots : []).forEach((id) => {
+                const key = String(id == null ? '' : id).trim();
+                if (known.has(key) && ids.indexOf(key) === -1 && ids.length < EVIDENCE_GAP_MAX_CANDIDATES) ids.push(key);
+            });
+            byN.set(n, ids);
+        });
+        return {
+            status: 'draft',
+            promptVersion: EVIDENCE_GAP_PROMPT_VERSION,
+            model: resp.model,
+            usage: _evidenceUsage(resp.usage),
+            matches: questions.map((q) => ({ n: Number(q.n), ids: byN.get(Number(q.n)) || [] }))
+        };
+    },
+
+    /**
+     * Step 2, with the images: is each candidate direct evidence for this one
+     * question? input: { question: {n, clause, text}, images: [{evId, src}] }.
+     * Returns { images: [{evId, support, reason}] }; an image the reply does
+     * not rate counts as "none".
+     */
+    verifyEvidenceFor: async (input) => {
+        const i = input || {};
+        const prep = await AI_SERVICE.prepareEvidenceImages(i.images || []);
+        if (!prep.sent.length) return { status: 'nothing', images: [], imagesFailed: prep.failed, flags: [] };
+        const resp = await AI_SERVICE.callProxyAPI(_evidenceGapVerifyPrompt(i.question, prep.sent), {
+            images: prep.sent.map((s) => ({ mimeType: s.mimeType, data: s.data })),
+            json: true,
+            withUsage: true,
+            feature: 'evidence-mapping',
+            models: [EVIDENCE_MODEL],
+            maxTokens: 8192,
+            temperature: 0.1
+        });
+        let parsed;
+        try {
+            parsed = JSON.parse(String(resp.text || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim());
+        } catch (_e) { parsed = null; }
+        if (!parsed || typeof parsed !== 'object') throw new Error('The AI reply could not be read.');
+        const flags = [];
+        const sentIds = prep.sent.map((s) => s.evId);
+        const seen = new Map();
+        (Array.isArray(parsed.images) ? parsed.images : []).forEach((im, n) => {
+            let id = String((im && im.evId) || '').trim();
+            if (sentIds.indexOf(id) === -1) id = sentIds[n];
+            if (id && !seen.has(id)) seen.set(id, im || {});
+        });
+        const q = i.question || {};
+        const images = sentIds.map((id) => {
+            const im = seen.get(id);
+            if (!im) return { evId: id, support: 'none', reason: '' };
+            const support = EVIDENCE_GAP_SUPPORT.indexOf(im.support) !== -1 ? im.support : 'none';
+            const visibleText = (Array.isArray(im.visibleText) ? im.visibleText : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 6);
+            const source = [visibleText.join('\n'), q.text || '', q.clause || ''].join('\n');
+            const reason = _evidenceSentences(_evidenceFactsClean(String(im.reason || ''), source, visibleText, id, flags))[0] || '';
+            return { evId: id, support, reason };
+        });
+        return { status: 'draft', promptVersion: EVIDENCE_GAP_PROMPT_VERSION, model: resp.model, usage: _evidenceUsage(resp.usage), images, imagesFailed: prep.failed, flags };
     },
 
     // ---------- Draft from evidence (Fix findings) ----------
