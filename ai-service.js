@@ -706,6 +706,27 @@ async function _evidenceCall(prompt, options) {
     }
 }
 
+/**
+ * _evidenceCall for a reply that must be JSON. A reply that cannot be read
+ * (cut off: thinking tokens count against the output limit) is asked for
+ * again, `tries` times in all, before the caller is told. Returns
+ * { resp, parsed }. Live, 2026-11-21: the one text request that starts the
+ * search for questions with no screenshot came back unreadable, it was not
+ * asked for again, and the whole search reported "did not run".
+ */
+async function _evidenceJsonCall(prompt, options, tries) {
+    const attempts = Math.max(1, tries || 2);
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        const resp = await _evidenceCall(prompt, options);
+        let parsed;
+        try {
+            parsed = JSON.parse(String((resp && resp.text) || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim());
+        } catch (_e) { parsed = null; }
+        if (parsed && typeof parsed === 'object') return { resp, parsed };
+    }
+    throw new Error('The AI reply could not be read.');
+}
+
 function _evidenceUsage(u) {
     const usage = u || {};
     const details = Array.isArray(usage.promptTokensDetails) ? usage.promptTokensDetails : [];
@@ -1494,27 +1515,18 @@ Return a raw JSON array with 'id' and 'text' fields only:
         }
         const started = Date.now();
         const prompt = _evidenceMapPrompt(input, prep.sent);
-        let resp;
-        let parsed = null;
         // In the live run 2 of 48 replies were cut off (thinking tokens count
         // against the limit) and could not be parsed. One more try, then the
         // caller is told: an unread reply must not look like unreadable images.
-        for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
-            resp = await _evidenceCall(prompt, {
-                images: prep.sent.map((s) => ({ mimeType: s.mimeType, data: s.data })),
-                json: true,
-                withUsage: true,
-                feature: 'evidence-mapping',
-                models: [EVIDENCE_MODEL],
-                maxTokens: 16384,
-                temperature: 0.1
-            });
-            try {
-                parsed = JSON.parse(String(resp.text || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim());
-            } catch (_e) { parsed = null; }
-            if (!parsed || typeof parsed !== 'object') parsed = null;
-        }
-        if (!parsed) throw new Error('The AI reply could not be read.');
+        const { resp, parsed } = await _evidenceJsonCall(prompt, {
+            images: prep.sent.map((s) => ({ mimeType: s.mimeType, data: s.data })),
+            json: true,
+            withUsage: true,
+            feature: 'evidence-mapping',
+            models: [EVIDENCE_MODEL],
+            maxTokens: 16384,
+            temperature: 0.1
+        }, 2);
         const checked = AI_SERVICE.validateEvidenceMapping(parsed, input, prep);
         return {
             status: 'draft',
@@ -1540,19 +1552,17 @@ Return a raw JSON array with 'id' and 'text' fields only:
         const questions = (input && Array.isArray(input.questions)) ? input.questions : [];
         const screenshots = (input && Array.isArray(input.screenshots)) ? input.screenshots : [];
         if (!questions.length || !screenshots.length) return { status: 'nothing', matches: [] };
-        const resp = await _evidenceCall(_evidenceGapMatchPrompt(questions, screenshots), {
+        // The whole search hangs on this one request, so it gets three tries
+        // and a larger output limit (its reply lists every question, and the
+        // model's thinking counts against the limit).
+        const { resp, parsed } = await _evidenceJsonCall(_evidenceGapMatchPrompt(questions, screenshots), {
             json: true,
             withUsage: true,
             feature: 'evidence-mapping',
             models: [EVIDENCE_MODEL],
-            maxTokens: 16384,
+            maxTokens: 32768,
             temperature: 0.1
-        });
-        let parsed;
-        try {
-            parsed = JSON.parse(String(resp.text || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim());
-        } catch (_e) { parsed = null; }
-        if (!parsed || typeof parsed !== 'object') throw new Error('The AI reply could not be read.');
+        }, 3);
         const asked = new Set(questions.map((q) => Number(q.n)));
         const known = new Set(screenshots.map((s) => String(s.id)));
         const byN = new Map();
@@ -1585,7 +1595,7 @@ Return a raw JSON array with 'id' and 'text' fields only:
         const i = input || {};
         const prep = await AI_SERVICE.prepareEvidenceImages(i.images || []);
         if (!prep.sent.length) return { status: 'nothing', images: [], imagesFailed: prep.failed, flags: [] };
-        const resp = await _evidenceCall(_evidenceGapVerifyPrompt(i.question, prep.sent), {
+        const { resp, parsed } = await _evidenceJsonCall(_evidenceGapVerifyPrompt(i.question, prep.sent), {
             images: prep.sent.map((s) => ({ mimeType: s.mimeType, data: s.data })),
             json: true,
             withUsage: true,
@@ -1593,12 +1603,7 @@ Return a raw JSON array with 'id' and 'text' fields only:
             models: [EVIDENCE_MODEL],
             maxTokens: 8192,
             temperature: 0.1
-        });
-        let parsed;
-        try {
-            parsed = JSON.parse(String(resp.text || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim());
-        } catch (_e) { parsed = null; }
-        if (!parsed || typeof parsed !== 'object') throw new Error('The AI reply could not be read.');
+        }, 2);
         const flags = [];
         const sentIds = prep.sent.map((s) => s.evId);
         const seen = new Map();
