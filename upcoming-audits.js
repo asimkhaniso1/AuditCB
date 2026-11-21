@@ -6,9 +6,12 @@
 // KPI card reads its figure from the same model, so the tile and the panel
 // can never disagree.
 //
-// "Open" = not completed (DataService.isPlanCompleted) and not cancelled. A
-// plan whose dates have passed but which was never closed stays on the list
-// under "Dates passed — not closed" rather than silently disappearing.
+// "Open" = not completed (DataService.isPlanCompleted) and not cancelled.
+// UPCOMING = open and not yet over (in progress today, or starting later),
+// listed first, soonest first; `count` (the badge and the KPI tile) counts
+// only these. Open plans with no date, and plans whose dates have passed but
+// were never closed, stay on the list in collapsed secondary groups below —
+// they never lead the panel and never inflate the upcoming figure.
 //
 // Dates are LOCAL calendar days as 'YYYY-MM-DD' strings (plans store a date
 // column), compared as strings — never as instants, which mis-sort the first
@@ -33,14 +36,16 @@
     const MONTHS_SHORT = MONTHS.map(m => m.slice(0, 3));
     const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+    // Upcoming buckets first (soonest first); secondary ones after, collapsed.
     const BUCKETS = [
-        { key: 'overdue', label: 'Dates passed — not closed' },
         { key: 'now', label: 'In progress / today' },
         { key: 'week', label: 'Next 7 days' },
         { key: 'month', label: 'Next 30 days' },
         { key: 'later', label: 'Later' },
-        { key: 'unscheduled', label: 'Date not set' }
+        { key: 'unscheduled', label: 'Date not set', secondary: true },
+        { key: 'overdue', label: 'Dates passed — not closed', secondary: true }
     ];
+    const UPCOMING_KEYS = BUCKETS.filter(b => !b.secondary).map(b => b.key);
     const BUCKET_ORDER = BUCKETS.reduce((acc, b, i) => { acc[b.key] = i; return acc; }, {});
 
     const TYPES = [
@@ -184,14 +189,19 @@
     function compareItems(a, b) {
         const bo = BUCKET_ORDER[a.bucket] - BUCKET_ORDER[b.bucket];
         if (bo) return bo;
+        // Passed-but-open: most recently ended first — the freshest is the
+        // one most likely still to be closed out.
+        if (a.bucket === 'overdue' && a.end !== b.end) return a.end > b.end ? -1 : 1;
         if (a.start !== b.start) return a.start < b.start ? -1 : 1;
         if (a.end !== b.end) return a.end < b.end ? -1 : 1;
         return a.client.localeCompare(b.client);
     }
 
     /**
-     * The open audits the viewer can see, soonest first and grouped. `plans`
-     * must already be role-scoped (getVisiblePlans) — this never widens it.
+     * The open audits the viewer can see, grouped: upcoming first (soonest
+     * first), then undated, then dates-passed. `count` is the UPCOMING figure
+     * only; `openCount` is every open plan. `plans` must already be
+     * role-scoped (getVisiblePlans) — this never widens it.
      */
     function build(plans, opts) {
         const o = opts || {};
@@ -211,8 +221,9 @@
         items.forEach(it => { counts[it.bucket]++; });
         const buckets = BUCKETS
             .filter(b => counts[b.key] > 0)
-            .map(b => ({ key: b.key, label: b.label, items: items.filter(it => it.bucket === b.key) }));
-        return { today, items, count: items.length, buckets, counts };
+            .map(b => ({ key: b.key, label: b.label, secondary: !!b.secondary, items: items.filter(it => it.bucket === b.key) }));
+        const count = UPCOMING_KEYS.reduce((s, k) => s + counts[k], 0);
+        return { today, items, count, openCount: items.length, buckets, counts };
     }
 
     // ── Month grid ───────────────────────────────────────────────────
@@ -316,19 +327,27 @@
     }
 
     function listHtml(model) {
-        if (!model.count) {
-            return `
+        const primary = model.buckets.filter(b => !b.secondary);
+        const secondary = model.buckets.filter(b => b.secondary);
+        const empty = model.count ? '' : `
                 <div class="ua-empty">
                     <i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i>
-                    <p>No open audits are scheduled.</p>
+                    <p>No upcoming audits are scheduled.</p>
                     <button type="button" class="btn btn-sm btn-primary" data-action="renderModule" data-id="audit-planning">Plan an audit</button>
                 </div>`;
-        }
-        return `<div class="ua-list">${model.buckets.map(b => `
+        if (!primary.length && !secondary.length) return empty;
+        const groups = primary.map(b => `
             <div class="ua-group">
                 <div class="ua-group-title">${esc(b.label)} <span>${b.items.length}</span></div>
                 ${b.items.map(rowHtml).join('')}
-            </div>`).join('')}</div>`;
+            </div>`).join('');
+        // Collapsed by default: these are housekeeping, not what is coming up.
+        const extra = secondary.map(b => `
+            <details class="ua-group ua-secondary ua-secondary-${b.key}">
+                <summary class="ua-group-title">${esc(b.label)} <span>${b.items.length}</span></summary>
+                ${b.items.map(rowHtml).join('')}
+            </details>`).join('');
+        return `<div class="ua-list">${empty}${groups}${extra}</div>`;
     }
 
     function calendarHtml(model) {

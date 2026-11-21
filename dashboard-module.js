@@ -229,7 +229,7 @@ function renderDashboardEnhanced() {
                             <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem;"></i>
                         </div>
                     </div>
-                    <div style="font-size: 0.75rem; opacity: 0.8;">${completedAudits} completed${upcoming.counts.overdue ? ` · ${upcoming.counts.overdue} past date` : ''} · View calendar <i class="fa-solid fa-arrow-down" aria-hidden="true"></i></div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">${completedAudits} completed${upcoming.counts.overdue ? ` · ${upcoming.counts.overdue} past date, not closed` : ''}${upcoming.counts.unscheduled ? ` · ${upcoming.counts.unscheduled} undated` : ''} · View calendar <i class="fa-solid fa-arrow-down" aria-hidden="true"></i></div>
                 </button>
 
                 <!-- Open NCRs -->
