@@ -551,6 +551,20 @@ describe('evidence for questions with no screenshot', () => {
             expect((await AI.matchEvidenceToQuestions({ questions: [], screenshots: SHOTS })).matches).toEqual([]);
             expect(AI.callProxyAPI).not.toHaveBeenCalled();
             await expect(AI.matchEvidenceToQuestions({ questions: GAPS, screenshots: SHOTS })).rejects.toThrow('could not be read');
+            // Three tries before giving up: the whole search hangs on this request.
+            expect(AI.callProxyAPI).toHaveBeenCalledTimes(3);
+        });
+
+        // Live, 2026-11-21: this reply came back cut off, was not asked for
+        // again, and the search reported "did not run".
+        it('asks again when the reply cannot be read, and uses the one that can', async () => {
+            const replies = [{ text: '{"matches":[{"item":3,"screensh', usage: {}, model: 'm' }, reply({ matches: [{ item: 3, screenshots: ['S1'] }] })];
+            AI.callProxyAPI = vi.fn(async () => replies.shift());
+            const out = await AI.matchEvidenceToQuestions({ questions: GAPS, screenshots: SHOTS });
+            expect(AI.callProxyAPI).toHaveBeenCalledTimes(2);
+            expect(AI.callProxyAPI.mock.calls[0][0]).toBe(AI.callProxyAPI.mock.calls[1][0]);
+            expect(AI.callProxyAPI.mock.calls[0][1].maxTokens).toBe(32768);
+            expect(out.matches).toEqual([{ n: 3, ids: ['S1'] }, { n: 5, ids: [] }]);
         });
     });
 
@@ -582,6 +596,17 @@ describe('evidence for questions with no screenshot', () => {
             ] }));
             out = await AI.verifyEvidenceFor(input);
             expect(out.images).toEqual([{ evId: 'S1', support: 'none', reason: 'x' }, { evId: 'S2', support: 'partial', reason: '' }]);
+        });
+
+        it('asks once more when the reply cannot be read, then gives up for this question', async () => {
+            const replies = [{ text: 'not json', usage: {}, model: 'm' }, reply({ images: [{ evId: 'S1', support: 'direct', visibleText: ['Change Requests'], reason: 'It lists Change Requests with their approval status.' }] })];
+            AI.callProxyAPI = vi.fn(async () => replies.shift());
+            const out = await AI.verifyEvidenceFor(input);
+            expect(AI.callProxyAPI).toHaveBeenCalledTimes(2);
+            expect(out.images[0]).toEqual({ evId: 'S1', support: 'direct', reason: 'It lists Change Requests with their approval status.' });
+            AI.callProxyAPI = vi.fn(async () => ({ text: '[1, 2', usage: {}, model: 'm' }));
+            await expect(AI.verifyEvidenceFor(input)).rejects.toThrow('could not be read');
+            expect(AI.callProxyAPI).toHaveBeenCalledTimes(2);
         });
 
         // Deployed run, 2026-11-21: both BCDR report offers came with no "Why".
@@ -646,6 +671,17 @@ describe('evidence for questions with no screenshot', () => {
             expect(res.gaps).toEqual([]);
             expect(res.failed.map((x) => x.n)).toEqual([3]);
             expect(res.none.map((x) => x.n)).toEqual([5]);
+        });
+
+        it('one unreadable reply to the first request does not stop the search', async () => {
+            const rows = await rowsFor();
+            AI.matchEvidenceToQuestions = realMatch;
+            const replies = [{ text: '', usage: {}, model: 'm' }, reply({ matches: [{ item: 3, screenshots: ['S1'] }] })];
+            AI.callProxyAPI = vi.fn(async () => replies.shift());
+            AI.verifyEvidenceFor = vi.fn(async (input) => ({ images: input.images.map((image) => ({ evId: image.evId, support: 'direct', reason: 'It lists changes with approvals.' })) }));
+            const res = await EM.findGapEvidence(report, rows);
+            expect(res.error).toBe('');
+            expect(res.gaps.map((g) => g.target.n)).toEqual([3]);
         });
 
         it('without the search in the AI service there is no result at all', async () => {
