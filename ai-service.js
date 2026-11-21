@@ -656,6 +656,56 @@ Return JSON only, in this shape:
 {"images":[{"evId":"","shows":"","visibleText":[""],"relevance":""}],"checks":[{"part":"","finding":"","evidence":""}],"explanation":"","suggestedAssessment":"","assessmentReason":""}`;
 }
 
+// ---------- A busy AI service (2026-11-21) ----------
+// Three live runs of the evidence check in a row: after about 60 to 80
+// requests Gemini rejected every request (even a one-word prompt) for two to
+// five minutes. Second readings were lost, so fewer moves came out "strong",
+// and the search for questions with no screenshot did not run at all. A
+// request that is rejected as busy now waits and is tried again; every other
+// evidence request waits with it instead of adding to the load.
+let _evidenceBusyUntil = 0;
+
+async function _evidenceHold() {
+    while (Date.now() < _evidenceBusyUntil) {
+        const hook = AI_SERVICE.evidenceBusy;
+        if (hook && typeof hook.cancelled === 'function' && hook.cancelled()) {
+            const stopped = new Error('Stopped.');
+            stopped.stopped = true;
+            throw stopped;
+        }
+        await new Promise((resolve) => setTimeout(resolve, Math.min(1000, Math.max(1, _evidenceBusyUntil - Date.now()))));
+    }
+}
+
+/**
+ * callProxyAPI for the evidence checks: through the server proxy only, and a
+ * "busy" rejection is waited out (AI_SERVICE.evidenceBusyWaits, or longer when
+ * Gemini says how long) and tried again. AI_SERVICE.evidenceBusy, when a
+ * screen sets it, is told of each wait and can cancel one:
+ * { onWait(seconds), cancelled() }.
+ */
+async function _evidenceCall(prompt, options) {
+    const waits = AI_SERVICE.evidenceBusyWaits || [];
+    for (let attempt = 0; ; attempt++) {
+        await _evidenceHold();
+        try {
+            return await AI_SERVICE.callProxyAPI(prompt, Object.assign({ proxyOnly: true }, options));
+        } catch (err) {
+            if (!err || !err.busy) throw err;
+            if (attempt >= waits.length) {
+                const busy = new Error('The AI service is busy (a rate limit or an overloaded model). Try again in a few minutes.');
+                busy.busy = true;
+                busy.upstreamStatus = err.upstreamStatus || null;
+                throw busy;
+            }
+            const wait = Math.min(Math.max(waits[attempt], (err.retryAfterSeconds || 0) * 1000), 300000);
+            _evidenceBusyUntil = Math.max(_evidenceBusyUntil, Date.now() + wait);
+            const hook = AI_SERVICE.evidenceBusy;
+            if (hook && typeof hook.onWait === 'function') hook.onWait(Math.ceil((_evidenceBusyUntil - Date.now()) / 1000));
+        }
+    }
+}
+
 function _evidenceUsage(u) {
     const usage = u || {};
     const details = Array.isArray(usage.promptTokensDetails) ? usage.promptTokensDetails : [];
@@ -727,7 +777,12 @@ Return JSON only, in this shape:
 // Now each of these questions is searched for on its own: first against the
 // descriptions of every screenshot (one text call), then each candidate is
 // checked against the image itself, and only "direct" evidence is offered.
-const EVIDENCE_GAP_PROMPT_VERSION = 'eg1';
+// eg2 (deployed run, 2026-11-21): eg1 rated thin candidates "direct": an
+// access-revocation email for 7.4 communication, a purchase request for A.8.32
+// change management, a BCDR RACI chart for 5.1 leadership, a training record
+// for 7.6 knowledge. The check now names the record the question needs first
+// and rates the image against that.
+const EVIDENCE_GAP_PROMPT_VERSION = 'eg2';
 const EVIDENCE_GAP_MAX_CANDIDATES = 3;
 const EVIDENCE_GAP_SUPPORT = ['direct', 'partial', 'none'];
 const EVIDENCE_GAP_QUESTION_CHARS = 320;
@@ -766,12 +821,20 @@ IMAGES:
 The ${sent.length} image(s) follow this prompt in this order: ${sent.map((s, n) => 'Image ' + (n + 1) + ' = ' + s.evId).join('; ')}.
 
 Rules:
-1. support: "direct" when the image shows what this question asks the auditor to verify. "partial" when it only relates to the same subject. "none" otherwise, or when its text cannot be read. Be strict: a candidate is "direct" only if an auditor answering this question would attach it.
-2. visibleText: copy up to 6 short pieces of text exactly as they appear in the image (its title, headings, system or document name).
-3. reason: one sentence (at most 25 words) naming what in the image shows it. Never write "conform", "nonconformity", "compliant", "compliance" or any certification judgement.
+1. needs: first, in at most 15 words, name the record an auditor must see to answer this question (for example "a change record followed from request to approval").
+2. is: for each image, in at most 10 words, what kind of record it is.
+3. support: "direct" only when the image is that record, or a clear instance of it, and the subject of this question is the main subject of the image. "partial" when it relates to the subject but is not that record. "none" otherwise, or when its text cannot be read.
+4. These are "partial", not "direct":
+   - the subject of the question appears in the image only as one line or an incidental detail;
+   - a single example of an activity (one email, one ticket, one chat message) offered for a question about how that activity is planned, defined or controlled, unless the question asks to sample such an example;
+   - a record of a different process, approval or purchase that merely resembles what the question asks for;
+   - a document about one process offered as evidence of another process, or of management commitment in general.
+5. When in doubt, "partial". Most candidates are not "direct"; an auditor answering this question must be able to attach a "direct" image without explaining why it is there.
+6. visibleText: copy up to 6 short pieces of text exactly as they appear in the image (its title, headings, system or document name).
+7. reason: one sentence (at most 25 words) naming what in the image shows it. Never write "conform", "nonconformity", "compliant", "compliance" or any certification judgement.
 
 Return JSON only, in this shape:
-{"images":[{"evId":"","support":"","visibleText":[""],"reason":""}]}`;
+{"needs":"","images":[{"evId":"","is":"","support":"","visibleText":[""],"reason":""}]}`;
 }
 
 // ---------- Draft from evidence, for Fix findings (2026-11-20) ----------
@@ -1334,6 +1397,11 @@ Return a raw JSON array with 'id' and 'text' fields only:
 
     // ---------- Evidence mapping check ----------
     EVIDENCE_MAX_IMAGES: EVIDENCE_MAX_IMAGES,
+    // How long an evidence request waits each time the AI service is busy
+    // (ms); after the last wait the request fails. See _evidenceCall.
+    evidenceBusyWaits: [30000, 60000, 120000, 120000],
+    // Set by a screen while it runs evidence checks: { onWait(seconds), cancelled() }.
+    evidenceBusy: null,
 
     /**
      * Normalise the model's reply for one question's screenshots into
@@ -1432,7 +1500,7 @@ Return a raw JSON array with 'id' and 'text' fields only:
         // against the limit) and could not be parsed. One more try, then the
         // caller is told: an unread reply must not look like unreadable images.
         for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
-            resp = await AI_SERVICE.callProxyAPI(prompt, {
+            resp = await _evidenceCall(prompt, {
                 images: prep.sent.map((s) => ({ mimeType: s.mimeType, data: s.data })),
                 json: true,
                 withUsage: true,
@@ -1472,7 +1540,7 @@ Return a raw JSON array with 'id' and 'text' fields only:
         const questions = (input && Array.isArray(input.questions)) ? input.questions : [];
         const screenshots = (input && Array.isArray(input.screenshots)) ? input.screenshots : [];
         if (!questions.length || !screenshots.length) return { status: 'nothing', matches: [] };
-        const resp = await AI_SERVICE.callProxyAPI(_evidenceGapMatchPrompt(questions, screenshots), {
+        const resp = await _evidenceCall(_evidenceGapMatchPrompt(questions, screenshots), {
             json: true,
             withUsage: true,
             feature: 'evidence-mapping',
@@ -1517,7 +1585,7 @@ Return a raw JSON array with 'id' and 'text' fields only:
         const i = input || {};
         const prep = await AI_SERVICE.prepareEvidenceImages(i.images || []);
         if (!prep.sent.length) return { status: 'nothing', images: [], imagesFailed: prep.failed, flags: [] };
-        const resp = await AI_SERVICE.callProxyAPI(_evidenceGapVerifyPrompt(i.question, prep.sent), {
+        const resp = await _evidenceCall(_evidenceGapVerifyPrompt(i.question, prep.sent), {
             images: prep.sent.map((s) => ({ mimeType: s.mimeType, data: s.data })),
             json: true,
             withUsage: true,
@@ -1546,7 +1614,14 @@ Return a raw JSON array with 'id' and 'text' fields only:
             const support = EVIDENCE_GAP_SUPPORT.indexOf(im.support) !== -1 ? im.support : 'none';
             const visibleText = (Array.isArray(im.visibleText) ? im.visibleText : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 6);
             const source = [visibleText.join('\n'), q.text || '', q.clause || ''].join('\n');
-            const reason = _evidenceSentences(_evidenceFactsClean(String(im.reason || ''), source, visibleText, id, flags))[0] || '';
+            let reason = _evidenceSentences(_evidenceFactsClean(String(im.reason || ''), source, visibleText, id, flags))[0] || '';
+            // An offer always says why. When the reason did not survive the
+            // fact check (live: both BCDR report offers came with none), what
+            // the image itself says stands in; with neither, it is not offered.
+            if (support === 'direct' && !reason) {
+                if (!visibleText.length) return { evId: id, support: 'partial', reason: '' };
+                reason = 'The screenshot reads: ' + visibleText.slice(0, 3).map((t) => '"' + t + '"').join(', ') + '.';
+            }
             return { evId: id, support, reason };
         });
         return { status: 'draft', promptVersion: EVIDENCE_GAP_PROMPT_VERSION, model: resp.model, usage: _evidenceUsage(resp.usage), images, imagesFailed: prep.failed, flags };
@@ -2530,10 +2605,17 @@ Example:
                             continue; // Try next model
                         }
                         lastError = new Error(data.error || `AI Service Error: ${response.status} `);
+                        // The proxy says when Gemini is rate limiting or
+                        // overloaded: worth waiting for (see _evidenceCall).
+                        lastError.upstreamStatus = data.upstreamStatus || null;
+                        lastError.busy = data.busy === true;
+                        lastError.retryAfterSeconds = Number(data.retryAfterSeconds) || 0;
                     } catch (_e) {
                         // Change to warn to avoid scaring users when fallback is available
                         console.warn(`AI Proxy connection failed: ${response.status} ${response.statusText} - will attempt fallback.`);
                         lastError = new Error(`AI Service connection failed: ${response.status} ${response.statusText} `);
+                        // A gateway answer with no JSON: the function timed out or is rate limited.
+                        lastError.busy = response.status === 429 || response.status === 503 || response.status === 504;
                     }
                     continue;
                 }
@@ -2570,8 +2652,9 @@ Example:
         }
 
         // Evidence images go only through the server proxy, never the
-        // browser-key fallback below.
-        if (Array.isArray(options.images) && options.images.length) {
+        // browser-key fallback below. options.proxyOnly: the same for a
+        // text-only evidence call (its prompt holds what the screenshots show).
+        if (options.proxyOnly || (Array.isArray(options.images) && options.images.length)) {
             throw lastError || new Error('The AI service is not available.');
         }
 

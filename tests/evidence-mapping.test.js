@@ -22,6 +22,7 @@ let EM;
 let realMap;
 let realMatch;
 let realVerify;
+let realCall;
 beforeEach(() => {
     AI = window.AI_SERVICE;
     EM = window.EvidenceMapping;
@@ -30,10 +31,15 @@ beforeEach(() => {
     AI.mapEvidence = realMap;
     realMatch = realMatch || AI.matchEvidenceToQuestions;
     realVerify = realVerify || AI.verifyEvidenceFor;
-    // The search for questions with no screenshot is off unless a test turns
-    // it on: the screen then falls back to the "also supports" lists.
-    AI.matchEvidenceToQuestions = vi.fn(async () => { throw new Error('off in this test'); });
-    AI.verifyEvidenceFor = vi.fn(async () => { throw new Error('off in this test'); });
+    realCall = realCall || AI.callProxyAPI;
+    // No search for questions with no screenshot unless a test turns it on:
+    // the screen then shows the "also supports" lists, as it does when no
+    // search was made.
+    AI.matchEvidenceToQuestions = undefined;
+    AI.verifyEvidenceFor = undefined;
+    // A busy AI service is waited out; in tests the waits are a millisecond.
+    AI.evidenceBusyWaits = [1, 1];
+    AI.evidenceBusy = null;
     report = { id: 'r1', checklistProgress: [
         { checklistId: 'cl1', itemIdx: 'A-0', clause: 'A.5.26', status: 'conform', requirement: 'Review incidents and security events across the period.', comment: '',
             evidenceImages: [img('chg')], evidenceImage: img('chg'), evidenceCapturedAtList: ['2026-11-18T13:28:10.112Z'], evidenceCapturedAt: '2026-11-18T13:28:10.112Z' },
@@ -559,7 +565,8 @@ describe('evidence for questions with no screenshot', () => {
             expect(prompt).toContain('QUESTION — item 3 (A.8.32):');
             expect(prompt).not.toContain('Pre-audit gap');
             expect(prompt).toContain('Image 1 = S1; Image 2 = S2');
-            expect(prompt).toContain('only if an auditor answering this question would attach it');
+            expect(prompt).toContain('name the record an auditor must see to answer this question');
+            expect(prompt).toContain('When in doubt, "partial"');
             expect(opts.images).toHaveLength(2);
         });
 
@@ -575,6 +582,19 @@ describe('evidence for questions with no screenshot', () => {
             ] }));
             out = await AI.verifyEvidenceFor(input);
             expect(out.images).toEqual([{ evId: 'S1', support: 'none', reason: 'x' }, { evId: 'S2', support: 'partial', reason: '' }]);
+        });
+
+        // Deployed run, 2026-11-21: both BCDR report offers came with no "Why".
+        it('an offer always says why: what the image reads when the reason is lost, and no offer with neither', async () => {
+            AI.callProxyAPI = vi.fn(async () => reply({ needs: 'the report of the last exercise', images: [
+                { evId: 'S1', is: 'an exercise report', support: 'direct', visibleText: ['BCDR_Lessons_Learned_Report_2023_Final', 'Lessons Learned', 'a', 'b'], reason: 'This shows the control is compliant.' },
+                { evId: 'S2', is: 'a list', support: 'direct', visibleText: [], reason: 'This shows the control is compliant.' }
+            ] }));
+            const out = await AI.verifyEvidenceFor(input);
+            expect(out.images).toEqual([
+                { evId: 'S1', support: 'direct', reason: 'The screenshot reads: "BCDR_Lessons_Learned_Report_2023_Final", "Lessons Learned", "a".' },
+                { evId: 'S2', support: 'partial', reason: '' }
+            ]);
         });
     });
 
@@ -605,14 +625,31 @@ describe('evidence for questions with no screenshot', () => {
             const rows = await rowsFor();
             rows[0] = Object.assign({}, rows[0], { fit: 'fits_better_elsewhere', to: { n: 3, key: 'cl1-A-2', clause: 'A.8.32', text: 't' } });
             AI.matchEvidenceToQuestions = vi.fn(async (input) => ({ matches: input.questions.map((q) => ({ n: q.n, ids: [] })) }));
+            AI.verifyEvidenceFor = vi.fn();
             await EM.findGapEvidence(report, rows);
             expect(AI.matchEvidenceToQuestions.mock.calls[0][0].questions.map((q) => q.n)).toEqual([5]);
         });
 
         it('a failed search offers nothing and reports the error', async () => {
             const rows = await rowsFor();
+            AI.matchEvidenceToQuestions = vi.fn(async () => { throw new Error('The AI service is busy.'); });
+            AI.verifyEvidenceFor = vi.fn();
             const res = await EM.findGapEvidence(report, rows);
-            expect(res).toEqual({ gaps: [], none: [], error: 'off in this test' });
+            expect(res).toEqual({ gaps: [], none: [], failed: [], error: 'The AI service is busy.' });
+        });
+
+        it('a question whose candidates could not be checked is listed as not checked, not as unsupported', async () => {
+            const rows = await rowsFor();
+            AI.matchEvidenceToQuestions = vi.fn(async (input) => ({ matches: input.questions.map((q) => ({ n: q.n, ids: q.n === 3 ? ['S1'] : [] })) }));
+            AI.verifyEvidenceFor = vi.fn(async () => { throw new Error('The AI service is busy.'); });
+            const res = await EM.findGapEvidence(report, rows);
+            expect(res.gaps).toEqual([]);
+            expect(res.failed.map((x) => x.n)).toEqual([3]);
+            expect(res.none.map((x) => x.n)).toEqual([5]);
+        });
+
+        it('without the search in the AI service there is no result at all', async () => {
+            expect(await EM.findGapEvidence(report, await rowsFor())).toBeNull();
         });
     });
 
@@ -635,6 +672,117 @@ describe('evidence for questions with no screenshot', () => {
         window.__save();
         expect(report.checklistProgress[2].evidenceImages).toEqual([img('chg')]);
         expect(report.checklistProgress[0].evidenceImages).toEqual([img('chg')]);
+    });
+});
+
+// Deployed runs, 2026-11-21: after about 60 to 80 requests Gemini rejected
+// every request for minutes. Readings were lost and the search for questions
+// with no screenshot did not run, with nothing on the screen to say so.
+describe('a busy AI service', () => {
+    const busy = (extra) => Object.assign(new Error('AI model request failed'), { busy: true, upstreamStatus: 429 }, extra || {});
+    const one = () => reply({ images: [{ evId: 'Image 1', here: 'direct', shows: 'A list of change requests.', visibleText: [], reason: '' }] });
+
+    it('a rejected evidence request waits and is tried again, through the proxy only, and the screen is told', async () => {
+        let n = 0;
+        AI.callProxyAPI = vi.fn(async () => { if (n++ === 0) throw busy(); return one(); });
+        const waits = [];
+        AI.evidenceBusy = { onWait: (seconds) => waits.push(seconds), cancelled: () => false };
+        const res = await AI.mapEvidence(INPUT);
+        expect(AI.callProxyAPI).toHaveBeenCalledTimes(2);
+        expect(AI.callProxyAPI.mock.calls[0][1].proxyOnly).toBe(true);
+        expect(waits).toHaveLength(1);
+        expect(res.images[0].shows).toBe('A list of change requests.');
+    });
+
+    it('gives up after the last wait and says to try again later', async () => {
+        AI.callProxyAPI = vi.fn(async () => { throw busy(); });
+        const failed = await AI.mapEvidence(INPUT).catch((e) => e);
+        expect(failed.message).toBe('The AI service is busy (a rate limit or an overloaded model). Try again in a few minutes.');
+        expect(failed.busy).toBe(true);
+        expect(AI.callProxyAPI).toHaveBeenCalledTimes(3);
+    });
+
+    it('an error that is not "busy" is not tried again', async () => {
+        AI.callProxyAPI = vi.fn(async () => { throw new Error('Model not allowed'); });
+        await expect(AI.mapEvidence(INPUT)).rejects.toThrow('Model not allowed');
+        expect(AI.callProxyAPI).toHaveBeenCalledTimes(1);
+    });
+
+    it('a wait can be cancelled (Stop)', async () => {
+        AI.evidenceBusyWaits = [40];
+        AI.callProxyAPI = vi.fn(async () => { throw busy(); });
+        AI.evidenceBusy = { onWait: () => {}, cancelled: () => true };
+        const err = await AI.mapEvidence(INPUT).catch((e) => e);
+        expect(err.message).toBe('Stopped.');
+        expect(AI.callProxyAPI).toHaveBeenCalledTimes(1);
+        await new Promise((resolve) => setTimeout(resolve, 60));
+    });
+
+    it('the proxy reply says when the service is busy, and a proxy-only call never uses the browser key', async () => {
+        const realFetch = globalThis.fetch;
+        const fetchMock = vi.fn(async () => ({ ok: false, status: 502, statusText: 'Bad Gateway', text: async () => JSON.stringify({ error: 'AI model request failed', upstreamStatus: 429, busy: true, retryAfterSeconds: 12 }) }));
+        globalThis.fetch = fetchMock;
+        window.state.settings = { geminiApiKey: 'browser-key' };
+        try {
+            const err = await realCall('p', { models: ['gemini-2.0-flash-lite'], proxyOnly: true }).catch((e) => e);
+            expect(err).toMatchObject({ message: 'AI model request failed', busy: true, upstreamStatus: 429, retryAfterSeconds: 12 });
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+            expect(String(fetchMock.mock.calls[0][0])).toBe('/api/gemini');
+        } finally { globalThis.fetch = realFetch; }
+    });
+
+    const fits = (extra) => vi.fn(async (input) => ({ images: input.images.map((image) => Object.assign({ evId: image.evId, shows: 'Screenshot of item ' + input.current.n + '.', here: 'direct', fit: 'fits', betterItem: null, alsoItems: [], reason: 'Its own question.' }, extra ? extra(input) : {})), imagesFailed: [], flags: [] }));
+
+    it('the screen says how many screenshots were read once only, and hears about waits while it runs', async () => {
+        const seen = { hook: '', n4: 0 };
+        const base = fits();
+        AI.mapEvidence = vi.fn(async (input) => {
+            seen.hook = typeof (AI.evidenceBusy && AI.evidenceBusy.onWait);
+            if (input.current.n === 4 && ++seen.n4 === 2) throw new Error('The AI service is busy.');
+            return base(input);
+        });
+        window.openEvidenceMapping('r1');
+        document.getElementById('em-start').click();
+        await vi.waitFor(() => expect(document.getElementById('em-again')).not.toBeNull());
+        expect(seen.hook).toBe('function');
+        expect(AI.evidenceBusy).toBeNull();
+        expect(document.body.textContent).toContain('1 screenshot was read once only because a request to the AI service failed, so it cannot be Strong.');
+    });
+
+    it('a search that fails says so; Search again runs only the search and keeps the choices made', async () => {
+        // Item 4's screenshot is proposed for item 3 by both readings; item 5 has no screenshot.
+        AI.mapEvidence = fits((input) => (input.current.n === 4 ? { here: 'none', fit: 'fits_better_elsewhere', betterItem: 3 } : { alsoItems: input.current.n === 2 ? [5] : [] }));
+        AI.matchEvidenceToQuestions = vi.fn(async () => { throw new Error('The AI service is busy (a rate limit or an overloaded model). Try again in a few minutes.'); });
+        AI.verifyEvidenceFor = vi.fn(async (input) => ({ images: input.images.map((image) => ({ evId: image.evId, support: 'direct', reason: 'It lists changes with approvals.' })) }));
+        window.openEvidenceMapping('r1');
+        document.getElementById('em-start').click();
+        await vi.waitFor(() => expect(document.getElementById('em-gap-failed')).not.toBeNull());
+        expect(document.getElementById('em-gap-failed').textContent).toContain('did not run: The AI service is busy');
+        // Only the proposed move: the "also supports" lists do not stand in for a failed search.
+        expect(document.querySelectorAll('.em-row')).toHaveLength(1);
+        document.querySelector('.em-choice').value = 'move:cl1-A-2';
+        const readings = AI.mapEvidence.mock.calls.length;
+        AI.matchEvidenceToQuestions = vi.fn(async (input) => ({ matches: input.questions.map((q) => ({ n: q.n, ids: ['S1'] })) }));
+        document.getElementById('em-gap-retry').click();
+        await vi.waitFor(() => expect(document.querySelectorAll('.em-row')).toHaveLength(2));
+        expect(AI.mapEvidence.mock.calls.length).toBe(readings);
+        expect(AI.matchEvidenceToQuestions.mock.calls[0][0].questions.map((q) => q.n)).toEqual([5]);
+        expect(document.getElementById('em-gap-failed')).toBeNull();
+        expect(document.body.textContent).toContain('item 5 · A.6.7 has no screenshot of its own');
+        expect(document.querySelector('.em-choice').value).toBe('move:cl1-A-2');
+    });
+
+    it('questions the search could not check are named, with Search again', async () => {
+        AI.mapEvidence = fits();
+        AI.matchEvidenceToQuestions = vi.fn(async (input) => ({ matches: input.questions.map((q) => ({ n: q.n, ids: q.n === 3 ? ['S1'] : [] })) }));
+        AI.verifyEvidenceFor = vi.fn(async () => { throw new Error('The AI service is busy.'); });
+        window.openEvidenceMapping('r1');
+        document.getElementById('em-start').click();
+        await vi.waitFor(() => expect(document.getElementById('em-gap-failed')).not.toBeNull());
+        expect(document.getElementById('em-gap-failed').textContent).toContain('The search could not check 1 question with no screenshot (item 3 · A.8.32).');
+        expect(document.getElementById('em-gap-retry')).not.toBeNull();
+        // Item 5 was searched and nothing fits; item 3 is not said to be unsupported.
+        expect(document.getElementById('em-none').textContent).toBe('No screenshot in this audit supports: item 5 · A.6.7');
     });
 });
 

@@ -115,8 +115,10 @@
     // readings a move is 'strong' only when every reading proposes the same
     // question; anything less is 'possible' and says why.
     function combine(entry, passes) {
-        const row = { src: entry.src, from: entry.from, shows: '', here: '', fit: 'unchecked', to: null, alt: null, also: [], strength: '', doubt: '', reason: '', flags: [], error: '' };
+        const row = { src: entry.src, from: entry.from, shows: '', here: '', fit: 'unchecked', to: null, alt: null, also: [], strength: '', doubt: '', reason: '', flags: [], error: '', reads: 0 };
         const ok = entry.reads.filter((r) => r.ok);
+        // How many readings came back: fewer than asked for means a request failed.
+        row.reads = ok.length;
         if (!ok.length) return Object.assign(row, { error: (entry.reads.find((r) => r.error) || {}).error || 'Not checked.' });
         const readable = ok.filter((r) => r.fit !== 'unreadable');
         if (!readable.length) return Object.assign(row, { fit: 'unreadable', here: 'unreadable', shows: ok[0].shows || '' });
@@ -293,19 +295,22 @@
         const place = (q) => ({ n: q.n, key: q.key, clause: q.clause, text: q.text, status: q.status, empty: true });
         const targets = questionIndex(report).filter((q) => q.text && !withImages.has(q.key) && !moveTargets.has(q.key) && needsEvidence(place(q)));
         const usable = list.filter((r) => r.shows && (r.fit === 'fits' || r.fit === 'fits_better_elsewhere'));
-        if (!targets.length || !usable.length) return { gaps: [], none: targets.map(place), error: '' };
+        if (!targets.length || !usable.length) return { gaps: [], none: targets.map(place), failed: [], error: '' };
         const catalogue = usable.map((r, k) => ({ id: 'S' + (k + 1), item: r.from.n, clause: r.from.clause, shows: r.shows }));
         const byId = new Map(catalogue.map((c, k) => [c.id, usable[k]]));
         let matched;
         try {
             matched = await AI.matchEvidenceToQuestions({ questions: targets.map((q) => ({ n: q.n, clause: q.clause, text: q.text })), screenshots: catalogue });
         } catch (err) {
-            return { gaps: [], none: [], error: (err && err.message) || 'The AI call failed.' };
+            return { gaps: [], none: [], failed: [], error: (err && err.message) || 'The AI call failed.' };
         }
         const byN = new Map(targets.map((q) => [q.n, q]));
         // A screenshot is not evidence for the question it is already under.
         const jobs = (matched.matches || []).map((m) => ({ q: byN.get(m.n), ids: (m.ids || []).filter((id) => byId.has(id) && byId.get(id).from.n !== m.n) })).filter((j) => j.q && j.ids.length);
         const found = new Map();
+        // Questions whose candidates could not be checked (the call failed, or
+        // the search was stopped first): not the same as "nothing supports it".
+        const unchecked = new Set(jobs.map((j) => j.q.n));
         let next = 0;
         let done = 0;
         async function worker() {
@@ -316,14 +321,20 @@
                     const res = await AI.verifyEvidenceFor({ question: { n: job.q.n, clause: job.q.clause, text: job.q.text }, images: job.ids.map((id) => ({ evId: id, src: byId.get(id).src })) });
                     const direct = (res.images || []).filter((im) => im.support === 'direct' && byId.has(im.evId));
                     if (direct.length) found.set(job.q.n, direct.map((im) => Object.assign({}, byId.get(im.evId), { reason: im.reason })));
-                } catch (_e) { /* this question simply gets no offer */ }
+                    unchecked.delete(job.q.n);
+                } catch (_e) { /* stays unchecked */ }
                 done++;
                 if (typeof o.onProgress === 'function') o.onProgress(done, jobs.length);
             }
         }
         await Promise.all(Array.from({ length: Math.min(o.concurrency || CONCURRENCY, jobs.length) }, worker));
         const gaps = targets.filter((q) => found.has(q.n)).map((q) => ({ target: place(q), total: found.get(q.n).length, rows: found.get(q.n).slice(0, ALSO_PER_QUESTION) }));
-        return { gaps, none: targets.filter((q) => !found.has(q.n)).map(place), error: '' };
+        return {
+            gaps,
+            none: targets.filter((q) => !found.has(q.n) && !unchecked.has(q.n)).map(place),
+            failed: targets.filter((q) => unchecked.has(q.n)).map(place),
+            error: ''
+        };
     }
 
     /**
@@ -479,8 +490,21 @@
         const shown = p.move.map((row) => ({ row, kind: 'move' }));
         // Searched for on their own (findGapEvidence); the "also supports"
         // by-product of the mapping calls is only the fallback.
-        const searched = result.gapEvidence && !result.gapEvidence.error ? result.gapEvidence : null;
-        const gaps = searched ? searched.gaps : p.gaps;
+        const ge = result.gapEvidence || null;
+        const searched = ge && !ge.error ? ge : null;
+        // A search that failed says so and can be run again on its own (live,
+        // 2026-11-21: it failed twice and the screen showed the old lists as
+        // if nothing had happened). Those lists stand in only when no search
+        // was made at all (a stopped check, or an AI service without it).
+        const gaps = searched ? searched.gaps : (ge ? [] : p.gaps);
+        const unsearched = searched ? (searched.failed || []) : [];
+        const gapNotice = ge && ge.error
+            ? 'The search for evidence for the questions with no screenshot did not run: ' + ge.error
+            : (unsearched.length
+                ? 'The search could not check ' + unsearched.length + ' question' + (unsearched.length === 1 ? '' : 's') + ' with no screenshot (' + unsearched.map(placeLabel).join('; ') + ').'
+                : '');
+        // Screenshots read fewer times than asked for: a request failed.
+        const readShort = result.passes > 1 ? result.rows.filter((r) => r.reads > 0 && r.reads < result.passes).length : 0;
         const gapsHtml = gaps.map((g) => {
             const more = g.total > g.rows.length ? ' <span style="color:#94a3b8;">(' + g.rows.length + ' of ' + g.total + ' shown)</span>' : '';
             const head = '<div style="font-size:0.8rem;color:#334155;margin-top:0.2rem;"><span style="font-family:monospace;font-weight:700;">' + esc(placeLabel(g.target)) + '</span> has no screenshot of its own: ' + esc(short(g.target.text, 120)) + more + '</div>';
@@ -491,8 +515,13 @@
                 ${esc(summaryText(p, result.rows.length))}
                 ${shown.length ? 'Each proposal below is the AI\'s reading of the screenshot. Nothing moves unless you choose it here and press Save.' : 'There is nothing to move.'}
                 ${result.passes > 1 && p.move.length ? 'Each screenshot was checked ' + (result.passes === 2 ? 'twice' : result.passes + ' times') + ': <strong>Strong</strong> means every check proposed the same question.' : ''}
+                ${readShort ? esc(readShort + ' screenshot' + (readShort === 1 ? ' was' : 's were') + ' read once only because a request to the AI service failed, so ' + (readShort === 1 ? 'it' : 'they') + ' cannot be Strong.') : ''}
                 ${result.stopped ? '<strong>The check was stopped before it finished.</strong>' : ''}
             </div>
+            ${gapNotice ? `<div id="em-gap-failed" style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;color:#92400e;margin-bottom:0.6rem;display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+                <span style="flex:1;min-width:14rem;">${esc(gapNotice)}</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="em-gap-retry">Search again</button>
+            </div>` : ''}
             ${p.strong.length ? `<div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem;">
                 <button type="button" class="btn btn-sm btn-outline-primary" id="em-accept-strong">Accept all strong (${p.strong.length})</button>
                 <button type="button" class="btn btn-sm btn-link" id="em-clear" style="padding:0;font-size:0.78rem;">Clear choices</button>
@@ -562,9 +591,41 @@
         });
         const clear = document.getElementById('em-clear');
         if (clear) clear.addEventListener('click', () => { setAll(() => ''); if (said) said.textContent = ''; });
+        // Run only the search again; the screenshot readings are kept, and so
+        // are the choices already made on the rows above.
+        const retry = document.getElementById('em-gap-retry');
+        if (retry) retry.addEventListener('click', async () => {
+            const kept = Array.from(document.querySelectorAll('.em-choice')).slice(0, p.move.length).map((el) => el.value);
+            retry.disabled = true;
+            retry.textContent = 'Searching…';
+            let found;
+            try {
+                found = await whileBusyShown((seconds) => { retry.textContent = 'The AI service is busy: trying again in ' + seconds + ' s…'; }, () => !retry.isConnected, () => findGapEvidence(report, result.rows, {
+                    shouldStop: () => !retry.isConnected,
+                    onProgress: (done, total) => { retry.textContent = 'Checked ' + done + ' of ' + total + '…'; }
+                }));
+            } catch (_e) { found = null; }
+            // Closed or replaced while it ran: nothing to show it on.
+            if (!retry.isConnected) return;
+            result.gapEvidence = found || { gaps: [], none: [], failed: [], error: 'The AI service is not available.' };
+            showResults(reportId, report, result);
+            const selects = document.querySelectorAll('.em-choice');
+            kept.forEach((value, i) => { if (value && selects[i]) selects[i].value = value; });
+            const shownList = document.getElementById('em-list');
+            if (shownList) shownList.dispatchEvent(new Event('change'));
+        });
         const again = document.getElementById('em-again');
         if (again) again.addEventListener('click', () => { delete cache[String(reportId)]; global.openEvidenceMapping(reportId); });
         if (typeof global.resolveAllIdbThumbs === 'function') global.resolveAllIdbThumbs();
+    }
+
+    // While fn runs, the screen hears when the AI service makes a request wait
+    // (AI_SERVICE.evidenceBusy) and can cancel that wait.
+    async function whileBusyShown(onWait, cancelled, fn) {
+        const AI = global.AI_SERVICE;
+        const before = AI ? AI.evidenceBusy : null;
+        if (AI) AI.evidenceBusy = { onWait, cancelled };
+        try { return await fn(); } finally { if (AI) AI.evidenceBusy = before || null; }
     }
 
     async function run(reportId, report) {
@@ -579,35 +640,39 @@
         const stopBtn = document.getElementById('em-stop');
         if (stopBtn) stopBtn.addEventListener('click', () => { stop = true; stopBtn.disabled = true; stopBtn.textContent = 'Stopping…'; });
         const sig = signature(report);
+        let last = '';
+        const say = (text) => { last = text; const label = document.getElementById('em-progress'); if (label) label.textContent = text; };
+        const busy = (seconds) => {
+            const label = document.getElementById('em-progress');
+            if (label) label.textContent = (last ? last + ' ' : '') + 'The AI service is busy: trying again in ' + seconds + ' seconds.';
+        };
         let result;
         try {
-            result = await check(report, {
+            result = await whileBusyShown(busy, () => stop, () => check(report, {
                 passes: PASSES,
                 shouldStop: () => stop,
                 onProgress: (done, total) => {
-                    const label = document.getElementById('em-progress');
                     const bar = document.getElementById('em-bar');
-                    if (label) label.textContent = 'Checked ' + done + ' of ' + total + ' request' + (total === 1 ? '' : 's') + '…';
+                    say('Checked ' + done + ' of ' + total + ' request' + (total === 1 ? '' : 's') + '…');
                     if (bar) bar.style.width = Math.round(done / total * 100) + '%';
                 }
-            });
+            }));
         } catch (err) {
             if (typeof global.closeModal === 'function') global.closeModal();
             notify('Evidence mapping failed: ' + ((err && err.message) || 'unknown error'), 'error');
             return;
         }
         if (!result.stopped) {
-            const label = document.getElementById('em-progress');
             const bar = document.getElementById('em-bar');
-            if (label) label.textContent = 'Looking for evidence for the questions with no screenshot…';
+            say('Looking for evidence for the questions with no screenshot…');
             try {
-                result.gapEvidence = await findGapEvidence(report, result.rows, {
+                result.gapEvidence = await whileBusyShown(busy, () => stop, () => findGapEvidence(report, result.rows, {
                     shouldStop: () => stop,
                     onProgress: (done, total) => {
-                        if (label) label.textContent = 'Checked the evidence found for ' + done + ' of ' + total + ' question' + (total === 1 ? '' : 's') + ' with no screenshot…';
+                        say('Checked the evidence found for ' + done + ' of ' + total + ' question' + (total === 1 ? '' : 's') + ' with no screenshot…');
                         if (bar) bar.style.width = Math.round(done / total * 100) + '%';
                     }
-                });
+                }));
             } catch (_e) { result.gapEvidence = null; }
         }
         if (!result.stopped && signature(report) === sig) cache[String(reportId)] = { sig, result };

@@ -2,7 +2,7 @@
 // JPEG/PNG/WebP only, base64, at most 6, size-capped so a request stays under
 // Vercel's ~4.5 MB body limit. A text-only call is unchanged.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import handler, { imageParts } from '../api/gemini.js';
+import handler, { imageParts, retryAfterSeconds } from '../api/gemini.js';
 
 const b64 = (n) => 'A'.repeat(n);
 
@@ -75,6 +75,37 @@ describe('the proxy request', () => {
         await handler(req({ prompt: 'Hello', model: 'gemini-2.0-flash' }), r);
         expect(sent.contents[0].parts).toEqual([{ text: 'Hello' }]);
         expect(sent.generationConfig.responseMimeType).toBeUndefined();
+    });
+
+    // Live, 2026-11-21: a run of evidence requests was rejected for minutes
+    // and the browser could not tell a rate limit from a bad request.
+    it('a rejected request says whether it is worth trying again, never why in Gemini\'s words', async () => {
+        const upstream = (status, body) => {
+            globalThis.fetch = vi.fn(async (url) => (String(url).includes('/auth/v1/user')
+                ? { ok: true, status: 200, json: async () => ({ id: 'u1' }) }
+                : { ok: false, status, json: async () => body }));
+        };
+        upstream(429, { error: { message: 'Quota exceeded for key AIza-secret', details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '26.4s' }] } });
+        let r = res();
+        await handler(req({ prompt: 'x', model: 'gemini-2.0-flash' }), r);
+        expect(r.code).toBe(502);
+        expect(r.body).toEqual({ error: 'AI model request failed', upstreamStatus: 429, busy: true, retryAfterSeconds: 27 });
+        upstream(503, { error: { message: 'The model is overloaded.' } });
+        r = res();
+        await handler(req({ prompt: 'x', model: 'gemini-2.0-flash' }), r);
+        expect(r.body).toEqual({ error: 'AI model request failed', upstreamStatus: 503, busy: true });
+        upstream(400, { error: { message: 'Invalid argument' } });
+        r = res();
+        await handler(req({ prompt: 'x', model: 'gemini-2.0-flash' }), r);
+        expect(r.body).toEqual({ error: 'AI model request failed', upstreamStatus: 400, busy: false });
+    });
+
+    it('the wait Gemini asks for is read from its reply and capped', () => {
+        expect(retryAfterSeconds({ error: { details: [{ retryDelay: '5s' }] } })).toBe(5);
+        expect(retryAfterSeconds({ error: { details: [{ retryDelay: '86400s' }] } })).toBe(300);
+        expect(retryAfterSeconds({ error: { details: [{ retryDelay: 'soon' }] } })).toBe(0);
+        expect(retryAfterSeconds({ error: {} })).toBe(0);
+        expect(retryAfterSeconds(null)).toBe(0);
     });
 
     it('refuses bad images before calling the model', async () => {
