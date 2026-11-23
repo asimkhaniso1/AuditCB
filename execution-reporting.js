@@ -319,6 +319,89 @@
     };
     window._effectivenessDefaults = _effectivenessDefaults;
 
+    // ─── Report Preview edits are saved to the report ──────────────────────
+    // The preview's report-level boxes were read only by the export of that
+    // open preview and never written back: closing it lost the auditor's
+    // effectiveness rows, conclusion, changes and previous-findings text, and
+    // Report Integrity (which reads the stored report) kept warning about
+    // fields the auditor had written (PC Connection, 23 Nov 2026). Each box
+    // below now saves to its report field when the auditor leaves it, and
+    // only if they changed it, so an untouched default is never stored.
+    const PREVIEW_FIELDS = {
+        'rp-exec-summary': { path: ['executiveSummary'], review: (id) => 'exec-summary-' + id },
+        'rp-positive-obs': { path: ['positiveObservations'], review: () => 'positive-observations' },
+        'rp-ofi': { path: ['ofi'], review: () => 'ofi' },
+        'rp-conclusion': { path: ['conclusion'] },
+        'rp-changes': { path: ['changesSinceLastAudit'] },
+        'rp-prev-findings': { path: ['previousFindingsStatus'] },
+        'rp-eff-internal-audit': { path: ['effInternalAudit'] },
+        'rp-eff-mgmt-review': { path: ['effMgmtReview'] },
+        'rp-eff-complaints': { path: ['effComplaints'] },
+        'rp-eff-marks': { path: ['effMarks'] },
+        'rp-eff-legal': { path: ['effLegal'] },
+        'rp-closing-summary': { path: ['closingMeeting', 'summary'] },
+        'rp-opening-notes': { path: ['openingMeeting', 'notes'] },
+        'rp-unresolved': { path: ['unresolvedIssues'] }
+    };
+    const previewBoxText = (el) => String((el && el.innerText) || '')
+        .replace(/[^\S\n]+/g, ' ')
+        .replace(/ \n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    const setPath = (obj, path, value) => {
+        let o = obj;
+        for (let i = 0; i < path.length - 1; i++) {
+            if (!o[path[i]] || typeof o[path[i]] !== 'object') o[path[i]] = {};
+            o = o[path[i]];
+        }
+        o[path[path.length - 1]] = value;
+    };
+
+    /** Save one Report Preview box to the report. Returns true when written. */
+    window.savePreviewEdit = function (boxId, text) {
+        const spec = PREVIEW_FIELDS[boxId];
+        const d = window._reportPreviewData;
+        if (!spec || !d || !d.report) return false;
+        const plain = String(text == null ? '' : text);
+        const S = window.Sanitizer;
+        const stored = S && typeof S.sanitizeText === 'function' ? S.sanitizeText(plain) : plain;
+        const st = window.state || {};
+        const report = (st.auditReports || []).find((r) => String(r.id) === String(d.report.id)) || d.report;
+        setPath(report, spec.path, stored);
+        if (d.report !== report) setPath(d.report, spec.path, stored);
+        // The Review & Submit boxes for the same text would otherwise show (and
+        // save back) the old wording.
+        if (spec.review) {
+            const box = document.getElementById(spec.review(report.id));
+            if (box) { box.value = plain; box.defaultValue = plain; }
+        }
+        if (typeof window.saveChecklist === 'function') window.saveChecklist(report.id, { quiet: true });
+        else if (typeof window.saveData === 'function') window.saveData();
+        return true;
+    };
+
+    if (typeof document !== 'undefined' && !window.__previewEditsBound) {
+        window.__previewEditsBound = true;
+        const boxOf = (e) => {
+            const el = e.target && e.target.closest ? e.target.closest('.rp-edit[id]') : null;
+            return el && PREVIEW_FIELDS[el.id] ? el : null;
+        };
+        document.addEventListener('focusin', (e) => {
+            const el = boxOf(e);
+            if (el) el.dataset.savedText = previewBoxText(el);
+        });
+        document.addEventListener('focusout', (e) => {
+            const el = boxOf(e);
+            if (!el || el.dataset.savedText == null) return;
+            const text = previewBoxText(el);
+            if (text === el.dataset.savedText) return;
+            el.dataset.savedText = text;
+            if (window.savePreviewEdit(el.id, text) && typeof window.showNotification === 'function') {
+                window.showNotification('Saved to the report.', 'success');
+            }
+        });
+    }
+
     // ─── Previous Findings Status default (never a bare dash) ─────────────────
     // A blank/dash isn't a status — W14 warns exactly about this on
     // surveillance/recertification reports. Derive the actual position from

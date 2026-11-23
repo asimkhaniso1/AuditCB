@@ -79,6 +79,23 @@ describe('saving while Review & Submit is drawn', () => {
         expect(sentItem(1).ncrType).toBe('ofi');
     });
 
+    it('keeps an executive summary saved elsewhere (Report Preview) instead of the box as drawn', async () => {
+        const box = document.getElementById('exec-summary-r1');
+        expect(box).not.toBeNull();
+        report.executiveSummary = 'The audit identified 5 minor nonconformities.';
+        save('r1');
+        await flush();
+        expect(upserts.filter(u => u.table === 'audit_reports').pop().row.data.executiveSummary).toBe('The audit identified 5 minor nonconformities.');
+    });
+
+    it('still writes an executive summary edited in its box on this tab', async () => {
+        const box = document.getElementById('exec-summary-r1');
+        box.value = 'Typed on the Review tab.';
+        save('r1');
+        await flush();
+        expect(upserts.filter(u => u.table === 'audit_reports').pop().row.data.executiveSummary).toBe('Typed on the Review tab.');
+    });
+
     it('leaving a remarks box without editing it does not write the drawn text back', async () => {
         report.checklistProgress[0].comment = 'New evidence from Fix findings.';
         const box = document.querySelector('.review-remarks[data-finding-id="checklist-0"]');
