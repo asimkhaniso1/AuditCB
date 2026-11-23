@@ -2135,8 +2135,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 // Auto-save remarks on blur
                 document.querySelectorAll('.review-remarks').forEach(textarea => {
                     textarea.addEventListener('blur', function () {
+                        // Leaving the box without editing it must not write the
+                        // text as drawn over a remark changed elsewhere since.
+                        if (this.value === this.defaultValue) return;
                         const findingId = this.dataset.findingId;
                         const remarks = this.value;
+                        this.defaultValue = remarks;
 
                         if (findingId.startsWith('checklist-')) {
                             const idx = parseInt(findingId.replace('checklist-', ''), 10);
@@ -2650,6 +2654,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
     // Report-time copies built from an answer's screenshots; a save never keeps them.
     const DERIVED_EVIDENCE_KEYS = new Set(['evidenceThumbs', 'evidenceImageThumb', '_evIds', '_origEvKeys', 'kbMatch']);
+    // A Review & Submit classification picked since the tab was drawn.
+    function reviewSelectChanged(select) {
+        const opts = Array.from((select && select.options) || []);
+        if (!opts.some(o => o.defaultSelected)) return true; // drawn with no classification: keep the old behaviour
+        return opts.some(o => o.selected !== o.defaultSelected);
+    }
     window.saveChecklist = function (reportId, opts) {
         const quiet = !!(opts && opts.quiet);
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
@@ -2882,26 +2892,34 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             window.ChecklistMerge.setBase(reportId, report);
         }
 
-        // Handle Review & Submit Tab classifications if present
+        // Handle Review & Submit Tab classifications if present.
+        // Only what was changed on this tab is written back. The boxes show the
+        // finding as it was when the tab was drawn; copying them back on every
+        // save undid text written elsewhere meanwhile (PC Connection, 23 Nov
+        // 2026: Fix findings' new objective evidence was reverted to the old
+        // field note by this loop on each save, so it never reached the server).
         const reviewSeverities = document.querySelectorAll('.review-severity');
         if (reviewSeverities.length > 0) {
             reviewSeverities.forEach(select => {
                 const findingId = select.dataset.findingId;
                 const newType = select.value;
-                const remarks = document.querySelector(`.review-remarks[data-finding-id="${findingId}"]`)?.value || '';
+                const remarksEl = document.querySelector(`.review-remarks[data-finding-id="${findingId}"]`);
+                const remarks = remarksEl ? remarksEl.value : '';
+                const typeChanged = reviewSelectChanged(select);
+                const remarksChanged = !!remarksEl && remarksEl.value !== remarksEl.defaultValue;
 
                 if (findingId.startsWith('checklist-')) {
                     const idx = parseInt(findingId.replace('checklist-', ''), 10);
                     // idx is the ORIGINAL index into checklistProgress (not a filtered sequential index)
                     if (report.checklistProgress && report.checklistProgress[idx]) {
-                        report.checklistProgress[idx].ncrType = newType;
-                        if (remarks) report.checklistProgress[idx].comment = remarks;
+                        if (typeChanged) report.checklistProgress[idx].ncrType = newType;
+                        if (remarksChanged && remarks) report.checklistProgress[idx].comment = remarks;
                     }
                 } else if (findingId.startsWith('ncr-')) {
                     const idx = parseInt(findingId.replace('ncr-', ''), 10);
                     if (report.ncrs && report.ncrs[idx]) {
-                        report.ncrs[idx].type = newType;
-                        if (remarks) report.ncrs[idx].description = remarks;
+                        if (typeChanged) report.ncrs[idx].type = newType;
+                        if (remarksChanged && remarks) report.ncrs[idx].description = remarks;
                     }
                 }
             });
