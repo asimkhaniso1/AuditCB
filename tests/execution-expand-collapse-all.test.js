@@ -37,7 +37,7 @@ const sections = () => Array.from(document.querySelectorAll('.accordion-section 
 const label = () => document.querySelector('#toggle-all-accordions span').textContent;
 const shown = el => !el.closest('[style*="display: none"]');
 
-beforeEach(async () => {
+beforeEach(() => {
     window.state = { auditReports: [], ncrs: [], clients: [], auditPlans: [], currentUser: { role: 'Lead Auditor' } };
     globalThis.state = window.state;
     window.Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
@@ -45,8 +45,18 @@ beforeEach(async () => {
     window.UTILS = { escapeHtml: s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) };
     for (const name of ['renderAuditExecutionEnhanced', 'renderExecutionDetail']) globalThis[name] = window[name] = vi.fn();
     document.body.innerHTML = '<div id="tab-content"></div>';
-    render();
-    await new Promise(r => setTimeout(r, 0)); // the render finishes its setup on the next tick
+    // The render finishes its setup (listeners, the Expand/Collapse label) in a
+    // setTimeout 100 ms later. Waiting one tick used to pass only when an earlier
+    // test's render timer happened to fire in time (flaky on CI, and the test
+    // failed every time when run alone). A fake clock runs that setup now and
+    // drops it afterwards, so no render's timer reaches a later test's page.
+    vi.useFakeTimers();
+    try {
+        render();
+        vi.runOnlyPendingTimers();
+    } finally {
+        vi.useRealTimers();
+    }
 });
 
 describe('checklist row markup', () => {
