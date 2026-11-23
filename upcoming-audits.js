@@ -290,8 +290,8 @@
         (clients || []).forEach(client => {
             if (!client || INACTIVE_CLIENT(client)) return;
             cardCertificates(client).forEach((cert, index) => {
-                let cs = null;
-                let rec = null;
+                let cs;
+                let rec;
                 try {
                     cs = d.cycleState({ client, standard: cert.standard, certificate: cert, allReports: reports, allPlans, today: todayDate });
                     rec = d.resolveCycle({ client, certificate: cert, index, now: todayDate, settings: d.settings || {}, cycleState: cs, allReports: reports, allPlans });
