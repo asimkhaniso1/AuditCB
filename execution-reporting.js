@@ -375,10 +375,42 @@
             const box = document.getElementById(spec.review(report.id));
             if (box) { box.value = plain; box.defaultValue = plain; }
         }
-        if (typeof window.saveChecklist === 'function') window.saveChecklist(report.id, { quiet: true });
-        else if (typeof window.saveData === 'function') window.saveData();
-        return true;
+        if (typeof window.saveData === 'function') window.saveData();
+        return persistPreviewField(report.id, spec.path, stored);
     };
+
+    // Write one field to the stored report. The preview opens from pages where
+    // saveChecklist does not exist (Plans: PC Connection, 23 Nov 2026), and
+    // saveData is browser-only, so the first fix saved nothing to the server
+    // there. Read the stored report, change this field only, write it back:
+    // a whole-report write from this page could undo work saved meanwhile in
+    // another tab.
+    const FIELD_COLUMNS = { closingMeeting: 'closing_meeting', openingMeeting: 'opening_meeting', conclusion: 'conclusion' };
+    // One write at a time: two boxes left in quick succession would otherwise
+    // both read the same stored report and the second write would drop the first.
+    let previewWriteQueue = Promise.resolve();
+    function persistPreviewField(reportId, path, value) {
+        const run = previewWriteQueue.then(() => writePreviewField(reportId, path, value));
+        previewWriteQueue = run.catch(() => false);
+        return run;
+    }
+    async function writePreviewField(reportId, path, value) {
+        const sb = window.SupabaseClient && window.SupabaseClient.client;
+        if (!sb || typeof sb.from !== 'function') return false;
+        try {
+            const { data: row, error: readError } = await sb.from('audit_reports').select('data').eq('id', String(reportId)).maybeSingle();
+            if (readError || !row) return false;
+            const stored = (row.data && typeof row.data === 'object') ? row.data : {};
+            setPath(stored, path, value);
+            const patch = { data: stored, updated_at: new Date().toISOString() };
+            const column = FIELD_COLUMNS[path[0]];
+            if (column) patch[column] = stored[path[0]];
+            const { error } = await sb.from('audit_reports').update(patch).eq('id', String(reportId));
+            return !error;
+        } catch (_e) {
+            return false;
+        }
+    }
 
     if (typeof document !== 'undefined' && !window.__previewEditsBound) {
         window.__previewEditsBound = true;
@@ -395,10 +427,15 @@
             if (!el || el.dataset.savedText == null) return;
             const text = previewBoxText(el);
             if (text === el.dataset.savedText) return;
+            const before = el.dataset.savedText;
             el.dataset.savedText = text;
-            if (window.savePreviewEdit(el.id, text) && typeof window.showNotification === 'function') {
-                window.showNotification('Saved to the report.', 'success');
-            }
+            Promise.resolve(window.savePreviewEdit(el.id, text)).then((ok) => {
+                // Not saved: keep it marked as changed so leaving the box again retries.
+                if (!ok) el.dataset.savedText = before;
+                if (typeof window.showNotification !== 'function') return;
+                if (ok) window.showNotification('Saved to the report.', 'success');
+                else window.showNotification('Not saved to the server. Click into the box and out again to retry.', 'error');
+            });
         });
     }
 
