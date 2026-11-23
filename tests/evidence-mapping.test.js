@@ -940,21 +940,42 @@ describe('a rate limit that does not lift: stop, keep what was read, check the r
     });
 
     it('the wait is counted down on the progress line', async () => {
-        let line = '';
+        // The countdown is read on a fake clock. With real timers, a setInterval
+        // created late in a busy tick can fire a few ms before Date.now() reaches
+        // the next second, so the first tick still said 90 (flaky on CI).
+        const lines = [];
         let n = 0;
         AI.mapEvidence = vi.fn(async (input) => {
             if (++n === 1) {
-                AI.evidenceBusy.onWait(90);
-                line = document.getElementById('em-progress').textContent;
-                await new Promise((resolve) => setTimeout(resolve, 1100));
-                line += ' | ' + document.getElementById('em-progress').textContent;
+                const line = () => document.getElementById('em-progress').textContent;
+                vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+                try {
+                    AI.evidenceBusy.onWait(90);
+                    lines.push(line());
+                    vi.advanceTimersByTime(1000);
+                    lines.push(line());
+                    vi.advanceTimersByTime(1000);
+                    lines.push(line());
+                    vi.advanceTimersByTime(87000);
+                    lines.push(line());
+                    // The wait is over: the countdown leaves the line and stops.
+                    vi.advanceTimersByTime(1000);
+                    lines.push(line());
+                    expect(vi.getTimerCount()).toBe(0);
+                } finally {
+                    vi.useRealTimers();
+                }
             }
             return reading(input);
         });
         window.openEvidenceMapping('r1');
         document.getElementById('em-start').click();
-        await vi.waitFor(() => expect(document.getElementById('em-again')).not.toBeNull(), { timeout: 4000 });
-        expect(line).toMatch(/The AI service is busy: trying again in 90 seconds\..* \| .*trying again in (89|88) seconds\./);
+        await vi.waitFor(() => expect(document.getElementById('em-again')).not.toBeNull());
+        expect(lines[0]).toMatch(/The AI service is busy: trying again in 90 seconds\.$/);
+        expect(lines[1]).toMatch(/The AI service is busy: trying again in 89 seconds\.$/);
+        expect(lines[2]).toMatch(/The AI service is busy: trying again in 88 seconds\.$/);
+        expect(lines[3]).toMatch(/The AI service is busy: trying again in 1 second\.$/);
+        expect(lines[4]).not.toContain('The AI service is busy');
     });
 });
 
