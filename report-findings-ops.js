@@ -571,19 +571,22 @@
 
     // ─── Section 4: CORRECTIVE ACTION REQUEST FORMS ────────────────────────
 
+    // Each form is sized to print on one A4 page. At the old spacing a typical
+    // form ran a few lines over, so the signature row printed alone on the
+    // next page (PC Connection, 23 Nov 2026: four near-empty pages).
     function ruledLine(value, lines) {
-        lines = lines || 3;
-        if (value) return '<div style="white-space:pre-wrap;padding:6px 0;">' + esc(value) + '</div>';
+        lines = lines || 2;
+        if (value) return '<div style="white-space:pre-wrap;padding:4px 0;">' + esc(value) + '</div>';
         var out = '';
         for (var i = 0; i < lines; i++) {
-            out += '<div style="border-bottom:1px solid var(--b4-border,#ccc);height:20px;"></div>';
+            out += '<div style="border-bottom:1px solid var(--b4-border,#ccc);height:18px;"></div>';
         }
         return out;
     }
 
     function signatureLine(label) {
         return '<div style="flex:1;min-width:150px;">'
-            + '<div style="border-bottom:1px solid #333;height:32px;"></div>'
+            + '<div style="border-bottom:1px solid #333;height:26px;"></div>'
             + '<div style="font-size:10px;color:var(--b4-muted,#666);margin-top:2px;">' + esc(label) + '</div>'
             + '</div>';
     }
@@ -632,7 +635,7 @@
         var cbName = cb.cbName || ((cb.cbSites || [])[0] || {}).name || cb.name || 'Certification Body';
         // Name only, no logo: these pages sit inside the report, whose cover
         // already carries it, and a logo per CAR page inflated the PDF.
-        var header = '<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px;">'
+        var header = '<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px;">'
             + '<div style="display:flex;align-items:center;gap:12px;">'
             + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--b4-muted,#666);">' + esc(cbName) + '</div>'
             + '<div style="font-size:16px;font-weight:800;letter-spacing:0.5px;">CORRECTIVE ACTION REQUEST</div>'
@@ -662,20 +665,27 @@
             + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--b4-muted,#666);margin-bottom:2px;">Responsible / Due Date</div>' + ruledLine((capa && capa.capaResponsible) ? capa.capaResponsible + (capa.dueDate ? ' — due ' + fmtDate(capa.dueDate) : '') : (item.caDueDate ? 'Due ' + fmtDate(item.caDueDate) : ''), 1) + '</div>'
             + '</div>';
 
-        var partC = '<h4 class="b4-subhead">PART C — VERIFICATION &amp; CLOSURE</h4>'
-            + '<table class="b4-tbl" style="margin-bottom:var(--b4-s5);">'
+        // Part C and the signatures stay together: if a long form still runs
+        // over, they move to the next page as a block instead of leaving the
+        // signature row alone there.
+        var partC = '<div style="break-inside:avoid;page-break-inside:avoid;">'
+            + '<h4 class="b4-subhead">PART C — VERIFICATION &amp; CLOSURE</h4>'
+            + '<table class="b4-tbl" style="margin-bottom:var(--b4-s3);">'
             + '<tbody>'
             + '<tr><td style="font-weight:700;width:160px;">Verification Method</td><td>' + esc((capa && capa.verificationMethod) || '—') + '</td></tr>'
             + '<tr><td style="font-weight:700;">Verified By / Date</td><td>' + esc((capa && capa.verifiedBy) || '—') + ' / ' + fmtDate(capa && capa.verifiedDate) + '</td></tr>'
             + '<tr><td style="font-weight:700;">Effectiveness</td><td>' + esc((capa && capa.effectiveness) || 'Pending assessment') + '</td></tr>'
             + '</tbody></table>'
-            + '<div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:24px;">'
+            + '<div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:12px;">'
             + signatureLine('Auditee Representative')
             + signatureLine('Lead Auditor')
             + signatureLine('Date')
-            + '</div>';
+            + '</div></div>';
 
-        return '<div style="page-break-before:always;break-before:page;">' + header + partA + partB + partC + '</div>';
+        // The first form follows the Annex C heading on the same page; a break
+        // before it left the heading alone on a page.
+        var breakBefore = index === 0 ? '' : 'page-break-before:always;break-before:page;';
+        return '<div style="' + breakBefore + '">' + header + partA + partB + partC + '</div>';
     }
 
     function buildCarFormsSection(d) {

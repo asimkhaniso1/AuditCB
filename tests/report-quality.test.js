@@ -55,7 +55,7 @@ describe('Report quality — findings-ops + operational sections', () => {
     });
 
     describe('carForms', () => {
-        it('emits one page-break-before block per major/minor NC', () => {
+        it('emits one form per major/minor NC, each later form on a new page', () => {
             const hydratedProgress = [
                 checklistItem({ clause: '8.5', status: 'nc', ncrType: 'major' }),
                 checklistItem({ clause: '9.2', status: 'nc', ncrType: 'minor' })
@@ -64,8 +64,10 @@ describe('Report quality — findings-ops + operational sections', () => {
             const sections = window.ReportFindingsOps.sections(d);
             const carForms = sections.find((s) => s.key === 'carForms');
             expect(carForms).toBeDefined();
+            expect((carForms.bodyHtml.match(/CORRECTIVE ACTION REQUEST/g) || []).length).toBe(2);
+            // The first form follows the Annex C heading (tests/car-form-one-page.test.js).
             const matches = carForms.bodyHtml.match(/page-break-before/g) || [];
-            expect(matches.length).toBe(2);
+            expect(matches.length).toBe(1);
         });
 
         it('produces no carForms section when there are zero NCs', () => {
