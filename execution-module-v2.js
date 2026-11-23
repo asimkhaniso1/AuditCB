@@ -2926,14 +2926,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         }
 
         // Save Executive Summary & Observations (Unified View)
-        const execSumInput = document.getElementById(`exec-summary-${reportId}`);
-        if (execSumInput) report.executiveSummary = Sanitizer.sanitizeText(execSumInput.value);
-
-        const posObsInput = document.getElementById('positive-observations');
-        if (posObsInput) report.positiveObservations = Sanitizer.sanitizeText(posObsInput.value);
-
-        const ofiInput = document.getElementById('ofi');
-        if (ofiInput) report.ofi = Sanitizer.sanitizeText(ofiInput.value);
+        // Only when changed in that box: the boxes hold the text as drawn, and
+        // copying them back on every save undid wording saved since from Report
+        // Preview or by AI drafting. Once written, the box counts as saved.
+        const takeNarrative = (el, field) => {
+            if (!el || el.value === el.defaultValue) return;
+            report[field] = Sanitizer.sanitizeText(el.value);
+            el.defaultValue = el.value;
+        };
+        takeNarrative(document.getElementById(`exec-summary-${reportId}`), 'executiveSummary');
+        takeNarrative(document.getElementById('positive-observations'), 'positiveObservations');
+        takeNarrative(document.getElementById('ofi'), 'ofi');
 
         // Persist to Database (Async)
         (async () => {
