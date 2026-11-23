@@ -1975,6 +1975,8 @@
         resolveRecommendation,
         buildProgramme,
         cycleState,
+        recordBelongsTo,
+        coversStandard,
         certificationHistory,
         formatCriterion,
         classifyCriterion,

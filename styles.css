@@ -2112,6 +2112,22 @@ textarea:focus:invalid {
     opacity: 0.7;
 }
 
+/* Due by certificate cycle, nothing planned: dashed so it never reads as booked. */
+.ua-row-due {
+    border-style: dashed;
+    border-left-style: solid;
+}
+
+.ua-row-due .ua-lead {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.ua-side .status-not-planned {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
 /* Secondary groups (undated, dates passed): collapsed under the upcoming list. */
 .ua-secondary {
     border-top: 1px dashed var(--border-color);

@@ -141,9 +141,23 @@ function renderDashboardEnhanced() {
     // not cancelled), built from the same role-scoped plans as every other tile.
     // Not cached: it depends on today's date and on plan dates, which the
     // stats fingerprint does not track.
+    // Audits the certificate cycle owes soon with nothing planned — the same
+    // derivation as each client's cycle card. Clients are role-scoped; plans
+    // are ALL plans, so a plan another auditor made still counts as planned.
+    const RS = window.ReportStats || {};
+    const APD = window.AuditPlanningDomain || {};
+    const dueUnplanned = window.UpcomingAudits.dueUnplanned(visibleClients, window.state.auditPlans || [], {
+        cycleState: RS.cycleState,
+        resolveCycle: APD.resolveCertificateCycle,
+        belongsTo: RS.recordBelongsTo,
+        coversStandard: RS.coversStandard,
+        reports: window.state.auditReports || [],
+        settings: window.state.cbSettings || window.state.settings || {}
+    });
     const upcoming = window.UpcomingAudits.build(auditPlans, {
         auditors,
-        isCompleted: window.DataService.isPlanCompleted
+        isCompleted: window.DataService.isPlanCompleted,
+        due: dueUnplanned
     });
 
     // Industry Distribution
@@ -229,7 +243,7 @@ function renderDashboardEnhanced() {
                             <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem;"></i>
                         </div>
                     </div>
-                    <div style="font-size: 0.75rem; opacity: 0.8;">${completedAudits} completed${upcoming.counts.overdue ? ` · ${upcoming.counts.overdue} past date, not closed` : ''}${upcoming.counts.unscheduled ? ` · ${upcoming.counts.unscheduled} undated` : ''} · View calendar <i class="fa-solid fa-arrow-down" aria-hidden="true"></i></div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">${completedAudits} completed${upcoming.counts.overdue ? ` · ${upcoming.counts.overdue} past date, not closed` : ''}${upcoming.counts.unscheduled ? ` · ${upcoming.counts.unscheduled} undated` : ''}${upcoming.due.length ? ` · ${upcoming.due.length} due, not planned` : ''} · View calendar <i class="fa-solid fa-arrow-down" aria-hidden="true"></i></div>
                 </button>
 
                 <!-- Open NCRs -->
