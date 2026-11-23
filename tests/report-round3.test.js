@@ -124,8 +124,12 @@ describe('4. Previous findings', () => {
         ];
         expect(window._prevNcRef(prevReport, focusNc, 0)).toBe('NCR-053');
         expect(window._prevNcCriterion(prevReport, focusNc)).toBe('9.2');
-        expect(window._prevFollowUpForNC(prevReport, focusNc)).toMatch(/Open — corrective action not yet verified \(Open\)/);
+        // "Open" is said once: the 2026-11-21 report printed "…not yet verified (Open)".
+        expect(window._prevFollowUpForNC(prevReport, focusNc)).toMatch(/Open — corrective action not yet verified<\/span>/);
         expect(window._prevFollowUpForNC(prevReport, plainNc)).toBe('Verified closed — corrective action implemented');
+        // Any other recorded state is still shown beside it.
+        window.state.ncrs[0].status = 'Awaiting Auditee Response';
+        expect(window._prevFollowUpForNC(prevReport, focusNc)).toMatch(/not yet verified \(Awaiting Auditee Response\)/);
     });
 
     it('never print an internal FOCUS ref, and say when there is no record at all', () => {

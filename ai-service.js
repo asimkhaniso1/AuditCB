@@ -2384,13 +2384,24 @@ Return raw JSON only (no markdown fences, no prose outside the JSON), an array w
             }
         }
 
+        // First to last day of the audit: the summary used to be told the
+        // first day only and wrote "from 2026-11-17 to 2026-11-17".
+        const auditDatesLine = (function () {
+            const RS = window.ReportStats;
+            const plan = (reportData.planId && window.DataService && typeof window.DataService.findAuditPlan === 'function')
+                ? window.DataService.findAuditPlan(reportData.planId) : null;
+            const info = RS && typeof RS.auditDates === 'function' ? RS.auditDates(reportData, plan) : null;
+            if (!info || !info.text) return String(reportData.date || '');
+            return info.text + (info.days > 1 ? ' (' + info.days + ' days)' : ' (one day)');
+        })();
+
         const prompt = `
 You are a Senior Lead Auditor with over 30 years of experience at a top-tier international Certification Body (e.g., BSI, Bureau Veritas, DNV, TÜV, SGS). Write an Executive Summary, Positive Observations, and Opportunities for Improvement for a formal Audit Report that will be submitted to the client. Your writing must reflect the authority, precision, and measured judgment of a seasoned CB professional. The report will be reviewed and attested by a Qualified Registrar before client submission.
 
 Context:
 - Client: ${reportData.client}
 - Standard: ${reportData.standard || 'ISO Standard'}
-- Date: ${reportData.date}
+- Audit dates: ${auditDatesLine}
 - Major Non-Conformities: ${stats.majorNC}
 - Minor Non-Conformities: ${stats.minorNC}
 - Total Non-Conformities (Major + Minor): ${ncCount}

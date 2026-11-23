@@ -1916,8 +1916,53 @@
             });
     }
 
+    // ── The audit's dates, as every report section prints them ──────────────
+    // A report row carries only `date`, the first day; the last day is on the
+    // plan (endDate). The report read report.endDate alone, so a three-day
+    // audit printed as one day on the cover, the summaries and the narrative
+    // (PC Connection, 17–19 November 2026, printed "2026-11-17"; the closing
+    // meeting on the 19th and two days of evidence contradicted it).
+    // Returns { start, end, days, text }; end is '' for a one-day audit.
+    function auditDates(report, auditPlan) {
+        const r = report || {};
+        const p = auditPlan || {};
+        const df = global.DocFormat;
+        const iso = (v) => ((df && df.toIso && df.toIso(v)) || String(v == null ? '' : v).slice(0, 10));
+        const start = trim(r.date || p.startDate || p.date);
+        let end = trim(r.endDate || p.endDate);
+        // An end on or before the start is not a range.
+        if (!start || !end || iso(end) <= iso(start)) end = '';
+        let days = start ? 1 : 0;
+        if (end) {
+            const span = df && df.daysBetween ? df.daysBetween(start, end)
+                : Math.round((Date.parse(iso(end)) - Date.parse(iso(start))) / 86400000);
+            days = (span > 0 ? span : 0) + 1;
+        }
+        let text = '';
+        if (start) {
+            text = (df && df.formatDateRange && df.formatDateRange(start, end))
+                || (end ? start + ' — ' + end : start);
+        }
+        return { start, end, days, text };
+    }
+
+    // ── The requirement, as the client reads it ──────────────────────────────
+    // The checklist appends planning notes for the auditor to a question:
+    // which documents were on file, that none was mapped, what was missing at
+    // the pre-audit review. They printed in the Requirement column of the
+    // report and on the corrective action forms ("Pre-audit gap: … Record what
+    // was supplied, or whether its absence affects conformity."). Everything
+    // from the first such note on is dropped.
+    const PLANNING_NOTE_RE = /\s*(?:Documented information on file that should support this|Pre-audit gap\s*:|No validated supporting document mapped)[\s\S]*$/i;
+    function clientRequirement(text) {
+        return String(text == null ? '' : text).replace(PLANNING_NOTE_RE, '').trim();
+    }
+
     global.ReportStats = {
         build,
+        auditDates,
+        clientRequirement,
+        classifyItem,
         version: 1,
         capaTimeframes,
         capaDueDate,

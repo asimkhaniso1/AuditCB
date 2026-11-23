@@ -347,7 +347,7 @@ Audit Data:
 - Client: ${report.client || client.name || 'the organization'}
 - Standard: ${report.standard || 'ISO Standard'}
 - Audit Type: ${report.auditType || 'Audit'}
-- Date: ${report.date || ''}
+- Audit dates: ${(window.ReportStats && window.ReportStats.auditDates ? window.ReportStats.auditDates(report, d && d.auditPlan).text : '') || report.date || ''}
 - Total Checklist Items Assessed: ${stats.totalItems || 0} (Applicable: ${stats.applicableCount || 0})
 - Conformities: ${stats.conformCount || 0}
 - Major Non-Conformities: ${stats.majorNC || 0}

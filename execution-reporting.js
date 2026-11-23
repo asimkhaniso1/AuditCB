@@ -137,6 +137,37 @@
     };
     window._auditMethodLabel = auditMethodLabel;
 
+    // The audit's dates for every print site: first to last day, the last day
+    // taken from the plan when the report row has none (ReportStats.auditDates).
+    // Returns plain text, not escaped.
+    const auditDatesInfo = (report, auditPlan) => {
+        const RS = window.ReportStats;
+        if (RS && typeof RS.auditDates === 'function') return RS.auditDates(report, auditPlan);
+        const r = report || {};
+        return { start: r.date || '', end: r.endDate || '', days: r.date ? 1 : 0, text: (r.date || '') + (r.endDate ? ' — ' + r.endDate : '') };
+    };
+    const auditDatesText = (report, auditPlan) => auditDatesInfo(report, auditPlan).text;
+    window._auditDatesText = auditDatesText;
+
+    // How many checklist items carry a result. The report said "109 items
+    // audited" and "109 items sampled" beside "73 of 109 assessed": the 36 not
+    // sampled were counted as audited. Figures come from ReportStats.
+    const assessedCounts = (d) => {
+        const total = (d && d.stats && d.stats.totalItems) || 0;
+        const ci = d && d.stats && d.stats.rs && d.stats.rs.coverageInputs;
+        if (!ci || typeof ci.assessed !== 'number') return { total, assessed: total, notAssessed: 0 };
+        return { total, assessed: ci.assessed, notAssessed: Math.max(0, (typeof ci.applicable === 'number' ? ci.applicable : total) - ci.assessed) };
+    };
+    const itemTotalsLine = (d) => {
+        const c = assessedCounts(d);
+        return 'Checklist Items: ' + c.total + ' | Assessed: ' + c.assessed + (c.notAssessed ? ' | Not sampled or not assessed: ' + c.notAssessed : '');
+    };
+    // An item with no result was not part of an audit trail.
+    const wasAssessed = (item) => {
+        const RS = window.ReportStats;
+        return !(RS && typeof RS.classifyItem === 'function' && RS.classifyItem(item) === 'notAssessed');
+    };
+
     // ─── Criterion display for findings (#7) ───────────────────────────────────
     // Checklist items carried over from a Stage 1 FOCUS item (or other internal
     // tracking refs like SURV./ORG./DOC.) use an internal reference in `clause`
@@ -392,8 +423,8 @@
         if (PREV_CLOSED_STATES.indexOf(raw.toLowerCase()) !== -1) {
             return 'Verified closed — corrective action implemented';
         }
-        return '<span style="color:#991b1b;">Open — corrective action not yet verified ('
-            + window.UTILS.escapeHtml(raw) + ')</span>';
+        return '<span style="color:#991b1b;">Open — corrective action not yet verified'
+            + (raw.toLowerCase() === 'open' ? '' : ' (' + window.UTILS.escapeHtml(raw) + ')') + '</span>';
     };
     // The NCR register record raised for a previous report's NC (state.ncrs),
     // matched by its source checklist question within that audit. The closure
@@ -913,10 +944,16 @@
             // with no single standard recorded, the question's own text stands.
             const kbMatch = kbRequirementFor({ clause, criterionRef: item.criterionRef }, report.standard);
 
+            // Planning notes the checklist adds for the auditor ("Documented
+            // information on file…", "Pre-audit gap: …") are not requirements
+            // and are not printed.
+            const clientReq = (text) => ((window.ReportStats && typeof window.ReportStats.clientRequirement === 'function')
+                ? window.ReportStats.clientRequirement(text) : String(text == null ? '' : text));
+
             return {
                 ...item,
                 clause: clause || item.clause || item.sectionName || 'General Requirement',
-                requirement: requirement || item.text || item.requirement || item.description || 'Requirement details not available',
+                requirement: clientReq(requirement || item.text || item.requirement || item.description) || 'Requirement details not available',
                 kbMatch: kbMatch,
                 comment: item.comment || ''
             };
@@ -1227,7 +1264,7 @@
             ? cbSettings.logoUrl : '';
         const accBody = cbSettings.accreditationBody || '';
         const accNum = cbSettings.accreditationNumber || '';
-        const datesText = (report.date || '') + (report.endDate ? ' to ' + report.endDate : '');
+        const datesText = auditDatesText(report, auditPlan);
         const cardPayload = {
             v: 1,
             cb: cbName,
@@ -1601,7 +1638,7 @@
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Date</div>
-                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.report.date || '—'}${d.report.endDate ? ' — ' + d.report.endDate : ''}</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${htmlEsc(auditDatesText(d.report, d.auditPlan) || '—')}</div>
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Lead Auditor</div>
@@ -1668,7 +1705,7 @@
                             <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Certification Scope</td><td style="padding:7px 12px;">${htmlEsc(d.client.certificationScope || '—')}</td></tr>
                             <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Standard</td><td style="padding:7px 12px;">${htmlEsc(d.report.standard || d.auditPlan?.standard || '—')}</td></tr>
                             <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Audit Type</td><td style="padding:7px 12px;">${htmlEsc(d.auditPlan?.auditType || 'Initial')}</td></tr>
-                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Dates</td><td style="padding:7px 12px;">${d.report.date || '—'} ${d.report.endDate ? '→ ' + d.report.endDate : ''}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Dates</td><td style="padding:7px 12px;">${htmlEsc(auditDatesText(d.report, d.auditPlan) || '—')}</td></tr>
                             <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Lead Auditor</td><td style="padding:7px 12px;">${htmlEsc(d.report.leadAuditor || '—')}</td></tr>
                             <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${(function () { var s = (d.client.sites && d.client.sites[0]) || {}; return htmlEsc([d.client.address || s.address, d.client.city || s.city, d.client.province, d.client.country || s.country].filter(Boolean).join(', ') || '—'); })()}</td></tr>
                 ${(() => {
@@ -2567,7 +2604,7 @@
                             <div style="margin-bottom:6px;">• Plan Reference: ${d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A'}</div>
                             <div style="margin-bottom:12px;">• Standard: ${htmlEsc(d.report.standard || 'ISO Standard')}</div>
                             <div style="font-weight:600;margin-bottom:8px;">Annexure B — Checklist Summary</div>
-                            <div style="margin-bottom:6px;">• Total Items Audited: ${d.stats.totalItems}</div>
+                            <div style="margin-bottom:6px;">• ${itemTotalsLine(d)}</div>
                             <div style="margin-bottom:6px;">• Conforming: ${d.stats.conformCount} | NC: ${d.stats.ncCount} | Observations: ${d.stats.observationCount} | OFI: ${d.stats.ofiCount}</div>
                             <div style="margin-bottom:12px;">• N/A Items: ${d.stats.naCount}</div>
                             <div style="font-weight:600;margin-bottom:8px;">Annexure C — Additional Documents</div>
@@ -2951,7 +2988,7 @@
 Client: ${d.report.client}
 Standard: ${standardName}
 Audit Type: ${d.auditPlan?.auditType || d.auditPlan?.type || 'Certification Audit'}
-Items Audited: ${d.stats.totalItems} | Conforming: ${d.stats.conformCount} | NC: ${ncTotal} (${d.stats.majorNC} Major, ${d.stats.minorNC} Minor) | Observations: ${obsTotal}
+Items Assessed: ${assessedCounts(d).assessed} of ${d.stats.totalItems} | Conforming: ${d.stats.conformCount} | NC: ${ncTotal} (${d.stats.majorNC} Major, ${d.stats.minorNC} Minor) | Observations: ${obsTotal}
 Recommendation: ${d.report.recommendation || 'Pending'}
 Deterministic recommendation sentence (mandatory, audit-type-verified — reproduce this recommendation wording verbatim; do not rephrase it): "${deterministicRec}"
 
@@ -3320,13 +3357,20 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         let editedDistribution = document.getElementById('rp-distribution')?.innerHTML || '';
         editedDistribution = editedDistribution.replace(/&nbsp;/g, ' ').trim();
         if (editedDistribution && window.Sanitizer && window.Sanitizer.sanitizeHTML) {
-            editedDistribution = window.Sanitizer.sanitizeHTML(editedDistribution, {
-                ALLOWED_TAGS: ['tr', 'td', 'th', 'span', 'strong', 'em', 'b', 'i', 'br'],
+            // An HTML parser keeps <tr>/<td> only inside a table. Sanitized on
+            // their own the rows lost their tags, and the list printed as one
+            // run-on line above an empty table (PC Connection, 2026-11-21). The
+            // rows are sanitized inside a table and taken back out of it.
+            const wrapped = window.Sanitizer.sanitizeHTML('<table><tbody>' + editedDistribution + '</tbody></table>', {
+                ALLOWED_TAGS: ['table', 'tbody', 'tr', 'td', 'th', 'span', 'strong', 'em', 'b', 'i', 'br'],
                 ALLOWED_ATTR: ['style', 'colspan', 'rowspan']
             });
+            const inner = /<tbody[^>]*>([\s\S]*)<\/tbody>/i.exec(String(wrapped || ''));
+            editedDistribution = inner ? inner[1] : '';
         }
-        // Guard against a tbody left with only whitespace/empty tags after sanitization
-        const distributionRows = (editedDistribution && editedDistribution.replace(/<[^>]*>/g, '').trim())
+        // The edited rows are used only if they are still rows with text in
+        // them; anything else falls back to the default list.
+        const distributionRows = (editedDistribution && /<tr[\s>]/i.test(editedDistribution) && editedDistribution.replace(/<[^>]*>/g, '').trim())
             ? editedDistribution : defaultDistributionRows;
         let editedSummary = document.getElementById('rp-exec-summary')?.innerHTML || d.report.executiveSummary || '';
         editedSummary = editedSummary.replace(/<em[^>]*>Click to add executive summary[^<]*<\/em>/gi, '').trim();
@@ -3659,7 +3703,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const auditTrailsBodyRows = (function () {
             const groups = {};
             const order = [];
-            (d.hydratedProgress || []).forEach(function (item) {
+            (d.hydratedProgress || []).filter(wasAssessed).forEach(function (item) {
                 const dept = (window.ReportStats && window.ReportStats.normalizeDeptName)
                     ? window.ReportStats.normalizeDeptName(item.department)
                     : ((item.department && String(item.department).trim()) || 'Unassigned / Cross-functional');
@@ -3731,7 +3775,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const auditTrailTimelineHtml = (function () {
             const groups = {};
             const order = [];
-            (d.hydratedProgress || []).forEach(function (item) {
+            (d.hydratedProgress || []).filter(wasAssessed).forEach(function (item) {
                 const dept = (window.ReportStats && window.ReportStats.normalizeDeptName)
                     ? window.ReportStats.normalizeDeptName(item.department)
                     : ((item.department && String(item.department).trim()) || 'Unassigned / Cross-functional');
@@ -3947,7 +3991,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + row('Standard', esc(report.standard || plan.standard || '—'))
                 + row('Scope', esc(report.scope || plan.scope || client.certificationScope || '—'))
                 + row('Sites / Locations', esc(sites))
-                + row('Audit Dates', esc((report.date || '—') + (report.endDate ? ' — ' + report.endDate : '')))
+                + row('Audit Dates', esc(auditDatesText(report, plan) || '—'))
                 + row('Audit Team', esc(team))
                 + row('Major NC / Minor NC / Observations / OFI', (stats.majorNC || 0) + ' / ' + (stats.minorNC || 0) + ' / ' + (stats.observationCount || 0) + ' / ' + (stats.ofiCount || 0))
                 + (stats.coveragePct != null ? row('Audit Coverage', esc(stats.coveragePct + '%'
@@ -4273,7 +4317,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // Labeled "Audit Date" (not "Report Date") — this is when the on-site audit
             // happened, not when the report was prepared/issued (client spec #26: the four
             // dates — Audit, Report Preparation, Technical Review, Issue — must stay distinct).
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.report.date || '—') + (d.report.endDate ? ' — ' + htmlEsc(d.report.endDate) : '') + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Date' + (auditDatesInfo(d.report, d.auditPlan).days > 1 ? 's' : '') + '</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(auditDatesText(d.report, d.auditPlan) || '—') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + reportRef(d) + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.report.leadAuditor || '—') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.auditPlan?.auditType || 'Initial') + '</div></div>'
@@ -4339,7 +4383,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<tr><td>Number of Employees</td><td>' + htmlEsc(d.client.employees || d.client.numberOfEmployees || '—') + '</td></tr>'
                 + '<tr><td>Audit Standard</td><td>' + htmlEsc(standard) + '</td></tr>'
                 + '<tr><td>Audit Type</td><td>' + htmlEsc(d.auditPlan?.auditType || 'Initial') + '</td></tr>'
-                + '<tr><td>Audit Dates</td><td>' + htmlEsc(d.report.date || '—') + (d.report.endDate ? ' → ' + htmlEsc(d.report.endDate) : '') + '</td></tr>'
+                + '<tr><td>Audit Dates</td><td>' + htmlEsc(auditDatesText(d.report, d.auditPlan) || '—') + '</td></tr>'
                 + '<tr><td>Lead Auditor</td><td>' + htmlEsc(d.report.leadAuditor || '—') + '</td></tr>'
                 + '<tr><td>Audit Method</td><td>' + auditMethodLabel(d.auditPlan) + '</td></tr>'
                 + (function () {
@@ -4396,8 +4440,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (secMap['summary'] ? '<div id="sec-summary" class="sh" style="border-left-color:#059669;">' + sBadge('summary') + 'AUDIT SUMMARY &amp; OPENING MEETING</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
                 + '<div style="padding:10px 14px;background:#eff6ff;border-radius:8px;border-left:3px solid #1d4ed8;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.auditPlan?.auditType || 'Initial') + '</div></div>'
-                + '<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;border-left:3px solid #475569;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.report.date || '—') + (d.report.endDate ? ' — ' + htmlEsc(d.report.endDate) : '') + '</div></div>'
-                + '<div style="padding:10px 14px;background:#eff6ff;border-radius:8px;border-left:3px solid #1d4ed8;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (function () { var md = d.auditPlan?.manDays || d.auditPlan?.man_days || '—'; var method = (d.auditPlan?.auditMethod || '').toLowerCase(); var suffix = method === 'remote' ? ' (Remote Audit)' : (method === 'hybrid' ? ' (Hybrid)' : (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '')); return md + ' Man-Days' + suffix; })() + '</div></div>'
+                + '<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;border-left:3px solid #475569;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(auditDatesText(d.report, d.auditPlan) || '—') + '</div></div>'
+                + '<div style="padding:10px 14px;background:#eff6ff;border-radius:8px;border-left:3px solid #1d4ed8;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (function () { var md = d.auditPlan?.manDays || d.auditPlan?.man_days || '—'; var method = (d.auditPlan?.auditMethod || '').toLowerCase(); var suffix = method === 'remote' ? ' (Remote Audit)' : (method === 'hybrid' ? ' (Hybrid)' : (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '')); var span = auditDatesInfo(d.report, d.auditPlan).days; return md + ' Man-Days' + (span > 1 ? ' over ' + span + ' days' : '') + suffix; })() + '</div></div>'
                 + '<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;border-left:3px solid #475569;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + auditMethodLabel(d.auditPlan) + '</div></div></div>'
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
@@ -4554,7 +4598,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="margin-bottom:4px;">• Plan Reference: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A') + '</div>'
                 + '<div style="margin-bottom:12px;">• Standard: ' + htmlEsc(standard) + '</div>'
                 + '<div style="font-weight:700;margin-bottom:6px;">Annexure B — Checklist Summary</div>'
-                + '<div style="margin-bottom:4px;">• Total Items Audited: ' + d.stats.totalItems + '</div>'
+                + '<div style="margin-bottom:4px;">• ' + itemTotalsLine(d) + '</div>'
                 + '<div style="margin-bottom:4px;">• Conforming: ' + d.stats.conformCount + ' | NC: ' + (d.stats.ncCount) + ' | Observations: ' + d.stats.observationCount + ' | OFI: ' + d.stats.ofiCount + '</div>'
                 + '<div style="margin-bottom:12px;">• N/A Items: ' + d.stats.naCount + '</div>'
                 + '</div></div>' : '')
