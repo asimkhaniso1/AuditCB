@@ -75,11 +75,13 @@ describe('isReportFinal — the single source of truth', () => {
         expect(isReportFinal({ status: 'Finalized' })).toBe(false); // report.status (workflow field) must not leak in here
     });
 
-    it('every raw reportStatus === comparison in the file lives in exactly two places: the helper body, and the unrelated cross-report lookup for a client\'s prior finalized report', () => {
+    it('every raw reportStatus === comparison in the file lives in one place: the helper body', () => {
         // If this count grows, someone re-tested reportStatus directly instead of
         // calling isReportFinal(), reopening the preview/export disagreement risk.
+        // The cross-report lookup for a client's prior finalized report used to
+        // be the second; it is ReportStats.previousReport now.
         const hits = SRC.match(/reportStatus === 'final'/g) || [];
-        expect(hits.length).toBe(2);
+        expect(hits.length).toBe(1);
     });
 });
 

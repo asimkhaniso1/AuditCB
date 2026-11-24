@@ -379,7 +379,11 @@ Return ONLY the raw JSON object, no markdown fences.`;
 
         const strengths = [];
         const conformPct = computeConformPct(d, stats) ?? 0;
-        if (conformPct >= 70) strengths.push(`Strong overall conformity across assessed clauses (${conformPct}% of applicable items conforming).`);
+        // conformPct is ReportStats.conformityPct: assessed items WITHOUT a
+        // nonconformity (observations and OFIs included), over ASSESSED items.
+        // It was labelled "of applicable items", which PC Connection's
+        // recertification printed as 93% against 56 of 109 applicable items.
+        if (conformPct >= 70) strengths.push(`Strong overall conformity across assessed clauses (${conformPct}% of assessed items without a nonconformity).`);
         deptEntries.filter(([, v]) => v.total > 0 && v.nc === 0).slice(0, 3).forEach(([name]) => strengths.push(`${name} demonstrated full conformity during this audit.`));
         if (!strengths.length) strengths.push('No specific strengths were separately highlighted during this surveillance audit.');
 

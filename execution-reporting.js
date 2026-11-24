@@ -449,6 +449,22 @@
     // window.state.auditReports, finalized only) so preview/export/validator
     // never disagree about which report is "the previous one".
     const PREV_STATUS_EMPTY_RE = /^(—|-{1,3}|n\/?a|none|nil|\.)?$/i; // same "blank" test as report-integrity.js EMPTY_STATUS_RE
+
+    // The client's previous audit report, for the Previous Findings table
+    // (preview and PDF) and its status sentence: ReportStats.previousReport,
+    // the one lookup that matches the client by id or, when a report carries
+    // none, by name. The tables matched `r.clientId === report.clientId`, which
+    // is true for two id-less reports of DIFFERENT clients: PC Connection's
+    // recertification printed KTD Select's NCs as its previous findings.
+    const findPreviousReport = (d) => {
+        const report = (d && d.report) || {};
+        const allReports = (window.state && window.state.auditReports) || [];
+        if (window.ReportStats && typeof window.ReportStats.previousReport === 'function') {
+            return window.ReportStats.previousReport({ report, client: d && d.client, allReports });
+        }
+        // Stats module missing: no client identity to trust, so no previous report.
+        return null;
+    };
     const _derivePreviousFindingsStatus = (d) => {
         const report = (d && d.report) || {};
         const auditPlan = (d && d.auditPlan) || {};
@@ -460,17 +476,7 @@
             return 'Not applicable — initial certification audit.';
         }
 
-        const allReports = (window.state && window.state.auditReports) || [];
-        const clientKey = report.clientId != null ? String(report.clientId) : ((d && d.client && d.client.id != null) ? String(d.client.id) : null);
-        const clientName = report.client || (d && d.client && d.client.name) || null;
-        const prevReport = allReports.filter(function (r) {
-            if (!r || String(r.id) === String(report.id)) return false;
-            const rClientKey = r.clientId != null ? String(r.clientId) : null;
-            const matchesClient = (clientKey && rClientKey && rClientKey === clientKey)
-                || (clientName && r.client && String(r.client).trim().toLowerCase() === String(clientName).trim().toLowerCase());
-            if (!matchesClient) return false;
-            return r.status === 'Finalized' || r.reportStatus === 'final';
-        }).sort(function (a, b) { return new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt); })[0];
+        const prevReport = findPreviousReport(d);
 
         if (!prevReport) return 'Records of previous findings were not available for review.';
 
@@ -2544,11 +2550,7 @@
                     <div class="rp-sec-body">
                         ${(function () {
                             // Look for previous reports for the same client
-                            const allReports = window.state?.auditReports || [];
-                            const prevReports = allReports
-                                .filter(r => r.clientId === d.report.clientId && String(r.id) !== String(d.report.id))
-                                .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
-                            const prevReport = prevReports[0];
+                            const prevReport = findPreviousReport(d);
                             // Pre-filled with the derived status (never invented/favourable) — the
                             // auditor's own previously-entered text still wins inside the helper itself.
                             const prevFindingsNarrative = '<div style="margin-top:12px;"><div style="font-size:0.8rem;font-weight:600;color:#3730a3;margin-bottom:6px;">Previous Findings Status (editable)</div><div id="rp-prev-findings" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">' + htmlEsc(_derivePreviousFindingsStatus(d)) + '</div></div>';
@@ -3998,11 +4000,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // function (see editedPrevFindings block) — reused here for section presence.
         // Previous-findings follow-up rows, sourced from the prior audit report for this client (if any).
         const prevFindingsRowsHtml = (function () {
-            const allReports = window.state?.auditReports || [];
-            const prevReports = allReports
-                .filter(function (r) { return r.clientId === d.report.clientId && String(r.id) !== String(d.report.id); })
-                .sort(function (a, b) { return new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt); });
-            const prevReport = prevReports[0];
+            const prevReport = findPreviousReport(d);
             if (!prevReport) return '';
             const prevNCs = (prevReport.checklistProgress || [])
                 .filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; });

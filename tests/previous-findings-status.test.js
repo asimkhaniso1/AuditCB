@@ -21,6 +21,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
+import { loadScript } from './helpers/load-script.js';
+
+globalThis.window = globalThis.window || globalThis;
+loadScript('./report-stats.js', { params: { module: undefined } });
+const ReportStats = globalThis.window.ReportStats;
 
 const SRC = fs.readFileSync(path.resolve('./execution-reporting.js'), 'utf8');
 
@@ -108,7 +113,9 @@ describe('Previous Findings Status — read from the NCR register', () => {
     const d = () => ({ report: { id: 'rep-nov', client: 'Acme', previousFindingsStatus: '' }, auditPlan: { auditType: 'Recertification' }, client: { name: 'Acme' } });
 
     beforeEach(() => {
-        win = { state: { auditReports: [prevReport], ncrs: [] } };
+        // The previous report is found by ReportStats.previousReport (the real
+        // module), the one lookup shared with the Previous Findings tables.
+        win = { state: { auditReports: [prevReport], ncrs: [] }, ReportStats };
         derive = loadDerive()(win);
     });
 

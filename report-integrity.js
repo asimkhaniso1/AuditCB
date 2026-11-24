@@ -176,6 +176,10 @@
 
     function hasPriorFinalizedReport(client, report) {
         const reports = safeArr(global.state && global.state.auditReports);
+        // The same lookup as the report's Previous Findings section.
+        if (global.ReportStats && typeof global.ReportStats.previousReport === 'function') {
+            return !!global.ReportStats.previousReport({ report, client, allReports: reports });
+        }
         const clientKey = (report && (report.clientId != null ? String(report.clientId) : null))
             || (client && client.id != null ? String(client.id) : null);
         const clientName = (report && report.client) || (client && client.name) || null;
@@ -443,6 +447,46 @@
                     `${ca.ref} has no corrective-action due date in the NC register; the report prints the computed date ${ca.dueDate}.`,
                     'state.ncrs[].dueDate vs ReportStats.correctiveActions',
                     'Set the due date on the register record so the report and the register give the client the same deadline.'
+                ));
+            }
+        });
+    }
+
+    // B33: the narrative names an NC register record of ANOTHER client.
+    // PC Connection's 2026 recertification draft cited NCR-080 to NCR-083 as
+    // its previous findings; they were KTD Select's. A report naming another
+    // client's records discloses that client's audit results (ISO/IEC 17021-1
+    // 8.4) and states findings that are not this client's.
+    function checkB33ForeignNcrRefs(input, results) {
+        const { report, client } = input;
+        const RS = global.ReportStats;
+        if (!RS || typeof RS.recordBelongsTo !== 'function') return;
+        const owner = {
+            id: report && report.clientId != null ? report.clientId : (client && client.id != null ? client.id : null),
+            name: (report && (report.client || report.clientName)) || (client && client.name) || ''
+        };
+        if (owner.id == null && !trim(owner.name)) return;
+        const register = safeArr(global.state && global.state.ncrs);
+        const narrative = narrativeFields(report);
+        const flagged = new Set();
+        Object.keys(narrative).forEach((key) => {
+            const text = narrative[key];
+            if (!text) return;
+            const re = /\bNCR-0*(\d+)\b/g;
+            let m;
+            while ((m = re.exec(text)) !== null) {
+                const rec = register.find((n) => n && String(n.id) === m[1]);
+                if (!rec || RS.recordBelongsTo(rec, owner)) continue;
+                const ref = 'NCR-' + m[1].padStart(3, '0');
+                if (flagged.has(ref)) continue;
+                flagged.add(ref);
+                results.blockers.push(item(
+                    'B33-' + ref,
+                    'blocker',
+                    'narrative',
+                    `Narrative (${key}) cites ${ref}, which is a nonconformity of another client (${trim(rec.clientName) || 'client ' + rec.clientId}), not of ${trim(owner.name) || 'this client'}.`,
+                    'report.' + key + ' vs state.ncrs',
+                    'Remove it, and list only this client\'s own previous findings.'
                 ));
             }
         });
@@ -2128,6 +2172,7 @@
         runCheck('checkB4MissingCriterion', () => checkB4MissingCriterion(ncrs, results), results);
         runCheck('checkB5RecommendationMismatch', () => checkB5RecommendationMismatch({ report, auditPlan, stats }, results), results);
         runCheck('checkW31W32NcRecords', () => checkW31W32NcRecords({ report, auditPlan, stats }, results), results);
+        runCheck('checkB33ForeignNcrRefs', () => checkB33ForeignNcrRefs({ report, client }, results), results);
         runCheck('checkB6FinancialClaims', () => checkB6FinancialClaims(report, results), results);
         runCheck('checkB6BannedPhrases', () => checkB6BannedPhrases(report, results), results);
         runCheck('checkB7RecurringWithoutHistory', () => checkB7RecurringWithoutHistory(report, client, results), results);

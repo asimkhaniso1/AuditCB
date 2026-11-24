@@ -535,11 +535,24 @@
         // History: real audits for this client+standard, finalized/approved/published,
         // mirroring the filter used by planning-module.js:2744-2780 (clientId+standard+status)
         // without importing that module.
-        const clientId = report.clientId != null ? report.clientId : client.id;
+        // The client by id when both sides carry one, else by name: reports in
+        // the field often have no clientId, which left PC Connection's
+        // finalized February 2026 surveillance out of its recertification
+        // programme (Surveillance 2 printed the calendar's "Dec 2025"). The
+        // standards are compared as a set: the two reports list the same three
+        // standards in a different order.
+        const owner = {
+            id: report.clientId != null ? report.clientId : (client.id != null ? client.id : null),
+            name: report.client || report.clientName || client.name || ''
+        };
+        const wanted = standardSet({ standard });
         const history = allReports.filter((r) => {
             if (!r || String(r.id) === String(report.id)) return false;
-            if (clientId == null || r.clientId == null || String(r.clientId) !== String(clientId)) return false;
-            if (standard && trim(r.standard).toLowerCase() !== trim(standard).toLowerCase()) return false;
+            if (!recordBelongsTo(r, owner)) return false;
+            if (wanted.size) {
+                const theirs = standardSet(r);
+                if (theirs.size && !Array.from(theirs).some((s) => wanted.has(s))) return false;
+            }
             const status = trim(r.reportStatus || r.status).toLowerCase();
             return status === 'final' || status === 'finalized' || status === 'approved' || status === 'published';
         }).sort((a, b) => new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
@@ -640,8 +653,19 @@
         // later cycle the recertification that opened it sits in the opening
         // row (s2), and only one dated well into the cycle is its closing one.
         const historyByStage = {};
+        const svDue = (n) => addMonths(cycleStart, 12 * n);
         history.forEach((r) => {
-            let sid = classifyAuditType(r.auditType || (r.auditPlan && r.auditPlan.type));
+            const typeStr = trim(r.auditType || (r.auditPlan && r.auditPlan.type));
+            let sid = classifyAuditType(typeStr);
+            // A bare "Surveillance" record carries no visit number:
+            // classifyAuditType calls it Surveillance 1. Slot it by its date
+            // against this cycle's two due dates instead, so PC Connection's
+            // February 2026 audit (the cycle's second) lands in Surveillance 2.
+            if (sid === 'sv1' && certStart && !/surveillance\s*1|sv1|1st|first/i.test(typeStr)) {
+                const d = parseDateSafe(r.date || r.createdAt);
+                if (d && Math.abs(d - svDue(2)) < Math.abs(d - svDue(1))) sid = 'sv2';
+                if (historyByStage[sid]) sid = sid === 'sv1' ? 'sv2' : 'sv1';
+            }
             if (laterCycle && (sid === 's1' || sid === 's2')) return;
             if (laterCycle && sid === 'recert') {
                 const d = parseDateSafe(r.date || r.createdAt);
@@ -814,6 +838,50 @@
         const named = organisationKey(record.client || record.clientName);
         const ours = organisationKey(client.name);
         return !!named && !!ours && named === ours;
+    }
+
+    const FINAL_STATUS_RE = /^(final|finalized|approved|published)$/i;
+
+    // The client's previous audit report: finalized, dated before this one,
+    // newest first. The ONE lookup behind the Previous Findings table (preview
+    // and PDF), its derived status sentence and Report Integrity.
+    //
+    // The tables used to match on `r.clientId === report.clientId` alone.
+    // Reports in the field often carry no clientId, and undefined === undefined,
+    // so PC Connection's 2026 recertification report took KTD Select's August
+    // audit as its "previous report" and printed KTD Select's four NCs as its
+    // own. recordBelongsTo decides by id when both sides carry one, else by
+    // the client's name, and attributes a record naming neither to nobody.
+    //
+    // @param {{report:object, client?:object, allReports?:Array}} input
+    // @returns {object|null}
+    function previousReport(input) {
+        const o = input || {};
+        const report = o.report || {};
+        const client = o.client || {};
+        const owner = {
+            id: report.clientId != null ? report.clientId : (client.id != null ? client.id : null),
+            name: report.client || report.clientName || client.name || ''
+        };
+        if (owner.id == null && !trim(owner.name)) return null;
+        const before = parseDateSafe(report.date || report.createdAt);
+        return safeArr(o.allReports)
+            .filter((r) => {
+                if (!r || String(r.id) === String(report.id)) return false;
+                if (report.planId != null && r.planId != null && String(r.planId) === String(report.planId)) return false;
+                if (!recordBelongsTo(r, owner)) return false;
+                if (!FINAL_STATUS_RE.test(trim(r.reportStatus)) && !FINAL_STATUS_RE.test(trim(r.status))) return false;
+                const d = parseDateSafe(r.date || r.createdAt);
+                return !before || !d || d < before;
+            })
+            .sort((a, b) => (parseDateSafe(b.date || b.createdAt) || 0) - (parseDateSafe(a.date || a.createdAt) || 0))[0] || null;
+    }
+
+    // The certified standards a record lists, normalized, whatever their order
+    // ("ISO 27001:2022, ISO 22301:2019" and "ISO 22301:2019, ISO 27001:2022").
+    function standardSet(record) {
+        return new Set([].concat(safeArr(record && record.standards), String((record && record.standard) || '').split(/\s*[,;+]\s*/))
+            .map((x) => trim(x).toLowerCase().replace(/\s+/g, ' ')).filter(Boolean));
     }
 
     // An integrated audit's record lists several standards.
@@ -1976,6 +2044,7 @@
         buildProgramme,
         cycleState,
         recordBelongsTo,
+        previousReport,
         coversStandard,
         certificationHistory,
         formatCriterion,
