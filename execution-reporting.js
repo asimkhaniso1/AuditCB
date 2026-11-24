@@ -4550,11 +4550,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="margin-top:12px;color:#334155;font-size:0.88rem;line-height:1.6;">' + htmlEsc(editedSiteSamplingNote || 'Site sampling conducted in accordance with IAF MD 1.') + '</div>'
                 + '</div>' : '')
             // SECTION: OBJECTIVES, CRITERIA & METHODOLOGY
+            // Section 4 starts on its own page and Section 5 on the next, so the
+            // three narrow columns must fit one page: at line-height 1.7 the
+            // methodology column ran 3 lines onto an otherwise empty page
+            // (PC Connection, 24 Nov 2026).
             + (secMap['objectives'] ? '<div id="sec-objectives" class="sh" style="border-left-color:#475569;">' + sBadge('objectives') + 'AUDIT OBJECTIVES, CRITERIA &amp; METHODOLOGY</div><div class="sb">'
-                + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Objectives</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + htmlEsc(editedObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system') + '</div></div>'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#1d4ed8;">Audit Criteria</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + htmlEsc(editedCriteria || '• ' + standard + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records') + '</div></div>'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + htmlEsc(editedMethodology || methodologyDefaultText(d.auditPlan) || METHODOLOGY_NEUTRAL_TEXT) + '</div></div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Objectives</h4><div style="white-space:pre-line;line-height:1.5;font-size:0.85rem;color:#334155;">' + htmlEsc(editedObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#1d4ed8;">Audit Criteria</h4><div style="white-space:pre-line;line-height:1.5;font-size:0.85rem;color:#334155;">' + htmlEsc(editedCriteria || '• ' + standard + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#475569;">Audit Methodology</h4><div style="white-space:pre-line;line-height:1.5;font-size:0.85rem;color:#334155;">' + htmlEsc(editedMethodology || methodologyDefaultText(d.auditPlan) || METHODOLOGY_NEUTRAL_TEXT) + '</div></div>'
                 + '</div></div>' : '')
             // SECTION: EXECUTIVE SUMMARY
             + (secMap['summary'] ? '<div id="sec-summary" class="sh" style="border-left-color:#059669;">' + sBadge('summary') + 'AUDIT SUMMARY &amp; OPENING MEETING</div><div class="sb">'
