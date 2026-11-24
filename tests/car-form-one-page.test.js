@@ -54,6 +54,37 @@ describe('Annex C CAR forms print one per page', () => {
         expect(partC.textContent).toContain('Lead Auditor');
     });
 
+    // NCR-089 and NCR-091 (24 Nov 2026) still pushed Part C over as a block:
+    // its three stacked rows now sit across one row.
+    it('lays Part C out as one row of three columns', () => {
+        const f = forms()[0];
+        const partC = Array.from(f.querySelectorAll('h4')).find((h) => /PART C/.test(h.textContent)).parentElement;
+        const table = partC.querySelector('table');
+        expect(Array.from(table.querySelectorAll('th')).map((th) => th.textContent)).toEqual(['Verification Method', 'Verified By / Date', 'Effectiveness']);
+        expect(table.querySelectorAll('tbody tr')).toHaveLength(1);
+        expect(table.querySelector('tbody tr').children[2].textContent).toBe('Pending assessment');
+    });
+
+    // User decision 24 Nov 2026: the NC statement names the clause and what it
+    // requires, so the Requirement row (usually the audit question) prints
+    // only when no statement is recorded.
+    it('omits the Requirement row when an NC statement is recorded', () => {
+        const f = forms()[0];
+        const labels = Array.from(f.querySelectorAll('td')).map((td) => td.textContent);
+        expect(labels).toContain('Statement of Nonconformity');
+        expect(labels).not.toContain('Requirement');
+        expect(f.textContent).not.toContain('Requirement for 9.2');
+    });
+
+    it('keeps the Requirement row when no NC statement is recorded', () => {
+        const noStatement = Object.assign(item('B-0', '8.1'), { ncrDescription: '' });
+        const d = { report: { id: 'r2', checklistProgress: [noStatement] }, hydratedProgress: [noStatement], auditPlan: {}, cbSettings: {} };
+        window.state = { ncrs: [], auditReports: [d.report] };
+        const one = window.ReportFindingsOps.sections(d).find((s) => s.key === 'carForms').bodyHtml;
+        expect(one).toContain('>Requirement<');
+        expect(one).toContain('Requirement for 8.1');
+    });
+
     it('uses two ruled lines per blank Part B box (was three)', () => {
         const f = forms()[0];
         const box = Array.from(f.querySelectorAll('div')).find((dv) => dv.children.length === 0 && dv.textContent === 'Root Cause');

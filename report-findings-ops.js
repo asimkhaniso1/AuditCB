@@ -579,14 +579,14 @@
         if (value) return '<div style="white-space:pre-wrap;padding:4px 0;">' + esc(value) + '</div>';
         var out = '';
         for (var i = 0; i < lines; i++) {
-            out += '<div style="border-bottom:1px solid var(--b4-border,#ccc);height:18px;"></div>';
+            out += '<div style="border-bottom:1px solid var(--b4-border,#ccc);height:16px;"></div>';
         }
         return out;
     }
 
     function signatureLine(label) {
         return '<div style="flex:1;min-width:150px;">'
-            + '<div style="border-bottom:1px solid #333;height:26px;"></div>'
+            + '<div style="border-bottom:1px solid #333;height:20px;"></div>'
             + '<div style="font-size:10px;color:var(--b4-muted,#666);margin-top:2px;">' + esc(label) + '</div>'
             + '</div>';
     }
@@ -644,10 +644,15 @@
             + '</div>';
 
         var partA = '<h4 class="b4-subhead">PART A — NONCONFORMITY</h4>'
-            + '<table class="b4-tbl" style="margin-bottom:var(--b4-s4);">'
+            + '<table class="b4-tbl b4-tbl--compact" style="margin-bottom:var(--b4-s3);">'
             + '<tbody>'
-            + '<tr><td style="font-weight:700;width:160px;">Criterion</td><td>' + criterionCell(item) + '</td></tr>'
-            + '<tr><td style="font-weight:700;">Requirement</td><td>' + esc(reqText(item.requirement) || '—') + '</td></tr>'
+            + '<tr><td style="font-weight:700;width:130px;">Criterion</td><td>' + criterionCell(item) + '</td></tr>'
+            // The statement names the clause and what it requires, so the
+            // Requirement row (on most checklists the audit question, e.g.
+            // "Verify… Sample two internal audit reports") prints only when no
+            // statement is recorded. It also kept long forms off one page
+            // (PC Connection NCR-091, 24 Nov 2026; user decision).
+            + (carText(item.ncrDescription) ? '' : '<tr><td style="font-weight:700;">Requirement</td><td>' + esc(reqText(item.requirement) || '—') + '</td></tr>')
             // The statement is the auditor's NC statement and the evidence is
             // what they recorded, as in Finding Details. The form printed the
             // remark as the statement and only a photo count as the evidence.
@@ -658,7 +663,7 @@
             + '</tbody></table>';
 
         var partB = '<h4 class="b4-subhead">PART B — ROOT CAUSE &amp; CORRECTION</h4>'
-            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:var(--b4-s4);">'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-bottom:var(--b4-s3);">'
             + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--b4-muted,#666);margin-bottom:2px;">Correction (immediate fix)</div>' + ruledLine(capa && capa.correction) + '</div>'
             + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--b4-muted,#666);margin-bottom:2px;">Root Cause</div>' + ruledLine(capa && capa.rootCause) + '</div>'
             + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--b4-muted,#666);margin-bottom:2px;">Corrective Action</div>' + ruledLine(capa && capa.correctiveAction) + '</div>'
@@ -668,15 +673,18 @@
         // Part C and the signatures stay together: if a long form still runs
         // over, they move to the next page as a block instead of leaving the
         // signature row alone there.
+        // One row across instead of three stacked rows: a long form still ran
+        // over by Part C (PC Connection, NCR-089 and NCR-091, 24 Nov 2026).
         var partC = '<div style="break-inside:avoid;page-break-inside:avoid;">'
             + '<h4 class="b4-subhead">PART C — VERIFICATION &amp; CLOSURE</h4>'
-            + '<table class="b4-tbl" style="margin-bottom:var(--b4-s3);">'
-            + '<tbody>'
-            + '<tr><td style="font-weight:700;width:160px;">Verification Method</td><td>' + esc((capa && capa.verificationMethod) || '—') + '</td></tr>'
-            + '<tr><td style="font-weight:700;">Verified By / Date</td><td>' + esc((capa && capa.verifiedBy) || '—') + ' / ' + fmtDate(capa && capa.verifiedDate) + '</td></tr>'
-            + '<tr><td style="font-weight:700;">Effectiveness</td><td>' + esc((capa && capa.effectiveness) || 'Pending assessment') + '</td></tr>'
-            + '</tbody></table>'
-            + '<div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:12px;">'
+            + '<table class="b4-tbl b4-tbl--compact" style="margin-bottom:var(--b4-s2);">'
+            + '<thead><tr><th>Verification Method</th><th>Verified By / Date</th><th>Effectiveness</th></tr></thead>'
+            + '<tbody><tr>'
+            + '<td>' + esc((capa && capa.verificationMethod) || '—') + '</td>'
+            + '<td>' + esc((capa && capa.verifiedBy) || '—') + ' / ' + fmtDate(capa && capa.verifiedDate) + '</td>'
+            + '<td>' + esc((capa && capa.effectiveness) || 'Pending assessment') + '</td>'
+            + '</tr></tbody></table>'
+            + '<div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:8px;">'
             + signatureLine('Auditee Representative')
             + signatureLine('Lead Auditor')
             + signatureLine('Date')
