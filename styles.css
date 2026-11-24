@@ -2257,7 +2257,7 @@ textarea:focus:invalid {
 
 .ua-side {
     display: grid;
-    grid-template-areas: "when status" "range lead";
+    grid-template-areas: "when status" "range lead" "expiry expiry";
     align-items: center;
     justify-items: end;
     gap: 0.2rem 0.9rem;
@@ -2270,6 +2270,13 @@ textarea:focus:invalid {
 .ua-side .ua-range { grid-area: range; }
 .ua-side .ua-lead { grid-area: lead; }
 .ua-side .status-badge { grid-area: status; }
+.ua-side .ua-expiry { grid-area: expiry; }
+
+/* Certificate expiry: amber within 30 days, red once it falls before the
+   audit ends or has passed. */
+.ua-expiry-soon { color: #b45309; font-weight: 600; }
+.ua-expiry-before-end,
+.ua-expiry-past { color: #b91c1c; font-weight: 600; }
 
 /* Zero specificity: statuses with their own .status-* colour keep it. */
 :where(.ua-side .status-badge) {

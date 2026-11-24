@@ -206,23 +206,96 @@
         return a.client.localeCompare(b.client);
     }
 
+    // ── Certificate expiry ───────────────────────────────────────────
+    // The expiry each row shows is the one the client's cycle card shows:
+    // the end of the certificate's current annual period, from the Initial
+    // Date (ReportStats.cycleState periodEnd), not the date on whatever
+    // certificate happens to be on file. `cycleEnd` is the last day of the
+    // three-year cycle.
+
+    const EXPIRY_SOON_DAYS = 30;
+
+    function expiryOfCycle(cs, cert) {
+        const expiry = toDay(cs && cs.periodEnd) || toDay(cert && cert.expiryDate);
+        if (!expiry) return null;
+        return { standard: String(cert.standard).trim(), expiry, cycleEnd: toDay(cs && cs.cycleLastDay) || expiry };
+    }
+
+    /**
+     * Certificate expiries for an audit plan: one per certificate the plan
+     * covers, for the plan's client. deps: { today, cycleState, belongsTo,
+     * coversStandard, reports, plans }.
+     */
+    function certificateExpiries(plan, clients, deps) {
+        const d = deps || {};
+        if (!plan) return [];
+        const belongsTo = typeof d.belongsTo === 'function' ? d.belongsTo
+            : (rec, c) => (rec.clientId != null && c.id != null ? String(rec.clientId) === String(c.id) : String(rec.client || '').trim().toLowerCase() === String(c.name || '').trim().toLowerCase());
+        const covers = typeof d.coversStandard === 'function' ? d.coversStandard : () => true;
+        const client = (clients || []).find(c => c && belongsTo(plan, c));
+        if (!client) return [];
+        const todayDate = parseDay(toDay(d.today || new Date()));
+        const out = [];
+        cardCertificates(client).forEach(cert => {
+            if (!covers(plan, cert.standard)) return;
+            let cs = null;
+            if (typeof d.cycleState === 'function') {
+                try {
+                    cs = d.cycleState({ client, standard: cert.standard, certificate: cert, allReports: d.reports || [], allPlans: d.plans || [], today: todayDate });
+                } catch (_err) {
+                    cs = null; // fall back to the date on the certificate
+                }
+            }
+            const e = expiryOfCycle(cs, cert);
+            if (e) out.push(e);
+        });
+        return out.sort((a, b) => (a.expiry < b.expiry ? -1 : a.expiry > b.expiry ? 1 : 0));
+    }
+
+    // Earliest expiry and how it sits against the audit: 'past' (already
+    // expired), 'before-end' (expires before the audit's last day), 'soon'
+    // (within EXPIRY_SOON_DAYS), or ''.
+    function withExpiry(it, expiries, today) {
+        const list = (expiries || []).filter(e => e && e.expiry);
+        it.expiries = list;
+        it.expiry = list.length ? list[0].expiry : null;
+        let risk = '';
+        if (it.expiry) {
+            // Booked audits only: a cycle window routinely runs past the
+            // annual expiry, so an unplanned row is never "before-end".
+            const last = it.end || null;
+            if (it.expiry < today) risk = 'past';
+            else if (last && it.expiry < last) risk = 'before-end';
+            else if (diffDays(today, it.expiry) <= EXPIRY_SOON_DAYS) risk = 'soon';
+        }
+        it.expiryRisk = risk;
+        return it;
+    }
+
     /**
      * The open audits the viewer can see, grouped: upcoming first (soonest
      * first), then undated, then dates-passed. `count` is the UPCOMING figure
      * only; `openCount` is every open plan. `plans` must already be
      * role-scoped (getVisiblePlans) — this never widens it.
+     * opts.expiryOf(plan) -> [{standard, expiry, cycleEnd}] adds each row's
+     * certificate expiry (see certificateExpiries).
      */
     function build(plans, opts) {
         const o = opts || {};
         const today = toDay(o.today || new Date());
         const isCompleted = typeof o.isCompleted === 'function' ? o.isCompleted : defaultIsCompleted;
+        const expiryOf = typeof o.expiryOf === 'function' ? o.expiryOf : null;
         const items = (plans || [])
             .filter(p => p && !isCancelled(p) && !isCompleted(p))
             .map(p => {
                 const it = normalizePlan(p, o.auditors);
                 it.bucket = bucketOf(it, today);
                 it.relative = relativeLabel(it, today);
-                return it;
+                let expiries = [];
+                if (expiryOf) {
+                    try { expiries = expiryOf(p) || []; } catch (_err) { expiries = []; }
+                }
+                return withExpiry(it, expiries, today);
             })
             .sort(compareItems);
         const counts = {};
@@ -312,13 +385,15 @@
                     && typeKey(p.auditType || p.type) === family
                     && (() => { const pd = toDay(p.date || p.startDate || p.start_date); return !!pd && Math.abs(diffDays(due, pd)) <= PLAN_MATCH_DAYS; })());
                 if (planned) return;
+                const exp = expiryOfCycle(cs, cert);
                 found.push({
                     clientId: client.id == null ? null : client.id,
                     client: String(client.name || 'Unnamed client').trim(),
                     standards: [String(cert.standard).trim()],
                     auditType: rec.auditType, typeKey: family,
                     due, windowStart, windowEnd,
-                    override: !!rec.override
+                    override: !!rec.override,
+                    expiries: exp ? [exp] : []
                 });
             });
         });
@@ -330,13 +405,14 @@
             const prev = merged.get(k);
             if (!prev) { merged.set(k, it); return; }
             it.standards.forEach(s => { if (!prev.standards.includes(s)) prev.standards.push(s); });
+            it.expiries.forEach(e => { if (!prev.expiries.some(x => x.standard === e.standard)) prev.expiries.push(e); });
             if (it.due < prev.due) prev.due = it.due;
         });
-        return [...merged.values()].map(it => Object.assign(it, {
+        return [...merged.values()].map(it => withExpiry(Object.assign(it, {
             bucket: 'due',
             windowOpen: it.windowStart <= today,
             relative: dueLabel(it, today)
-        })).sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : a.client.localeCompare(b.client)));
+        }), it.expiries.slice().sort((a, b) => (a.expiry < b.expiry ? -1 : a.expiry > b.expiry ? 1 : 0)), today)).sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : a.client.localeCompare(b.client)));
     }
 
     function dueLabel(it, today) {
@@ -429,6 +505,38 @@
 
     const ui = { model: null, view: 'list', year: 0, month: 0 };
 
+    const EXPIRY_NOTE = {
+        past: 'expired',
+        'before-end': 'expires before the audit ends',
+        soon: `expires within ${EXPIRY_SOON_DAYS} days`
+    };
+
+    // "Cert expires 15 Dec 2026": one date when every standard shares it,
+    // otherwise each date with its standard. The title adds the cycle end
+    // where the expiry is only the current year's.
+    function expiryText(it) {
+        const list = it.expiries || [];
+        if (!list.length) return '';
+        const dates = [...new Set(list.map(e => e.expiry))];
+        const fmt = iso => formatRange(iso, iso);
+        if (dates.length === 1) return `Cert expires ${fmt(dates[0])}`;
+        return `Cert expires ${list.map(e => `${fmt(e.expiry)} (${e.standard})`).join(' · ')}`;
+    }
+
+    function expiryTitle(it) {
+        return (it.expiries || []).map(e => `${e.standard}: certificate expires ${formatRange(e.expiry, e.expiry)}`
+            + (e.cycleEnd && e.cycleEnd !== e.expiry ? `; certification cycle ends ${formatRange(e.cycleEnd, e.cycleEnd)}` : '')).join('\n')
+            + (it.expiryRisk ? `\n${EXPIRY_NOTE[it.expiryRisk]}` : '');
+    }
+
+    function expiryHtml(it) {
+        const text = expiryText(it);
+        if (!text) return '';
+        const risk = it.expiryRisk ? ` ua-expiry-${it.expiryRisk}` : '';
+        const icon = it.expiryRisk ? 'fa-triangle-exclamation' : 'fa-certificate';
+        return `<span class="ua-expiry${risk}" title="${esc(expiryTitle(it))}"><i class="fa-solid ${icon}" aria-hidden="true"></i> ${esc(text)}${it.expiryRisk ? ` — ${esc(EXPIRY_NOTE[it.expiryRisk])}` : ''}</span>`;
+    }
+
     function rowHtml(it) {
         const day = it.start ? String(parseDay(it.start).getDate()) : 'TBC';
         const mon = it.start ? MONTHS_SHORT[parseDay(it.start).getMonth()] : '';
@@ -445,6 +553,7 @@
                     <span class="ua-range">${esc(formatRange(it.start, it.end))}</span>
                     <span class="ua-lead"><i class="fa-solid fa-user-tie" aria-hidden="true"></i> ${it.lead ? esc(it.lead) : 'Lead not assigned'}</span>
                     <span class="status-badge status-${slug(it.status)}">${esc(it.status)}</span>
+                    ${expiryHtml(it)}
                 </span>
             </button>`;
     }
@@ -467,6 +576,7 @@
                     <span class="ua-range">${esc(windowText)}</span>
                     <span class="ua-lead"><i class="fa-solid fa-plus" aria-hidden="true"></i> Plan audit</span>
                     <span class="status-badge status-not-planned">Not planned</span>
+                    ${expiryHtml(it)}
                 </span>
             </button>`;
     }
@@ -526,7 +636,8 @@
                 </div>`).join('');
             const segs = w.segments.filter(s => s.lane < MAX_LANES).map(s => {
                 const it = s.item;
-                const title = `${it.client} — ${it.auditType} — ${formatRange(it.start, it.end)}${it.lead ? ` — Lead: ${it.lead}` : ''} — ${it.status}`;
+                const expiry = expiryText(it);
+                const title = `${it.client} — ${it.auditType} — ${formatRange(it.start, it.end)}${it.lead ? ` — Lead: ${it.lead}` : ''} — ${it.status}${expiry ? ` — ${expiry}${it.expiryRisk ? ` (${EXPIRY_NOTE[it.expiryRisk]})` : ''}` : ''}`;
                 return `<button type="button" class="ua-seg ua-type-${it.typeKey}${s.continuesBefore ? ' ua-cont-l' : ''}${s.continuesAfter ? ' ua-cont-r' : ''}" style="grid-column: ${s.col + 1} / span ${s.span}; grid-row: ${s.lane + 2};" data-action="viewAuditPlan" data-id="${esc(it.id)}" title="${esc(title)}" aria-label="Open audit plan: ${esc(title)}"><span>${esc(it.client)}</span><small>${esc(it.auditType)}</small></button>`;
             }).join('');
             const more = hidden.map((n, c) => n ? `<button type="button" class="ua-more" style="grid-column: ${c + 1}; grid-row: ${lanes + 2};" data-action="UpcomingAudits_showList">+${n} more</button>` : '').join('');
@@ -607,7 +718,7 @@
     const API = {
         PANEL_ID, VIEW_KEY, MAX_LANES, DUE_HORIZON_DAYS,
         toDay, addDays, diffDays, formatRange, typeKey, normalizePlan, bucketOf, relativeLabel,
-        build, dueUnplanned, monthGrid, panelHtml,
+        build, dueUnplanned, certificateExpiries, monthGrid, panelHtml,
         showList: () => setView('list'),
         showCalendar: () => setView('calendar'),
         prevMonth: () => shiftMonth(-1),

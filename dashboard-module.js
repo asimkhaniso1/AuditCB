@@ -154,10 +154,21 @@ function renderDashboardEnhanced() {
         reports: window.state.auditReports || [],
         settings: window.state.cbSettings || window.state.settings || {}
     });
+    // Each row's certificate expiry, as the client's cycle card shows it. A
+    // visible plan's client is looked up among the clients this user loaded.
+    const expiryDeps = {
+        cycleState: RS.cycleState,
+        belongsTo: RS.recordBelongsTo,
+        coversStandard: RS.coversStandard,
+        reports: window.state.auditReports || [],
+        plans: window.state.auditPlans || []
+    };
+    const allClients = window.state.clients || [];
     const upcoming = window.UpcomingAudits.build(auditPlans, {
         auditors,
         isCompleted: window.DataService.isPlanCompleted,
-        due: dueUnplanned
+        due: dueUnplanned,
+        expiryOf: (plan) => window.UpcomingAudits.certificateExpiries(plan, allClients, expiryDeps)
     });
 
     // Industry Distribution
