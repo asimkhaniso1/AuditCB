@@ -320,22 +320,78 @@ window.ChecklistMerge = (function () {
         return { items: r.items, merged: true, kept: r.kept };
     }
 
-    // The cloud copy's progress and revision log, or null when it can't be read.
+    // The cloud copy's progress and revision log, plus the whole stored report
+    // (`data`) for the report-level merge below, or null when it can't be read.
     async function fetchRemote(reportId) {
         const sb = window.SupabaseClient && window.SupabaseClient.client;
         if (!sb || typeof sb.from !== 'function') return null;
         try {
             const { data, error } = await sb.from('audit_reports')
-                .select('checklist_progress, revisions:data->checklistRevisions')
+                .select('checklist_progress, revisions:data->checklistRevisions, data')
                 .eq('id', String(reportId)).maybeSingle();
             if (error || !data) return null;
-            return { items: data.checklist_progress || [], revisions: Array.isArray(data.revisions) ? data.revisions : [] };
+            const stored = data.data && typeof data.data === 'object' ? data.data : null;
+            return { items: data.checklist_progress || [], revisions: Array.isArray(data.revisions) ? data.revisions : [], data: stored };
         } catch (_e) {
             return null;
         }
     }
 
-    return { keyOf: keyOf, same: same, merge: merge, setBase: setBase, getBase: getBase, reconcileLocal: reconcileLocal, fetchRemote: fetchRemote, revCount: revCount };
+    // ---- Report-level fields (conclusion, meetings, status, issue log…) ----
+    // Every save writes the whole report, so a tab opened before a change made
+    // elsewhere wrote its old copy back over it: PC Connection, 24 Nov 2026,
+    // the CAR deadline and headcount set on the server would have been undone
+    // by Finalize from a tab opened earlier. Each tab now remembers the report
+    // as it last read or wrote it; at save time a field this tab has not
+    // changed since then takes the server's newer value, and a field it did
+    // change keeps this tab's value. Plain objects (closingMeeting…) merge per
+    // key. The checklist questions keep their own per-question merge above.
+    const FIELD_SKIP = { checklistProgress: 1, checklistRevisions: 1, _evidenceIndexBuilt: 1 };
+    const fieldBases = {};
+    const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+    // Key order differs once Postgres has stored a value, so compare sorted.
+    function stable(v) {
+        if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+        if (isPlain(v)) return '{' + Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+        return v === undefined ? 'undefined' : JSON.stringify(v);
+    }
+    const eq = (a, b) => stable(a) === stable(b);
+    function fieldsOf(report) {
+        const out = {};
+        Object.keys(report || {}).forEach(k => { if (!FIELD_SKIP[k] && report[k] !== undefined) out[k] = report[k]; });
+        return clone(out);
+    }
+    // opts.ifAbsent: only when this tab has no record yet (the view being drawn).
+    function noteServerFields(reportId, report, opts) {
+        if (!report) return;
+        const id = String(reportId);
+        if (opts && opts.ifAbsent && fieldBases[id]) return;
+        fieldBases[id] = fieldsOf(report);
+    }
+    function mergeInto(base, local, remote, path, taken) {
+        new Set(Object.keys(local).concat(Object.keys(remote))).forEach(k => {
+            if (!path && FIELD_SKIP[k]) return;
+            const b = base ? base[k] : undefined;
+            const l = local[k];
+            const r = remote[k];
+            if (eq(r, b) || eq(l, r)) return; // not changed on the server, or already equal
+            if (isPlain(b) && isPlain(l) && isPlain(r)) { mergeInto(b, l, r, path + k + '.', taken); return; }
+            if (!eq(l, b)) return; // changed in this tab: this tab's value is kept
+            if (r === undefined) delete local[k]; else local[k] = clone(r);
+            taken.push(path + k);
+        });
+    }
+    // Brings the server's newer values into `report` for every field this tab
+    // left untouched. Returns the field paths taken. No record → no change.
+    function mergeFields(reportId, report, remoteData) {
+        const base = fieldBases[String(reportId)];
+        if (!base || !report || !isPlain(remoteData)) return [];
+        const taken = [];
+        mergeInto(base, report, remoteData, '', taken);
+        return taken;
+    }
+
+    return { keyOf: keyOf, same: same, merge: merge, setBase: setBase, getBase: getBase, reconcileLocal: reconcileLocal, fetchRemote: fetchRemote, revCount: revCount, noteServerFields: noteServerFields, mergeFields: mergeFields };
 })();
 
 // The checklist view is drawn from the report as it is now, not from the
@@ -916,6 +972,9 @@ window.NCRSyncUtils.correctHeadcountInNote = correctHeadcountInNote;
 // eslint-disable-next-line no-unused-vars
 function renderExecutionTab(report, tabName, contextData = {}) {
     const tabContent = document.getElementById('tab-content');
+    // The report as this tab first shows it: what a later save compares with
+    // to tell this tab's changes from changes saved elsewhere meanwhile.
+    if (report && window.ChecklistMerge) window.ChecklistMerge.noteServerFields(report.id, report, { ifAbsent: true });
 
     switch (tabName) {
         case 'checklist': {
@@ -2938,14 +2997,20 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         takeNarrative(document.getElementById('positive-observations'), 'positiveObservations');
         takeNarrative(document.getElementById('ofi'), 'ofi');
 
-        // Persist to Database (Async)
-        (async () => {
+        // Persist to Database (Async). The promise is returned so Finalize can
+        // wait for this save before it writes.
+        const persisted = (async () => {
             try {
                 // The cloud copy moved on since this tab last knew it (another tab or
                 // device saved): merge with it per question before writing.
                 let remoteMerged = false;
+                const remote = await window.ChecklistMerge.fetchRemote(reportId);
+                // Report-level fields this tab did not change take the newer saved value.
+                if (remote && remote.data) {
+                    const taken = window.ChecklistMerge.mergeFields(reportId, report, remote.data);
+                    if (taken.length) console.info('[saveChecklist] kept newer saved values for: ' + taken.join(', '));
+                }
                 if (domData) {
-                    const remote = await window.ChecklistMerge.fetchRemote(reportId);
                     if (remote && remote.revisions.length > knownRevs) {
                         const r = window.ChecklistMerge.merge(baseUsed ? baseUsed.items : [], domData, remote.items, { allFields: offScreen });
                         const ours = report.checklistRevisions[report.checklistRevisions.length - 1] || {};
@@ -2979,6 +3044,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     closing_meeting: report.closingMeeting || {},
                     ncrs: report.ncrs || []
                 });
+                window.ChecklistMerge.noteServerFields(reportId, report);
 
                 // Success UI
                 if (indicator) {
@@ -3300,6 +3366,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         }
 
         window.saveData();
+        return persisted;
     };
 
     // Filter checklist items by status

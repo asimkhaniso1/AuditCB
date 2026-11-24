@@ -3092,7 +3092,7 @@ window.computeIssuanceGate = function (reportId) {
 };
 
 // 1. Finalize & Publish (One-Click Workflow)
-window.finalizeAndPublish = function (reportId) {
+window.finalizeAndPublish = async function (reportId) {
     if (!_hasReportIssuanceRole()) {
         window.showNotification && window.showNotification('You do not have permission to finalize this report.', 'error');
         return;
@@ -3136,8 +3136,11 @@ window.finalizeAndPublish = function (reportId) {
 
     if (!confirm('Are you sure you want to finalize and publish this report? This will lock the audit.')) return;
 
-    // Save current state first
-    window.saveChecklist(reportId);
+    // Save current state first, and wait for it: that save merges in what was
+    // saved elsewhere since this tab loaded (ChecklistMerge.mergeFields), so
+    // the write below no longer puts an old copy back over it. It used to run
+    // unawaited, and this write sent the tab's copy as it stood.
+    if (typeof window.saveChecklist === 'function') await window.saveChecklist(reportId);
 
     // ─── Versioning: bump ONLY here, on finalize/re-issue, authored by the ACTUAL
     // current user (not report.leadAuditor). Replaces the old +0.1-per-export scheme
@@ -3172,6 +3175,7 @@ window.finalizeAndPublish = function (reportId) {
                 status: report.status,
                 data: Object.assign({}, report, { _evidenceIndexBuilt: undefined })
             });
+            if (window.ChecklistMerge) window.ChecklistMerge.noteServerFields(reportId, report);
             if (typeof window.saveData === 'function') window.saveData();
             window.showNotification('Audit Report successfully finalized and published!', 'success');
 
