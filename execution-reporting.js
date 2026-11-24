@@ -341,7 +341,8 @@
         'rp-eff-legal': { path: ['effLegal'] },
         'rp-closing-summary': { path: ['closingMeeting', 'summary'] },
         'rp-opening-notes': { path: ['openingMeeting', 'notes'] },
-        'rp-unresolved': { path: ['unresolvedIssues'] }
+        'rp-unresolved': { path: ['unresolvedIssues'] },
+        'rp-sig-date': { path: ['preparedDate'] }
     };
     const previewBoxText = (el) => String((el && el.innerText) || '')
         .replace(/[^\S\n]+/g, ' ')
@@ -911,6 +912,54 @@
         return { reviewer: '', outcome: '', date: '', notes: '', isLegacy: true };
     };
     window._resolveTechnicalReview = resolveTechnicalReview;
+
+    // ─── Sign-off dates ────────────────────────────────────────────────────────
+    // "Prepared" printed the day the PDF was exported, so the PC Connection
+    // report (exported 24 Nov 2026, technically reviewed 23 Nov) read as
+    // reviewed before it was prepared, and the two dates were in different
+    // formats (24/11/2026 beside 2026-11-23). Prepared now comes from the
+    // report: the date the auditor recorded, else when it was submitted for
+    // review, the closing meeting, or the last audit day. A derived date is
+    // never later than the technical review. Both dates print as "19 November 2026".
+    const signoffDay = (v) => {
+        const s = String(v == null ? '' : v).trim();
+        if (!s) return '';
+        // en-GB day/month/year, as the old default printed and auditors typed it.
+        const gb = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+        if (gb) {
+            const pad = (n) => (n.length < 2 ? '0' + n : n);
+            const iso = gb[3] + '-' + pad(gb[2]) + '-' + pad(gb[1]);
+            return signoffDay(iso) === iso ? iso : '';
+        }
+        const df = window.DocFormat;
+        if (df && typeof df.toIso === 'function') return df.toIso(s);
+        const m = /^(\d{4}-\d{2}-\d{2})(?:$|[T\s])/.exec(s);
+        return m ? m[1] : '';
+    };
+    // Prints a date in the report's long form; text that is not a date (an
+    // auditor may type "Pending") is printed as written.
+    const formatSignoffDate = (v) => {
+        const raw = String(v == null ? '' : v).trim();
+        const day = signoffDay(raw);
+        if (!day) return raw;
+        const df = window.DocFormat;
+        return (df && typeof df.formatDate === 'function' && df.formatDate(day)) || day;
+    };
+    const resolvePreparedDate = (report, auditPlan) => {
+        const r = report || {};
+        const recorded = String(r.preparedDate == null ? '' : r.preparedDate).trim();
+        if (recorded) return recorded;
+        const reviewed = signoffDay(resolveTechnicalReview(r).date);
+        const dates = auditDatesInfo(r, auditPlan);
+        const candidates = [r.submittedAt, r.closingMeeting && r.closingMeeting.date, dates.end, dates.start];
+        for (const c of candidates) {
+            const day = signoffDay(c);
+            if (day && (!reviewed || day <= reviewed)) return day;
+        }
+        return '';
+    };
+    window._resolvePreparedDate = resolvePreparedDate;
+    window._formatSignoffDate = formatSignoffDate;
 
     // ─── Corrective-action timeframe display (client spec #20) ────────────────
     // 30/90 days are the certification body's OWN scheme rules, not ISO's — printing
@@ -1640,7 +1689,7 @@
         overlay.id = 'report-preview-overlay';
         overlay.innerHTML = `
         <style>
-            #rp-unresolved:empty:before{content:attr(data-placeholder);color:#94a3b8;font-style:italic;}
+            #rp-unresolved:empty:before,#rp-sig-date:empty:before{content:attr(data-placeholder);color:#94a3b8;font-style:italic;}
             #report-preview-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;background:rgba(15,23,42,0.7);display:flex;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
             .rp-modal{background:#f8fafc;border-radius:16px;width:100%;max-width:1280px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.3);}
             .rp-header{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:white;padding:20px 28px;}
@@ -2672,7 +2721,7 @@
                                 <div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:0.5rem;">${htmlEsc(d.auditPlan?.team?.[0] || d.report.leadAuditor || 'Lead Auditor Name')}</div>
                                 <div style="border-bottom:2px solid #1e293b;width:100%;margin:1.5rem 0 0.5rem;"></div>
                                 <div style="font-size:0.8rem;color:#64748b;">Signature</div>
-                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Prepared: <span id="rp-sig-date" contenteditable="true" class="rp-edit" style="font-weight:600;">${new Date().toLocaleDateString('en-GB')}</span></div>
+                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Prepared: <span id="rp-sig-date" contenteditable="true" class="rp-edit" data-placeholder="date prepared" style="font-weight:600;display:inline-block;min-width:90px;">${htmlEsc(formatSignoffDate(resolvePreparedDate(d.report, d.auditPlan)))}</span></div>
                             </div>
                             <div style="padding:1.5rem;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
                                 <div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;font-weight:600;">Technical Reviewer / Certification Manager</div>
@@ -3531,8 +3580,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const editedEffLegal = document.getElementById('rp-eff-legal')?.innerText || d.report.effLegal || effDefaults.legal;
         const technicalReview = resolveTechnicalReview(d.report);
         const editedReviewerName = technicalReview.reviewer || '';
-        const editedSigDate = document.getElementById('rp-sig-date')?.innerText || new Date().toLocaleDateString('en-GB');
-        const editedReviewerDate = document.getElementById('rp-reviewer-date')?.value || technicalReview.date || '';
+        const editedSigDate = formatSignoffDate(String(document.getElementById('rp-sig-date')?.innerText || '').trim() || resolvePreparedDate(d.report, d.auditPlan));
+        const editedReviewerDate = formatSignoffDate(document.getElementById('rp-reviewer-date')?.value || technicalReview.date || '');
         const modifiedSinceIssue = window._isModifiedSinceIssue(d);
         const editedProgS1 = document.getElementById('rp-prog-s1')?.innerText || '';
         const editedProgS2 = document.getElementById('rp-prog-s2')?.innerText || '';
@@ -4674,7 +4723,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: SIGNATURE & ATTESTATION
             + (secMap['signature'] ? '<div id="sec-signature" class="sh" style="border-left-color:#1e293b;">' + sBadge('signature') + 'SIGNATURE &amp; ATTESTATION</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">'
-                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + htmlEsc(d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Prepared: ' + htmlEsc(editedSigDate || d.today) + '</div></div>'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + htmlEsc(d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Prepared: ' + htmlEsc(editedSigDate || '____________________') + '</div></div>'
                 + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + htmlEsc(editedReviewerName || (technicalReview.isLegacy && !editedReviewerName ? 'Not recorded' : '____________________')) + '</div>' + (technicalReview.outcome ? '<div style="font-size:0.82rem;font-weight:700;margin-bottom:6px;color:' + (technicalReview.outcome === 'Approved' ? '#15803d' : '#b91c1c') + ';">Outcome: ' + htmlEsc(technicalReview.outcome) + '</div>' : '') + (technicalReview.notes ? '<div style="font-size:0.78rem;color:#64748b;margin-bottom:6px;">' + window.UTILS.escapeHtml(technicalReview.notes) + '</div>' : '') + '<div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Reviewed: ' + htmlEsc(editedReviewerDate || '____________________') + '</div></div>'
                 + '</div>'
                 + '<div style="margin-top:20px;padding:12px;background:#eff6ff;border-radius:8px;font-size:0.82rem;color:#475569;text-align:center;">This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
