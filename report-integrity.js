@@ -492,6 +492,71 @@
         });
     }
 
+    // ── Technical review independence ───────────────────────────────────────
+    // ISO/IEC 17021-1 clause 9.5: the review before the certification
+    // decision, and the decision, are made by persons not involved in the
+    // audit. The technical review form took the reviewer as free text and
+    // recorded nobody as having entered it, so the lead auditor could record
+    // a review of their own report, under any name (PC Connection, 2026).
+
+    // A person's name, compared without case, punctuation or extra spaces.
+    function personKey(name) {
+        return trim(name).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    /**
+     * Everyone on the audit team: the report's lead auditor and the plan's
+     * lead, team, team allocations and assigned auditors (by id).
+     * @returns {string[]} names
+     */
+    function auditTeamOf(report, auditPlan) {
+        const r = report || {};
+        const p = auditPlan || {};
+        const names = [];
+        const add = (v) => { const n = trim(v && typeof v === 'object' ? (v.name || v.auditor) : v); if (n) names.push(n); };
+        add(r.leadAuditor);
+        add(p.lead); add(p.leadAuditor);
+        safeArr(p.team).forEach(add);
+        safeArr(p.teamAllocations).forEach(add);
+        const auditors = safeArr(global.state && global.state.auditors);
+        safeArr(p.auditors).forEach((id) => {
+            const a = auditors.find((x) => x && String(x.id) === String(id));
+            if (a) add(a.name);
+        });
+        const seen = new Set();
+        return names.filter((n) => { const k = personKey(n); if (!k || seen.has(k)) return false; seen.add(k); return true; });
+    }
+
+    /** The audit-team member a reviewer name refers to, or '' when it is nobody on the team. */
+    function reviewerOnAuditTeam(reviewer, report, auditPlan) {
+        const k = personKey(reviewer);
+        if (!k) return '';
+        return auditTeamOf(report, auditPlan).find((n) => personKey(n) === k) || '';
+    }
+
+    /** Who is recording a technical review now: the signed-in user, for the record. */
+    function reviewRecordedBy() {
+        const u = (global.state && global.state.currentUser) || {};
+        return { name: trim(u.name || u.email) || 'Unknown user', role: trim(u.role), id: u.id != null ? String(u.id) : null, at: new Date().toISOString() };
+    }
+
+    // B34: a technical review recorded in the name of an audit-team member.
+    function checkB34ReviewerIndependence(input, results) {
+        const { report, auditPlan } = input;
+        const tr = report && report.technicalReview;
+        const reviewer = tr && typeof tr === 'object' ? tr.reviewer : (report && report.technicalReviewer);
+        const member = reviewerOnAuditTeam(reviewer, report, auditPlan);
+        if (!member) return;
+        results.blockers.push(item(
+            'B34',
+            'blocker',
+            'technical-review',
+            `The technical review is recorded in the name of ${member}, a member of the audit team. ISO/IEC 17021-1 requires the review before the certification decision to be made by a person not involved in the audit.`,
+            'report.technicalReview.reviewer vs audit team',
+            'Have the review done by someone who was not on the audit team, and record it in their name.'
+        ));
+    }
+
     function checkB6FinancialClaims(report, results) {
         if (report && report.financialClaimsConfirmed === true) return;
         const narrative = narrativeFields(report);
@@ -2173,6 +2238,7 @@
         runCheck('checkB5RecommendationMismatch', () => checkB5RecommendationMismatch({ report, auditPlan, stats }, results), results);
         runCheck('checkW31W32NcRecords', () => checkW31W32NcRecords({ report, auditPlan, stats }, results), results);
         runCheck('checkB33ForeignNcrRefs', () => checkB33ForeignNcrRefs({ report, client }, results), results);
+        runCheck('checkB34ReviewerIndependence', () => checkB34ReviewerIndependence({ report, auditPlan }, results), results);
         runCheck('checkB6FinancialClaims', () => checkB6FinancialClaims(report, results), results);
         runCheck('checkB6BannedPhrases', () => checkB6BannedPhrases(report, results), results);
         runCheck('checkB7RecurringWithoutHistory', () => checkB7RecurringWithoutHistory(report, client, results), results);
@@ -2290,7 +2356,7 @@
     }
 
     // looksLikeRawNote: the E1 test, shared with fix-findings.js.
-    global.ReportIntegrity = { check, checkById, looksLikeRawNote };
+    global.ReportIntegrity = { check, checkById, looksLikeRawNote, auditTeamOf, reviewerOnAuditTeam, reviewRecordedBy };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = global.ReportIntegrity;
