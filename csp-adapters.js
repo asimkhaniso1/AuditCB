@@ -34,6 +34,12 @@
     // threw a TypeError, so every saved checklist photo failed to open
     // (PC Connection, 2026-11-18). Both shapes are accepted.
     window.viewEvidenceImageByUrlSelf = function (el) {
+        // The clicked thumbnail itself: open the viewer on it with the rest of
+        // its item's images, so the auditor can step through them.
+        if (el && typeof el !== 'string' && window.EvidenceViewer && typeof window.EvidenceViewer.openFromElement === 'function') {
+            window.EvidenceViewer.openFromElement(el);
+            return;
+        }
         const src = typeof el === 'string' ? el
             : (el && ((el.getAttribute && el.getAttribute('src')) || (el.dataset && (el.dataset.src || el.dataset.id)))) || '';
         if (src && window.viewEvidenceImageByUrl) window.viewEvidenceImageByUrl(src);

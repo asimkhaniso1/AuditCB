@@ -425,8 +425,168 @@
         return window.EvidenceUtils.compress(img.src, { maxPx: 1600, quality: 0.75 });
     }
 
-    // View evidence image in full size (modal/popup)
-    // View evidence image in full size (modal/popup)
+    // ============================================
+    // EVIDENCE VIEWER
+    // ============================================
+    // One viewer for every evidence image: checklist thumbnails, the Review &
+    // Submit "View Evidence" link and the older single-image opener. It used to
+    // be three lightboxes, the one behind checklist thumbnails showing a single
+    // image with only a close button: no way to step to the item's next
+    // screenshot, no count, and no zoom, so a screenshot of a document (PC
+    // Connection's 2026 internal audit report, 19 Nov 2026) could not be read.
+    //
+    // Built with DOM calls, not innerHTML, so an image URL can never break the
+    // markup (the Review & Submit thumbnail strip had a broken attribute), and
+    // with listeners rather than inline handlers, for the CSP.
+    window.EvidenceViewer = (function () {
+        // 0 = fit to the window; zooming in from Fit goes straight to 100%, the
+        // size at which a screenshot of a document can be read.
+        const ZOOMS = [0, 1, 1.5, 2, 3];
+        let current = null;
+
+        function el(tag, style, attrs) {
+            const n = document.createElement(tag);
+            if (style) n.style.cssText = style;
+            Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+            return n;
+        }
+        function button(label, title, onClick) {
+            const b = el('button', 'background: rgba(255,255,255,0.14); color: #fff; border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; min-width: 36px;', { type: 'button', title: title, 'aria-label': title });
+            b.textContent = label;
+            b.addEventListener('click', function (e) { e.stopPropagation(); onClick(); });
+            return b;
+        }
+
+        function close() {
+            if (!current) return;
+            document.removeEventListener('keydown', current.onKey, true);
+            if (current.overlay.parentNode) current.overlay.parentNode.removeChild(current.overlay);
+            current = null;
+        }
+
+        /**
+         * Open the viewer.
+         * @param {string[]} srcs  image URLs, in order
+         * @param {number} [start] index to show first
+         * @param {{title?: string}} [opts]
+         */
+        function open(srcs, start, opts) {
+            const list = (Array.isArray(srcs) ? srcs : [srcs]).map(function (s) { return String(s || ''); }).filter(Boolean);
+            if (!list.length) {
+                if (window.showNotification) window.showNotification('No evidence image to show.', 'warning');
+                return null;
+            }
+            close();
+            const o = opts || {};
+            const state = { idx: Math.min(Math.max(0, Number(start) || 0), list.length - 1), zoom: 0 };
+
+            const overlay = el('div', 'position: fixed; inset: 0; background: rgba(15,23,42,0.94); z-index: 10000; display: flex; flex-direction: column;', { id: 'evidence-viewer', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Evidence viewer' });
+            const bar = el('div', 'display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: rgba(0,0,0,0.45); color: #fff; flex: 0 0 auto; flex-wrap: wrap;');
+            const label = el('div', 'flex: 1 1 auto; font-weight: 600; font-size: 0.95rem;', { class: 'ev-viewer-label', 'aria-live': 'polite' });
+            const zoomLabel = el('span', 'font-size: 0.85rem; opacity: 0.85; min-width: 44px; text-align: center;');
+            const stage = el('div', 'flex: 1 1 auto; overflow: auto; display: flex; align-items: center; justify-content: center; position: relative; padding: 12px;');
+            const img = el('img', 'max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); background: #fff; cursor: zoom-in;', { alt: 'Evidence image' });
+            const strip = el('div', 'display: flex; gap: 8px; justify-content: center; padding: 10px; background: rgba(0,0,0,0.45); flex: 0 0 auto; overflow-x: auto;');
+
+            function render() {
+                img.src = list[state.idx];
+                label.textContent = (o.title ? o.title + ' — ' : '') + 'Evidence ' + (state.idx + 1) + ' of ' + list.length;
+                const z = ZOOMS[state.zoom];
+                if (!z) {
+                    img.style.maxWidth = '100%'; img.style.maxHeight = '100%'; img.style.width = ''; img.style.cursor = 'zoom-in';
+                    stage.style.alignItems = 'center'; stage.style.justifyContent = 'center';
+                    zoomLabel.textContent = 'Fit';
+                } else {
+                    const w = (img.naturalWidth || 1200) * z;
+                    img.style.maxWidth = 'none'; img.style.maxHeight = 'none'; img.style.width = w + 'px'; img.style.cursor = 'zoom-out';
+                    // Start-aligned when larger than the window, so the whole image scrolls into reach.
+                    stage.style.alignItems = 'flex-start'; stage.style.justifyContent = 'flex-start';
+                    zoomLabel.textContent = Math.round(z * 100) + '%';
+                }
+                Array.prototype.forEach.call(strip.children, function (t, i) {
+                    t.style.outline = i === state.idx ? '2px solid #fff' : 'none';
+                    t.style.opacity = i === state.idx ? '1' : '0.55';
+                });
+            }
+            function go(delta) { state.idx = (state.idx + delta + list.length) % list.length; state.zoom = 0; render(); }
+            function zoom(delta) { state.zoom = Math.min(ZOOMS.length - 1, Math.max(0, state.zoom + delta)); render(); }
+
+            const many = list.length > 1;
+            bar.appendChild(label);
+            if (many) bar.appendChild(button('‹ Previous', 'Previous image (←)', function () { go(-1); }));
+            if (many) bar.appendChild(button('Next ›', 'Next image (→)', function () { go(1); }));
+            bar.appendChild(button('−', 'Zoom out (−)', function () { zoom(-1); }));
+            bar.appendChild(zoomLabel);
+            bar.appendChild(button('+', 'Zoom in (+)', function () { zoom(1); }));
+            bar.appendChild(button('Fit', 'Fit to window (0)', function () { state.zoom = 0; render(); }));
+            bar.appendChild(button('✕ Close', 'Close (Esc)', close));
+
+            stage.appendChild(img);
+            if (many) {
+                const side = 'position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 64px; font-size: 2rem; background: rgba(0,0,0,0.45); color: #fff; border: none; cursor: pointer; border-radius: 8px;';
+                const prev = el('button', side + ' left: 8px;', { type: 'button', 'aria-label': 'Previous image' }); prev.textContent = '‹';
+                const next = el('button', side + ' right: 8px;', { type: 'button', 'aria-label': 'Next image' }); next.textContent = '›';
+                prev.addEventListener('click', function (e) { e.stopPropagation(); go(-1); });
+                next.addEventListener('click', function (e) { e.stopPropagation(); go(1); });
+                stage.appendChild(prev); stage.appendChild(next);
+                list.forEach(function (src, i) {
+                    const t = el('img', 'width: 64px; height: 48px; object-fit: cover; border-radius: 4px; cursor: pointer; flex: 0 0 auto;', { alt: 'Evidence ' + (i + 1) });
+                    t.src = src;
+                    t.addEventListener('click', function (e) { e.stopPropagation(); state.idx = i; state.zoom = 0; render(); });
+                    strip.appendChild(t);
+                });
+            }
+            // Click the image to toggle between fit and 100%.
+            img.addEventListener('click', function (e) { e.stopPropagation(); state.zoom = ZOOMS[state.zoom] ? 0 : ZOOMS.indexOf(1); render(); });
+            img.addEventListener('load', function () { if (ZOOMS[state.zoom]) render(); });
+            // A click on the empty backdrop around the image closes it.
+            stage.addEventListener('click', function (e) { if (e.target === stage) close(); });
+
+            overlay.appendChild(bar);
+            overlay.appendChild(stage);
+            if (many) overlay.appendChild(strip);
+
+            const onKey = function (e) {
+                if (e.key === 'Escape') { e.preventDefault(); close(); }
+                else if (e.key === 'ArrowRight' && many) { e.preventDefault(); go(1); }
+                else if (e.key === 'ArrowLeft' && many) { e.preventDefault(); go(-1); }
+                else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoom(1); }
+                else if (e.key === '-') { e.preventDefault(); zoom(-1); }
+                else if (e.key === '0') { e.preventDefault(); state.zoom = 0; render(); }
+            };
+            document.addEventListener('keydown', onKey, true);
+            document.body.appendChild(overlay);
+            current = { overlay: overlay, onKey: onKey, state: state, list: list };
+            render();
+            return current;
+        }
+
+        // The image a thumbnail shows, and the other images of the same
+        // checklist item (its evidence strip), so the viewer can step through them.
+        function srcOf(imgEl) {
+            return (imgEl && (imgEl.getAttribute('src') || (imgEl.dataset && (imgEl.dataset.src || imgEl.dataset.id)))) || '';
+        }
+        function openFromElement(imgEl) {
+            const strip = imgEl && imgEl.closest ? imgEl.closest('[id^="evidence-preview-"]') : null;
+            if (!strip) return open([srcOf(imgEl)], 0);
+            const imgs = Array.prototype.slice.call(strip.querySelectorAll('.ev-thumb img'));
+            const srcs = imgs.map(srcOf);
+            const start = Math.max(0, imgs.indexOf(imgEl));
+            // Thumbnails still loading from the device store have no src yet; skip them.
+            const shown = []; let startShown = 0;
+            srcs.forEach(function (s, i) { if (!s) return; if (i === start) startShown = shown.length; shown.push(s); });
+            return open(shown, startShown);
+        }
+        function openFromUrl(url) {
+            const u = String(url || '');
+            const thumbs = document.querySelectorAll('[id^="evidence-preview-"] .ev-thumb img');
+            const match = Array.prototype.find.call(thumbs, function (t) { return srcOf(t) === u; });
+            return match ? openFromElement(match) : open([u], 0);
+        }
+
+        return { open: open, close: close, openFromElement: openFromElement, openFromUrl: openFromUrl, isOpen: function () { return !!current; } };
+    })();
+
     // View evidence image in full size (modal/popup)
     window.viewEvidenceImage = function (uniqueId) {
 
@@ -474,23 +634,7 @@
         }
 
 
-        // Create modal overlay
-        const overlay = document.createElement('div');
-        overlay.id = 'evidence-modal-overlay';
-        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
-        overlay.onclick = function () { overlay.remove(); };
-
-        // Create image container
-        overlay.innerHTML = `
-        <div style="position: relative; max-width: 90%; max-height: 90%;">
-            <img src="${imgEl.src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
-            <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;" aria-label="Close">
-                <i class="fa-solid fa-times"></i>
-            </button>
-        </div>
-    `;
-
-        document.body.appendChild(overlay);
+        window.EvidenceViewer.openFromElement(imgEl);
     };
 
     // View evidence image directly from cached data (used in Review tab)
@@ -501,24 +645,7 @@
             return;
         }
         // Handle both old (string) and new (array) formats
-        const srcs = Array.isArray(cached) ? cached : [cached];
-        const overlay = document.createElement('div');
-        overlay.id = 'evidence-modal-overlay';
-        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
-        overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
-        overlay.innerHTML = `
-            <div style="position: relative; max-width: 90%; max-height: 80vh;" data-action="stopProp">
-                <img id="ev-gallery-main" src="${srcs[0]}" style="max-width: 100%; max-height: 70vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
-                <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;" aria-label="Close">
-                    <i class="fa-solid fa-times"></i>
-                </button>
-            </div>
-            ${srcs.length > 1 ? `<div style="display: flex; gap: 8px; margin-top: 12px;" data-action="stopProp">
-                ${srcs.map((s, i) => `<img src="${s}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid ${i === 0 ? 'white' : 'transparent'}; opacity: ${i === 0 ? '1' : '0.6'};" data-action="setGalleryMainSrc"\\'")}'; this.parentElement.querySelectorAll('img').forEach(t=>{t.style.border='2px solid transparent';t.style.opacity='0.6';}); this.style.border='2px solid white'; this.style.opacity='1';">`).join('')}
-            </div>` : ''}
-            <p style="color: rgba(255,255,255,0.6); font-size: 0.8rem; margin-top: 8px;">${srcs.length} photo${srcs.length > 1 ? 's' : ''} \u2022 Click outside to close</p>
-        `;
-        document.body.appendChild(overlay);
+        window.EvidenceViewer.open(Array.isArray(cached) ? cached : [cached], 0);
     };
 
     // Remove evidence image
@@ -551,14 +678,8 @@
     // View any evidence image by URL in a lightbox overlay
     window.viewEvidenceImageByUrl = function (url) {
         if (!url) return;
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; cursor: pointer;';
-        overlay.onclick = () => overlay.remove();
-        overlay.innerHTML = `
-            <img src="${url}" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-            <button style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); border: none; color: white; font-size: 24px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;">\u00d7</button>
-        `;
-        document.body.appendChild(overlay);
+        // Opens with the rest of the item's images when the URL is one of its thumbnails.
+        window.EvidenceViewer.openFromUrl(url);
     };
     window.activeAuditScreenStream = null;
 
@@ -835,5 +956,5 @@
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { handleEvidenceUpload: window.handleEvidenceUpload, viewEvidenceImage: window.viewEvidenceImage, viewEvidenceImageDirect: window.viewEvidenceImageDirect, removeEvidence: window.removeEvidence, removeEvidenceByIdx: window.removeEvidenceByIdx, viewEvidenceImageByUrl: window.viewEvidenceImageByUrl, captureScreenEvidence: window.captureScreenEvidence, handleCameraButton: window.handleCameraButton, captureWebcam: window.captureWebcam, getEvidenceCaptureMeta: window.getEvidenceCaptureMeta, EvidenceUtils: window.EvidenceUtils };
+    module.exports = { EvidenceViewer: window.EvidenceViewer, handleEvidenceUpload: window.handleEvidenceUpload, viewEvidenceImage: window.viewEvidenceImage, viewEvidenceImageDirect: window.viewEvidenceImageDirect, removeEvidence: window.removeEvidence, removeEvidenceByIdx: window.removeEvidenceByIdx, viewEvidenceImageByUrl: window.viewEvidenceImageByUrl, captureScreenEvidence: window.captureScreenEvidence, handleCameraButton: window.handleCameraButton, captureWebcam: window.captureWebcam, getEvidenceCaptureMeta: window.getEvidenceCaptureMeta, EvidenceUtils: window.EvidenceUtils };
 }
