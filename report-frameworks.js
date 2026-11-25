@@ -95,7 +95,13 @@
             const frameworkData = (report && report.frameworkData) || {};
 
             const label = matched.map((fw) => fw.label).join(' / ');
-            const blocksHtml = blockIds.map((bId) => renderBlock(bId, packBlockDefs[bId], frameworkData[bId])).join('<div style="height:var(--b4-s5);"></div>');
+            // Only tables with recorded data print. An empty one printed four
+            // blank rows and "To be completed during audit" in the issued
+            // report (PC Connection, 2026, flagged at technical review); with
+            // nothing recorded the pack is left out altogether.
+            const filled = blockIds.filter((bId) => packBlockDefs[bId] && safeArr(frameworkData[bId]).length);
+            if (!filled.length) return [];
+            const blocksHtml = filled.map((bId) => renderBlock(bId, packBlockDefs[bId], frameworkData[bId])).join('<div style="height:var(--b4-s5);"></div>');
 
             const bodyHtml = `<div class="b4-caption" style="margin-bottom:var(--b4-s4);">Framework-specific evidence tables applicable to this audit's scope: ${esc(label)}.</div>${blocksHtml}`;
 

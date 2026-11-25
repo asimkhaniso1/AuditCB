@@ -1315,9 +1315,19 @@
      * @param {Object} [opts] - passed through to formatCriterion (e.g. standardClauses)
      * @returns {{rows: Array, unresolved: Object, totals: Object}}
      */
+    // Items outside clauses 4-10 are not all "unassigned". PC Connection's 2026
+    // recertification showed 17 under "Criterion not assigned": 16 were ISO/IEC
+    // 27001 Annex A controls, one was a recertification-programme question,
+    // and none lacked a criterion. They are now three rows: Annex A controls,
+    // certification-programme items, and items with no criterion. A FOCUS
+    // item carries a previous finding forward and needs a clause of its own;
+    // without one it stays "Criterion not assigned".
+    const PROGRAMME_REF_RE = /^(RECERT|SURV|ORG|DOC|DOCNOTE|REVIEW)\b/i;
     function computeClauseAreaBreakdown(items, opts) {
         const areas = {};
         const unresolved = emptyAreaRow(null);
+        const annexA = emptyAreaRow('A');
+        const programme = emptyAreaRow(null);
         CLAUSE_AREA_ORDER.forEach((c) => { areas[c] = emptyAreaRow(c); });
 
         safeArr(items).forEach((item) => {
@@ -1336,7 +1346,12 @@
             const classified = classifyCriterion(item, opts);
             const resolved = classified.kind === 'standard' ? classified.ref : null;
             const mainC = resolved ? String(resolved).split('.')[0] : null;
-            const row = (mainC && areas[mainC]) ? areas[mainC] : unresolved;
+            const rawRef = trim(item.criterionRef || item.clause);
+            let row;
+            if (mainC && areas[mainC]) row = areas[mainC];
+            else if (PROGRAMME_REF_RE.test(rawRef) || classified.kind === 'programme') row = programme;
+            else if (resolved && /^A\.\d/.test(String(resolved))) row = annexA;
+            else row = unresolved;
 
             row.checked++;
             if (bucket === 'conform') row.conform++;
@@ -1347,7 +1362,7 @@
         });
 
         const rows = CLAUSE_AREA_ORDER.map((c) => areas[c]).filter((r) => r.checked > 0);
-        const all = rows.concat(unresolved.checked > 0 ? [unresolved] : []);
+        const all = rows.concat([annexA, programme, unresolved].filter((r) => r.checked > 0));
         const totals = all.reduce((t, r) => ({
             checked: t.checked + r.checked,
             conform: t.conform + r.conform,
@@ -1357,7 +1372,13 @@
             ofi: t.ofi + r.ofi
         }), { checked: 0, conform: 0, majorNC: 0, minorNC: 0, observation: 0, ofi: 0 });
 
-        return { rows, unresolved: unresolved.checked > 0 ? unresolved : null, totals };
+        return {
+            rows,
+            annexA: annexA.checked > 0 ? annexA : null,
+            programme: programme.checked > 0 ? programme : null,
+            unresolved: unresolved.checked > 0 ? unresolved : null,
+            totals
+        };
     }
 
     function safeMinimalDataset() {

@@ -82,10 +82,11 @@ describe('previous findings — the claim exists in exactly one place', () => {
     });
 
     it('both the preview and the export tables go through the shared helper', () => {
-        // prevFollowUpForNC / prevFollowUpLabel are called once per row builder:
-        // two in the preview table, two in the export table.
-        const calls = (SRC.match(/prevFollowUpForNC\(prevReport, nc\)|prevFollowUpLabel\(ncr\.status\)/g) || []).length;
-        expect(calls).toBe(4);
+        // One row builder, prevFindingsRows, serves the preview (editable)
+        // and the export; it is the only caller of the per-row labels.
+        expect((SRC.match(/prevFindingsRows\(prevReport, true\)/g) || []).length).toBe(1);
+        expect((SRC.match(/prevFindingsRows\(prevReport, false\)/g) || []).length).toBe(1);
+        expect((SRC.match(/prevFollowUpForNC\(prevReport, x\.p\)|prevFollowUpLabel\(ncr\.status\)/g) || []).length).toBe(2);
     });
 });
 

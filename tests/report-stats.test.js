@@ -438,8 +438,38 @@ describe('ReportStats.build — byClauseArea', () => {
             item({ status: 'conform', clause: '4.1' })
         ];
         const d = window.ReportStats.build({ report: {}, hydratedProgress });
-        expect(d.byClauseArea.unresolved).toMatchObject({ checked: 2, minorNC: 1, observation: 1 });
+        // The 17021-1 surveillance criterion is a programme item, not an unmapped one.
+        expect(d.byClauseArea.unresolved).toMatchObject({ checked: 1, minorNC: 1, observation: 0 });
+        expect(d.byClauseArea.programme).toMatchObject({ checked: 1, observation: 1 });
         expect(d.byClauseArea.rows.find((r) => r.clause === '4').conform).toBe(1);
+    });
+
+    // Technical review of PC Connection's 2026 recertification: 17 items under
+    // "Criterion not assigned" were 16 Annex A controls and 1 RECERT question.
+    it('separates Annex A controls and certification-programme items from unassigned criteria', () => {
+        const hydratedProgress = [
+            item({ status: 'conform', clause: 'A.5.1' }),
+            item({ status: 'nc', ncrType: 'observation', clause: 'A.8.13' }),
+            item({ status: 'nc', ncrType: 'minor', clause: 'RECERT 1' }),
+            item({ status: 'conform', clause: 'SURV.2' }),
+            item({ status: 'nc', ncrType: 'ofi', clause: 'FOCUS.3' }),
+            item({ status: 'conform', clause: '' }),
+            item({ status: 'conform', clause: '8.1' })
+        ];
+        const d = window.ReportStats.build({ report: {}, hydratedProgress });
+        const b = d.byClauseArea;
+        expect(b.annexA).toMatchObject({ checked: 2, conform: 1, observation: 1 });
+        expect(b.programme).toMatchObject({ checked: 2, conform: 1, minorNC: 1 });
+        expect(b.unresolved).toMatchObject({ checked: 2, conform: 1, ofi: 1 });
+        expect(b.rows.find((r) => r.clause === '8').checked).toBe(1);
+        expect(b.totals.checked).toBe(d.totals.assessed);
+        expect(b.totals.minorNC).toBe(d.resultCounts.minorNC);
+    });
+
+    it('leaves the Annex A and programme rows out when there are none', () => {
+        const d = window.ReportStats.build({ report: {}, hydratedProgress: [item({ status: 'conform', clause: '4.1' })] });
+        expect(d.byClauseArea.annexA).toBeNull();
+        expect(d.byClauseArea.programme).toBeNull();
     });
 
     it('excludes notAssessed and na items — they carry no result to attribute', () => {

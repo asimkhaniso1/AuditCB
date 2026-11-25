@@ -132,6 +132,36 @@ describe('4. Previous findings', () => {
         expect(window._prevFollowUpForNC(prevReport, focusNc)).toMatch(/not yet verified \(Awaiting Auditee Response\)/);
     });
 
+    // Technical review of PC Connection's 2026 recertification: the table
+    // listed only the previous nonconformities, not observations and OFIs.
+    it('list previous observations and OFIs after the NCs, each with its follow-up status', () => {
+        window.state.ncrs = [
+            { id: 60, auditId: 'plan-2025', sourceChecklistId: 'cl9', sourceItemIdx: 'O-1', status: 'Closed', type: 'observation' }
+        ];
+        const prev = {
+            id: 'prev', planId: 'plan-2025', findingStatus: {},
+            checklistProgress: [
+                { checklistId: 'cl9', itemIdx: 'X-1', clause: '7.2', status: 'nc', ncrType: 'ofi' },
+                { checklistId: 'cl9', itemIdx: 'O-1', clause: '8.1', status: 'nc', ncrType: 'observation' },
+                { checklistId: 'cl9', itemIdx: 'O-2', clause: '6.2', status: 'nc', ncrType: 'observation' },
+                { checklistId: 'cl9', itemIdx: 'B-3', clause: '9.1', status: 'nc', ncrType: 'minor' },
+                { checklistId: 'cl9', itemIdx: 'C-1', clause: '5.1', status: 'conform' }
+            ]
+        };
+        const out = window._prevFindingsRows(prev, false);
+        expect(out.total).toBe(4);
+        expect(out.summary).toBe('1 NC(s), 2 observation(s), 1 OFI(s) raised');
+        const rows = out.rows.split('</tr>').filter(Boolean);
+        expect(rows.map((r) => (r.match(/>(Minor|Observation|OFI)</) || [])[1])).toEqual(['Minor', 'Observation', 'Observation', 'OFI']);
+        expect(rows[1]).toContain('NCR-060');
+        expect(rows[1]).toContain('Closed — follow-up recorded');
+        expect(rows[2]).toContain('Follow-up not recorded');
+        expect(rows[2]).not.toMatch(/closed/i);
+        // An observation is never described as a verified corrective action.
+        expect(out.rows.split('Verified closed').length - 1).toBe(0);
+        expect(window._prevFindingsRows(prev, true).rows).toContain('contenteditable="true"');
+    });
+
     it('never print an internal FOCUS ref, and say when there is no record at all', () => {
         expect(window._prevNcRef(prevReport, focusNc, 0)).toBe('PREV-1');
         expect(window._prevNcCriterion(prevReport, focusNc)).toContain('Criterion not recorded');

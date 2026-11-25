@@ -410,16 +410,34 @@ Return ONLY the raw JSON object, no markdown fences.`;
         // states it.
         const concerns = [];
 
+        // With minor nonconformities open the narrative may not reassure. PC
+        // Connection's 2026 recertification carried five open minors, one of
+        // them on corrective action that had not worked, and the issued report
+        // still said results did "not indicate risks likely to affect
+        // certification status" and called the system "stable" (flagged at
+        // technical review). The statement of no risk is kept for an audit
+        // with no open nonconformity.
+        const minorWord = stats.minorNC === 1 ? 'minor nonconformity remains' : 'minor nonconformities remain';
+        const recurrence = stats.minorNC > 0 ? computeGenuineRecurrence(d) : null;
+        const recurringCount = recurrence && recurrence.hasPrior ? recurrence.recurringClauses.length : 0;
+        const recurrenceNote = recurringCount
+            ? ` ${recurringCount === 1 ? 'One affected clause' : recurringCount + ' affected clauses'} also failed at the previous audit, which puts the effectiveness of the earlier corrective action in question.`
+            : '';
+
         return {
             strengths,
             findings,
             concerns,
             businessImpact: stats.majorNC > 0
                 ? `Unresolved major findings put the certification decision and closure timeline at risk.`
-                : `Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.`,
+                : stats.minorNC > 0
+                    ? `${stats.minorNC} ${minorWord} open. Certification status depends on corrective action for each being completed within the required timeframe.${recurrenceNote}`
+                    : `Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.`,
             risks: stats.majorNC > 0
                 ? 'Failure to close major non-conformities within the required timeframe may delay or jeopardize certification issuance.'
-                : 'Continued monitoring of minor findings and observations is advised to prevent them from compounding into a broader pattern of control gaps.',
+                : stats.minorNC > 0
+                    ? 'A minor nonconformity that is not corrected effectively can recur and be raised as a major nonconformity at a later audit.'
+                    : 'Continued monitoring of observations is advised to prevent them from developing into nonconformities.',
             forwardOutlook: stats.majorNC > 0
                 ? `Certification remains achievable on the current timeline provided the major finding(s) identified above are closed within the corrective-action window; the audit team has moderate confidence in readiness pending that closure.`
                 // Open minor nonconformities make continued conformity
@@ -429,7 +447,7 @@ Return ONLY the raw JSON object, no markdown fences.`;
                 // continued conformity" — an assurance the findings do not
                 // support. Confidence language is reserved for a clean audit.
                 : stats.minorNC > 0
-                    ? `The management system demonstrates an overall stable level of implementation. Continued conformity is dependent upon satisfactory corrective action and closure of the ${stats.minorNC === 1 ? 'identified minor nonconformity' : (['', '', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][stats.minorNC] || stats.minorNC) + ' identified minor nonconformities'} within the required timeframe.`
+                    ? `Continued conformity is dependent upon satisfactory corrective action and closure of the ${stats.minorNC === 1 ? 'identified minor nonconformity' : (['', '', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][stats.minorNC] || stats.minorNC) + ' identified minor nonconformities'} within the required timeframe.`
                     : conformPct >= 80
                         ? `The management system is on a stable trajectory toward the next audit stage; the audit team has high confidence in continued conformity if current controls are sustained.`
                         : `Closure of the findings above, verified at the next audit, is what the certification programme requires from this point.`
@@ -1207,6 +1225,9 @@ ${intel.missingEvidence.length ? `
             } else {
                 risks.push(`${stats.minorNC} minor non-conformities were identified across processes; collectively they warrant a review of the underlying controls.`);
             }
+        } else if (stats.minorNC > 0) {
+            // A few open minors still are not "no risk" (see fallbackExecSummaryData).
+            risks.push(`${stats.minorNC} minor non-conformit${stats.minorNC === 1 ? 'y remains' : 'ies remain'} open; certification status depends on corrective action within the required timeframe.`);
         }
         if (!risks.length) risks.push('Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.');
 
