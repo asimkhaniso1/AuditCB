@@ -495,13 +495,56 @@ window.AuditFindingCategory = (function () {
         c.nc = c.major + c.minor + c.pending;
         return c;
     }
-    return { of: of, numberFindings: numberFindings, counts: counts };
+    // A nonconformity is known by its NC register reference (NCR-091), which
+    // the client report and the client's corrective-action responses use. The
+    // findings lists numbered them NCR-001, NCR-002… by position, so screen and
+    // printed findings summary named a finding differently from the report,
+    // and "NCR-001" read like another register record (PC Connection, 2026).
+    // Each Major/Minor finding takes its register record's reference, matched
+    // first by the checklist item that raised it, else by a clause that only
+    // one open record of this audit carries. A nonconformity with no register
+    // record is numbered NC-001… so it is never mistaken for a register entry.
+    const clauseToken = (v) => {
+        const m = String(v == null ? '' : v).trim().match(/^(A\.\d{1,2}\.\d{1,2}|\d{1,2}(?:\.\d{1,2}){0,3})/);
+        return m ? m[1] : String(v == null ? '' : v).trim().toLowerCase();
+    };
+    function withRegisterRefs(numbered, report, ncrs) {
+        const planId = report && report.planId != null ? String(report.planId) : null;
+        const pool = (Array.isArray(ncrs) ? ncrs : []).filter(n => n
+            && !/^withdrawn$/i.test(String(n.status || '').trim())
+            && /^(major|minor)/i.test(String(n.severity || n.type || '').trim())
+            && (!planId || String(n.auditId == null ? '' : n.auditId) === planId));
+        const claimed = new Set();
+        const isNc = f => f._cat && (f._cat.key === 'major' || f._cat.key === 'minor');
+        const linked = f => pool.find(n => !claimed.has(n) && n.sourceChecklistId != null && f.sourceChecklistId != null
+            && String(n.sourceChecklistId) === String(f.sourceChecklistId) && String(n.sourceItemIdx) === String(f.sourceItemIdx));
+        const byClause = f => {
+            const tok = clauseToken(f.criterionRef || f.clause);
+            const hits = pool.filter(n => !claimed.has(n) && (clauseToken(n.clause) === tok || clauseToken(n.criterionRef) === tok));
+            return hits.length === 1 ? hits[0] : null;
+        };
+        const recordOf = new Map();
+        // Linked records first, so a clause match can never take another item's record.
+        (numbered || []).filter(isNc).forEach(f => { const n = linked(f); if (n) { claimed.add(n); recordOf.set(f, n); } });
+        (numbered || []).filter(isNc).forEach(f => { if (recordOf.has(f)) return; const n = byClause(f); if (n) { claimed.add(n); recordOf.set(f, n); } });
+        let unregistered = 0;
+        return (numbered || []).map(f => {
+            if (!f._cat || f._cat.prefix !== 'NCR') return f;
+            const n = recordOf.get(f);
+            if (n && n.id != null && n.id !== '') {
+                return Object.assign({}, f, { _ref: 'NCR-' + String(n.id).padStart(3, '0'), _registerId: n.id });
+            }
+            unregistered++;
+            return Object.assign({}, f, { _ref: 'NC-' + String(unregistered).padStart(3, '0'), _registerId: null });
+        });
+    }
+    return { of: of, numberFindings: numberFindings, counts: counts, withRegisterRefs: withRegisterRefs };
 })();
 
 // Every finding of an audit: the manual ones (report.ncrs) and the checklist
 // items flagged NC (report.checklistProgress), numbered by category. The
 // Findings tab and the printed findings summary both read this, so the paper
-// handed to the client carries the same references (NCR-001, OBS-002) as the
+// handed to the client carries the same references (NCR-091, OBS-002) as the
 // screen. Checklist findings also carry what the summary prints: the
 // requirement, the auditor's evidence remark and the NC statement as recorded.
 window.collectAuditFindings = function (report, assignedChecklists) {
@@ -511,9 +554,12 @@ window.collectAuditFindings = function (report, assignedChecklists) {
     const checklistNCRs = (r.checklistProgress || [])
         .filter(item => item && item.status === 'nc')
         .map(item => {
-            // Resolve clause from checklist definition
-            let clauseText = 'Checklist Item';
-            let reqText = '';
+            // Resolve clause from checklist definition. Start from the clause and
+            // requirement saved on the item itself: the template lookup below is
+            // skipped when the auditor assigned a criterion, which left every
+            // such finding showing "Checklist Item" in the Clause column.
+            let clauseText = String(item.clause || '').trim() || 'Checklist Item';
+            let reqText = String(item.requirement || '').trim();
             // Carried from the checklist item when present (FOCUS.n/SURV items
             // store the real ISO clause here since their own `clause` is an
             // internal pseudo-reference — see client-docs-bulk.js's question()).
@@ -588,13 +634,13 @@ window.collectAuditFindings = function (report, assignedChecklists) {
 
     // A manual record keeps its index in report.ncrs for the edit button,
     // whatever the display order.
-    const findings = window.AuditFindingCategory.numberFindings([
+    const findings = window.AuditFindingCategory.withRegisterRefs(window.AuditFindingCategory.numberFindings([
         ...manualNCRs.map((ncr, manualIdx) => ({
             ...ncr, source: 'manual', _manualIdx: manualIdx,
             evidenceCount: Array.isArray(ncr.evidenceImages) ? ncr.evidenceImages.filter(Boolean).length : (ncr.evidenceImage ? 1 : 0)
         })),
         ...checklistNCRs
-    ]);
+    ]), r, (window.state && window.state.ncrs) || []);
     return {
         findings,
         counts: window.AuditFindingCategory.counts(findings),
@@ -1608,7 +1654,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         case 'ncr': {
             // All findings of this audit: nonconformities (Major / Minor), observations
-            // and OFIs, grouped and numbered by category (NCR-001, OBS-001, OFI-001),
+            // and OFIs, grouped by category: NCs under their NC register reference
+            // (NCR-091; NC-001 when not in the register), then OBS-001, OFI-001,
             // so an observation is never labelled an NCR. Same list the printed
             // findings summary uses (window.collectAuditFindings).
             const collected = window.collectAuditFindings(report, contextData.assignedChecklists || []);
@@ -1837,6 +1884,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     evidenceImage: item.evidenceImage,
                     evidenceImages: item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []),
                     clause: clauseText,
+                    criterionRef: item.criterionRef || null,
+                    // The checklist item, so the reference resolves to its
+                    // register record (AuditFindingCategory.withRegisterRefs).
+                    sourceChecklistId: item.checklistId == null ? null : item.checklistId,
+                    sourceItemIdx: item.itemIdx == null ? null : item.itemIdx,
                     requirement: reqText && !isBadValue(reqText) ? reqText : '',
                     kbMatch: kbMatch
                 });
@@ -1863,13 +1915,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (ncr.evidenceImage) window._evidenceCache[`ncr-${idx}`] = ncr.evidenceImage;
             });
 
-            // Same references as the Findings tab (NCR-001, OBS-001, OFI-001), so a
-            // finding is called the same thing on both screens.
+            // Same references as the Findings tab (the register's NCR-091, OBS-001,
+            // OFI-001), so a finding is called the same thing on both screens.
             const reviewRefById = {};
-            window.AuditFindingCategory.numberFindings([
+            window.AuditFindingCategory.withRegisterRefs(window.AuditFindingCategory.numberFindings([
                 ...allFindings.filter(f => f.source === 'Manual'),
                 ...allFindings.filter(f => f.source === 'Checklist')
-            ]).forEach(f => { reviewRefById[f.id] = f._ref; });
+            ]), report, (window.state && window.state.ncrs) || []).forEach(f => { reviewRefById[f.id] = f._ref; });
 
             const pendingFindings = allFindings.filter(f => f.type === window.CONSTANTS.NCR_TYPES.PENDING);
             const isReadyToSubmit = pendingFindings.length === 0;

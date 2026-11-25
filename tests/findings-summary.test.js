@@ -79,8 +79,8 @@ describe('findings summary document', () => {
         seedState();
         const ctx = FS.context('r1');
         const t = text(FS.build(ctx));
-        expect(ctx.findings.map(f => f._ref)).toEqual(['NCR-001', 'NCR-002', 'OBS-001', 'OBS-002', 'OFI-001']);
-        expect(t).toContain('NCR-001 Minor nonconformity');
+        expect(ctx.findings.map(f => f._ref)).toEqual(['NC-001', 'NC-002', 'OBS-001', 'OBS-002', 'OFI-001']);
+        expect(t).toContain('NC-001 Minor nonconformity');
         expect(t).toContain('OBS-002 Observation');
         expect(t).toContain('OFI-001 Opportunity for improvement');
         expect(t).toContain('Nonconformities (2)');
@@ -216,15 +216,15 @@ describe('screenshots in the findings summary', () => {
         expect(calls[1][1]).toEqual({ win: { placeholder: true } });
         expect(window.EvidenceUtils.compress).toHaveBeenCalledWith('https://x/1.jpg', { maxPx: 900, quality: 0.72 });
         const doc = new DOMParser().parseFromString(calls[1][0], 'text/html');
-        const block = Array.from(doc.querySelectorAll('.fs-finding')).find(b => b.textContent.includes('NCR-001'));
+        const block = Array.from(doc.querySelectorAll('.fs-finding')).find(b => b.textContent.includes('NC-001'));
         expect(block.classList.contains('fs-has-shots')).toBe(true);
         const caps = Array.from(block.querySelectorAll('figcaption')).map(c => c.textContent);
-        expect(caps).toEqual(['NCR-001 · screenshot 1 of 2 · captured 17 November 2026', 'NCR-001 · screenshot 2 of 2']);
+        expect(caps).toEqual(['NC-001 · screenshot 1 of 2 · captured 17 November 2026', 'NC-001 · screenshot 2 of 2']);
         expect(Array.from(block.querySelectorAll('img')).every(i => i.getAttribute('src').startsWith('data:image/jpeg;base64,'))).toBe(true);
         // The count line is replaced by the screenshots themselves.
         expect(block.textContent).not.toContain('on file with the audit record');
         // Findings without screenshots are unchanged.
-        const other = Array.from(doc.querySelectorAll('.fs-finding')).find(b => b.textContent.includes('NCR-002'));
+        const other = Array.from(doc.querySelectorAll('.fs-finding')).find(b => b.textContent.includes('NC-002'));
         expect(other.querySelector('figure')).toBeNull();
         expect(PS.lint(calls[1][0])).toEqual([]);
     });
@@ -234,7 +234,7 @@ describe('screenshots in the findings summary', () => {
         const calls = await print();
         expect(calls.length).toBe(2);
         expect(window.EvidenceUtils.compress).toHaveBeenCalledWith('https://x/manual.jpg', { maxPx: 900, quality: 0.72 });
-        expect(calls[1][0]).toContain('NCR-001 · screenshot 1 of 1');
+        expect(calls[1][0]).toContain('NC-001 · screenshot 1 of 1');
     });
 
     it('prints straight away, with no placeholder, when no finding has screenshots', async () => {
