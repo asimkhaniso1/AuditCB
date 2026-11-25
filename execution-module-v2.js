@@ -5098,8 +5098,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             : { reviewer: report.technicalReviewer || '', outcome: '', date: '', notes: '' };
         const esc = window.UTILS.escapeHtml;
         const today = new Date().toISOString().split('T')[0];
+        // The audit team, for the independence check (ISO/IEC 17021-1 9.5).
+        const plan = (state.auditPlans || []).find(p => String(p.id) === String(report.planId)) || null;
+        const RI = window.ReportIntegrity || {};
+        const team = typeof RI.auditTeamOf === 'function' ? RI.auditTeamOf(report, plan) : [];
+        const prior = tr.recordedBy && tr.recordedBy.name
+            ? `<p style="margin:0 0 0.75rem;font-size:0.8rem;color:var(--text-secondary);">Last recorded by ${esc(tr.recordedBy.name)}${tr.recordedBy.role ? ' (' + esc(tr.recordedBy.role) + ')' : ''}${tr.recordedBy.at ? ' on ' + esc(String(tr.recordedBy.at).slice(0, 10)) : ''}.</p>`
+            : '';
 
         window.DataService.openFormModal('Record Technical Review', `
+            ${prior}
+            <p style="margin:0 0 0.75rem;font-size:0.8rem;color:var(--text-secondary);">The reviewer must not have been involved in the audit${team.length ? ' (audit team: ' + esc(team.join(', ')) + ')' : ''}. Your name is saved as the person recording this review.</p>
             <div class="form-group">
                 <label>Technical reviewer <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="tr-reviewer-input" placeholder="Reviewer name" value="${esc(tr.reviewer || '')}">
@@ -5131,7 +5140,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (warning) { warning.textContent = 'Reviewer name and outcome are both required.'; warning.style.display = 'block'; }
                 return;
             }
-            report.technicalReview = { reviewer, outcome, date, notes };
+            const member = typeof RI.reviewerOnAuditTeam === 'function' ? RI.reviewerOnAuditTeam(reviewer, report, plan) : '';
+            if (member) {
+                if (warning) { warning.textContent = member + ' was on the audit team. The technical review must be done by someone not involved in the audit (ISO/IEC 17021-1 9.5).'; warning.style.display = 'block'; }
+                return;
+            }
+            // Who entered it, so a review recorded on someone's behalf says so.
+            const recordedBy = typeof RI.reviewRecordedBy === 'function' ? RI.reviewRecordedBy() : null;
+            report.technicalReview = { reviewer, outcome, date, notes, recordedBy };
             window.closeModal();
             persistAndRefreshIntegrity(reportId, 'Technical review recorded: ' + outcome + ' (' + reviewer + ').');
         });

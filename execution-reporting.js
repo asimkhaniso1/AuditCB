@@ -891,6 +891,16 @@
             d.report.technicalReview = { reviewer: d.report.technicalReviewer || '', outcome: '', date: '', notes: '' };
         }
         d.report.technicalReview[field] = value;
+        // Who entered it (ISO/IEC 17021-1 9.5 independence is checked by
+        // Report Integrity B34, which blocks issuance; warn here as they type).
+        const RI = window.ReportIntegrity || {};
+        if (typeof RI.reviewRecordedBy === 'function') d.report.technicalReview.recordedBy = RI.reviewRecordedBy();
+        if (field === 'reviewer' && typeof RI.reviewerOnAuditTeam === 'function') {
+            const member = RI.reviewerOnAuditTeam(value, d.report, d.auditPlan);
+            if (member && window.showNotification) {
+                window.showNotification(member + ' was on the audit team. The technical review must be done by someone not involved in the audit.', 'warning');
+            }
+        }
         if (typeof window.saveData === 'function') window.saveData();
     };
     // data-action-input adapter (the input delegation passes (el, dataset, e),
