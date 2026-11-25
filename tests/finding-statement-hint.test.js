@@ -167,7 +167,7 @@ describe('a template blank is caught before it prints', () => {
         const open = vi.spyOn(PS, 'open').mockReturnValue({});
         window.confirm = vi.fn(() => false);
         expect(window.printFindingsSummary('r1')).toBeNull();
-        expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('NCR-001 still has a template blank'));
+        expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('NC-001 still has a template blank'));
         expect(open).not.toHaveBeenCalled();
         open.mockRestore();
     });

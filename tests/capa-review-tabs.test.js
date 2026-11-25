@@ -114,7 +114,7 @@ describe('Review & Submit', () => {
     it('numbers findings with the Findings tab references', async () => {
         const text = document.getElementById('tab-content').textContent;
         expect(text).toContain('OFI-001');
-        expect(text).toContain('NCR-001');
+        expect(text).toContain('NC-001');
         expect(text).not.toMatch(/#1\b/);
     });
 

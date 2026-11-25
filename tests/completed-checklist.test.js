@@ -81,7 +81,7 @@ describe('completed checklist', () => {
     it('prints every question with its result and the finding it raised', async () => {
         seed();
         const t = text(await printed());
-        expect(t).toContain('IMS 1 4.4 Determine the processes needed. NCR-001 Minor nonconformity No process map shown. Finding: Process Map missing. Interviewed: J. Smith, IT Director 2 screenshots below');
+        expect(t).toContain('IMS 1 4.4 Determine the processes needed. NC-001 Minor nonconformity No process map shown. Finding: Process Map missing. Interviewed: J. Smith, IT Director 2 screenshots below');
         expect(t).toContain('IMS 2 9.3 Management review at planned intervals. Conforming Review held 3 March & minutes seen.');
         expect(t).toContain('IMS 3 7.5 Control documented information. Not assessed');
         expect(t).toContain('ISMS 1 A.5.9 Inventory of assets. Not applicable Excluded in SoA v4.');

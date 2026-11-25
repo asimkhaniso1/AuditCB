@@ -77,7 +77,9 @@ describe('execution Findings tab', () => {
 
     it('numbers OBS and OFI in their own series and labels an OFI as OFI', () => {
         const rows = Array.from(tab.querySelectorAll('tbody tr')).map(r => [r.cells[0].textContent.trim(), r.cells[2].textContent.trim()]);
-        expect(rows).toEqual([['NCR-001', 'Minor NC'], ['NCR-002', 'Minor NC'], ['OBS-001', 'OBS'], ['OFI-001', 'OFI']]);
+        // No register records in this fixture, so the NCs are NC-001/NC-002: an
+        // NCR- number is only ever the NC register's own reference.
+        expect(rows).toEqual([['NC-001', 'Minor NC'], ['NC-002', 'Minor NC'], ['OBS-001', 'OBS'], ['OFI-001', 'OFI']]);
     });
 
     it('a checklist finding links to the item that raised it', () => {
