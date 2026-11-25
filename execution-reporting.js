@@ -603,6 +603,68 @@
         }
         return htmlEsc(ref);
     };
+    // Observations and OFIs raise no corrective action, so their follow-up
+    // is stated in its own terms, from the same recorded state: closed only
+    // when recorded closed, otherwise open, and "not recorded" when nothing
+    // was recorded.
+    const prevAdvisoryFollowUp = (prevReport, item) => prevAdvisoryLabel(
+        ((prevReport.findingStatus || {})[String(item.clause || '') + '|' + String(item.department || '')] || {}).status
+            || registerFollowUpState(prevRegisterRecord(prevReport, item)));
+    const prevAdvisoryLabel = (recorded) => {
+        const raw = recorded == null ? '' : String(recorded).trim();
+        if (!raw) return '<span style="color:#92400e;">Follow-up not recorded</span>';
+        if (PREV_CLOSED_STATES.indexOf(raw.toLowerCase()) !== -1) return 'Closed — follow-up recorded';
+        return '<span style="color:#991b1b;">Open — follow-up not yet recorded'
+            + (raw.toLowerCase() === 'open' ? '' : ' (' + window.UTILS.escapeHtml(raw) + ')') + '</span>';
+    };
+    const PREV_TYPE_BADGE = {
+        major: ['Major', 'background:#fee2e2;color:#991b1b;'],
+        minor: ['Minor', 'background:#fef3c7;color:#92400e;'],
+        observation: ['Observation', 'background:#e0f2fe;color:#075985;'],
+        ofi: ['OFI', 'background:#dcfce7;color:#166534;']
+    };
+    const prevFindingKind = (t) => {
+        const k = String(t || '').toLowerCase();
+        return k === 'major' || k === 'observation' || k === 'ofi' ? k : 'minor';
+    };
+    // Every finding of the previous audit with its follow-up status: the
+    // nonconformities, then observations, then OFIs. PC Connection's 2026
+    // recertification listed only the nonconformities, and the technical
+    // reviewer asked for the previous observations and OFIs as well. The
+    // preview (editable cells) and the export both build their rows here.
+    const prevFindingsRows = (prevReport, editable) => {
+        const order = { major: 0, minor: 1, observation: 2, ofi: 3 };
+        const items = (prevReport.checklistProgress || [])
+            .filter(function (p) { return p && p.status === 'nc'; })
+            .map(function (p, i) { return { p: p, kind: prevFindingKind(p.ncrType), i: i }; })
+            .sort(function (a, b) { return (order[a.kind] - order[b.kind]) || (a.i - b.i); });
+        const legacy = (prevReport.ncrs || []).filter(Boolean);
+        const counts = { nc: 0, observation: 0, ofi: 0 };
+        const cell = editable ? '<td contenteditable="true" style="cursor:text;min-width:150px;">' : '<td>';
+        const badge = function (kind) {
+            const b = PREV_TYPE_BADGE[kind];
+            return '<td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + b[1] + '">' + b[0] + '</span></td>';
+        };
+        let rows = '';
+        items.forEach(function (x, n) {
+            const isNc = x.kind === 'major' || x.kind === 'minor';
+            counts[isNc ? 'nc' : x.kind]++;
+            rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">' + htmlEsc(prevNcRef(prevReport, x.p, n)) + '</td><td>' + prevNcCriterion(prevReport, x.p) + '</td>' + badge(x.kind)
+                + cell + (isNc ? prevFollowUpForNC(prevReport, x.p) : prevAdvisoryFollowUp(prevReport, x.p)) + '</td></tr>';
+        });
+        legacy.forEach(function (ncr, i) {
+            const kind = prevFindingKind(ncr.type || ncr.ncrType || ncr.severity);
+            const isNc = kind === 'major' || kind === 'minor';
+            counts[isNc ? 'nc' : kind]++;
+            rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (items.length + i + 1) + '</td><td>' + htmlEsc(ncr.clause || '') + '</td>' + badge(kind)
+                + cell + (isNc ? prevFollowUpLabel(ncr.status) : prevAdvisoryLabel(ncr.status)) + '</td></tr>';
+        });
+        const parts = [counts.nc + ' NC(s)'];
+        if (counts.observation) parts.push(counts.observation + ' observation(s)');
+        if (counts.ofi) parts.push(counts.ofi + ' OFI(s)');
+        return { rows: rows, total: items.length + legacy.length, summary: parts.join(', ') + ' raised' };
+    };
+    window._prevFindingsRows = prevFindingsRows;
     window._prevRegisterRecord = prevRegisterRecord;
     window._prevNcRef = prevNcRef;
     window._prevNcCriterion = prevNcCriterion;
@@ -2567,22 +2629,13 @@
                             if (!prevReport) {
                                 return '<div style="text-align:center;padding:20px;color:#94a3b8;"><i class="fa-solid fa-info-circle" style="margin-right:6px;"></i>No previous audit reports found for this client. Enter the previous findings status manually below.</div>' + prevFindingsNarrative;
                             }
-                            // Extract NCs from previous report
-                            const prevNCs = (prevReport.checklistProgress || [])
-                                .filter(p => p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi');
-                            const prevNCRs = prevReport.ncrs || [];
-                            if (prevNCs.length === 0 && prevNCRs.length === 0) {
-                                return '<div style="padding:12px;background:#f0fdf4;border-radius:8px;color:#166534;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><strong>Previous Audit (' + (prevReport.date || '—') + '):</strong> No non-conformities were raised. Certification was recommended.</div>' + prevFindingsNarrative;
+                            // Every previous finding: NCs, observations and OFIs.
+                            const prev = prevFindingsRows(prevReport, true);
+                            if (!prev.total) {
+                                return '<div style="padding:12px;background:#f0fdf4;border-radius:8px;color:#166534;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><strong>Previous Audit (' + (prevReport.date || '—') + '):</strong> No findings were raised.</div>' + prevFindingsNarrative;
                             }
-                            let rows = '';
-                            prevNCs.forEach(function (nc, i) {
-                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">' + htmlEsc(prevNcRef(prevReport, nc, i)) + '</td><td>' + prevNcCriterion(prevReport, nc) + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(nc.ncrType || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
-                            });
-                            prevNCRs.forEach(function (ncr, i) {
-                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + htmlEsc(ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(ncr.type || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">' + prevFollowUpLabel(ncr.status) + '</td></tr>';
-                            });
-                            return '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i><strong>Previous Audit:</strong> ' + (prevReport.date || '—') + ' | ' + htmlEsc(prevReport.standard || d.report.standard || '') + ' | ' + (prevNCs.length + prevNCRs.length) + ' NC(s) raised</div>'
-                                + '<table style="width:100%;font-size:0.84rem;border-collapse:collapse;"><thead><tr style="background:#eef2ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Ref</th><th style="padding:10px 14px;text-align:left;width:20%;">Clause</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:56%;">Follow-up Status (click to edit)</th></tr></thead><tbody>' + rows + '</tbody></table>'
+                            return '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i><strong>Previous Audit:</strong> ' + (prevReport.date || '—') + ' | ' + htmlEsc(prevReport.standard || d.report.standard || '') + ' | ' + prev.summary + '</div>'
+                                + '<table style="width:100%;font-size:0.84rem;border-collapse:collapse;"><thead><tr style="background:#eef2ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Ref</th><th style="padding:10px 14px;text-align:left;width:20%;">Clause</th><th style="padding:10px 14px;text-align:center;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:56%;">Follow-up Status (click to edit)</th></tr></thead><tbody>' + prev.rows + '</tbody></table>'
                                 // The status text prints in the executive summary and is
                                 // checked by Report Integrity, so it must be editable here
                                 // too, not only when there were no previous NCs. With a
@@ -3833,11 +3886,20 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // drop — this is what keeps every column's total equal to the report's
         // own resultCounts/advisories, whatever mix of conform/NC/OBS/OFI items
         // land there.
+        // Annex A controls and certification-programme questions have their
+        // own rows: they are assigned, just not to a clause 4-10. Only items
+        // with no criterion at all read "Criterion not assigned".
+        if (areaBreakdown.annexA) {
+            areaTableRows += areaRowHtml(areaBreakdown.annexA, 'Annex A — ISO/IEC 27001 controls');
+        }
+        if (areaBreakdown.programme) {
+            areaTableRows += areaRowHtml(areaBreakdown.programme, '<span style="font-style:italic;">Certification programme items</span>');
+        }
         if (areaBreakdown.unresolved) {
             areaTableRows += areaRowHtml(areaBreakdown.unresolved, '<span style="font-style:italic;color:#92400e;">Criterion not assigned</span>')
                 .replace('<tr>', '<tr style="background:#fff7ed;">');
         }
-        let areaTableHtml = areaTableRows ? '<div style="margin-top:16px;page-break-before:always;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">Minor NC</th><th style="padding:8px 12px;text-align:center;">Observation</th><th style="padding:8px 12px;text-align:center;">OFI</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table>' + (areaBreakdown.unresolved ? '<div style="margin-top:6px;font-size:0.72rem;color:#64748b;">† Criterion not assigned = item(s) with no real standard clause resolved (an internal tracking reference or surveillance-programme criterion); not attributable to a clause area above.</div>' : '') + '</div>' : '';
+        let areaTableHtml = areaTableRows ? '<div style="margin-top:16px;page-break-before:always;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">Minor NC</th><th style="padding:8px 12px;text-align:center;">Observation</th><th style="padding:8px 12px;text-align:center;">OFI</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table>' + ((areaBreakdown.unresolved || areaBreakdown.programme) ? '<div style="margin-top:6px;font-size:0.72rem;color:#64748b;">Certification programme items test the certification cycle (for example the follow-up of previous findings), not a clause of a standard. Criterion not assigned = item(s) with no standard clause or control resolved; not attributable to a row above.</div>' : '') + '</div>' : '';
         // Serialize area stats for chart script — 'nc' combines major+minor,
         // matching the table's own Status column (which treats any major as
         // Critical and folds both severities together for the bar chart).
@@ -4018,19 +4080,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const prevFindingsRowsHtml = (function () {
             const prevReport = findPreviousReport(d);
             if (!prevReport) return '';
-            const prevNCs = (prevReport.checklistProgress || [])
-                .filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; });
-            const prevNCRs = prevReport.ncrs || [];
-            if (prevNCs.length === 0 && prevNCRs.length === 0) return '';
-
-            let rows = '';
-            prevNCs.forEach(function (nc, i) {
-                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">' + htmlEsc(prevNcRef(prevReport, nc, i)) + '</td><td>' + prevNcCriterion(prevReport, nc) + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(nc.ncrType || 'Minor') + '</span></td><td>' + prevFollowUpForNC(prevReport, nc) + '</td></tr>';
-            });
-            prevNCRs.forEach(function (ncr, i) {
-                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + htmlEsc(ncr.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + htmlEsc(ncr.type || 'Minor') + '</span></td><td>' + prevFollowUpLabel(ncr.status) + '</td></tr>';
-            });
-            return rows;
+            return prevFindingsRows(prevReport, false).rows;
         })();
         // ─── Audit Programme (3-year certification cycle) ────────────────
         // Single computation shared with the preview path via ReportStats.buildProgramme
@@ -4661,7 +4711,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: PREVIOUS FINDINGS STATUS
             + (secMap['prev-findings'] ? '<div id="sec-prev-findings" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('prev-findings') + 'PREVIOUS FINDINGS STATUS</div><div class="sb">'
                 + (prevFindingsRowsHtml
-                    ? '<div style="margin-bottom:12px;padding:10px 14px;background:#eff6ff;border-radius:8px;font-size:0.88rem;color:#1d4ed8;">Nonconformities and observations raised at the previous audit were reviewed for effective closure.</div>'
+                    ? '<div style="margin-bottom:12px;padding:10px 14px;background:#eff6ff;border-radius:8px;font-size:0.88rem;color:#1d4ed8;">Findings raised at the previous audit (nonconformities, observations and opportunities for improvement) and their follow-up status.</div>'
                         + '<table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:14%;">Ref</th><th style="width:18%;">Clause</th><th style="width:12%;text-align:center;">Type</th><th style="width:56%;">Follow-up Status</th></tr></thead><tbody>' + prevFindingsRowsHtml + '</tbody></table>'
                     : '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + htmlEsc(editedPrevFindings || _derivePreviousFindingsStatus(d)) + '</div>')
                 + '</div>' : '')

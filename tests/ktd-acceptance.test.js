@@ -1146,6 +1146,23 @@ describe('Executive summary fallback — client-release wording', () => {
         expect(out).not.toMatch(/high confidence/i);
     });
 
+    // Technical review of PC Connection's 2026 recertification: five open
+    // minors, and the report still said results did "not indicate risks
+    // likely to affect certification status" and called the system "stable".
+    it('never states "no risk" or "stable" while minor NCs are open', () => {
+        const out = fallback(2);
+        const text = [out.businessImpact, out.risks, out.forwardOutlook].join(' ');
+        expect(text).not.toMatch(/do not indicate risks/i);
+        expect(text).not.toMatch(/stable level of implementation/i);
+        expect(out.businessImpact).toContain('2 minor nonconformities remain open');
+        expect(out.businessImpact).toContain('Certification status depends on corrective action');
+        expect(out.risks).toMatch(/recur/);
+    });
+
+    it('keeps the no-risk statement for an audit with no open nonconformity', () => {
+        expect(fallback(0).businessImpact).toMatch(/do not indicate risks/);
+    });
+
     it('uses the singular for one open minor NC', () => {
         expect(fallback(1).forwardOutlook).toContain('the identified minor nonconformity within');
     });
