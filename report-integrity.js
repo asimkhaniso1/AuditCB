@@ -1455,6 +1455,26 @@
         ));
     }
 
+    // W35: use of certification marks is reviewed at every surveillance and
+    // recertification audit. Left blank, the report used to print "Usage
+    // verified as conforming to CB rules." — a verification nobody recorded
+    // (flagged at technical review of PC Connection's 2026 recertification).
+    // It now prints "Not recorded.", and the gap is flagged here.
+    function checkW35MarksNotRecorded(report, auditPlan, results) {
+        const auditTypeStr = lower((auditPlan && auditPlan.auditType) || (report && report.auditType));
+        if (!/surveillance|recert/.test(auditTypeStr)) return;
+        const marks = trim(report && report.effMarks);
+        if (marks && !EMPTY_STATUS_RE.test(marks) && !/^not recorded\.?$/i.test(marks)) return;
+        results.warnings.push(item(
+            'W35',
+            'warning',
+            'certification-marks',
+            'Use of certification marks is not recorded on a surveillance/recertification report.',
+            'report.effMarks',
+            'Record what was checked (website, documents, marketing material) and the result, or state that it was not reviewed and when it will be.'
+        ));
+    }
+
     // The next audit event must be described as the stage the certification
     // programme actually schedules next.
     function checkW15NextAuditType(input, results) {
@@ -2271,6 +2291,7 @@
         runCheck('checkW12EmployeeCount', () => checkW12EmployeeCount(report, client, results), results);
         runCheck('checkW13DesignApplicability', () => checkW13DesignApplicability(report, client, auditPlan, results), results);
         runCheck('checkW14PreviousFindings', () => checkW14PreviousFindings(report, auditPlan, results), results);
+        runCheck('checkW35MarksNotRecorded', () => checkW35MarksNotRecorded(report, auditPlan, results), results);
         runCheck('checkW15NextAuditType', () => checkW15NextAuditType({ report, auditPlan, client }, results), results);
         runCheck('checkW16ChangesContradiction', () => checkW16ChangesContradiction(report, client, results), results);
         runCheck('checkW17AdvisoryClassification', () => checkW17AdvisoryClassification(report, results), results);

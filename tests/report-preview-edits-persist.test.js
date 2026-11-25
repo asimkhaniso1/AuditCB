@@ -148,7 +148,7 @@ describe('Report Preview edits', () => {
     });
 
     it('never stores a box the auditor only clicked into: an untouched default stays a default', async () => {
-        const el = box('rp-eff-marks', 'Usage verified as conforming to CB rules.');
+        const el = box('rp-eff-marks', 'Not recorded.');
         el.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
         el.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
         await new Promise((r) => setTimeout(r, 30));
