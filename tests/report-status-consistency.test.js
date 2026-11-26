@@ -94,13 +94,16 @@ describe('every touched render site calls isReportFinal(d.report), not a local r
         // exact shared substring proves all three read the same logic, the same
         // way tests/previous-findings-status.test.js counts a shared call across
         // its two preview/export row builders.
-        const hits = SRC.match(/isReportFinal\(d\.report\) \? 'Final' : 'Draft'/g) || [];
+        // Since 2026-11-26 they share one helper, _reportIssueLabel, which also
+        // says when a final report has changed since issue.
+        const hits = SRC.match(/_reportIssueLabel\(d, /g) || [];
         expect(hits.length).toBe(3);
+        expect(SRC).toMatch(/window\._reportIssueLabel = function \(d, modified\) \{\s*if \(!d \|\| !d\.report \|\| !isReportFinal\(d\.report\)\) return 'Draft';/);
     });
 
     it('the toggle button, watermark CSS trigger, watermark div, and closing Report Status row all call isReportFinal(d.report)', () => {
         expect(SRC).toMatch(/isReportFinal\(d\.report\) \? 'FINAL' : 'DRAFT'/); // rp-status-toggle button
-        expect(SRC).toMatch(/!isReportFinal\(d\.report\) \? '\.watermark\{display:flex !important;\}' : ''/); // print CSS
+        expect(SRC).toMatch(/\(!isReportFinal\(d\.report\) \|\| modifiedSinceIssue\) \? '\.watermark\{display:flex !important;\}' : ''/); // print CSS
         expect(SRC).toMatch(/\+ \(!isReportFinal\(d\.report\)\s*\n\s*\? '<div class="watermark">/); // watermark div
         expect(SRC).toMatch(/isReportFinal\(d\.report\) \? 'Final — Issued' : 'Draft — not yet issued'/); // closing page
     });
@@ -113,10 +116,15 @@ describe('every touched render site calls isReportFinal(d.report), not a local r
 describe('both directions, using the real extracted source expressions', () => {
     const isReportFinal = loadIsReportFinal();
 
-    it('cover / footer / document-control "Status:" field: FINAL prints Final, DRAFT prints Draft', () => {
-        const snippet = "isReportFinal(d.report) ? 'Final' : 'Draft'";
-        expect(evalSnippet(snippet, isReportFinal, finalReport)).toBe('Final');
-        expect(evalSnippet(snippet, isReportFinal, draftReport)).toBe('Draft');
+    it('cover / footer / document-control "Status:" field: FINAL prints Final, DRAFT prints Draft, a FINAL changed since issue is not for distribution', () => {
+        const src = extract(/window\._reportIssueLabel = function \(d, modified\) \{[\s\S]*?\n {4}\};/, '_reportIssueLabel');
+        // eslint-disable-next-line no-new-func
+        const label = new Function('isReportFinal', 'window', src + '\nreturn window._reportIssueLabel;')(isReportFinal, {});
+        expect(label(finalReport, false)).toBe('Final');
+        expect(label(draftReport, false)).toBe('Draft');
+        expect(label(draftReport, true)).toBe('Draft');
+        const issued = { report: { reportStatus: 'final', issuedSnapshot: { version: '1.0' } } };
+        expect(label(issued, true)).toBe('Modified since issue (v1.0) — not for distribution');
     });
 
     it('rp-status-toggle button label: FINAL prints "FINAL", DRAFT prints "DRAFT"', () => {
@@ -131,15 +139,16 @@ describe('both directions, using the real extracted source expressions', () => {
         expect(evalSnippet(snippet, isReportFinal, draftReport)).toBe('Draft — not yet issued');
     });
 
-    it('print CSS: only a DRAFT report forces the watermark visible; a FINAL report leaves it display:none by default', () => {
-        const snippet = extract(/!isReportFinal\(d\.report\) \? '\.watermark\{display:flex !important;\}' : ''/, 'watermark CSS trigger ternary');
-        expect(evalSnippet(snippet, isReportFinal, finalReport)).toBe('');
-        expect(evalSnippet(snippet, isReportFinal, draftReport)).toBe('.watermark{display:flex !important;}');
+    it('print CSS: a DRAFT or a FINAL changed since issue forces the watermark visible; an unchanged FINAL leaves it display:none', () => {
+        const snippet = extract(/\(!isReportFinal\(d\.report\) \|\| modifiedSinceIssue\) \? '\.watermark\{display:flex !important;\}' : ''/, 'watermark CSS trigger ternary');
+        expect(evalSnippet(snippet, isReportFinal, finalReport, false)).toBe('');
+        expect(evalSnippet(snippet, isReportFinal, finalReport, true)).toBe('.watermark{display:flex !important;}');
+        expect(evalSnippet(snippet, isReportFinal, draftReport, false)).toBe('.watermark{display:flex !important;}');
     });
 
     it('watermark content: DRAFT always shows the DRAFT watermark regardless of modifiedSinceIssue; FINAL never shows DRAFT', () => {
         const snippet = extract(
-            /\(!isReportFinal\(d\.report\)[\s\S]*?: '<div class="watermark"><span>CONFIDENTIAL<\/span><\/div>'\)\)/,
+            /\(!isReportFinal\(d\.report\)\s*\n\s*\? '<div class="watermark">[\s\S]*?: '<div class="watermark"><span>CONFIDENTIAL<\/span><\/div>'\)\)/,
             'watermark div ternary'
         );
         // Draft always wins the DRAFT watermark, whether or not modifiedSinceIssue is (nonsensically) set.

@@ -1154,6 +1154,17 @@
         } catch (_e) { return false; }
     };
 
+    // What a report calls itself on the page. A final report changed since issue
+    // is not the issued document, so it never prints as "Final": PC
+    // Connection's export of 26 Nov 2026 said "Confidential — Final" on all 89
+    // pages while differing from the issued v1.0.
+    window._reportIssueLabel = function (d, modified) {
+        if (!d || !d.report || !isReportFinal(d.report)) return 'Draft';
+        if (!modified) return 'Final';
+        const v = d.report.issuedSnapshot && d.report.issuedSnapshot.version;
+        return 'Modified since issue' + (v ? ' (v' + v + ')' : '') + ' — not for distribution';
+    };
+
     // The Knowledge Base requirement for a finding, from its own standard.
     function kbRequirementFor(finding, reportStandard) {
         const KB = window.KB_HELPERS;
@@ -1918,7 +1929,7 @@
                                 <strong style="color:#1e293b;">Document ID:</strong> ${reportRef(d)}
                             </div>
                             <div style="text-align:center;">
-                                <strong style="color:#1e293b;">Status:</strong> ${isReportFinal(d.report) ? 'Final' : 'Draft'}
+                                <strong style="color:#1e293b;">Status:</strong> ${htmlEsc(window._reportIssueLabel(d, window._isModifiedSinceIssue(d)))}
                             </div>
                             <div style="text-align:right;">
                                 <strong style="color:#1e293b;">Classification:</strong> Confidential
@@ -3899,7 +3910,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             areaTableRows += areaRowHtml(areaBreakdown.unresolved, '<span style="font-style:italic;color:#92400e;">Criterion not assigned</span>')
                 .replace('<tr>', '<tr style="background:#fff7ed;">');
         }
-        let areaTableHtml = areaTableRows ? '<div style="margin-top:16px;page-break-before:always;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">Minor NC</th><th style="padding:8px 12px;text-align:center;">Observation</th><th style="padding:8px 12px;text-align:center;">OFI</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table>' + ((areaBreakdown.unresolved || areaBreakdown.programme) ? '<div style="margin-top:6px;font-size:0.72rem;color:#64748b;">Certification programme items test the certification cycle (for example the follow-up of previous findings), not a clause of a standard. Criterion not assigned = item(s) with no standard clause or control resolved; not attributable to a row above.</div>' : '') + '</div>' : '';
+        let areaTableHtml = areaTableRows ? '<div style="margin-top:16px;page-break-before:always;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">Minor NC</th><th style="padding:8px 12px;text-align:center;">Observation</th><th style="padding:8px 12px;text-align:center;">OFI</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table>' + ((areaBreakdown.unresolved || areaBreakdown.programme) ? '<div style="margin-top:6px;font-size:0.72rem;color:#64748b;">' + [areaBreakdown.programme ? 'Certification programme items test the certification cycle (for example the follow-up of previous findings), not a clause of a standard.' : '', areaBreakdown.unresolved ? 'Criterion not assigned = item(s) with no standard clause or control resolved; not attributable to a row above.' : ''].filter(Boolean).join(' ') + '</div>' : '') + '</div>' : '';
         // Serialize area stats for chart script — 'nc' combines major+minor,
         // matching the table's own Status column (which treats any major as
         // Critical and folds both severities together for the bar chart).
@@ -4380,7 +4391,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // A forced break on a box already at a page boundary is ignored by
             // the fragmentation spec, so this cannot introduce blank pages.
             +   '#sec-objectives,#sec-summary,#sec-conclusion,#sec-signature{page-break-before:always;break-before:page;}'
-            +   (!isReportFinal(d.report) ? '.watermark{display:flex !important;}' : '')
+            // The watermark prints on a draft and on a final changed since issue.
+            +   ((!isReportFinal(d.report) || modifiedSinceIssue) ? '.watermark{display:flex !important;}' : '')
             +   '.toc-item{break-inside:avoid;page-break-inside:avoid;}'
             // Print-quality guarantees: no orphan/widow lines, headings keep their
             // first block, tables never leave a lone header row, charts never clip.
@@ -4528,7 +4540,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<table class="rpt-running"><thead><tr><td>'
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + htmlEsc(d.cbLogo) + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + htmlEsc(cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + htmlEsc(standard) + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">Audit360 &mdash; ' + reportRef(d) + '</div></div>'
             + '</td></tr></thead><tfoot><tr><td>'
-            + '<div class="rpt-ftr"><div class="rpt-ftr-left">Confidential &mdash; ' + (isReportFinal(d.report) ? 'Final' : 'Draft') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">Generated by Audit360</div></div>'
+            + '<div class="rpt-ftr"><div class="rpt-ftr-left">Confidential &mdash; ' + htmlEsc(window._reportIssueLabel(d, modifiedSinceIssue)) + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">Generated by Audit360</div></div>'
             + '</td></tr></tfoot><tbody><tr><td>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
             + '<button data-action="print" style="background:linear-gradient(135deg,#1d4ed8,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:500;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Download"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
@@ -4561,7 +4573,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + htmlEsc(d.auditPlan.team.join(', ')) + '</div></div>' : '')
             + '</div>'
             + '<div class="cover-doc" style="position:absolute;bottom:50px;left:50px;right:50px;border-top:2px solid #cbd5e1;padding-top:16px;">'
-            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;"><span><strong>Doc ID:</strong> ' + reportRef(d) + '</span><span><strong>Status:</strong> ' + (isReportFinal(d.report) ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
+            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;"><span><strong>Doc ID:</strong> ' + reportRef(d) + '</span><span><strong>Status:</strong> ' + htmlEsc(window._reportIssueLabel(d, modifiedSinceIssue)) + '</span><span><strong>Classification:</strong> Confidential</span></div>'
             + '</div>'
             + '</div>'
             // TABLE OF CONTENTS — formal report first, then each enabled annex under
