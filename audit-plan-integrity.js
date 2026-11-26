@@ -939,6 +939,42 @@
      * The full, certification-record form of the duration calculation. The
      * client-facing plan shows a summary; this stays in the internal record.
      */
+    // Remote document review done outside the agenda (before the audit, between
+    // sessions or after it) is audit time (IAF MD 4) that the agenda cannot
+    // show. PC Connection's 2026 recertification: records were reviewed on the
+    // client's SharePoint before the audit, and the plan recorded that as a
+    // 3-day REDUCTION, so the report showed 1.5 auditor-days for three
+    // standards (flagged at technical review). The review is recorded here
+    // instead and counts towards the total; the agenda still reconciles to the
+    // time it schedules (finalDays).
+    const REVIEW_TIMING = { before: 'before the audit', during: 'between audit sessions', after: 'after the audit' };
+    function offAgendaReviewOf(plan) {
+        const r = ((plan || {}).durationCalculation || {}).offAgendaReview;
+        const days = Number(r && r.days) || 0;
+        if (!(days > 0)) return null;
+        const timing = REVIEW_TIMING[str(r.timing)] ? str(r.timing) : 'before';
+        return { days: days, timing: timing, timingLabel: REVIEW_TIMING[timing], date: str(r.date), covered: str(r.covered), evidence: str(r.evidence) };
+    }
+    function agendaDaysOf(plan) {
+        const p = plan || {};
+        return Number((p.durationCalculation || {}).finalDays) || Number(p.manDays) || 0;
+    }
+    function totalAuditDays(plan) {
+        const r = offAgendaReviewOf(plan);
+        return agendaDaysOf(plan) + (r ? r.days : 0);
+    }
+    /** "4.5 auditor-days: 1.5 in remote audit sessions and 3 in remote document review before the audit" */
+    function durationSummary(plan) {
+        const p = plan || {};
+        const agenda = agendaDaysOf(p);
+        const r = offAgendaReviewOf(p);
+        const n = function (x) { return String(Math.round(x * 100) / 100); };
+        if (!r) return agenda ? n(agenda) + ' auditor-days' : '';
+        const method = str(p.auditMethod).toLowerCase();
+        const sessions = method === 'remote' ? 'remote audit sessions' : (method === 'hybrid' ? 'audit sessions' : 'on-site audit');
+        return n(agenda + r.days) + ' auditor-days: ' + n(agenda) + ' in ' + sessions + ' and ' + n(r.days) + ' in remote document review ' + r.timingLabel;
+    }
+
     function buildDurationRecord(plan, ctx) {
         const p = plan || {};
         const c = ctx || {};
@@ -984,6 +1020,7 @@
                 considerations: /remote|hybrid/i.test(str(p.auditMethod)) ? 'Remote audit time is counted as audit time; secure communication and document sharing are in place.' : '' },
             increases: adjustments.filter(function (a) { return a.days > 0; }), reductions: adjustments.filter(function (a) { return a.days < 0; }),
             baselineDays: baseline, finalDays: finalDays, calculated: baseline * (1 + ims / 100) + justified,
+            offAgendaReview: offAgendaReviewOf(p), totalDays: totalAuditDays(p),
             methodology: { version: str(d.methodologyVersion), imsRule: str(d.imsRuleVersion), builtInDefault: usesDefaults, provisional: !!d.provisional,
                 note: usesDefaults ? 'Calculated from the Audit360 default duration table, which is a starter table and not a certification-body-approved methodology.' : '' },
             approval: { approvedBy: str(d.approvedBy) || null, approvedAt: str(d.approvedAt) || null }
@@ -1516,6 +1553,9 @@
         const dur = p.durationCalculation || {};
         if (!(Number(dur.finalDays) > 0)) B('DURATION_MISSING', 'No audit duration is recorded.', { field: 'durationCalculation' });
         if (!dur.approvedBy || !dur.approvedAt || dur.provisional || /^draft$/i.test(str(dur.methodologyVersion))) B('DURATION_NOT_APPROVED', 'The audit duration has not been approved (approver and approval date are required).', { field: 'durationCalculation' });
+        // Review time outside the agenda counts only when it says what was reviewed.
+        const review = offAgendaReviewOf(p);
+        if (review && !review.covered) B('OFF_AGENDA_REVIEW_UNSUPPORTED', 'Remote document review outside the agenda (' + review.days + ' auditor-day(s)) does not record what was reviewed.', { field: 'durationCalculation' });
         const teamNames = team.assigned.map(function (a) { return a.name; });
         const rec = reconcileDuration({ rows: rows, finalDays: dur.finalDays || p.manDays, hoursPerDay: c.hoursPerDay, teamNames: teamNames, scheduledDates: start && end ? df.eachDay(start, end) : [] });
         if (rows.length) rec.errors.forEach(function (e) { B(e.code, e.message, { field: 'agenda' }); });
@@ -1663,7 +1703,7 @@
         resolveAuditors, auditTeamLabel, isPlaceholderAuditor,
         collectPreviousFindings, mapFindings,
         buildAgenda, buildTraceability, flattenChecklist,
-        buildDurationRecord, reconcileDuration,
+        buildDurationRecord, reconcileDuration, offAgendaReviewOf, totalAuditDays, durationSummary,
         checkScope, buildNarratives, checkNarratives, scopeLabels,
         validate, canTransition, contentHash, assemble, standardIdsOf, schemesOf, SCHEME_TOPICS
     };

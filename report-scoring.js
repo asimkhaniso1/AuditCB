@@ -733,8 +733,13 @@
         // Man-days: prefer explicit man-days, fall back to on-site days.
         const manDays = d?.auditPlan?.manDays;
         const onsiteDays = d?.auditPlan?.onsiteDays;
-        const auditDuration = (manDays != null && manDays !== '') ? Number(manDays)
-            : ((onsiteDays != null && onsiteDays !== '') ? Number(onsiteDays) : null);
+        // Remote document review outside the agenda counts as audit time.
+        const ipi = global.AuditPlanIntegrity;
+        const totalDays = (ipi && typeof ipi.offAgendaReviewOf === 'function' && ipi.offAgendaReviewOf(d && d.auditPlan))
+            ? ipi.totalAuditDays(d.auditPlan) : null;
+        const auditDuration = totalDays != null ? totalDays
+            : (manDays != null && manDays !== '') ? Number(manDays)
+                : ((onsiteDays != null && onsiteDays !== '') ? Number(onsiteDays) : null);
 
         // Top business-impact category, sourced defensively from window.ReportRisk
         // (a sibling module) if it has already been loaded. Omitted gracefully

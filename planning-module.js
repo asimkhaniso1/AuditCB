@@ -622,6 +622,17 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                     <div><label style="font-size:.8rem;font-weight:600;">Final audit duration</label><input type="number" id="plan-mandays" class="form-control" readonly style="font-weight:bold;color:var(--primary-color);"></div>
                                 </div>
                                 <div><label style="font-size:.8rem;">Adjustment justification</label><textarea id="plan-duration-justification" class="form-control" rows="2" placeholder="Required when a justified adjustment is applied"></textarea></div>
+                                <div style="border-top:1px dashed var(--border-color);padding-top:.75rem;">
+                                    <label style="font-size:.8rem;font-weight:600;">Remote document review outside the agenda</label>
+                                    <small style="display:block;color:#6b7280;font-size:.72rem;margin-bottom:.4rem;">Audit time spent reviewing the client's records outside the scheduled sessions. It counts towards the total audit time; it is not a reduction.</small>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;">
+                                        <div><label style="font-size:.75rem;">Auditor-days</label><input type="number" id="plan-review-days" class="form-control" min="0" step="0.25" value="0"></div>
+                                        <div><label style="font-size:.75rem;">When</label><select id="plan-review-timing" class="form-control"><option value="before">Before the audit</option><option value="during">Between sessions</option><option value="after">After the audit</option></select></div>
+                                        <div><label style="font-size:.75rem;">Completed on</label><input type="date" id="plan-review-date" class="form-control"></div>
+                                    </div>
+                                    <div style="margin-top:.5rem;"><label style="font-size:.75rem;">What was reviewed</label><textarea id="plan-review-covered" class="form-control" rows="2" placeholder="Required when review days are recorded"></textarea></div>
+                                    <div style="margin-top:.5rem;"><label style="font-size:.75rem;">Record of the review</label><input type="text" id="plan-review-evidence" class="form-control" placeholder="e.g. pre-audit document review, completed 15 Nov 2026"></div>
+                                </div>
                             </div>
                             <small id="manday-hint" style="color:#6b7280;display:block;margin-top:8px;font-size:.75rem;text-align:center;">Uses the CB rule when configured; otherwise Audit360 defaults are provided for auditor review.</small>
                         </div>
@@ -845,6 +856,12 @@ function editAuditPlan(id) {
         if (document.getElementById('plan-remote-days')) document.getElementById('plan-remote-days').value = duration.remoteDays || 0;
         if (document.getElementById('plan-justified-adjustment')) document.getElementById('plan-justified-adjustment').value = duration.justifiedAdjustment || 0;
         if (document.getElementById('plan-duration-justification')) document.getElementById('plan-duration-justification').value = duration.justification || '';
+        const review = duration.offAgendaReview || {};
+        if (document.getElementById('plan-review-days')) document.getElementById('plan-review-days').value = review.days || 0;
+        if (document.getElementById('plan-review-timing')) document.getElementById('plan-review-timing').value = review.timing || 'before';
+        if (document.getElementById('plan-review-date')) document.getElementById('plan-review-date').value = review.date || '';
+        if (document.getElementById('plan-review-covered')) document.getElementById('plan-review-covered').value = review.covered || '';
+        if (document.getElementById('plan-review-evidence')) document.getElementById('plan-review-evidence').value = review.evidence || '';
         if (document.getElementById('plan-duration-basis')) document.getElementById('plan-duration-basis').value = duration.basis || '';
 
         // Reopen with the certificates this plan was made for, not every
@@ -3586,6 +3603,7 @@ function saveAuditPlan(shouldPrint = false, saveAsDraft = false) {
             onsiteDays,
             justifiedAdjustment: parseFloat(document.getElementById('plan-justified-adjustment')?.value) || 0,
             justification: document.getElementById('plan-duration-justification')?.value || '',
+            offAgendaReview: offAgendaReviewFromForm(),
             methodologyVersion: /^PROVISIONAL PLANNING ONLY/.test(document.getElementById('plan-duration-basis')?.value || '')
                 ? 'DRAFT'
                 : (window.AuditPlanningDomain?.resolveDurationMethodology(window.state?.cbSettings || {}, cycleContext.standards)?.version || null),
@@ -3899,6 +3917,20 @@ async function generateAIAgenda() {
     }
 }
 
+/** Remote document review outside the agenda, from the duration panel (null when none). */
+function offAgendaReviewFromForm() {
+    const days = parseFloat(document.getElementById('plan-review-days')?.value) || 0;
+    if (!(days > 0)) return null;
+    const clean = (id) => (window.DocFormat ? window.DocFormat.toPlainText : Sanitizer.sanitizeText)(document.getElementById(id)?.value || '').trim();
+    return {
+        days,
+        timing: document.getElementById('plan-review-timing')?.value || 'before',
+        date: document.getElementById('plan-review-date')?.value || '',
+        covered: clean('plan-review-covered'),
+        evidence: clean('plan-review-evidence')
+    };
+}
+
 /** A plan-shaped object from the form's current values, for the builders. */
 function planFromForm(cycle, selectedSites, fullTeam, manDays) {
     const num = (id) => parseFloat(document.getElementById(id)?.value) || 0;
@@ -3914,7 +3946,7 @@ function planFromForm(cycle, selectedSites, fullTeam, manDays) {
             employees: parseInt(document.getElementById('plan-employees')?.value, 10) || 0, sites: parseInt(document.getElementById('plan-sites')?.value, 10) || 0,
             riskLevel: document.getElementById('plan-risk')?.value || 'Medium', basis: document.getElementById('plan-duration-basis')?.value || '',
             baselineDays: num('plan-baseline-days'), imsAdjustmentPercent: num('plan-ims-adjustment'), remoteDays: num('plan-remote-days'), onsiteDays: num('plan-onsite-days'),
-            justifiedAdjustment: num('plan-justified-adjustment'), justification: document.getElementById('plan-duration-justification')?.value || '', finalDays: manDays
+            justifiedAdjustment: num('plan-justified-adjustment'), justification: document.getElementById('plan-duration-justification')?.value || '', offAgendaReview: offAgendaReviewFromForm(), finalDays: manDays
         },
         timeZone: (document.getElementById('plan-timezone')?.value) ? { iana: document.getElementById('plan-timezone').value, source: 'plan-agreed' } : null,
         halfDays: Array.from(window._agendaHalfDays || []).sort((a, b) => a - b)

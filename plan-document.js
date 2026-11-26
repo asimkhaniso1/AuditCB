@@ -247,7 +247,10 @@
             + pair(meta('Recommended audit window', cyc.recommendedWindowStart ? t(df.formatDateRange(cyc.recommendedWindowStart, cyc.recommendedWindowEnd)) + ' (planning guidance)' : 'Not recorded'),
                 meta('Certificate expiry', cyc.certificateExpiry ? t(df.formatDate(cyc.certificateExpiry)) : 'Not recorded'))
             + pair(meta('Lead Auditor', t(lead ? lead.name : 'Not assigned')), meta('Audit team', t(teamLabel)))
-            + pair(meta('Approved audit duration', finalDays ? t(finalDays.toFixed(1) + ' auditor-days' + (p.auditMethod ? ' (' + String(p.auditMethod).toLowerCase() + ')' : '')) : 'Not approved'),
+            + pair(meta('Approved audit duration', !finalDays ? 'Not approved'
+                : (ipi.offAgendaReviewOf && ipi.offAgendaReviewOf(p))
+                    ? t(ipi.durationSummary(p))
+                    : t(finalDays.toFixed(1) + ' auditor-days' + (p.auditMethod ? ' (' + String(p.auditMethod).toLowerCase() + ')' : ''))),
                 meta('Time zone', tzInfo ? t(tzInfo.label) : '<span class="bad">Not agreed</span>'))
             + wide('Impartiality risk', t((p.impartialityAssessment && p.impartialityAssessment.risk) || 'None identified'))
             + '</table>';
@@ -358,9 +361,12 @@
             + fld('Degree of IMS integration', t(d.imsIntegration ? d.imsIntegration.degree + '; adjustment ' + d.imsIntegration.adjustmentPercent + '%; rule ' + (d.imsIntegration.ruleVersion || 'not recorded') : ''))
             + fld('Team ability for an integrated audit', t(d.teamAbility && d.teamAbility.integratedAuditCapable ? 'Lead Auditor holds current competence for all standards in scope' : 'Not demonstrated'))
             + fld('Remote-audit considerations', t(d.remote ? d.remote.method + ': ' + d.remote.remoteDays + ' remote / ' + d.remote.onsiteDays + ' on-site. ' + d.remote.considerations : ''))
+            + fld('Remote document review outside the agenda', d.offAgendaReview
+                ? t(d.offAgendaReview.days + ' auditor-day(s) ' + d.offAgendaReview.timingLabel + (d.offAgendaReview.date ? ', completed ' + df.formatDate(d.offAgendaReview.date) : '') + '. Reviewed: ' + (d.offAgendaReview.covered || 'not recorded') + (d.offAgendaReview.evidence ? '. Record: ' + d.offAgendaReview.evidence : '') + '.')
+                : 'None')
             + fld('Increases', arr(d.increases).length ? arr(d.increases).map(function (a) { return t(a.type + ' +' + a.days + ' d — ' + (a.justification || 'no justification')); }).join('<br>') : 'None')
             + fld('Reductions', arr(d.reductions).length ? arr(d.reductions).map(function (a) { return t(a.type + ' ' + a.days + ' d — ' + (a.justification || 'no justification')); }).join('<br>') : 'None')
-            + fld('Calculation', t((d.baselineDays || 0) + ' baseline → ' + ((d.imsIntegration && d.imsIntegration.adjustmentPercent) || 0) + '% IMS → ' + ((d.increases || []).concat(d.reductions || []).reduce(function (n, a) { return n + a.days; }, 0)) + ' justified adjustment = ' + (d.calculated != null ? d.calculated : '') + ' calculated → ' + (d.finalDays || 0) + ' final auditor-days'))
+            + fld('Calculation', t((d.baselineDays || 0) + ' baseline → ' + ((d.imsIntegration && d.imsIntegration.adjustmentPercent) || 0) + '% IMS → ' + ((d.increases || []).concat(d.reductions || []).reduce(function (n, a) { return n + a.days; }, 0)) + ' justified adjustment = ' + (d.calculated != null ? d.calculated : '') + ' calculated → ' + (d.finalDays || 0) + ' final auditor-days' + (d.offAgendaReview ? ' in the agenda + ' + d.offAgendaReview.days + ' remote document review = ' + d.totalDays + ' total auditor-days' : '')))
             + fld('Agenda reconciliation', t((rec.scheduledHours != null ? rec.scheduledHours.toFixed(2) : '?') + ' productive auditor-hours scheduled (lunch excluded) against ' + (rec.approvedHours != null ? rec.approvedHours.toFixed(2) : '?') + ' approved') + ' <b class="' + (rec.errors && rec.errors.length ? 'bad' : 'ok') + '">' + (rec.errors && rec.errors.length ? 'DOES NOT AGREE' : 'AGREES') + '</b>')
             + fld('Approved by / on', d.approval && d.approval.approvedBy ? t(d.approval.approvedBy + ' on ' + df.formatDate(d.approval.approvedAt)) : '<b class="bad">Not approved — approver and approval date are not recorded</b>')
             + '</tbody></table>';
