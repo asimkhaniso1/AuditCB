@@ -4502,6 +4502,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.f-tbl th{background:transparent;color:#64748b;font-weight:700;text-align:left;padding:9px 14px 7px;border-bottom:1px solid #cbd5e1;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.07em;}'
             + '.f-tbl td{padding:11px 14px;border-bottom:1px solid #eef2f6;vertical-align:top;word-break:normal;overflow-wrap:anywhere;line-height:1.5;}'
             + '.f-tbl tbody tr:nth-child(even){background:#fafbfc;}.f-tbl tbody tr{break-inside:avoid;}'
+            // Audit-trail rows may split: one area's clause list can be taller than
+            // what is left of a page, and an unsplittable row left the Audit Trails
+            // heading alone on page 32 of PC Connection's report (26 Nov 2026).
+            + '.f-tbl.at-tbl tbody tr{break-inside:auto;page-break-inside:auto;}'
             + '.f-tbl td .badge,.f-tbl td .pill,.f-tbl td .b4-badge,.f-tbl td .b4-pill,.f-tbl td span[style*="border-radius"]{white-space:nowrap;}'
             + '.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}'
             + '.stat-box{text-align:center;padding:16px 10px;border-radius:10px;border-bottom:3px solid transparent;}'
@@ -4717,7 +4721,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                         { label: 'Items Sampled', thStyle: 'text-align:center;', tdStyle: 'padding:11px 14px;text-align:center;' },
                         { label: 'Result', thStyle: 'text-align:center;', tdStyle: 'padding:11px 14px;text-align:center;' }
                     ], auditTrailsBodyRows);
-                    return '<table class="f-tbl"><thead>' + atTable.theadHtml + '</thead><tbody>' + atTable.bodyHtml + '</tbody></table>';
+                    return '<table class="f-tbl at-tbl"><thead>' + atTable.theadHtml + '</thead><tbody>' + atTable.bodyHtml + '</tbody></table>';
                 })()
                 + '</div>' : '')
             // SECTION: PREVIOUS FINDINGS STATUS
@@ -4795,9 +4799,16 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     // above already evidence acknowledgement — an unconditional blank line here
                     // misrepresented an unrequired signature as required.
                     const showClientSig = !!(d.cbSettings && d.cbSettings.requireClientSignature);
+                    // The lead auditor signs in the Signature and Attestation section;
+                    // a second, bare signature line here printed the signature twice
+                    // (PC Connection, 26 Nov 2026). It stays only when that section is
+                    // left out of the report.
+                    const showLeadSig = !secMap['signature'];
+                    if (!showLeadSig && !showClientSig) return '';
                     const leadBox = '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:500;margin-top:4px;">' + htmlEsc(d.report.leadAuditor || '') + '</div></div>';
                     const clientBox = showClientSig ? '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div>' : '';
-                    return '<div style="display:grid;grid-template-columns:' + (showClientSig ? '1fr 1fr' : '1fr') + ';gap:40px;margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;">' + leadBox + clientBox + '</div>';
+                    const boxes = (showLeadSig ? [leadBox] : []).concat(showClientSig ? [clientBox] : []);
+                    return '<div style="display:grid;grid-template-columns:' + (boxes.length > 1 ? '1fr 1fr' : '1fr') + ';gap:40px;margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;break-inside:avoid;page-break-inside:avoid;">' + boxes.join('') + '</div>';
                 })()
                 + '</div>' : '')
             // SECTION: SIGNATURE & ATTESTATION
@@ -4809,11 +4820,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="margin-top:12px;padding:8px 12px;background:#eff6ff;border-radius:8px;font-size:0.78rem;line-height:1.5;color:#475569;text-align:center;">This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
                 + '</div>' : '')
             // SECTION: DISTRIBUTION LIST
-            + (secMap['distribution'] ? '<div id="sec-distribution" class="sh" style="border-left-color:#0d9488;">' + sBadge('distribution') + 'DISTRIBUTION LIST</div><div class="sb">'
+            // The Distribution List is short: kept whole, so its table cannot
+            // move to the next page and leave the heading behind (PC Connection,
+            // 26 Nov 2026, page 56).
+            + (secMap['distribution'] ? '<div class="keep-whole" style="break-inside:avoid;page-break-inside:avoid;"><div id="sec-distribution" class="sh" style="border-left-color:#0d9488;">' + sBadge('distribution') + 'DISTRIBUTION LIST</div><div class="sb">'
                 + '<div style="margin-bottom:8px;font-size:0.85rem;color:#64748b;">This report is distributed to the following parties. Unauthorized distribution is prohibited.</div>'
                 + '<table class="info-tbl dist-tbl"><thead><tr style="background:#f8fafc;"><th style="width:5%;">#</th><th style="width:28%;">Recipient</th><th style="width:22%;">Role</th><th style="width:32%;">Organization</th><th style="width:13%;">Format</th></tr></thead><tbody>'
                 + distributionRows
-                + '</tbody></table></div>' : '')
+                + '</tbody></table></div></div>' : '')
             // ═══ END OF FORMAL CERTIFICATION REPORT — everything below is an optional,
             // separately-toggled annex (report.reportConfig.annexes) that does NOT form
             // part of the certification decision. ═══

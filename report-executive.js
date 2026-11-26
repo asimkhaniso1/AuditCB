@@ -2159,6 +2159,7 @@ Answer:`;
 .b4-heat-cell.b4-heat-crit { background: #7f1d1d; border: 2px solid #7f1d1d; color: #ffffff; }
 .b4-tbl--compact th { padding: 7px 8px; font-size: 8.75pt; }
 .b4-tbl--compact td { padding: 8px 8px; font-size: 9pt; }
+.b4-tbl--compact.car-dense td { padding: 5px 8px; font-size: 8pt; line-height: 1.3; }
 .b4-tbl--compact .b4-badge, .b4-tbl--compact .b4-pill { font-size: 9pt; padding: 2px 6px; }
 
 .b4-chart-box {
