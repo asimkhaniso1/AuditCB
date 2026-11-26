@@ -214,6 +214,22 @@
         return idx;
     }
 
+    // Characters of statement plus evidence above which Part A of a CAR is set
+    // in smaller type (see buildCarForm).
+    var CAR_DENSE_CHARS = 1100;
+
+    // The register's due date is the one agreed and tracked; the checklist
+    // item's caDueDate is only a default (audit date + 90 days) filled in when
+    // the finding was raised. PC Connection's CAR for NCR-092 printed that
+    // default (15 Feb 2027) instead of the agreed 11 Dec 2026, because the
+    // register date was read only when a responsible person was recorded.
+    function carResponsibleDue(capa, item) {
+        var due = (capa && capa.dueDate) || (item && item.caDueDate) || '';
+        var who = capa && capa.capaResponsible;
+        if (who) return who + (due ? ' — due ' + fmtDate(due) : '');
+        return due ? 'Due ' + fmtDate(due) : '';
+    }
+
     /** The register record for a checklist finding: its own record first, else the clause's newest. */
     function capaForItem(capaIndex, item) {
         var src = capaIndex && capaIndex.bySource;
@@ -482,7 +498,7 @@
             { header: '<th style="text-align:center;">Severity</th>', cell: function (r) { return '<td style="text-align:center;">' + badge(r.severity, ncrTypeSeverity(r.severity)) + '</td>'; } },
             { header: '<th style="text-align:center;">Status</th>', cell: function (r) { return '<td style="text-align:center;">' + badge(LIFECYCLE_LABELS[r.status] || r.status, LIFECYCLE_SEVERITY[r.status] || 'neutral') + '</td>'; } },
             { header: '<th>CAPA Ref</th>', cell: function (r) { return '<td>' + esc(r.capa && r.capa.id != null && r.capa.id !== '' ? 'NCR-' + String(r.capa.id).padStart(3, '0') : '—') + '</td>'; } },
-            { header: '<th>Due Date</th>', cell: function (r) { return '<td>' + fmtDate(r.item.caDueDate || (r.capa && r.capa.dueDate)) + '</td>'; } }
+            { header: '<th>Due Date</th>', cell: function (r) { return '<td>' + fmtDate((r.capa && r.capa.dueDate) || r.item.caDueDate) + '</td>'; } }
         ];
         var table = buildSuppressedTable(lifecycleCols, rowInfo);
 
@@ -643,8 +659,14 @@
             + '<div style="text-align:right;"><div style="font-weight:700;">' + esc(carNo) + '</div>' + badge(classification, classification === 'Major' ? 'bad' : 'warn') + '</div>'
             + '</div>';
 
+        // A long statement and evidence set Part A in smaller type so the form
+        // still fits one page. PC Connection's NCR-092 (statement with its
+        // grading sentence, plus the previous-findings evidence) ran Part C
+        // onto a second page that held nothing else (26 Nov 2026).
+        var partAText = (carText(item.ncrDescription) || '').length + (carText(item.clientEvidenceStatement || item.comment) || '').length;
+        var partADense = partAText > CAR_DENSE_CHARS;
         var partA = '<h4 class="b4-subhead">PART A — NONCONFORMITY</h4>'
-            + '<table class="b4-tbl b4-tbl--compact" style="margin-bottom:var(--b4-s3);">'
+            + '<table class="b4-tbl b4-tbl--compact' + (partADense ? ' car-dense' : '') + '" style="margin-bottom:var(--b4-s3);">'
             + '<tbody>'
             + '<tr><td style="font-weight:700;width:130px;">Criterion</td><td>' + criterionCell(item) + '</td></tr>'
             // The statement names the clause and what it requires, so the
@@ -667,7 +689,7 @@
             + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--b4-muted,#666);margin-bottom:2px;">Correction (immediate fix)</div>' + ruledLine(capa && capa.correction) + '</div>'
             + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--b4-muted,#666);margin-bottom:2px;">Root Cause</div>' + ruledLine(capa && capa.rootCause) + '</div>'
             + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--b4-muted,#666);margin-bottom:2px;">Corrective Action</div>' + ruledLine(capa && capa.correctiveAction) + '</div>'
-            + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--b4-muted,#666);margin-bottom:2px;">Responsible / Due Date</div>' + ruledLine((capa && capa.capaResponsible) ? capa.capaResponsible + (capa.dueDate ? ' — due ' + fmtDate(capa.dueDate) : '') : (item.caDueDate ? 'Due ' + fmtDate(item.caDueDate) : ''), 1) + '</div>'
+            + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--b4-muted,#666);margin-bottom:2px;">Responsible / Due Date</div>' + ruledLine(carResponsibleDue(capa, item), 1) + '</div>'
             + '</div>';
 
         // Part C and the signatures stay together: if a long form still runs
