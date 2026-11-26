@@ -2082,10 +2082,22 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                             </select>
                                         </div>
                                         <!--Remarks Column-->
-            <div>
-                <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Auditor Remarks / Notes</label>
-                <textarea class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Justification or internal notes..." rows="3" style="font-size: 0.85rem;">${_execEscText(f.remarks || '')}</textarea>
-            </div>
+            <!-- This box is not a private remark: for a checklist finding it edits the
+                 item's checklist note, for a manual one the finding's description, and
+                 both print in the report, the completed checklist and the findings
+                 summary. The label says which, so nobody types a private remark here. -->
+            ${(() => {
+                const isManual = f.source === 'Manual';
+                const lbl = isManual ? 'Finding description' : 'Checklist note';
+                const hint = isManual
+                    ? 'This is the finding text. It prints in the report and the findings summary.'
+                    : 'This is the checklist item’s note. It prints in the report, the completed checklist and the findings summary.';
+                const ph = isManual ? 'Describe the finding as it will appear in the report...' : 'Evidence seen, as it will appear in the report...';
+                return `<div>
+                <label for="review-remarks-${_execEscText(f.id)}" class="review-remarks-label" style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">${lbl} <span style="font-weight: 400;">(prints in report)</span></label>
+                <textarea id="review-remarks-${_execEscText(f.id)}" class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="${ph}" title="${hint}" rows="3" style="font-size: 0.85rem;">${_execEscText(f.remarks || '')}</textarea>
+            </div>`;
+            })()}
 
                                     </div >
                                 </div >
