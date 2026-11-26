@@ -64,4 +64,35 @@ describe('Audit Trails area for an item', () => {
     it('a plan without traceability keeps the old grouping', () => {
         expect(window._auditTrailAreaResolver({})({ clause: '4.2' }).label).toBe('Unassigned / Cross-functional');
     });
+
+    it('is one rule, in ReportStats, shared with the evidence annex', () => {
+        expect(window.ReportStats.auditAreaResolver(plan)({ clause: '4.2' }).label)
+            .toBe(window._auditTrailAreaResolver(plan)({ clause: '4.2' }).label);
+    });
+});
+
+// The evidence annex (Annex B) grouped by department too, so PC Connection's
+// read "Evidence attachment by department: Unassigned / Cross-functional 79%"
+// and every evidence card carried that label.
+describe('evidence annex areas', () => {
+    const items = [
+        { status: 'conform', clause: '4.2', evidenceImages: ['a.jpg'], comment: 'Seen.' },
+        { status: 'conform', clause: 'A.5.19', evidenceImages: [], comment: 'Seen.' },
+        { status: 'nc', ncrType: 'minor', clause: 'A.7.1', evidenceImages: ['b.jpg'], comment: 'Gap.' }
+    ];
+    const intel = () => window.ReportExecutive.computeEvidenceIntel({ report: { checklistProgress: items }, hydratedProgress: items, auditPlan: plan });
+
+    it('groups attachment by agenda session, not "Unassigned / Cross-functional"', () => {
+        const by = intel().byDepartment;
+        expect(Object.keys(by)).toEqual(expect.arrayContaining([
+            'Context and interested parties; leadership, policy, roles and responsibilities',
+            'Access lifecycle; supplier and cloud-service security',
+            'Other items (not tied to an agenda session)'
+        ]));
+        expect(by['Unassigned / Cross-functional']).toBeUndefined();
+    });
+
+    it('labels evidence cards with the same area', () => {
+        expect(intel().evidenced.map((e) => e.department)).toContain('Context and interested parties; leadership, policy, roles and responsibilities');
+    });
 });
