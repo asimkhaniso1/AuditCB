@@ -643,7 +643,10 @@
         const cell = editable ? '<td contenteditable="true" style="cursor:text;min-width:150px;">' : '<td>';
         const badge = function (kind) {
             const b = PREV_TYPE_BADGE[kind];
-            return '<td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + b[1] + '">' + b[0] + '</span></td>';
+            // "Observation" did not fit the 12% Type column and ran into the
+            // follow-up text in the printed report (PC Connection, 26 Nov 2026):
+            // the column is wider now and the badge never wraps or overflows.
+            return '<td style="text-align:center;white-space:nowrap;padding-left:6px;padding-right:6px;"><span style="display:inline-block;padding:2px 6px;border-radius:12px;font-size:0.72rem;font-weight:600;white-space:nowrap;' + b[1] + '">' + b[0] + '</span></td>';
         };
         let rows = '';
         items.forEach(function (x, n) {
@@ -2646,7 +2649,7 @@
                                 return '<div style="padding:12px;background:#f0fdf4;border-radius:8px;color:#166534;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><strong>Previous Audit (' + (prevReport.date || '—') + '):</strong> No findings were raised.</div>' + prevFindingsNarrative;
                             }
                             return '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i><strong>Previous Audit:</strong> ' + (prevReport.date || '—') + ' | ' + htmlEsc(prevReport.standard || d.report.standard || '') + ' | ' + prev.summary + '</div>'
-                                + '<table style="width:100%;font-size:0.84rem;border-collapse:collapse;"><thead><tr style="background:#eef2ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Ref</th><th style="padding:10px 14px;text-align:left;width:20%;">Clause</th><th style="padding:10px 14px;text-align:center;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:56%;">Follow-up Status (click to edit)</th></tr></thead><tbody>' + prev.rows + '</tbody></table>'
+                                + '<table style="width:100%;font-size:0.84rem;border-collapse:collapse;"><thead><tr style="background:#eef2ff;"><th style="padding:10px 14px;text-align:left;width:13%;">Ref</th><th style="padding:10px 14px;text-align:left;width:13%;">Clause</th><th style="padding:10px 14px;text-align:center;width:18%;">Type</th><th style="padding:10px 14px;text-align:left;width:56%;">Follow-up Status (click to edit)</th></tr></thead><tbody>' + prev.rows + '</tbody></table>'
                                 // The status text prints in the executive summary and is
                                 // checked by Report Integrity, so it must be editable here
                                 // too, not only when there were no previous NCs. With a
@@ -4728,7 +4731,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (secMap['prev-findings'] ? '<div id="sec-prev-findings" class="sh" style="border-left-color:#1d4ed8;">' + sBadge('prev-findings') + 'PREVIOUS FINDINGS STATUS</div><div class="sb">'
                 + (prevFindingsRowsHtml
                     ? '<div style="margin-bottom:12px;padding:10px 14px;background:#eff6ff;border-radius:8px;font-size:0.88rem;color:#1d4ed8;">Findings raised at the previous audit (nonconformities, observations and opportunities for improvement) and their follow-up status.</div>'
-                        + '<table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:14%;">Ref</th><th style="width:18%;">Clause</th><th style="width:12%;text-align:center;">Type</th><th style="width:56%;">Follow-up Status</th></tr></thead><tbody>' + prevFindingsRowsHtml + '</tbody></table>'
+                        + '<table class="f-tbl"><thead><tr style="background:#eff6ff;"><th style="width:14%;">Ref</th><th style="width:12%;">Clause</th><th style="width:18%;text-align:center;">Type</th><th style="width:56%;">Follow-up Status</th></tr></thead><tbody>' + prevFindingsRowsHtml + '</tbody></table>'
                     : '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + htmlEsc(editedPrevFindings || _derivePreviousFindingsStatus(d)) + '</div>')
                 + '</div>' : '')
             // SECTION: OBSERVATIONS
