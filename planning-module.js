@@ -685,7 +685,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
         recalculateDurationAllocation();
         generatePlanNarratives();
     });
-    ['plan-ims-adjustment', 'plan-remote-days', 'plan-onsite-days', 'plan-justified-adjustment'].forEach(id => {
+    ['plan-ims-adjustment', 'plan-remote-days', 'plan-onsite-days', 'plan-justified-adjustment', 'plan-review-days'].forEach(id => {
         document.getElementById(id)?.addEventListener('input', recalculateDurationAllocation);
     });
     ['plan-lead-auditor', 'plan-team'].forEach(id => document.getElementById(id)?.addEventListener('change', renderTeamCompetence));
@@ -775,7 +775,12 @@ function recalculateDurationAllocation() {
     const baseline = parseFloat(document.getElementById('plan-baseline-days')?.value) || 0;
     const imsPercent = parseFloat(document.getElementById('plan-ims-adjustment')?.value) || 0;
     const justified = parseFloat(document.getElementById('plan-justified-adjustment')?.value) || 0;
-    const finalDays = Math.max(0, Math.ceil((baseline * (1 + imsPercent / 100) + justified) * 2) / 2);
+    // Review recorded outside the agenda is part of the calculated duration,
+    // so the agenda carries only the rest. Without this, reopening PC
+    // Connection's plan (4.5 calculated, 3 reviewed before the audit) would
+    // have put 4.5 days back into an agenda that schedules 1.5.
+    const reviewDays = parseFloat(document.getElementById('plan-review-days')?.value) || 0;
+    const finalDays = Math.max(0, Math.ceil((baseline * (1 + imsPercent / 100) + justified - reviewDays) * 2) / 2);
     const method = document.getElementById('plan-audit-method')?.value || 'On-site';
     const remoteInput = document.getElementById('plan-remote-days');
     const onsiteInput = document.getElementById('plan-onsite-days');
