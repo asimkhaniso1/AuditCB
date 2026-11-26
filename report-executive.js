@@ -946,11 +946,16 @@ ${data.forwardOutlook ? `
         const missingEvidence = [];
         const evidenced = [];
         const byDepartment = {};
+        // Areas as in Audit Trails: department, else the agenda session that
+        // covered the item (ReportStats.auditAreaResolver).
+        const areaOf = (window.ReportStats && typeof window.ReportStats.auditAreaResolver === 'function')
+            ? window.ReportStats.auditAreaResolver(d && d.auditPlan) : null;
 
         items.forEach(item => {
             const imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
-            const dept = normalizeDept(item.department);
-            if (!byDepartment[dept]) byDepartment[dept] = { total: 0, withEvidence: 0 };
+            const area = areaOf ? areaOf(item) : { label: normalizeDept(item.department), rank: -1 };
+            const dept = area.label;
+            if (!byDepartment[dept]) byDepartment[dept] = { total: 0, withEvidence: 0, rank: area.rank };
             byDepartment[dept].total++;
 
             totalPhotos += (imgs && imgs.length) || 0;
@@ -1056,7 +1061,9 @@ ${data.forwardOutlook ? `
   <td>${m.status === 'nc' ? `<span class="b4-badge b4-badge--${m.ncrType === 'major' ? 'bad' : 'warn'}">${m.ncrType === 'major' ? '✕ ' : '! '}${esc((m.ncrType || 'nc').toUpperCase())}</span>` : `<span class="b4-badge b4-badge--neutral">${esc(m.status || '')}</span>`}</td>
 </tr>`).join('');
 
-        const deptRows = Object.entries(intel.byDepartment).map(([name, v]) => {
+        const deptRows = Object.entries(intel.byDepartment)
+            .sort((a, b) => ((a[1].rank == null ? -1 : a[1].rank) - (b[1].rank == null ? -1 : b[1].rank)))
+            .map(([name, v]) => {
             const pct = v.total ? Math.round((v.withEvidence / v.total) * 100) : 0;
             const sev = pct >= 80 ? 'good' : pct >= 50 ? 'warn' : 'bad';
             return `<div class="b4-bar-row">
@@ -1128,7 +1135,7 @@ ${data.forwardOutlook ? `
 </div>
 <p class="b4-caption" style="margin-top:var(--b4-s3);">${esc(intel.qualityNote)}</p>
 
-<div class="b4-section-title" style="margin-top:var(--b4-s5);">Evidence Attachment by Department</div>
+<div class="b4-section-title" style="margin-top:var(--b4-s5);">Evidence Attachment by Audit Area</div>
 <div class="b4-card">${deptRows}</div>
 
 ${sampleCards ? `

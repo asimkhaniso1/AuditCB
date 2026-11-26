@@ -169,42 +169,10 @@
     // recertification recorded no departments, so all 78 items printed as one
     // "Unassigned / Cross-functional" row (technical review item 12). Items no
     // session covered are listed as such, never guessed into one.
-    const UNTIED_AREA = 'Other items (not tied to an agenda session)';
-    const auditTrailAreaResolver = (plan) => {
-        const tr = (plan && plan.traceability) || {};
-        const titles = {};
-        const rank = {};
-        (Array.isArray(tr.sessions) ? tr.sessions : []).forEach((sn, i) => {
-            if (sn && sn.sessionId && sn.title) { titles[sn.sessionId] = String(sn.title).trim(); rank[sn.sessionId] = i; }
-        });
-        const tokens = (c) => String(c == null ? '' : c).split(/[,/;]+/).map((t) => t.trim()).filter(Boolean);
-        const byToken = {};
-        const questions = (tr.checklist && Array.isArray(tr.checklist.questions)) ? tr.checklist.questions : [];
-        questions.forEach((q) => {
-            const ids = (q && Array.isArray(q.sessionIds) ? q.sessionIds : []).filter((id) => titles[id]);
-            if (!ids.length) return;
-            [String(q.clause || '').trim()].concat(tokens(q.clause)).forEach((t) => { if (t && !byToken[t]) byToken[t] = ids[0]; });
-        });
-        const hasSessions = Object.keys(titles).length > 0;
-        return (item) => {
-            const raw = item && item.department && String(item.department).trim();
-            if (raw) {
-                const label = (window.ReportStats && window.ReportStats.normalizeDeptName) ? window.ReportStats.normalizeDeptName(raw) : raw;
-                return { label: label, rank: -1 };
-            }
-            if (hasSessions) {
-                const cands = [item && item.clause, item && item.criterionRef].map((c) => String(c == null ? '' : c).trim()).filter(Boolean);
-                const all = cands.concat(cands.reduce((acc, c) => acc.concat(tokens(c)), []));
-                for (let i = 0; i < all.length; i++) {
-                    const sid = byToken[all[i]];
-                    if (sid) return { label: titles[sid], rank: rank[sid] };
-                }
-                return { label: UNTIED_AREA, rank: 100000 };
-            }
-            const fallback = (window.ReportStats && window.ReportStats.normalizeDeptName) ? window.ReportStats.normalizeDeptName(item && item.department) : 'Unassigned / Cross-functional';
-            return { label: fallback, rank: -1 };
-        };
-    };
+    // One rule for every report section, in ReportStats.auditAreaResolver.
+    const auditTrailAreaResolver = (plan) => (window.ReportStats && typeof window.ReportStats.auditAreaResolver === 'function')
+        ? window.ReportStats.auditAreaResolver(plan)
+        : (item) => ({ label: (item && item.department && String(item.department).trim()) || 'Unassigned / Cross-functional', rank: -1 });
     // Departments first (in the order met), then agenda sessions in agenda
     // order, then items no session covered.
     const sortAreas = (order, areaRank) => {

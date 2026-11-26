@@ -56,6 +56,42 @@
         return s;
     }
 
+    // The area an item is reported under (Audit Trails, the evidence annex):
+    // its department when one is recorded, otherwise the agenda session that
+    // covered its clause (plan.traceability), otherwise "not tied to an agenda
+    // session". PC Connection's 2026 recertification recorded no departments,
+    // so every item read "Unassigned / Cross-functional" (technical review
+    // item 12). Returns item -> { label, rank }; rank orders departments
+    // first, then sessions in agenda order, then untied items.
+    const UNTIED_AREA_LABEL = 'Other items (not tied to an agenda session)';
+    function auditAreaResolver(plan) {
+        const tr = (plan && plan.traceability) || {};
+        const titles = {};
+        const rank = {};
+        safeArr(tr.sessions).forEach((sn, i) => {
+            if (sn && sn.sessionId && sn.title) { titles[sn.sessionId] = trim(sn.title); rank[sn.sessionId] = i; }
+        });
+        const tokens = (c) => String(c == null ? '' : c).split(/[,/;]+/).map(trim).filter(Boolean);
+        const byToken = {};
+        safeArr(tr.checklist && tr.checklist.questions).forEach((q) => {
+            const ids = safeArr(q && q.sessionIds).filter((id) => titles[id]);
+            if (!ids.length) return;
+            [trim(q.clause)].concat(tokens(q.clause)).forEach((t) => { if (t && !byToken[t]) byToken[t] = ids[0]; });
+        });
+        const hasSessions = Object.keys(titles).length > 0;
+        return (item) => {
+            const raw = trim(item && item.department);
+            if (raw || !hasSessions) return { label: normalizeDeptName(raw), rank: -1 };
+            const cands = [item && item.clause, item && item.criterionRef].map(trim).filter(Boolean);
+            const all = cands.concat(cands.reduce((acc, c) => acc.concat(tokens(c)), []));
+            for (let i = 0; i < all.length; i++) {
+                const sid = byToken[all[i]];
+                if (sid) return { label: titles[sid], rank: rank[sid] };
+            }
+            return { label: UNTIED_AREA_LABEL, rank: 100000 };
+        };
+    }
+
     function itemHasEvidence(item) {
         return !!(item && (item.evidenceImage || (Array.isArray(item.evidenceImages) && item.evidenceImages.length > 0)));
     }
@@ -2060,6 +2096,8 @@
         CAPA_PROCEDURE_SENTENCE,
         normalizeDeptName,
         UNASSIGNED_LABEL,
+        auditAreaResolver,
+        UNTIED_AREA_LABEL,
         recommendationText,
         resolveRecommendation,
         buildProgramme,
