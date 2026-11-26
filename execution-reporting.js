@@ -182,6 +182,28 @@
     };
     window._auditTrailAreaResolver = auditTrailAreaResolver;
 
+    // The opening paragraph of Annex B: what the annex holds, naming only the
+    // parts this report includes.
+    const ANNEX_B_PARTS = {
+        'evidence-intel': 'an overview of the evidence attached to the assessed items, by audit area, with the findings that have no attached evidence',
+        evidenceTrace: 'the evidence behind each finding, with its corrective action reference',
+        fwPack: 'framework-specific technical evidence tables',
+        evidence: 'an index of every evidence item with its criterion, finding reference and capture date'
+    };
+    const annexBIntroHtml = (mods, secMap) => {
+        const parts = (Array.isArray(mods) ? mods : [])
+            .filter((m) => m && m.present !== false)
+            .map((m) => ANNEX_B_PARTS[m.key] || String(m.desc || '').trim())
+            .filter(Boolean);
+        if (secMap && secMap.evidence) parts.push(ANNEX_B_PARTS.evidence);
+        const list = parts.length > 1 ? parts.slice(0, -1).join('; ') + '; and ' + parts[parts.length - 1] : (parts[0] || '');
+        return '<p style="margin:0 0 14px;">This annex supports the findings and conformity statements in the body of the report. It does not form part of the certification decision. '
+            + 'It gives the audit plan and checklist references below' + (list ? ', followed by ' + htmlEsc(list) : '') + '. '
+            + 'Full-resolution images are provided in the separate Evidence Pack under the same report reference.</p>';
+    };
+
+    window._annexBIntroHtml = annexBIntroHtml;
+
     const wasAssessed = (item) => {
         const RS = window.ReportStats;
         return !(RS && typeof RS.classifyItem === 'function' && RS.classifyItem(item) === 'notAssessed');
@@ -2870,13 +2892,13 @@
                 </div>
                 <!-- Annexures -->
                 <div class="rp-sec" id="sec-annexures">
-                    <div class="rp-sec-hdr" style="border-left-color:#9333ea;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-paperclip"></i></span>ANNEXURES / APPENDICES<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#9333ea;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-paperclip"></i></span>ANNEX CONTENTS &amp; REFERENCES<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <div id="rp-annexures" class="rp-edit" contenteditable="true" style="min-height:80px;line-height:1.8;color:#334155;">
-                            <div style="font-weight:600;margin-bottom:8px;">Annexure A — Audit Plan Reference</div>
+                            <div style="font-weight:600;margin-bottom:8px;">Audit plan reference</div>
                             <div style="margin-bottom:6px;">• Plan Reference: ${d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A'}</div>
                             <div style="margin-bottom:12px;">• Standard: ${htmlEsc(d.report.standard || 'ISO Standard')}</div>
-                            <div style="font-weight:600;margin-bottom:8px;">Annexure B — Checklist Summary</div>
+                            <div style="font-weight:600;margin-bottom:8px;">Checklist summary</div>
                             <div style="margin-bottom:6px;">• ${itemTotalsLine(d)}</div>
                             <div style="margin-bottom:6px;">• Conforming: ${d.stats.conformCount} | NC: ${d.stats.ncCount} | Observations: ${d.stats.observationCount} | OFI: ${d.stats.ofiCount}</div>
                             <div style="margin-bottom:12px;">• N/A Items: ${d.stats.naCount}</div>
@@ -4175,7 +4197,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             { key: 'conclusion',   name: 'AUDIT CONCLUSION &amp; RECOMMENDATION', desc: 'Closing meeting, certification recommendation',      color: '#4338ca', present: en['conclusion'] !== false },
             { key: 'signature',    name: 'SIGNATURE &amp; ATTESTATION',        desc: 'Signatures and attestation',                            color: '#1e293b', present: en['signature'] !== false },
             { key: 'distribution', name: 'DISTRIBUTION LIST',                  desc: 'Controlled distribution of this report',                color: '#0d9488', present: en['distribution'] !== false },
-            { key: 'annexures',    name: 'ANNEXURES &amp; APPENDICES',         desc: 'Supporting documents and appendices',                   color: '#9333ea', present: en['annexures'] !== false },
+            { key: 'annexures',    name: 'ANNEX CONTENTS &amp; REFERENCES',    desc: 'What this annex contains; audit plan and checklist references',                   color: '#9333ea', present: en['annexures'] !== false },
             { key: 'evidence',     name: 'EVIDENCE INDEX',                     desc: 'Indexed photographic evidence collected during the audit', color: '#c2410c', present: hasEvidence }
         ];
         // ─── Formal report vs optional annexes (#3) ────────────────────────
@@ -4887,12 +4909,17 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 ? annexDivider('B', 'EVIDENCE', 'This annex contains supporting evidence records for traceability. It does not form part of the certification decision.')
                 : '')
             // SECTION: ANNEXURES
-            + (secMap['annexures'] ? '<div id="sec-annexures" class="sh" style="border-left-color:#9333ea;flex-direction:column;align-items:flex-start;gap:2px;"><div style="font-size:0.62rem;letter-spacing:0.08em;color:#cbd5e1;text-transform:uppercase;">Annex B</div><div style="display:flex;align-items:center;gap:12px;width:100%;">' + sBadge('annexures') + 'ANNEXURES &amp; APPENDICES</div></div><div class="sb">'
+            + (secMap['annexures'] ? '<div id="sec-annexures" class="sh" style="border-left-color:#9333ea;flex-direction:column;align-items:flex-start;gap:2px;"><div style="font-size:0.62rem;letter-spacing:0.08em;color:#cbd5e1;text-transform:uppercase;">Annex B</div><div style="display:flex;align-items:center;gap:12px;width:100%;">' + sBadge('annexures') + 'ANNEX CONTENTS &amp; REFERENCES</div></div><div class="sb">'
                 + '<div style="line-height:1.55;color:#334155;">'
-                + '<div style="font-weight:700;margin-bottom:6px;">Annexure A — Audit Plan Reference</div>'
+                // Technical review of PC Connection's 2026 report (item 17): this
+                // section was headed "Annexures & Appendices", listed an
+                // "Annexure A" and "Annexure B" inside Annex B, and never said
+                // what the annex contains. It now opens with that.
+                + annexBIntroHtml(modEvidenceMods, secMap)
+                + '<div style="font-weight:700;margin-bottom:6px;">Audit plan reference</div>'
                 + '<div style="margin-bottom:4px;">• Plan Reference: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A') + '</div>'
                 + '<div style="margin-bottom:12px;">• Standard: ' + htmlEsc(standard) + '</div>'
-                + '<div style="font-weight:700;margin-bottom:6px;">Annexure B — Checklist Summary</div>'
+                + '<div style="font-weight:700;margin-bottom:6px;">Checklist summary</div>'
                 + '<div style="margin-bottom:4px;">• ' + itemTotalsLine(d) + '</div>'
                 + '<div style="margin-bottom:4px;">• Conforming: ' + d.stats.conformCount + ' | NC: ' + (d.stats.ncCount) + ' | Observations: ' + d.stats.observationCount + ' | OFI: ' + d.stats.ofiCount + '</div>'
                 + '<div style="margin-bottom:12px;">• N/A Items: ' + d.stats.naCount + '</div>'

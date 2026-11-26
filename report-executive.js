@@ -1038,7 +1038,10 @@ ${data.forwardOutlook ? `
         } else if (coveragePct >= 80) {
             qualityNote = `Objective evidence is well-documented, with evidence-attachment coverage at ${coveragePct}%.`;
         } else if (coveragePct >= 50) {
-            qualityNote = `Evidence-attachment coverage is moderate at ${coveragePct}%; ${missingEvidence.length} finding(s) need supporting evidence before issuance.`;
+            // Client-facing: states the position, not an internal to-do
+            // ("need supporting evidence before issuance" printed in PC
+            // Connection's 2026 report).
+            qualityNote = `Evidence is attached to ${coveragePct}% of assessed items; ${missingEvidence.length} finding(s) have no attached evidence.`;
         } else {
             qualityNote = `Evidence-attachment coverage is low at ${coveragePct}%; ${missingEvidence.length} finding(s) currently lack supporting evidence.`;
         }
