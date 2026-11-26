@@ -163,6 +163,57 @@
         return 'Checklist Items: ' + c.total + ' | Assessed: ' + c.assessed + (c.notAssessed ? ' | Not sampled or not assessed: ' + c.notAssessed : '');
     };
     // An item with no result was not part of an audit trail.
+    // The area an assessed item is reported under in Audit Trails: its
+    // department when one is recorded, otherwise the agenda session that
+    // covered its clause (plan.traceability). PC Connection's 2026
+    // recertification recorded no departments, so all 78 items printed as one
+    // "Unassigned / Cross-functional" row (technical review item 12). Items no
+    // session covered are listed as such, never guessed into one.
+    const UNTIED_AREA = 'Other items (not tied to an agenda session)';
+    const auditTrailAreaResolver = (plan) => {
+        const tr = (plan && plan.traceability) || {};
+        const titles = {};
+        const rank = {};
+        (Array.isArray(tr.sessions) ? tr.sessions : []).forEach((sn, i) => {
+            if (sn && sn.sessionId && sn.title) { titles[sn.sessionId] = String(sn.title).trim(); rank[sn.sessionId] = i; }
+        });
+        const tokens = (c) => String(c == null ? '' : c).split(/[,/;]+/).map((t) => t.trim()).filter(Boolean);
+        const byToken = {};
+        const questions = (tr.checklist && Array.isArray(tr.checklist.questions)) ? tr.checklist.questions : [];
+        questions.forEach((q) => {
+            const ids = (q && Array.isArray(q.sessionIds) ? q.sessionIds : []).filter((id) => titles[id]);
+            if (!ids.length) return;
+            [String(q.clause || '').trim()].concat(tokens(q.clause)).forEach((t) => { if (t && !byToken[t]) byToken[t] = ids[0]; });
+        });
+        const hasSessions = Object.keys(titles).length > 0;
+        return (item) => {
+            const raw = item && item.department && String(item.department).trim();
+            if (raw) {
+                const label = (window.ReportStats && window.ReportStats.normalizeDeptName) ? window.ReportStats.normalizeDeptName(raw) : raw;
+                return { label: label, rank: -1 };
+            }
+            if (hasSessions) {
+                const cands = [item && item.clause, item && item.criterionRef].map((c) => String(c == null ? '' : c).trim()).filter(Boolean);
+                const all = cands.concat(cands.reduce((acc, c) => acc.concat(tokens(c)), []));
+                for (let i = 0; i < all.length; i++) {
+                    const sid = byToken[all[i]];
+                    if (sid) return { label: titles[sid], rank: rank[sid] };
+                }
+                return { label: UNTIED_AREA, rank: 100000 };
+            }
+            const fallback = (window.ReportStats && window.ReportStats.normalizeDeptName) ? window.ReportStats.normalizeDeptName(item && item.department) : 'Unassigned / Cross-functional';
+            return { label: fallback, rank: -1 };
+        };
+    };
+    // Departments first (in the order met), then agenda sessions in agenda
+    // order, then items no session covered.
+    const sortAreas = (order, areaRank) => {
+        const first = {};
+        order.forEach((a, i) => { first[a] = i; });
+        order.sort((a, b) => ((areaRank[a] - areaRank[b]) || (first[a] - first[b])));
+    };
+    window._auditTrailAreaResolver = auditTrailAreaResolver;
+
     const wasAssessed = (item) => {
         const RS = window.ReportStats;
         return !(RS && typeof RS.classifyItem === 'function' && RS.classifyItem(item) === 'notAssessed');
@@ -3966,10 +4017,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const auditTrailsBodyRows = (function () {
             const groups = {};
             const order = [];
+            const areaOf = auditTrailAreaResolver(d.auditPlan);
+            const areaRank = {};
             (d.hydratedProgress || []).filter(wasAssessed).forEach(function (item) {
-                const dept = (window.ReportStats && window.ReportStats.normalizeDeptName)
-                    ? window.ReportStats.normalizeDeptName(item.department)
-                    : ((item.department && String(item.department).trim()) || 'Unassigned / Cross-functional');
+                const area = areaOf(item);
+                const dept = area.label;
+                if (!(dept in areaRank)) areaRank[dept] = area.rank;
                 if (!groups[dept]) { groups[dept] = { personnel: new Set(), clauses: new Set(), internalRefs: new Set(), count: 0, worst: 'conform' }; order.push(dept); }
                 const g = groups[dept];
                 if (item.personnel) String(item.personnel).split(/[,;]/).map(function (p) { return p.trim(); }).filter(Boolean).forEach(function (p) { g.personnel.add(p); });
@@ -4000,6 +4053,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 }
                 if (rank[worstKey] > (rank[g.worst] || 0)) g.worst = worstKey;
             });
+            sortAreas(order, areaRank);
             const worstLabel = { major: 'Major NC', minor: 'Minor NC', observation: 'Observation', ofi: 'OFI', conform: 'Conforming' };
             const worstStyle = {
                 major: 'background:#fee2e2;color:#991b1b;',
@@ -4038,10 +4092,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const auditTrailTimelineHtml = (function () {
             const groups = {};
             const order = [];
+            const areaOf = auditTrailAreaResolver(d.auditPlan);
+            const areaRank = {};
             (d.hydratedProgress || []).filter(wasAssessed).forEach(function (item) {
-                const dept = (window.ReportStats && window.ReportStats.normalizeDeptName)
-                    ? window.ReportStats.normalizeDeptName(item.department)
-                    : ((item.department && String(item.department).trim()) || 'Unassigned / Cross-functional');
+                const area = areaOf(item);
+                const dept = area.label;
+                if (!(dept in areaRank)) areaRank[dept] = area.rank;
                 if (!groups[dept]) { groups[dept] = { personnel: new Set(), clauses: new Set(), count: 0, nc: 0, major: 0, advisory: 0 }; order.push(dept); }
                 const g = groups[dept];
                 if (item.personnel) String(item.personnel).split(/[,;]/).map(function (p) { return p.trim(); }).filter(Boolean).forEach(function (p) { g.personnel.add(p); });
@@ -4058,6 +4114,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 }
             });
             if (!order.length) return '';
+            sortAreas(order, areaRank);
             return '<div class="b4-timeline" style="position:relative;padding-left:22px;">'
                 + order.map(function (dept) {
                     const g = groups[dept];
