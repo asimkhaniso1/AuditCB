@@ -427,7 +427,7 @@
     // there. Read the stored report, change this field only, write it back:
     // a whole-report write from this page could undo work saved meanwhile in
     // another tab.
-    const FIELD_COLUMNS = { closingMeeting: 'closing_meeting', openingMeeting: 'opening_meeting', conclusion: 'conclusion' };
+    const FIELD_COLUMNS = { closingMeeting: 'closing_meeting', openingMeeting: 'opening_meeting', conclusion: 'conclusion', status: 'status' };
     // One write at a time: two boxes left in quick succession would otherwise
     // both read the same stored report and the second write would drop the first.
     let previewWriteQueue = Promise.resolve();
@@ -958,7 +958,48 @@
             return;
         }
         if (typeof window.saveData === 'function') window.saveData();
+        // saveData keeps the browser copy only. The revert stayed in the open
+        // tab while the server still held the report as issued, so a reload
+        // brought "Final" back and Finalize & Publish disappeared again (PC
+        // Connection, 27 Nov 2026: two Draft exports, no way to re-issue).
+        // Both fields are written to the stored report, one at a time.
+        const id = d.report.id;
+        const status = d.report.status;
+        Promise.all([
+            persistPreviewField(id, ['reportStatus'], 'draft'),
+            status ? persistPreviewField(id, ['status'], status) : true
+        ]).then((oks) => {
+            if (typeof window.showNotification !== 'function') return;
+            if (oks.every(Boolean)) window.showNotification('Report reverted to draft and saved.', 'success');
+            else window.showNotification('Reverted in this tab only: the server still holds the issued report. Check your connection and revert again.', 'error');
+        });
         window.showReportPreviewModal();
+    };
+
+    // The issuing action the preview offers, or null. A draft is finalized; a
+    // final report whose content has changed since it was issued is re-issued
+    // as the next version without reverting it first. The execution page
+    // offered only "Download PDF" for an issued report, so re-issuing meant a
+    // revert in the preview and a trip back to that page.
+    const previewIssueAction = (d) => {
+        if (!d || !d.report || !hasIssuanceRole()) return null;
+        if (!isReportFinal(d.report)) return { label: 'Finalize & Publish', reissue: false };
+        if (!window._isModifiedSinceIssue(d)) return null;
+        const log = Array.isArray(d.report.issueLog) ? d.report.issueLog : [];
+        const last = log.length ? (parseFloat(log[log.length - 1].version) || 1.0) : 0;
+        return { label: 'Re-issue as v' + (last ? (last + 0.1).toFixed(1) : '1.0'), reissue: true };
+    };
+    window._previewIssueAction = previewIssueAction;
+
+    /** Finalize (or re-issue) the report open in the preview, then redraw it. */
+    window.finalizeFromPreview = async function () {
+        const d = window._reportPreviewData;
+        if (!d || !d.report || typeof window.finalizeAndPublish !== 'function') return;
+        const before = Array.isArray(d.report.issueLog) ? d.report.issueLog.length : 0;
+        await window.finalizeAndPublish(d.report.id);
+        const after = Array.isArray(d.report.issueLog) ? d.report.issueLog.length : 0;
+        // Cancelled or blocked: nothing was issued, leave the preview as it is.
+        if (after > before) window.showReportPreviewModal();
     };
 
     // ─── Finding Status editor (report.findingStatus[clause|department]) ──────
@@ -2917,6 +2958,10 @@
                     <button id="ai-polish-btn" data-action="polishNotesWithAI" style="padding:10px 20px;border-radius:8px;border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);font-weight:600;cursor:pointer;color:#0369a1;" aria-label="Auto-generate"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>Polish Notes with AI</button>
                     <button data-action="toggleReportStatus" id="rp-status-toggle" style="padding:10px 16px;border-radius:20px;border:2px solid ${isReportFinal(d.report) ? '#059669' : '#f59e0b'};background:${isReportFinal(d.report) ? '#ecfdf5' : '#fffbeb'};color:${isReportFinal(d.report) ? '#059669' : '#b45309'};font-weight:700;cursor:pointer;" aria-label="Toggle report status" title="Click to switch between Draft and Final. Draft exports show a DRAFT watermark and do not advance the revision history."><i class="fa-solid ${isReportFinal(d.report) ? 'fa-circle-check' : 'fa-pen'}" style="margin-right:6px;"></i>${isReportFinal(d.report) ? 'FINAL' : 'DRAFT'}</button>
                     <button data-action="exportEvidencePack" data-arg1="${d.report.id}" style="padding:10px 20px;border-radius:8px;border:1px solid #c2410c;background:#fff7ed;color:#c2410c;font-weight:600;cursor:pointer;" aria-label="Evidence Pack PDF"><i class="fa-solid fa-images" style="margin-right:6px;"></i>Evidence Pack (PDF)</button>
+                    ${(function () {
+                        const act = previewIssueAction(d);
+                        return act ? `<button data-action="finalizeFromPreview" id="rp-finalize" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:white;font-weight:600;cursor:pointer;" aria-label="${htmlEsc(act.label)}" title="${act.reissue ? 'The content has changed since it was issued. Issue it again as the next version.' : 'Issue this report as FINAL.'}"><i class="fa-solid fa-check-double" style="margin-right:6px;"></i>${htmlEsc(act.label)}</button>` : '';
+                    })()}
                     <button data-action="exportReportPDF" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Export PDF"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
                 </div>
             </div>
