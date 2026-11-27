@@ -1019,7 +1019,7 @@ describe('KTD acceptance #33 — the corrected report issues cleanly', () => {
             expect(intel.evidenced[0].department).toBe('Management');
         });
 
-        it('uses the explicit "Untitled item" placeholder — never requirement/description — in the missing-evidence table', () => {
+        it('uses a dash placeholder — never requirement/description — in the missing-evidence table', () => {
             const progress = [{
                 status: 'nc', ncrType: 'minor', clause: '8.5.2', department: 'Management',
                 requirement: 'Management', description: 'Management',
@@ -1028,7 +1028,9 @@ describe('KTD acceptance #33 — the corrected report issues cleanly', () => {
             }];
             const d = { report: correctedReport(), hydratedProgress: progress };
             const intel = window.ReportExecutive.computeEvidenceIntel(d);
-            expect(intel.missingEvidence[0].item).toBe('Untitled item');
+            // No KB title and no standards registry loaded here: a dash, not a
+            // department name ("Untitled item" read as a defect; PC Connection, 27 Nov 2026).
+            expect(intel.missingEvidence[0].item).toBe('—');
             expect(intel.missingEvidence[0].item).not.toBe('Management');
             expect(intel.missingEvidence[0].department).toBe('Management');
         });
