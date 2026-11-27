@@ -230,6 +230,28 @@
 
     const clauseTitle = (item) => cleanFindingText((item.kbMatch && item.kbMatch.title) ? item.kbMatch.title : '', 90);
 
+    // A clause title from the standards registry, when the clause means one
+    // thing across the report's standards. An integrated finding has no
+    // Knowledge Base match (it belongs to no single standard), so the
+    // "Findings without supporting evidence" table printed "Untitled item"
+    // for PC Connection's observations at 8.1 and 8.7.2 (27 Nov 2026). 8.1 is
+    // "Operational planning and control" in 27001, 22301 and 20000-1, and
+    // 8.7.2 exists only in 20000-1. A number whose title differs between the
+    // standards (8.3, 10.1, 10.2) gets no title: the clause-number trap
+    // documented in checklist-standards.js. Never the item's requirement or
+    // description, which can hold a department name (see clauseTitle).
+    const registryClauseTitle = (item, d) => {
+        const CS = (typeof window !== 'undefined') ? window.ChecklistStandards : null;
+        if (!CS || typeof CS.resolve !== 'function' || typeof CS.lookupRef !== 'function') return '';
+        const m = /\b(A\.\d+(?:\.\d+)*|\d+(?:\.\d+)+)\b/.exec(String(item.criterionRef || item.clause || ''));
+        if (!m) return '';
+        const standard = (d && d.report && d.report.standard) || (d && d.auditPlan && d.auditPlan.standard) || '';
+        const ids = CS.resolve(standard).standards.map(s => s.id);
+        if (!ids.length) return '';
+        const titles = Array.from(new Set(CS.lookupRef(ids, m[1]).map(h => String(h.title || '').trim()).filter(Boolean)));
+        return titles.length === 1 ? cleanFindingText(titles[0], 90) : '';
+    };
+
     // ------------------------------------------------------------------
     // Criterion / department safety helpers — prevent "Clause FOCUS.x" and
     // "(General)" from ever reaching printed narrative text. Prefer the
@@ -1009,10 +1031,11 @@ ${data.forwardOutlook ? `
                         clause: clauseLabel(item),
                         // Same rule as `title` above: never substitute item.requirement/
                         // item.description (a different field) for a genuine KB clause
-                        // title. When clauseTitle(item) has nothing, show the explicit
-                        // placeholder — never a department/category name masquerading
-                        // as the finding's title.
-                        item: clauseTitle(item) || 'Untitled item',
+                        // title. When neither the KB nor the standards registry has an
+                        // unambiguous title, print a dash, never a department/category
+                        // name masquerading as the finding's title. "Untitled item"
+                        // read to the client as a defect in the report.
+                        item: clauseTitle(item) || registryClauseTitle(item, d) || '—',
                         department: dept,
                         status: item.status,
                         ncrType: item.ncrType || ''
@@ -1149,7 +1172,7 @@ ${sampleCards ? `
 ${intel.missingEvidence.length ? `
 <table class="b4-tbl">
   <thead><tr>
-    <th>Clause</th><th>Item</th><th>Department</th><th>Status</th>
+    <th>Clause</th><th>Item</th><th>Audit area</th><th>Status</th>
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>` : '<div class="b4-callout b4-callout--good">All findings are supported by documented evidence.</div>'}`;
