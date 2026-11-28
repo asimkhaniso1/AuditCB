@@ -4501,7 +4501,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // when it does not, it moves to the next page and the section goes
             // with it. It carries the header's 34px top gap, which a page break
             // then drops. Measured in Chrome 158 with this stylesheet.
-            +   '.sec-keep{display:block;height:125mm;margin:34px 0 -125mm;break-inside:avoid;page-break-inside:avoid;}'
+            // It must not part from its section: when the section's first block
+            // could not be split and filled a page (PC Connection's Finding
+            // Details, a 224 mm finding row), the spacer moved to a new page,
+            // the section moved on again, and the spacer was left on a blank
+            // page (page 59 of the 28 Nov export). break-after:avoid keeps them
+            // together; measured with rows of 205 to 232 mm, no blank page.
+            +   '.sec-keep{display:block;height:125mm;margin:34px 0 -125mm;break-inside:avoid;page-break-inside:avoid;break-after:avoid;page-break-after:avoid;}'
             +   '.sec-keep + .sh{margin-top:0;}'
             // The watermark prints on a draft and on a final changed since issue.
             +   ((!isReportFinal(d.report) || modifiedSinceIssue) ? '.watermark{display:flex !important;}' : '')

@@ -63,7 +63,7 @@ describe('running footer and page numbers', () => {
 
 describe('a section starts a new page when less than half a page is left', () => {
     it('has an unbreakable 125 mm spacer whose margin takes its height back', () => {
-        expect(SRC).toContain('.sec-keep{display:block;height:125mm;margin:34px 0 -125mm;break-inside:avoid;page-break-inside:avoid;}');
+        expect(SRC).toContain('.sec-keep{display:block;height:125mm;margin:34px 0 -125mm;break-inside:avoid;page-break-inside:avoid;break-after:avoid;page-break-after:avoid;}');
         expect(SRC).toContain('.sec-keep + .sh{margin-top:0;}');
         expect(SRC).toContain('@media screen{.sec-keep{display:none;}}');
     });
