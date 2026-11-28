@@ -102,6 +102,24 @@ describe('the corrective-action criterion cell', () => {
             .toBe('ISO/IEC 20000-1:2018, ISO/IEC 27001:2022 and ISO 22301:2019 clause 7.5.3');
     });
 
+    // PC Connection export of 28 Nov 2026: the CA table still printed NCR-092 as
+    // "ISO 27001:2022 — Clause 10.2 / 10.1". Its rows came from
+    // ReportStats.correctiveActions without the statement that pairs the two
+    // numbers with their standards, and the fallback named the first one's.
+    it('cites a corrective-action row for a two-standard reference from its statement', () => {
+        const stmt = 'ISO/IEC 27001:2022 clause 10.2, and ISO 22301:2019 and ISO/IEC 20000-1:2018 clause 10.1, require the organization to react to a nonconformity and take corrective action.';
+        const item = { checklistId: 'c', itemIdx: 'R0', status: 'nc', ncrType: 'minor', clause: '10.2 / 10.1', ncrDescription: stmt, comment: 'Findings from the previous audit were reviewed.' };
+        const rs = window.ReportStats.build({ report: { standard: STD, checklistProgress: [item] }, hydratedProgress: [item] });
+        const row = window.ReportStats.correctiveActions(rs, {})[0];
+        expect(row.ncrDescription).toBe(stmt);
+        expect(cell(row)).toBe('ISO/IEC 27001:2022 clause 10.2 / ISO/IEC 20000-1:2018 and ISO 22301:2019 clause 10.1');
+    });
+
+    it('never names one standard for a reference with several clause numbers', () => {
+        expect(cell({ clause: '10.2 / 10.1' })).toBe('Clause 10.2 / 10.1');
+        expect(cell({ clause: '4.4, 6.1' })).toBe('Clause 4.4, 6.1');
+    });
+
     it('names none, rather than all three, when the standard is not recorded or the clause is common', () => {
         expect(cell({ clause: '8.2.2' })).toBe('Clause 8.2.2');
         expect(cell({ clause: '7.5' })).toBe('Clause 7.5');

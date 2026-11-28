@@ -777,9 +777,14 @@
         if (cite) return '<div>' + esc(cite) + '</div>';
         // An integrated report passes all its standards; name only the one
         // this finding belongs to, or none when that isn't recorded.
-        const own = (window.ReportStats && typeof window.ReportStats.resolveFindingStandard === 'function')
-            ? window.ReportStats.resolveFindingStandard(finding, standard).standard
-            : standard;
+        // A reference with several clause numbers ("10.2 / 10.1") spans
+        // standards; naming one would misattribute it (PC Connection's NCR-092
+        // printed as "ISO 27001:2022 — Clause 10.2 / 10.1", 28 Nov 2026).
+        const multiRef = /\d\s*[/,;]\s*[A-Za-z]?\.?\d/.test(String(real || ''));
+        const own = multiRef ? ''
+            : (window.ReportStats && typeof window.ReportStats.resolveFindingStandard === 'function')
+                ? window.ReportStats.resolveFindingStandard(finding, standard).standard
+                : standard;
         const stdPrefix = own ? esc(own) + ' — ' : '';
         // With the standard named, its tag ("8.2.2 (22301)") would say it twice.
         const shown = own ? String(real).replace(/\s*\(\s*(?:ISO(?:\/IEC)?\s*)?\d{4,5}(?:[-:]\d+)?\s*\)/i, '') : real;

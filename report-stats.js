@@ -1776,6 +1776,9 @@
                 department: dept,
                 severity: severityFromBucket(bucket),
                 statement: cleanText(item.requirement || item.description || '', 120),
+                // The auditor's nonconformity statement, in full: citeFinding
+                // reads it to pair a "10.2 / 10.1" reference with its standards.
+                ncrDescription: item.ncrDescription || null,
                 comment: cleanText(item.comment || '', 200),
                 evidenceCount: evidenceCount(item),
                 caDueDate: item.caDueDate || null,
@@ -1807,6 +1810,7 @@
                 department: dept,
                 severity: sev,
                 statement: cleanText(n.description || n.comment || '', 120),
+                ncrDescription: n.description || null,
                 comment: cleanText(n.comment || n.description || '', 200),
                 evidenceCount: 0,
                 caDueDate: n.caDueDate || null,
@@ -2167,6 +2171,10 @@
                     criterionSource: f.criterionSource || null,
                     type: sev,
                     desc: f.comment || f.statement || '',
+                    // The nonconformity statement, so the row can be cited
+                    // against its standards (citeFinding pairs "10.2 / 10.1"
+                    // by what the statement says).
+                    ncrDescription: f.ncrDescription || '',
                     dueDate,
                     dueSource: f.registerDueDate ? 'register' : (f.caDueDate ? 'report' : 'computed')
                 };
