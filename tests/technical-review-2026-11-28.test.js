@@ -223,3 +223,25 @@ describe('Report Integrity: decisions left to the auditor', () => {
         expect(JSON.stringify({ report, plan, ncrs: window.state.ncrs })).toBe(before);
     });
 });
+
+// "Remove repetitive conclusions": section 1 printed the previous-findings
+// paragraph twice and the recommendation twice, once in the facts table and
+// again in the Audit Outcome Summary under it.
+describe('executive summary repeats nothing the facts table states', () => {
+    it('tags the two rows the facts table already carries', () => {
+        const s = window.ReportExecutive.buildAuditOutcomeSummary({ report: { id: 'x', standard: STD }, hydratedProgress: [], auditPlan: {} }, { strengths: [] });
+        const html = (window.ReportExecutive.renderAuditOutcomeSummary || (() => ''))(s);
+        const src = fs.readFileSync(path.resolve('report-executive.js'), 'utf8');
+        expect(src).toContain('<div class="b4-board-brief-row" data-brief="previous-findings">');
+        expect(src).toContain('<div class="b4-board-brief-row" data-brief="recommendation">');
+        if (html) expect(html).toContain('data-brief="recommendation"');
+    });
+
+    it('hides them in the export, where the facts table sits above', () => {
+        const er = fs.readFileSync(path.resolve('execution-reporting.js'), 'utf8');
+        expect(er).toContain(`execSummarySec.bodyHtml = factsTable + '<div class="exec-facts-shown">' + (execSummarySec.bodyHtml || '') + '</div>';`);
+        expect(er).toContain('.exec-facts-shown [data-brief="previous-findings"],.exec-facts-shown [data-brief="recommendation"]{display:none !important;}');
+        expect(er).toContain("row('Previous NC Status', prevStatus)");
+        expect(er).toContain("row('Recommendation', esc(recommendation))");
+    });
+});

@@ -765,7 +765,7 @@ ${data.forwardOutlook ? `
     <div class="b4-board-brief-label">${icon('alert', { size: 13 })} Key Findings</div>
     <ul class="b4-bullets b4-board-brief-list">${li(s.findings)}</ul>
   </div>
-  <div class="b4-board-brief-row">
+  <div class="b4-board-brief-row" data-brief="previous-findings">
     <div class="b4-board-brief-label">${icon('clock', { size: 13 })} Previous Findings Status</div>
     <div class="b4-board-brief-value">${esc(s.previousFindingsStatus)}</div>
   </div>
@@ -773,7 +773,7 @@ ${data.forwardOutlook ? `
     <div class="b4-board-brief-label">${icon('capa', { size: 13 })} Corrective Action Requirements</div>
     <div class="b4-board-brief-value">${esc(s.correctiveAction)}</div>
   </div>
-  <div class="b4-board-brief-row">
+  <div class="b4-board-brief-row" data-brief="recommendation">
     <div class="b4-board-brief-label">${icon('check', { size: 13 })} Certification Recommendation</div>
     <div class="b4-board-brief-value">${esc(s.recommendation)}</div>
   </div>

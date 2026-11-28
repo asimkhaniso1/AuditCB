@@ -4354,7 +4354,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + row('Previous NC Status', prevStatus)
                 + row('Recommendation', esc(recommendation))
                 + '</table></div>';
-            execSummarySec.bodyHtml = factsTable + (execSummarySec.bodyHtml || '');
+            // The facts table states the previous NC status and the
+            // recommendation, so the Audit Outcome Summary below it does not
+            // repeat them: the export printed the previous-findings paragraph
+            // twice and the recommendation twice in section 1 (PC Connection
+            // technical review, 28 Nov 2026: "remove repetitive conclusions").
+            execSummarySec.bodyHtml = factsTable + '<div class="exec-facts-shown">' + (execSummarySec.bodyHtml || '') + '</div>';
         })();
         const modAnalyticsMods = sortFront(allModuleSections.filter(function (s) { return groupOf(s.key) === 'analytics'; }));
         const modEvidenceMods = allModuleSections.filter(function (s) { return groupOf(s.key) === 'evidence'; });
@@ -4640,6 +4645,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // Distribution list: one line per recipient where it fits, so the list
             // stays on the signature page (PC Connection, 24 Nov 2026: the 4th row
             // spilled onto a page of its own). Kept whole when it moves.
+            + '.exec-facts-shown [data-brief="previous-findings"],.exec-facts-shown [data-brief="recommendation"]{display:none !important;}'
             + '.dist-tbl{break-inside:avoid;page-break-inside:avoid;}.dist-tbl th,.dist-tbl td{padding:6px 10px;font-size:0.8rem;line-height:1.4;text-align:left;}.dist-tbl td:first-child{width:auto;color:#64748b;font-size:0.8rem;font-weight:400;text-transform:none;letter-spacing:0;}'
             // Consulting-grade table: airy rows, hairline rules only, eyebrow header.
             // word-break stays normal so short words like "Medium" never fragment;
