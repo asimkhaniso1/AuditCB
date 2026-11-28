@@ -133,3 +133,34 @@ describe('issuing from the preview', () => {
         expect(footer).toContain('data-action="finalizeFromPreview"');
     });
 });
+
+// PC Connection, 28 Nov 2026: a report reverted to draft for re-issue printed
+// "Draft — not yet issued" above "Issue Date: 11/25/2026" on its closing page.
+describe('closing-page issue date', () => {
+    const resolver = () => {
+        const block = "const isReportFinal = (report) => !!(report && report.reportStatus === 'final');\n"
+            + slice('// ─── Issue Date resolver', '// ─── Recommendation single-source');
+        // eslint-disable-next-line no-new-func
+        new Function('window', block)(window);
+        return window._resolveIssueDate;
+    };
+    const fmt = { formatDate: (v) => { const [y, m, dd] = String(v).slice(0, 10).split('-'); return Number(dd) + ' ' + ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][Number(m) - 1] + ' ' + y; } };
+
+    it('prints the issue date of a final report in the long form', () => {
+        window.DocFormat = fmt;
+        expect(resolver()(issued())).toBe('25 November 2026');
+    });
+
+    it('prints no issue date on a draft, even one issued before', () => {
+        window.DocFormat = fmt;
+        expect(resolver()(Object.assign(issued(), { reportStatus: 'draft', status: 'Draft' }))).toBe('');
+    });
+
+    it('prints no issue date on a report never issued', () => {
+        expect(resolver()({ reportStatus: 'final' })).toBe('');
+    });
+
+    it('the closing page prints it only when the resolver returns one', () => {
+        expect(SRC).toMatch(/\(resolveIssueDate\(d\.report\) \? ' · Issue Date: ' \+ resolveIssueDate\(d\.report\) : ''\)/);
+    });
+});

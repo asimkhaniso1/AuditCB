@@ -1161,16 +1161,24 @@
     // that has gone through finalizeAndPublish (ai-service.js) carries issuedSnapshot;
     // fall back to the latest issueLog entry for older data. Returns '' when the
     // report has never been issued so callers omit the row rather than inventing one.
+    //
+    // A draft prints no issue date either. A report reverted to draft for
+    // re-issue still carries the earlier issue, and its closing page read
+    // "Draft — not yet issued" above "Issue Date: 11/25/2026" (PC Connection,
+    // 28 Nov 2026). The date prints in the report's long form ("25 November
+    // 2026"), not the browser's locale.
     const resolveIssueDate = (report) => {
-        if (!report) return '';
+        if (!report || !isReportFinal(report)) return '';
+        let at = '';
         if (report.issuedSnapshot && report.issuedSnapshot.issuedAt) {
-            return new Date(report.issuedSnapshot.issuedAt).toLocaleDateString();
-        }
-        if (Array.isArray(report.issueLog) && report.issueLog.length > 0) {
+            at = report.issuedSnapshot.issuedAt;
+        } else if (Array.isArray(report.issueLog) && report.issueLog.length > 0) {
             const last = report.issueLog[report.issueLog.length - 1];
-            if (last && last.at) return new Date(last.at).toLocaleDateString();
+            at = (last && last.at) || '';
         }
-        return '';
+        if (!at) return '';
+        const df = window.DocFormat;
+        return (df && typeof df.formatDate === 'function' && df.formatDate(at)) || new Date(at).toLocaleDateString('en-GB');
     };
     window._resolveIssueDate = resolveIssueDate;
 
@@ -4461,13 +4469,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '*{margin:0;padding:0;box-sizing:border-box;}'
             + "body{font-family:'Inter','Segoe UI',Helvetica,Arial,sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;font-size:11pt;line-height:1.6;}"
             + '@media print{'
-            // Pagination fix: @page margin-box content (@top-left etc.) and counter(pages) are
-            // not implemented by Chrome's print engine, so those rules were dead code. Instead
-            // we run .rpt-hdr/.rpt-ftr as fixed-position elements that repeat on every printed
-            // page (Chrome DOES support position:fixed repeating across pages), with body
-            // padding so content never underlaps them. "Page X of Y" is not achievable this way
-            // (no live page count in Chrome print CSS) — the footer shows report ref + confidentiality
-            // classification instead of a fake/static page count.
+            // Running header/footer: .rpt-hdr/.rpt-ftr are rows of a table that
+            // wraps the report (see .rpt-running below) and repeat on every page.
+            // The page number is a page margin box in the @page rule further down:
+            // Chrome has printed margin boxes with counter(page)/counter(pages)
+            // since version 131, which the old note here said it could not.
             +   'body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10pt;padding-top:0;padding-bottom:0;}'
             +   '.rpt-hdr,.rpt-ftr{display:flex !important;}'
             +   '.page-break{page-break-before:always;}'
@@ -4486,6 +4492,17 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // A forced break on a box already at a page boundary is ignored by
             // the fragmentation spec, so this cannot introduce blank pages.
             +   '#sec-objectives,#sec-summary,#sec-conclusion,#sec-signature{page-break-before:always;break-before:page;}'
+            // Every other section starts a new page when less than half a page
+            // is left (PC Connection, 28 Nov 2026: sections began in the last
+            // few centimetres of a page). CSS has no "break if less than N left",
+            // so an unbreakable 115 mm spacer (half the ~233 mm body area) sits
+            // before each section header with a -115 mm bottom margin: when it
+            // fits, the margin takes it back and the section stays where it was;
+            // when it does not, it moves to the next page and the section goes
+            // with it. It carries the header's 34px top gap, which a page break
+            // then drops. Measured in Chrome 158 with this stylesheet.
+            +   '.sec-keep{display:block;height:115mm;margin:34px 0 -115mm;break-inside:avoid;page-break-inside:avoid;}'
+            +   '.sec-keep + .sh{margin-top:0;}'
             // The watermark prints on a draft and on a final changed since issue.
             +   ((!isReportFinal(d.report) || modifiedSinceIssue) ? '.watermark{display:flex !important;}' : '')
             +   '.toc-item{break-inside:avoid;page-break-inside:avoid;}'
@@ -4541,7 +4558,19 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // so the contents page still starts on page 2.
             +   '.cover{min-height:0 !important;height:auto !important;padding:24px 40px 28px !important;page-break-after:always;break-after:page;}'
             +   '.cover-doc{position:static !important;left:auto !important;right:auto !important;bottom:auto !important;width:100%;margin-top:28px;}'
-            +   '@page{size:A4;margin:20mm 14mm 16mm 14mm;}'
+            // "Page X of Y" in the bottom margin, under the running footer row.
+            // The page count comes from the print engine (Chrome 131+ page
+            // margin boxes, as print-shell.js uses for the plan and checklist),
+            // so it is always true. The cover carries no number. PC Connection
+            // asked for page numbers on 28 Nov 2026; the report had none.
+            // All six margin boxes are defined (five empty): Chrome then drops
+            // its own date/URL decoration even with "Headers and footers" on.
+            // With only the number defined it still printed its date at the top
+            // of every page, and its URL on the cover. Measured in Chrome 158.
+            +   '@page{size:A4;margin:20mm 14mm 16mm 14mm;'
+            +     '@top-left{content:"";}@top-center{content:"";}@top-right{content:"";}@bottom-left{content:"";}@bottom-center{content:"";}'
+            +     '@bottom-right{content:"Page " counter(page) " of " counter(pages);font:7.5pt Inter,"Segoe UI",Helvetica,Arial,sans-serif;color:#64748b;vertical-align:top;text-align:right;padding-top:3mm;}}'
+            +   '@page :first{@bottom-right{content:"";}}'
             + '}'
             // The running header is 18mm tall with 3mm of vertical padding, so its
             // content box is only ~12mm (≈34px). A 36px logo did not fit and was
@@ -4556,6 +4585,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // height, so top:-20mm painted the header at ~261mm, i.e. straight through the
             // body text. thead/table-header-group repeats per page and reserves its space
             // in flow, so content genuinely starts below it on every page.
+            + '@media screen{.sec-keep{display:none;}}'
             + '.rpt-running{width:100%;border-collapse:collapse;}'
             + '.rpt-running > thead > tr > td,.rpt-running > tfoot > tr > td,.rpt-running > tbody > tr > td{padding:0;}'
             + '.rpt-hdr{display:none;height:16mm;background:white;color:#1e293b;padding:2mm 0;align-items:center;justify-content:space-between;font-size:0.72rem;line-height:1.25;border-bottom:1px solid #e2e8f0;overflow:hidden;}'
@@ -5194,7 +5224,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 return '<div id="sec-' + key + '" class="sh" style="border-left-color:' + c + ';">';
             }
         );
-        const reportHtmlFinal = reportHtmlColored + '</td></tr></tbody></table>'
+        // Half-page rule (see .sec-keep in the print CSS): a spacer before every
+        // section header except the four that always open a new page, where a
+        // spacer pushed onto the next page would leave that page blank.
+        const SECTION_FORCED_PAGE = { objectives: 1, summary: 1, conclusion: 1, signature: 1 };
+        const reportHtmlKept = reportHtmlColored.replace(
+            /<div id="sec-([a-z0-9-]+)" class="sh"/g,
+            function (m, key) { return SECTION_FORCED_PAGE[key] ? m : '<div class="sec-keep" aria-hidden="true"></div>' + m; }
+        );
+        const reportHtmlFinal = reportHtmlKept + '</td></tr></tbody></table>'
             + '<script src="' + chartScriptUrl + '"></script></body></html>';
 
         // Open via Blob URL. Chart script is also a Blob URL (loaded via <script src>)
