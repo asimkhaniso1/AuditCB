@@ -8,7 +8,7 @@ import path from 'path';
 
 // Evaluating a snippet cut out of a file (not the whole file) can't be
 // attributed to the file anyway, so these stay as they are.
-const SNIPPET_LOADERS = new Set(['previous-findings-status.test.js', 'report-status-consistency.test.js', 'report-preview-edits-persist.test.js', 'signoff-prepared-date.test.js']);
+const SNIPPET_LOADERS = new Set(['previous-findings-status.test.js', 'report-status-consistency.test.js', 'report-preview-edits-persist.test.js', 'signoff-prepared-date.test.js', 'report-reissue-from-preview.test.js', 'report-print-pagination.test.js']);
 
 describe('test source loading', () => {
     it('no test evaluates source with eval or new Function', () => {
