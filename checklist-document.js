@@ -194,11 +194,19 @@
      * each standard's figures as planned in this audit, inherited from earlier
      * audits in the cycle, and remaining.
      */
+    // "Planned coverage": the panel describes what the checklist intends to
+    // ask plus what earlier audits answered. It is not a validation that the
+    // requirements were audited, and never a measure of conformity.
     function coverageHeading(checklist) {
         const type = String((checklist && checklist.auditType) || '').toLowerCase();
-        if (type.indexOf('recert') !== -1) return 'Recertification coverage validation';
-        if (type.indexOf('surv') !== -1) return 'Coverage validation — this audit and the cycle so far';
-        return 'Coverage validation';
+        if (type.indexOf('recert') !== -1) return 'Recertification planned coverage — this audit and the certification cycle';
+        if (type.indexOf('surv') !== -1) return 'Planned coverage — this audit and the cycle so far';
+        return 'Planned coverage';
+    }
+
+    function warnClass(outcome) {
+        return outcome === 'blocked' || outcome === 'failed' ? 'qa-fail'
+            : (outcome === 'passed-with-notes' || outcome === 'not-assessed' || outcome === 'review' ? 'qa-warn' : 'qa-pass');
     }
 
     function coveragePanel(cov, checklist) {
@@ -208,20 +216,24 @@
         }
         const c = cov.coverage || {};
         const outcome = cov.outcome || (cov.blocking ? 'failed' : 'passed');
-        const cls = outcome === 'blocked' || outcome === 'failed' ? 'qa-fail' : (outcome === 'passed-with-notes' || outcome === 'not-assessed' ? 'qa-warn' : 'qa-pass');
+        const cls = warnClass(outcome);
         const label = (global.ChecklistCoverage && global.ChecklistCoverage.OUTCOMES && global.ChecklistCoverage.OUTCOMES[outcome]) || outcome;
         const rows = [];
+        // "Audited" = answered conform / nonconform at this audit or on a prior
+        // audit's final report. An older stored coverage result has no such
+        // figure, which is shown as a dash rather than guessed.
+        const audited = function (x, den) { return x.cycleVerified == null ? '—' : x.cycleVerified + ' / ' + den; };
         arr(c.clauses).forEach(function (cl) {
-            rows.push('<tr><td>' + t(cl.label) + ' — requirements</td><td>' + cl.planned + ' / ' + cl.total + '</td><td>' + cl.inherited + '</td><td>' + cl.remaining + '</td></tr>');
+            rows.push('<tr><td>' + t(cl.label) + ' — requirements</td><td>' + cl.planned + ' / ' + cl.total + '</td><td>' + audited(cl, cl.total) + '</td><td>' + cl.inherited + '</td><td>' + cl.remaining + '</td></tr>');
         });
         arr(c.controls).forEach(function (ct) {
-            rows.push('<tr><td>' + t(ct.label) + ' — Annex A applicable (' + t(annexALabel(ct)) + ')</td><td>' + ct.planned + ' / ' + ct.pool + '</td><td>' + ct.inherited + '</td><td>' + ct.remaining + '</td></tr>');
+            rows.push('<tr><td>' + t(ct.label) + ' — Annex A ' + (ct.soaDriven ? 'applicable' : 'provisional pool') + ' (' + t(annexALabel(ct)) + ')</td><td>' + ct.planned + ' / ' + ct.pool + '</td><td>' + audited(ct, ct.pool) + '</td><td>' + ct.inherited + '</td><td>' + ct.remaining + '</td></tr>');
         });
         if (c.processes && c.processes.total) {
-            rows.push('<tr><td>Critical processes</td><td>—</td><td>' + c.processes.covered + ' / ' + c.processes.total + ' over the cycle</td><td>' + (c.processes.total - c.processes.covered) + '</td></tr>');
+            rows.push('<tr><td>Critical processes</td><td>—</td><td>—</td><td>' + c.processes.covered + ' / ' + c.processes.total + ' over the cycle</td><td>' + (c.processes.total - c.processes.covered) + '</td></tr>');
         }
         if (c.integrated && c.integrated.standards > 1) {
-            rows.push('<tr class="cov-total"><td>Integrated view — ' + c.integrated.standards + ' standards</td><td>' + c.integrated.planned + ' / ' + c.integrated.requirements + '</td><td>' + c.integrated.inherited + '</td><td>' + c.integrated.remaining + '</td></tr>');
+            rows.push('<tr class="cov-total"><td>Integrated view — ' + c.integrated.standards + ' standards</td><td>' + c.integrated.planned + ' / ' + c.integrated.requirements + '</td><td>' + (c.integrated.cycleVerified == null ? '—' : c.integrated.cycleVerified + ' / ' + c.integrated.requirements) + '</td><td>' + c.integrated.inherited + '</td><td>' + c.integrated.remaining + '</td></tr>');
         }
         const order = { critical: 0, warning: 1, info: 2 };
         const list = arr(cov.issues).slice().sort(function (a, b) { return order[a.severity] - order[b.severity]; }).slice(0, 20)
@@ -233,21 +245,22 @@
             ? '<p style="margin-top:8px;"><strong>Dispositioned by the auditor:</strong></p><ul>' + resolved.map(function (r) {
                 return '<li>' + t(r.note || r.action) + ' <em>(' + t(r.by || '') + (r.at ? ', ' + t(d.formatDate(r.at) || r.at) : '') + ')</em></li>'; }).join('') + '</ul>'
             : '';
+        const withResults = cycle.priorWithResults == null ? (cycle.priorChecklists || 0) : cycle.priorWithResults;
         const cycleText = (cycle.start && cycle.end) ? 'Certification cycle ' + d.formatDateRange(cycle.start, cycle.end) + (cycle.anchored ? ' (anchored on ' + t(cycle.anchored) + ')' : '')
-            + ', ' + (cycle.priorAudits || 0) + ' prior audit(s) on file, ' + (cycle.priorChecklists || 0) + ' of their checklists read for coverage.' : '';
+            + ', ' + (cycle.priorAudits || 0) + ' prior audit(s) on file, ' + (cycle.priorChecklists || 0) + ' of their checklists on file, ' + withResults + ' with audited results.' : '';
         return '<div class="qa-panel qa-cov ' + cls + '">'
             + '<h2>' + coverageHeading(checklist) + '</h2>'
             + '<p><strong>' + t(label) + '.</strong> ' + t(cycleText) + '</p>'
-            + (rows.length ? '<table class="cov-table"><thead><tr><th>Coverage by standard</th><th>Planned this audit</th><th>Inherited from cycle</th><th>Remaining</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>' : '')
+            + (rows.length ? '<table class="cov-table"><thead><tr><th>Coverage by standard</th><th>Planned this audit</th><th>Audited so far</th><th>Audited earlier in cycle</th><th>Remaining</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>' : '')
             + (list ? '<ul>' + list + '</ul>' : '') + disp
-            + '<p class="cov-note">Annex A controls are selected risk-based from the applicable set — the Statement of Applicability, the risk assessment, changes since the previous audit, incidents and previous audit results. Auditing every control at every audit is not required; covering the applicable set across the certification cycle is.</p>'
+            + '<p class="cov-note">Planned coverage shows what this checklist will ask; it is not evidence that a requirement was audited, and no coverage figure is a measure of conformity. Annex A controls are selected risk-based from the applicable set — the Statement of Applicability, the risk assessment, changes since the previous audit, incidents and previous audit results. Auditing every control at every audit is not required; covering the applicable set across the certification cycle is.</p>'
             + '</div>';
     }
 
     /** The single status line for the whole checklist. */
     function validationBanner(combined) {
         if (!combined) return '';
-        const cls = combined.outcome === 'blocked' || combined.outcome === 'failed' ? 'qa-fail' : (combined.outcome === 'passed-with-notes' || combined.outcome === 'not-assessed' ? 'qa-warn' : 'qa-pass');
+        const cls = warnClass(combined.outcome);
         return '<div class="qa-panel ' + cls + ' pd-keep"><h2>Checklist validation status</h2><p><strong>' + t(combined.label) + '</strong>'
             + (combined.reasons && combined.reasons.length ? ' ' + t(combined.reasons.join(' ')) : '') + '</p></div>';
     }

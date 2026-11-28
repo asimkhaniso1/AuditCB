@@ -318,6 +318,11 @@
         ['8.4', 'Business continuity plans and procedures', null, true],
         ['8.4.2', 'Response structure', null, true],
         ['8.4.3', 'Warning and communication', null, true],
+        // 8.4.4 and 8.4.5 are requirements of their own. Without these rows a
+        // checklist that never asked about the plans' content or about recovery
+        // still read "29/29" — a complete count of an incomplete inventory.
+        ['8.4.4', 'Business continuity plans', null, true],
+        ['8.4.5', 'Recovery', null, true],
         ['8.5', 'Exercise programme', null, true],
         ['8.6', 'Evaluation of business continuity documentation and capabilities', null, true],
         ['9.1', 'Monitoring, measurement, analysis and evaluation', SHARED.PERF_MONITORING, true],
@@ -338,7 +343,12 @@
         ['5.3', 'Organizational roles, responsibilities and authorities', SHARED.LEAD_ROLES, true],
         ['6.1', 'Actions to address risks and opportunities', SHARED.PLAN_RISK_ACTIONS, true],
         ['6.2', 'Service management objectives and planning to achieve them', SHARED.PLAN_OBJECTIVES, true],
-        ['6.3', 'Plan the service management system', SHARED.PLAN_CHANGES, true],
+        // NOT the "planning of changes" of 27001/22301 6.3: in this standard 6.3
+        // requires an SMS plan (services, limitations, obligations, authorities,
+        // resources, other parties, technology, how effectiveness is measured).
+        // Consolidating it under "Planning of changes" asked about change
+        // planning, credited this clause, and never asked for the plan.
+        ['6.3', 'Plan the service management system', null, true],
         ['7.1', 'Resources', SHARED.SUP_RESOURCES, true],
         ['7.2', 'Competence', SHARED.SUP_COMPETENCE, true],
         ['7.3', 'Awareness', SHARED.SUP_AWARENESS, true],
@@ -513,34 +523,38 @@
 
     const ISO22301_THEMES = [
         ['bcms-bia', 'Business impact analysis', ['8.2.2'],
-            'Verify the BIA is current, covers the prioritised activities in the certified scope, and derives RTOs, RPOs and minimum business continuity objectives from stated impact criteria. Confirm dependencies (people, ICT, suppliers, facilities) are identified for each prioritised activity.'],
+            'Verify the BIA is current, covers the prioritised activities in the certified scope, and sets from stated impact criteria the timeframe within which each prioritised activity must be resumed and its minimum acceptable capacity (a recovery point objective only where the organisation has chosen to set one — the standard does not require it). Confirm dependencies (people, ICT, suppliers, facilities) are identified for each prioritised activity.'],
         ['bcms-risk', 'Business continuity risk assessment', ['8.2.3'],
             'Confirm disruption risks to prioritised activities and their resources are assessed and treated, and that the assessment is consistent with the BIA outputs.'],
         ['bcms-strategy', 'Continuity strategies and solutions', ['8.3'],
             'Verify the selected continuity strategies and solutions meet the RTOs from the BIA, that the resource requirements are provided for, and that the solutions are actually implemented — not just documented.'],
-        ['bcms-plans', 'Business continuity plans and response structure', ['8.4', '8.4.2', '8.4.3'],
-            'Sample the business continuity and incident response plans: confirm the response structure, roles and triggers are defined, plans name the activities they recover and within what timeframe, and the warning and communication arrangements cover interested parties.'],
+        ['bcms-plans', 'Business continuity plans and response structure', ['8.4', '8.4.2', '8.4.3', '8.4.4'],
+            'Sample the business continuity and incident response plans: confirm the response structure, roles and triggers are defined, and the warning and communication arrangements cover interested parties. For each plan sampled, check it states its purpose and scope, the roles and authorities of the team that uses it, when and how it is activated, the actions to continue or recover the prioritised activities within the timeframes set by the BIA, the resources and dependencies it relies on, and how it is kept current.'],
         ['bcms-exercise', 'Exercise programme and evaluation', ['8.5', '8.6'],
             'Review the exercises performed since the previous audit against the exercise programme: confirm objectives, scope, post-exercise reports, findings raised, and that the resulting corrective actions were implemented and re-evaluated.'],
         ['bcms-disruption', 'Actual disruptions and invocation', ['8.4', '10.1'],
-            'For any actual disruption or plan invocation since the previous audit, verify the response followed the plan, achieved times were measured against RTO/RPO, and the post-incident review produced improvement actions.']
+            'For any actual disruption or plan invocation since the previous audit, verify the response followed the plan, the recovery achieved was measured against the timeframes and minimum capacity set in the BIA, and the post-incident review produced improvement actions.'],
+        // Appended (not inserted) so a budgeted surveillance, which takes the
+        // first themes of each standard, samples exactly what it did before.
+        ['bcms-recovery', 'Recovery — return from temporary measures', ['8.4.5'],
+            'Verify there is a documented process to restore business activities and return from the temporary measures adopted during a disruption: who decides that normal operation can resume, the criteria used, and how the return is controlled. Where a disruption or exercise ran since the previous audit, check the return to normal followed that process; where neither did, test the process and its readiness instead.']
     ];
 
     const ISO20000_THEMES = [
         ['sms-slm', 'Service level management and service catalogue', ['8.3.3', '8.2.4'],
             'Sample the current SLAs and the service catalogue: confirm they are agreed with the customer, the targets are measurable, actual performance is measured against them for the period, and shortfalls are reviewed with the customer.'],
         ['sms-incident', 'Incident management', ['8.6.1'],
-            'Sample incidents across the period including at least one major incident: verify recording, classification, prioritisation, escalation, resolution within target, customer communication and closure.'],
+            'Sample incidents across the period, including any major incident: verify recording, classification, prioritisation, escalation, resolution within target, customer communication and closure. If no major incident occurred in the period, confirm how a major incident is defined and test the documented major-incident procedure and its readiness instead.'],
         ['sms-request', 'Service request fulfilment', ['8.6.2'],
             'Sample service requests: verify they are fulfilled through the defined procedure, within the agreed target, and are distinguishable from incidents in the records.'],
         ['sms-problem', 'Problem management', ['8.6.3'],
             'Verify problems are identified from incident trends, root cause analysis is performed, known errors are recorded, and permanent fixes are implemented and measured for effect.'],
         ['sms-change', 'Change management', ['8.5.1'],
-            'Sample changes including at least one emergency change: verify assessment, authorisation by the defined authority, testing, back-out planning, scheduling, and post-implementation review. Confirm unsuccessful changes are analysed.'],
+            'Sample changes, including any emergency change: verify assessment, authorisation by the defined authority, testing, back-out planning, scheduling, and post-implementation review. Confirm unsuccessful changes are analysed. If no emergency change was made in the period, test the documented emergency-change route and who may authorise it instead.'],
         ['sms-release', 'Release and deployment management', ['8.5.3'],
             'Sample releases deployed since the previous audit: verify acceptance criteria, release records, deployment into the live environment, and verification that the release achieved its intended outcome.'],
         ['sms-config', 'Configuration and asset management', ['8.2.5', '8.2.6'],
-            'Verify configuration items in scope are recorded with the defined attributes and relationships, the CMDB is verified at planned intervals, and discrepancies are corrected. Trace one live service to its configuration items.'],
+            'Verify configuration items in scope are recorded with the defined attributes and relationships, the configuration information is verified at planned intervals — in whatever tool or record the organisation keeps it; the standard does not require a CMDB — and discrepancies are corrected. Trace one live service to its configuration items.'],
         ['sms-capacity', 'Capacity and availability management', ['8.4.3', '8.7.1'],
             'Verify capacity and availability requirements are agreed, monitored against target, and forecast — and that capacity or availability shortfalls result in planned action.'],
         ['sms-continuity', 'Service continuity management', ['8.7.2'],
@@ -554,7 +568,11 @@
         ['sms-security', 'Information security management within the SMS', ['8.7.3'],
             'Verify the information security controls applied to the services in scope are defined, implemented and operated as part of service delivery.'],
         ['sms-budget', 'Budgeting and accounting for services', ['8.4.1'],
-            'Verify service costs are budgeted, tracked against actuals and accounted for at the level defined by the organisation.']
+            'Verify service costs are budgeted, tracked against actuals and accounted for at the level defined by the organisation.'],
+        // Appended for the same reason as bcms-recovery: surveillance budgets
+        // take the first themes, so existing samples are unchanged.
+        ['sms-plan', 'Service management system plan', ['6.3'],
+            'Review the SMS plan: confirm it is maintained and takes account of the service management policy, objectives, risks and opportunities and the service requirements, and that it covers or points to the services, known limitations, obligations (policies, standards, legal, regulatory and contractual requirements), authorities and responsibilities, the resources needed, the approach to other parties in the service lifecycle, the supporting technology, and how the effectiveness of the SMS and the services is measured, audited, reported and improved. Confirm it was updated when the services or the SMS changed.']
     ];
 
     const ISO9001_THEMES = [
@@ -635,14 +653,19 @@
             SHARED.PLAN_OBJECTIVES,
             'Review the objectives set for each management system in scope over the certification cycle: confirm they are measurable, resourced and assigned, review actual achievement against target, and verify that missed targets triggered action.',
             null],
+        // Cites the clauses that hold the risk ASSESSMENT and TREATMENT this
+        // question tests — not 6.1.1 / 6.1 "actions to address risks and
+        // opportunities", which the IMS section already asks.
         ['risk-treatment', 'Risk assessment and treatment currency',
-            SHARED.PLAN_RISK_ACTIONS,
+            null,
             'Confirm the risk assessment(s) have been reviewed and updated over the cycle, that treatments are implemented and their effectiveness evaluated, and that changes in the operating environment are reflected.',
-            null],
+            { iso27001: ['6.1.2', '6.1.3', '8.2', '8.3'], iso22301: ['8.2.3'], iso20000: ['6.1'], iso9001: ['6.1'], iso14001: ['6.1.1'], iso45001: ['6.1.2'] }],
         ['incidents', 'Incidents, disruptions and complaints over the cycle',
             null,
             'Review incidents, disruptions, security events and complaints across the certification cycle. Verify handling against the organisation’s own procedure, trend analysis, and whether the resulting actions reduced recurrence.',
-            { iso27001: ['A.5.26', 'A.5.27'], iso22301: ['8.4'], iso20000: ['8.6.1', '8.6.3'], iso9001: ['8.2'], iso14001: ['8.2'], iso45001: ['10.2'] }],
+            // ISO/IEC 20000-1 handles complaints under 8.3.2 business
+            // relationship management, not 8.6.3 problem management.
+            { iso27001: ['A.5.26', 'A.5.27'], iso22301: ['8.4'], iso20000: ['8.6.1', '8.3.2'], iso9001: ['8.2'], iso14001: ['8.2'], iso45001: ['10.2'] }],
         ['internal-audit', 'Internal audit programme across the cycle',
             SHARED.PERF_INTERNAL_AUDIT,
             'Verify the internal audit programme covered every requirement of every certified standard, every site and every process over the certification cycle, that auditors were competent and impartial, and that findings were closed. Sample two internal audit reports for depth of evidence.',
@@ -710,10 +733,9 @@
             controls: [],
             themes: expandThemes('iso22301', ISO22301_THEMES),
             hasSoA: false,
-            // ISO 22301 has no supplier-control clause of its own — dependencies
-            // on external providers are handled inside 8.2.2/8.3 rather than a
-            // dedicated requirement, so `outsourced` is deliberately null.
-            orgRefs: { scope: '4.3', site: '4.3', process: '8.1', outsourced: null }
+            // ISO 22301 8.1 itself requires outsourced processes and the supply
+            // chain to be controlled, so an outsourced process cites 8.1.
+            orgRefs: { scope: '4.3', site: '4.3', process: '8.1', outsourced: '8.1' }
         },
         {
             id: 'iso20000',
@@ -840,6 +862,39 @@
         if (!s || !ref) return false;
         const r = String(ref).trim();
         return s.clauses.some(c => c.ref === r) || (s.controls || []).some(c => c.ref === r);
+    }
+
+    /**
+     * Does the registry hold sub-clauses of `ref` as rows of their own
+     * (22301 8.4 → 8.4.2…8.4.5)? Where it does, each sub-clause is a
+     * requirement to cover in its own right, so a question citing one of them
+     * does not also cover the parent. Where it does not (27001 7.5 is held at
+     * parent level), a sub-clause citation such as "7.5.1" still counts for
+     * the parent row.
+     */
+    function hasChildRows(stdId, ref) {
+        const s = BY_ID[stdId];
+        if (!s || !ref) return false;
+        const prefix = String(ref).trim() + '.';
+        return s.clauses.some(c => c.ref.indexOf(prefix) === 0);
+    }
+
+    /**
+     * Is registry row `ref` of `stdId` covered by the set of `stdId::ref` keys?
+     * Exact match, or a sub-clause citation when the registry holds no
+     * sub-clause rows of its own for it (see hasChildRows). A parent citation
+     * never covers a sub-clause.
+     *
+     * @param {Object|Set} keys plain-object set or Set of "stdId::ref"
+     */
+    function refCovered(keys, stdId, ref) {
+        const has = k => (keys instanceof Set ? keys.has(k) : !!keys[k]);
+        const key = `${stdId}::${String(ref).trim()}`;
+        if (has(key)) return true;
+        if (hasChildRows(stdId, ref)) return false;
+        const prefix = key + '.';
+        const list = keys instanceof Set ? Array.from(keys) : Object.keys(keys);
+        return list.some(k => k.indexOf(prefix) === 0);
     }
 
     /** Every standard in `ids` that genuinely has this ref, with its own title. */
@@ -991,6 +1046,8 @@
         planScope,
         systemsPhrase,
         isKnownRef,
+        hasChildRows,
+        refCovered,
         lookupRef,
         citation,
         compressRuns,

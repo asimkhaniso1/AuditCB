@@ -375,8 +375,10 @@
           shared: [S.SCOPE, S.CHANGES, S.MON], priorities: ['changes', 'scope', 'objectives-performance'] },
         { id: 'context-leadership', title: 'Context and interested parties; leadership, policy, roles and responsibilities', hours: 1.5, auditee: SM.top,
           shared: [S.ISSUES, S.PARTIES, S.SYSTEM, S.COMMIT, S.POLICY, S.ROLES], std: { iso9001: ['5.1.2'] }, priorities: ['context', 'scope-and-interaction', 'leadership'] },
+        // ISO/IEC 20000-1 6.3 is the SMS plan, not "planning of changes", so it
+        // is planned here rather than with the change review.
         { id: 'planning', title: 'Risks, opportunities and objectives', hours: 1.0, auditee: SM.risk,
-          shared: [S.RISK, S.OBJ], priorities: ['risks-objectives'] },
+          shared: [S.RISK, S.OBJ], std: { iso20000: ['6.3'] }, priorities: ['risks-objectives'] },
         { id: 'support', title: 'Resources, competence, awareness, communication and documented information', hours: 1.0, auditee: SM.support,
           shared: [S.RES, S.COMP, S.AWARE, S.COMM, S.DOC], std: { iso20000: ['7.6'], iso9001: ['7.1.6'] }, priorities: ['support'] },
         { id: 'isms-risk-soa', title: 'Information security risk assessment and treatment; Statement of Applicability; risk-based Annex A sampling', hours: 1.25, auditee: SM.isms,
@@ -397,8 +399,8 @@
           std: { iso20000: ['8.6.3'] }, processes: ['Problem Management'], priorities: ['problem'] },
         { id: 'bcms-bia-risk', title: 'Business impact analysis; business continuity risk assessment', hours: 1.0, auditee: SM.bcm,
           std: { iso22301: ['8.2.2', '8.2.3'] }, processes: ['Business Continuity & Disaster Recovery'], priorities: ['bia', 'bc-risk'] },
-        { id: 'bcms-strategy-plans', title: 'Business continuity strategies and solutions; continuity plans and response structure', hours: 1.0, auditee: SM.bcm,
-          std: { iso22301: ['8.3', '8.4', '8.4.2', '8.4.3'] }, processes: ['Business Continuity & Disaster Recovery'], priorities: ['bc-strategies', 'bc-plans'] },
+        { id: 'bcms-strategy-plans', title: 'Business continuity strategies and solutions; continuity plans and response structure; recovery', hours: 1.0, auditee: SM.bcm,
+          std: { iso22301: ['8.3', '8.4', '8.4.2', '8.4.3', '8.4.4', '8.4.5'] }, processes: ['Business Continuity & Disaster Recovery'], priorities: ['bc-strategies', 'bc-plans'] },
         { id: 'bcms-exercise', title: 'Exercise programme; evaluation of continuity documentation and capabilities; actual disruptions or invocations, where applicable', hours: 1.0, auditee: SM.bcm,
           std: { iso22301: ['8.5', '8.6'] }, priorities: ['bc-exercise', 'bc-evaluation', 'bc-disruptions'] },
         { id: 'sms-continuity-capacity', title: 'Service continuity, availability, capacity and demand management', hours: 1.0, auditee: SM.sms,

@@ -1955,8 +1955,14 @@
                     : `${scope.labels[0]} — management system requirements`,
                 subClauses: commonGroups.map(g => {
                     const refs = g.members.map(m => ({ stdId: m.stdId, ref: m.ref }));
+                    // Name only the systems whose standards share this
+                    // requirement: ISO/IEC 20000-1 has no "planning of changes"
+                    // clause, so that question must not tell the auditor to
+                    // test the SMS for it.
+                    const memberIds = Array.from(new Set(g.members.map(m => m.stdId)));
+                    const groupSystems = memberIds.length === scope.ids.length ? systems : CS.systemsPhrase(memberIds);
                     const prompt = (CS.SHARED_PROMPT[g.shared] || `Verify the requirements of ${g.label} are met.`)
-                        .replace(/\{systems\}/g, systems);
+                        .replace(/\{systems\}/g, groupSystems);
                     return scopedQuestion(displayRefFor(refs), g.label,
                         prompt + evidenceHint(list, refs, 3, { topic: g.shared, client: client }),
                         refs, { source: 'ims-consolidated' });

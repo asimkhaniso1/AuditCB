@@ -55,6 +55,20 @@ function ctxOf(over) {
     }, over || {});
 }
 
+/**
+ * The prior checklists given, every question answered on a final report.
+ * Since R1 a prior checklist earns cycle credit only for audited answers —
+ * a checklist that was merely planned covers nothing.
+ */
+function audited(...checklists) {
+    const out = {};
+    checklists.forEach(ck => {
+        const m = out[String(ck.id)] = out[String(ck.id)] || {};
+        window.ChecklistCoverage.itemKeys(ck).forEach(k => { m[k] = true; });
+    });
+    return out;
+}
+
 function codes(result) {
     return result.issues.map(i => i.code);
 }
@@ -83,7 +97,7 @@ describe('ChecklistCoverage.assess — requirements over the certification cycle
         const here = mandatory.slice(0, mandatory.length - 3);
         const earlier = checklistOf(mandatory.slice(mandatory.length - 3));
         const res = window.ChecklistCoverage.assess(
-            checklistOf(here), ctxOf({ priorChecklists: [earlier] }));
+            checklistOf(here), ctxOf({ priorChecklists: [earlier], priorExecuted: audited(earlier) }));
         expect(codes(res)).not.toContain('CYCLE_REQUIREMENT_GAP');
     });
 
@@ -101,10 +115,13 @@ describe('ChecklistCoverage.assess — requirements over the certification cycle
         const mandatory = allMandatory('iso27001');
         const res = window.ChecklistCoverage.assess(
             checklistOf(mandatory.slice(0, 5)),
-            ctxOf({ priorChecklists: [checklistOf(mandatory.slice(5))] }));
+            ctxOf({ priorChecklists: [checklistOf(mandatory.slice(5))], priorExecuted: audited(checklistOf(mandatory.slice(5))) }));
         const row = res.coverage.clauses.find(c => c.stdId === 'iso27001');
         expect(row.thisAudit).toBe(5);
         expect(row.cycle).toBe(row.total);
+        // Planned is not audited: nothing was answered at this audit.
+        expect(row.completed).toBe(0);
+        expect(row.cycleVerified).toBe(row.total - 5);
     });
 });
 
@@ -203,7 +220,7 @@ describe('ChecklistCoverage — risk-based Annex A selection', () => {
         const base = allMandatory('iso27001');
         const res = window.ChecklistCoverage.assess(
             checklistOf(base.concat(['A.5.1'])),
-            ctxOf({ soaApplicable: soa, priorChecklists: [checklistOf(['A.5.9'])] }));
+            ctxOf({ soaApplicable: soa, priorChecklists: [checklistOf(['A.5.9'])], priorExecuted: audited(checklistOf(['A.5.9'])) }));
         expect(codes(res)).not.toContain('CYCLE_CONTROL_GAP');
     });
 });
@@ -231,7 +248,7 @@ describe('ChecklistCoverage — critical processes', () => {
             'Walk the Client Onboarding process end to end and verify it runs as planned.';
         const res = window.ChecklistCoverage.assess(
             checklistOf(allMandatory('iso27001')),
-            ctxOf({ keyProcesses: [{ name: 'Client Onboarding' }], priorChecklists: [earlier] }));
+            ctxOf({ keyProcesses: [{ name: 'Client Onboarding' }], priorChecklists: [earlier], priorExecuted: audited(earlier) }));
         expect(codes(res)).not.toContain('CYCLE_PROCESS_GAP');
     });
 });
