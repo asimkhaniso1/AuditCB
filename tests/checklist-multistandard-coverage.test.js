@@ -107,8 +107,8 @@ describe('the coverage contradiction is gone', () => {
         const issue = result.issues.find(i => i.code === 'COVERAGE_UNAVAILABLE');
         expect(issue.severity).toBe('critical');
         const line = CC.summarize(result);
-        expect(line).toMatch(/^Blocked — coverage could not be assessed/);
-        expect(line).not.toMatch(/validated/i);
+        expect(line).toMatch(/^Failed validation — coverage could not be assessed/);
+        expect(line).not.toMatch(/validated —|coverage validated/i);
     });
 
     it('the Ready-for-Audit gate refuses it', () => {
@@ -133,16 +133,19 @@ describe('the coverage contradiction is gone', () => {
         const cov = CC.assess(ck, ctxOf(ck));
         const combined = CC.combine({ ok: true, counts: { critical: 0, warning: 0, info: 0 }, issues: [] }, cov);
         expect(combined.outcome).toBe('blocked');
-        expect(combined.label).toBe('Blocked — coverage could not be assessed');
+        expect(combined.label).toBe('Failed validation — coverage could not be assessed');
     });
 });
 
 describe('mutually exclusive outcomes', () => {
+    // No label says "validated": coverage is PLANNED coverage, never a
+    // statement that requirements were audited (R1, CE-35).
     const LABELS = {
-        passed: 'Passed — coverage validated',
-        'passed-with-notes': 'Passed with notes — coverage validated with identified limitations',
-        blocked: 'Blocked — coverage could not be assessed',
-        failed: 'Failed — identified coverage gaps',
+        passed: 'Passed — planned coverage complete',
+        'passed-with-notes': 'Passed with warnings — planned coverage complete, with identified limitations',
+        review: 'Requires auditor review — items need a decision before the checklist is released',
+        blocked: 'Failed validation — coverage could not be assessed',
+        failed: 'Failed validation — identified coverage gaps',
         'not-assessed': 'Not assessed — no clause registry is held for this scheme; the auditor confirms coverage'
     };
     it('carries the exact wording', () => { expect(CC.OUTCOMES).toEqual(LABELS); });
@@ -217,10 +220,18 @@ describe('per-standard coverage over the certification cycle', () => {
         expect(before.gaps).toContain('7.2');
         expect(before.inherited).toBe(0);
 
-        // after: the S1 audit ran against that checklist
+        // planned only: the S1 audit was planned against that checklist, but no
+        // final report records it being answered — nothing is credited.
         window.state.auditPlans = [{ id: 'p-s1', clientId: CLIENT_ID, client: CLIENT.name, date: '2023-11-20', selectedChecklists: ['prior-1'], type: 'Surveillance 1' }];
+        const plannedOnly = CC.assess(ckSmall, ctxOf(ckSmall, { planId: PLAN_ID }));
+        expect(plannedOnly.coverage.clauses.find(c => c.stdId === 'iso27001').gaps).toContain('7.2');
+        expect(plannedOnly.issues.map(i => i.code)).toContain('PRIOR_RESULTS_UNAVAILABLE');
+
+        // after: the S1 report was finalized with 7.2 answered
+        window.state.auditReports = [{ id: 'r-s1', planId: 'p-s1', status: 'Finalized', checklistProgress: [{ checklistId: 'prior-1', itemIdx: 'IMS-0', status: 'conform' }] }];
         const after = CC.assess(ckSmall, ctxOf(ckSmall, { planId: PLAN_ID })).coverage.clauses.find(c => c.stdId === 'iso27001');
         expect(after.inherited).toBe(1);
+        expect(after.earlierAudited).toBe(1);
         expect(after.gaps).not.toContain('7.2');
         expect(after.remaining).toBe(before.remaining - 1);
     });

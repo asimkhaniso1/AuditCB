@@ -201,32 +201,105 @@
     }
 
     /**
-     * Every `stdId::ref` a checklist tests, plus the free text it tests them
-     * with (used for process matching).
-     *
-     * @returns {{refs: Object, text: string}} refs is a plain-object set
+     * The id execution uses for each question, in flatten() order:
+     * "<mainClause>-<subIdx>" for a sectioned checklist, the item index for a
+     * flat one. Matches report.checklistProgress[].itemIdx.
      */
-    function coverageOf(checklist, standardIds) {
-        const ids = arr(standardIds);
-        const refs = Object.create(null);
-        const parts = [];
-        flatten(checklist).forEach(function (it) {
-            parts.push(it.title, it.requirement);
-            arr(it.refs).forEach(function (r) { refs[refKey(r.stdId, r.ref)] = true; });
-            const qa = QA();
-            const pseudo = qa && typeof qa.isPseudoRef === 'function'
-                ? qa.isPseudoRef(it.clause)
-                : !str(it.clause).trim();
-            if (!pseudo) ids.forEach(function (id) { refs[refKey(id, it.clause)] = true; });
+    function itemKeys(checklist) {
+        const keys = [];
+        arr(checklist && checklist.clauses).forEach(function (main) {
+            arr(main.subClauses).forEach(function (_sub, i) { keys.push(str(main.mainClause) + '-' + i); });
         });
-        return { refs: refs, text: parts.join(' \n ') };
+        if (!keys.length) arr(checklist && checklist.items).forEach(function (_it, i) { keys.push(String(i)); });
+        return keys;
     }
 
-    /** True when `ref`, or any sub-clause of it, is covered for that standard. */
+    /** What a question earns credit for — ChecklistQA.creditedRefs is THE rule. */
+    function creditedRefs(it, ids) {
+        const qa = QA();
+        if (qa && typeof qa.creditedRefs === 'function') return qa.creditedRefs(it, ids);
+        if (!it || it.documentNote || it.auditorReview) return [];
+        if (Array.isArray(it.refs)) return it.refs.filter(function (r) { return r && r.stdId && r.ref; });
+        const clause = str(it.clause).trim();
+        return clause ? arr(ids).map(function (id) { return { stdId: id, ref: clause }; }) : [];
+    }
+
+    /**
+     * Every `stdId::ref` a checklist tests, plus the text each question tests
+     * it with (used for process matching).
+     *
+     * With `opts.executed` (a set of item ids answered conform / nonconform),
+     * only those questions count: that is what was AUDITED, as opposed to what
+     * is merely planned on the checklist.
+     *
+     * @param {Object} [opts] - { executed: {itemId: true} }
+     * @returns {{refs: Object, text: string, items: Array<{text: string}>}}
+     */
+    function coverageOf(checklist, standardIds, opts) {
+        const ids = arr(standardIds);
+        const only = opts && opts.executed ? opts.executed : null;
+        const refs = Object.create(null);
+        const parts = [];
+        const items = [];
+        const keys = itemKeys(checklist);
+        flatten(checklist).forEach(function (it, i) {
+            if (only && !only[keys[i]]) return;
+            parts.push(it.title, it.requirement);
+            const raw = it.raw || {};
+            // A process counts as audited only where a question is ABOUT it:
+            // its title names the process, or it is an organisation-context
+            // question listing the processes it walks. Matching the whole
+            // checklist text credited "Legal", "Change" and "Risk Management"
+            // from words in unrelated questions. A legacy question (no source
+            // recorded) keeps its full text.
+            const source = str(raw.criterionSource || raw.source);
+            items.push({ text: (!source || source === 'org-context') ? str(it.title) + ' \n ' + str(it.requirement) : str(it.title) });
+            creditedRefs(it, ids).forEach(function (r) { refs[refKey(r.stdId, r.ref)] = true; });
+        });
+        return { refs: refs, text: parts.join(' \n '), items: items };
+    }
+
+    /**
+     * True when registry row `ref` is covered for that standard. A sub-clause
+     * citation covers its parent only where the registry holds no sub-clause
+     * rows of its own (ChecklistStandards.refCovered); a parent never covers a
+     * sub-clause.
+     */
     function covers(refs, stdId, ref) {
+        const Std = CS();
+        if (Std && typeof Std.refCovered === 'function') return Std.refCovered(refs, stdId, ref);
         if (refs[refKey(stdId, ref)]) return true;
         const prefix = refKey(stdId, ref) + '.';
         return Object.keys(refs).some(function (k) { return k.indexOf(prefix) === 0; });
+    }
+
+    /** Report statuses that mean the audit's results are final. */
+    function isFinalReport(r) {
+        const s = lower(str(r && (r.reportStatus || r.status)).trim());
+        return s === 'final' || s === 'finalized' || s === 'finalised' || s === 'approved' || s === 'published' || s === 'issued';
+    }
+
+    /** Execution answers that mean a question was actually audited. */
+    function isAudited(status) {
+        const s = lower(status);
+        return s === 'conform' || s === 'compliant' || s === 'nc';
+    }
+
+    /**
+     * Item ids answered conform / nonconform, by checklist id, across the given
+     * reports' checklistProgress.
+     * @returns {Object} { checklistId: { itemIdx: true } }
+     */
+    function executedByChecklist(reports) {
+        const out = {};
+        arr(reports).forEach(function (r) {
+            arr(r && r.checklistProgress).forEach(function (p) {
+                if (!p || p.isCustom || p.checklistId == null || p.itemIdx == null || !isAudited(p.status)) return;
+                const cid = String(p.checklistId);
+                (out[cid] = out[cid] || {})[String(p.itemIdx)] = true;
+            });
+        });
+        return out;
     }
 
     // ── Which standards is this checklist tied to? ────────────────────
@@ -307,11 +380,16 @@
     // Four states, mutually exclusive. "Validated" is printed ONLY for the two
     // that actually assessed coverage — a coverage pass that could not run must
     // never read as one that found nothing wrong.
+    // Coverage here is PLANNED coverage: it says what the checklist intends to
+    // ask, plus what earlier audits in the cycle actually answered. It is never
+    // a statement that the requirements were audited, and never conformity \u2014
+    // so no label says "validated".
     const OUTCOMES = {
-        passed: 'Passed \u2014 coverage validated',
-        'passed-with-notes': 'Passed with notes \u2014 coverage validated with identified limitations',
-        blocked: 'Blocked \u2014 coverage could not be assessed',
-        failed: 'Failed \u2014 identified coverage gaps',
+        passed: 'Passed \u2014 planned coverage complete',
+        'passed-with-notes': 'Passed with warnings \u2014 planned coverage complete, with identified limitations',
+        review: 'Requires auditor review \u2014 items need a decision before the checklist is released',
+        blocked: 'Failed validation \u2014 coverage could not be assessed',
+        failed: 'Failed validation \u2014 identified coverage gaps',
         // A checklist for a scheme the clause registry does not hold (GMP,
         // Halal, cGMP, ...): there is no requirement set to check it against.
         // That is a known limit, not an internal error \u2014 it must neither
@@ -323,7 +401,7 @@
     // nothing has been shown to be uncovered.
     const LIMITATION_CODES = {
         SOA_NOT_SUPPLIED: 1, SOA_DOCUMENT_UNREADABLE: 1, RISK_DRIVER_UNAVAILABLE: 1, PROGRAMME_INCOMPLETE: 1,
-        CYCLE_ANCHOR_ASSUMED: 1, PRIOR_CHECKLIST_UNAVAILABLE: 1, STANDARD_NOT_IN_REGISTRY: 1
+        CYCLE_ANCHOR_ASSUMED: 1, PRIOR_CHECKLIST_UNAVAILABLE: 1, PRIOR_RESULTS_UNAVAILABLE: 1, STANDARD_NOT_IN_REGISTRY: 1
     };
     // Issues that mean the assessment could not be made at all — an internal
     // error in how the checklist is associated with its standards, not a
@@ -432,17 +510,44 @@
         // plan.selectedChecklists is the field the Configure Checklists screen
         // and the execution view both write, so it is the authoritative link
         // between an audit and what it actually covered.
+        // Only audits that are genuinely PRIOR count: not the audit this
+        // checklist is for (it was reported as "2 of 2 prior audits" when one
+        // existed), not a cancelled plan, and not one scheduled for later.
+        const isCurrentPlan = function (p) { return !!(o.planId && String(p.id) === String(o.planId)); };
         const plans = arr(state.auditPlans).filter(function (p) {
-            return forClient(p) && inCycle(p.startDate || p.date || p.createdAt);
+            if (!p || isCurrentPlan(p) || !forClient(p)) return false;
+            if (/cancel/i.test(str(p.status))) return false;
+            const when = parseDate(p.startDate || p.date || p.createdAt);
+            if (when && when.getTime() > now.getTime()) return false;
+            return inCycle(p.startDate || p.date || p.createdAt);
         });
         const priorChecklistIds = {};
         plans.forEach(function (p) {
-            if (checklist && o.planId && String(p.id) === String(o.planId)) return;
             arr(p.selectedChecklists).forEach(function (cid) { priorChecklistIds[String(cid)] = true; });
         });
         const priorChecklists = arr(state.checklists).filter(function (c) {
             return c && String(c.id) !== String(checklist && checklist.id) && priorChecklistIds[String(c.id)];
         });
+        const checklistOnFile = {};
+        priorChecklists.forEach(function (c) { checklistOnFile[String(c.id)] = true; });
+
+        // What was actually AUDITED: answers from each prior audit's FINAL
+        // report, and from this audit's report as it stands. A prior checklist
+        // that was planned but never answered on a final report is not
+        // evidence that anything was covered.
+        const reportsOf = function (planId) {
+            return allReports.filter(function (r) { return r && r.planId != null && String(r.planId) === String(planId); });
+        };
+        const priorExecuted = {};
+        plans.forEach(function (p) {
+            const done = executedByChecklist(reportsOf(p.id).filter(isFinalReport));
+            arr(p.selectedChecklists).forEach(function (cid) {
+                if (done[String(cid)]) priorExecuted[String(cid)] = done[String(cid)];
+            });
+        });
+        const executed = (o.planId && checklist)
+            ? (executedByChecklist(reportsOf(o.planId))[String(checklist.id)] || {})
+            : {};
 
         // Previous results: the CAPA register is the real store of findings,
         // joined to an audit by auditId -> planId.
@@ -556,12 +661,20 @@
                 issues: arr(programme && programme.issues)
             },
             priorAudits: plans.map(function (p) {
+                const ids = arr(p.selectedChecklists).map(String);
                 return {
                     id: p.id, date: p.startDate || p.date || p.createdAt || '',
-                    type: p.auditType || p.type || '', checklists: arr(p.selectedChecklists).length
+                    type: p.auditType || p.type || '', checklists: ids.length,
+                    checklistsOnFile: ids.filter(function (cid) { return checklistOnFile[cid]; }).length,
+                    resultsOnFile: ids.filter(function (cid) { return !!priorExecuted[cid]; }).length
                 };
             }),
             priorChecklists: priorChecklists,
+            // { checklistId: { itemIdx: true } } — questions answered on a
+            // prior audit's final report. Only these earn cycle credit.
+            priorExecuted: priorExecuted,
+            // { itemIdx: true } — this checklist's questions answered so far.
+            executed: executed,
             keyProcesses: arr(client && client.keyProcesses).map(function (p) {
                 return typeof p === 'string' ? { name: p } : p;
             }),
@@ -696,21 +809,36 @@
         const gapSeverity = closing ? 'critical' : 'info';
         const issues = [];
 
+        // Three different things, kept apart (they used to be one number):
+        //   planned   — what this checklist intends to ask (here)
+        //   completed — what this audit has actually answered (done)
+        //   earlier   — what prior audits in the cycle answered on a final
+        //               report (priorRefs). A prior checklist that was planned
+        //               but never answered earns nothing.
+        // The Ready gate judges planned + earlier: it runs before the audit.
+        // Nothing here is a statement of conformity.
         const here = coverageOf(checklist, ids);
-        const cycleRefs = Object.assign(Object.create(null), here.refs);
-        let cycleText = here.text;
+        const done = coverageOf(checklist, ids, { executed: c.executed || {} });
+        const priorRefs = Object.create(null);
+        const priorItems = [];
+        let priorWithoutResults = 0;
         arr(c.priorChecklists).forEach(function (prior) {
-            const cov = coverageOf(prior, arr(prior.standardIds).length ? prior.standardIds : ids);
-            Object.keys(cov.refs).forEach(function (k) { cycleRefs[k] = true; });
-            cycleText += ' \n ' + cov.text;
+            const exec = c.priorExecuted && c.priorExecuted[String(prior.id)];
+            if (!exec) { priorWithoutResults++; return; }
+            const cov = coverageOf(prior, arr(prior.standardIds).length ? prior.standardIds : ids, { executed: exec });
+            Object.keys(cov.refs).forEach(function (k) { priorRefs[k] = true; });
+            cov.items.forEach(function (x) { priorItems.push(x); });
         });
+        const cycleRefs = Object.assign(Object.create(null), here.refs, priorRefs);
+        const verifiedRefs = Object.assign(Object.create(null), done.refs, priorRefs);
 
         const coverage = {
             cycle: {
                 start: c.cycle && c.cycle.start, end: c.cycle && c.cycle.end,
                 anchored: c.cycle && c.cycle.anchored,
                 priorAudits: arr(c.priorAudits).length,
-                priorChecklists: arr(c.priorChecklists).length
+                priorChecklists: arr(c.priorChecklists).length,
+                priorWithResults: arr(c.priorChecklists).length - priorWithoutResults
             },
             clauses: [], controls: [], processes: { total: 0, covered: 0, gaps: [] }
         };
@@ -765,16 +893,30 @@
         // Prior audits whose checklist is not on file: their coverage cannot be
         // credited. A gap reported below may then be unavailable evidence
         // rather than genuine noncoverage, and the message says so.
-        const priorAuditCount = arr(c.priorAudits).length;
-        const priorReadCount = arr(c.priorChecklists).length;
-        const unread = Math.max(0, priorAuditCount - priorReadCount);
-        const unreadNote = unread
-            ? ' (' + unread + ' of ' + priorAuditCount + ' prior audit(s) in the cycle have no checklist on file, so part of this may be evidence that is not available here rather than genuine noncoverage)'
+        // Counted per audit, not audits against checklists: one audit with two
+        // checklists used to hide another audit with none.
+        const priorAuditList = arr(c.priorAudits);
+        const priorAuditCount = priorAuditList.length;
+        const perAudit = priorAuditList.length && priorAuditList.every(function (p) { return p && p.checklistsOnFile != null; });
+        const unread = perAudit
+            ? priorAuditList.filter(function (p) { return !p.checklistsOnFile; }).length
+            : Math.max(0, priorAuditCount - arr(c.priorChecklists).length);
+        const noResults = perAudit
+            ? priorAuditList.filter(function (p) { return p.checklistsOnFile && !p.resultsOnFile; }).length
+            : 0;
+        const unknownPrior = unread + noResults;
+        const unreadNote = unknownPrior
+            ? ' (' + unknownPrior + ' of ' + priorAuditCount + ' prior audit(s) in the cycle have no audited results on file, so part of this may be evidence that is not available here rather than genuine noncoverage — a missing record does not mean the audit did not cover it)'
             : '';
         if (unread) {
             issues.push(issue('PRIOR_CHECKLIST_UNAVAILABLE', 'warning',
-                unread + ' of ' + priorAuditCount + ' prior audit(s) in the certification cycle have no checklist on file. Their coverage cannot be credited, so cycle coverage below is computed from the '
-                + priorReadCount + ' that can be read.', { unread: unread }));
+                unread + ' of ' + priorAuditCount + ' prior audit(s) in the certification cycle have no checklist on file. What they covered is unknown and is not credited.',
+                { unread: unread }));
+        }
+        if (priorWithoutResults) {
+            issues.push(issue('PRIOR_RESULTS_UNAVAILABLE', 'warning',
+                priorWithoutResults + ' checklist(s) from prior audits in this cycle have no answers on a final audit report, so their planned questions are not credited as covered. Finalize that audit\'s report, or record what it covered, to credit it.',
+                { checklists: priorWithoutResults }));
         }
 
         // ── 1. Requirements of the standards, over the cycle ──────────
@@ -786,16 +928,28 @@
             const missCycle = mandatory.filter(function (cl) { return !covers(cycleRefs, id, cl.ref); });
             const thisAudit = mandatory.length - missHere.length;
             const overCycle = mandatory.length - missCycle.length;
+            const completed = mandatory.filter(function (cl) { return covers(done.refs, id, cl.ref); }).length;
+            const verified = mandatory.filter(function (cl) { return covers(verifiedRefs, id, cl.ref); }).length;
+            const earlier = mandatory.filter(function (cl) { return covers(priorRefs, id, cl.ref); }).length;
             coverage.clauses.push({
                 stdId: id, label: std.label, total: mandatory.length,
+                // `thisAudit` is kept for existing readers; it is PLANNED.
                 thisAudit: thisAudit,
                 cycle: overCycle,
                 // Planned in THIS audit, inherited from earlier audits in the
                 // cycle, and what remains — the three things an assessor asks.
                 planned: thisAudit,
+                // Answered at this audit so far (conform / nonconform) — the
+                // only "done" figure. Zero until the audit is carried out.
+                completed: completed,
                 inherited: Math.max(0, overCycle - thisAudit),
+                // Covered by an audited answer: this audit's or a prior final
+                // report's. Planned questions never count here.
+                cycleVerified: verified,
+                earlierAudited: earlier,
                 remaining: missCycle.length,
                 percentCycle: mandatory.length ? Math.round(overCycle / mandatory.length * 100) : 100,
+                percentVerified: mandatory.length ? Math.round(verified / mandatory.length * 100) : 100,
                 gaps: missCycle.map(function (m) { return m.ref; })
             });
             if (missCycle.length) {
@@ -820,9 +974,16 @@
             const sampledHere = sel.pool.filter(function (ct) { return covers(here.refs, id, ct.ref); });
             const sampledCycle = sel.pool.filter(function (ct) { return covers(cycleRefs, id, ct.ref); });
             const neverSampled = sel.pool.filter(function (ct) { return !covers(cycleRefs, id, ct.ref); });
+            const completedHere = sel.pool.filter(function (ct) { return covers(done.refs, id, ct.ref); });
+            const verifiedCycle = sel.pool.filter(function (ct) { return covers(verifiedRefs, id, ct.ref); });
 
             coverage.controls.push({
                 stdId: id, label: std.label, pool: sel.pool.length, soaDriven: sel.soaDriven,
+                // What the pool's applicability rests on. Without an SoA it is
+                // the tier-1 PROVISIONAL set — a working assumption, never
+                // "applicable" (applicability is the client's, in its SoA).
+                poolBasis: sel.soaDriven ? (c.soaSource === 'document' ? 'soa-document' : 'soa-supplied') : 'provisional',
+                completed: completedHere.length, cycleVerified: verifiedCycle.length,
                 // 'supplied' | 'document' | null — lets the printed panel and
                 // the detail card say where the applicable set came from,
                 // rather than only whether one was found.
@@ -883,7 +1044,9 @@
             if (closing && neverSampled.length) {
                 issues.push(issue('CYCLE_CONTROL_GAP', sel.soaDriven ? 'critical' : 'warning',
                     std.label + ': ' + neverSampled.length + ' of ' + sel.pool.length
-                    + ' applicable Annex A control(s) were sampled at no audit in this cycle — '
+                    + (sel.soaDriven
+                        ? ' applicable Annex A control(s) were sampled at no audit in this cycle — '
+                        : ' Annex A control(s) in the provisional pool (no Statement of Applicability confirmed, so applicability is assumed, not established) were sampled at no audit in this cycle — ')
                     + neverSampled.slice(0, 10).map(function (ct) { return ct.ref; }).join(', ')
                     + (neverSampled.length > 10 ? '…' : '') + unreadNote
                     + '. Sample them at this audit or record why they need not be.',
@@ -900,15 +1063,22 @@
 
         // ── 3. Critical processes, over the cycle ─────────────────────
         const processes = arr(c.keyProcesses).filter(function (p) { return p && str(p.name).trim(); });
-        const haystack = lower(cycleText);
+        // Matched question by question (this checklist's planned questions and
+        // the questions prior audits actually answered), never across the
+        // whole checklist text at once.
+        const norm = function (s) { return lower(s).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); };
+        const questionTexts = here.items.concat(priorItems).map(function (x) { return ' ' + norm(x.text) + ' '; });
         const gaps = processes.filter(function (p) {
-            const name = lower(p.name).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+            const name = norm(p.name);
             if (!name) return false;
-            if (haystack.indexOf(name) !== -1) return false;
             // A multi-word process name still counts as covered when the words
-            // that carry its meaning all appear — "Order to Cash" vs "order-to-cash".
+            // that carry its meaning all appear in ONE question — "Order to
+            // Cash" vs "order-to-cash".
             const words = name.split(' ').filter(function (w) { return w.length > 3; });
-            return !(words.length && words.every(function (w) { return haystack.indexOf(w) !== -1; }));
+            return !questionTexts.some(function (t) {
+                if (t.indexOf(' ' + name + ' ') !== -1) return true;
+                return words.length > 0 && words.every(function (w) { return t.indexOf(w) !== -1; });
+            });
         });
         coverage.processes = {
             total: processes.length, covered: processes.length - gaps.length,
@@ -962,7 +1132,9 @@
         const total = sum('total');
         coverage.integrated = {
             standards: rows.length, requirements: total, planned: sum('planned'), inherited: sum('inherited'),
-            remaining: sum('remaining'), percentCycle: total ? Math.round(sum('cycle') / total * 100) : null
+            completed: sum('completed'), cycleVerified: sum('cycleVerified'),
+            remaining: sum('remaining'), percentCycle: total ? Math.round(sum('cycle') / total * 100) : null,
+            percentVerified: total ? Math.round(sum('cycleVerified') / total * 100) : null
         };
         // What needs an auditor's judgement rather than a fix.
         coverage.notes = issues.filter(function (i) { return LIMITATION_CODES[i.code] || i.code === 'RISK_DRIVER_UNAVAILABLE'; })
@@ -998,7 +1170,7 @@
      * coverage could not run.
      * @returns {{outcome: string, label: string, reasons: string[]}}
      */
-    function combine(qa, coverage) {
+    function combine(qa, coverage, checklist) {
         const reasons = [];
         if (!coverage) {
             reasons.push('The coverage pass did not run.');
@@ -1017,8 +1189,23 @@
             return { outcome: 'not-assessed', label: OUTCOMES['not-assessed'], reasons: reasons };
         }
         if (coverage.outcome === 'failed') reasons.push(coverage.counts.critical + ' coverage gap(s).');
-        if (qaCritical || coverage.outcome === 'failed') return { outcome: 'failed', label: OUTCOMES.failed, reasons: reasons };
-        const notes = (qa && qa.counts && qa.counts.warning) || coverage.outcome === 'passed-with-notes' || !qa;
+        // The same judgement the Ready gate makes, so the printed status and
+        // the gate can never disagree. A critical issue the auditor has
+        // dispositioned (recorded justification) no longer fails the
+        // checklist; anything else the gate would block needs a decision.
+        const gate = readiness(checklist || {}, { qa: qa || undefined, coverage: coverage });
+        const openCritical = gate.blockers.filter(function (b) { return b.severity === 'critical'; });
+        const dispositionedOnly = (qaCritical || coverage.outcome === 'failed') && !openCritical.length && checklist;
+        if ((qaCritical || coverage.outcome === 'failed') && !dispositionedOnly) {
+            return { outcome: 'failed', label: OUTCOMES.failed, reasons: reasons };
+        }
+        if (dispositionedOnly) reasons.push('Every critical issue has a recorded auditor disposition.');
+        if (!gate.ready) {
+            reasons.push(gate.blockers.length + ' item(s) need an auditor decision before release: '
+                + Array.from(new Set(gate.blockers.map(function (b) { return b.label; }))).join('; ') + '.');
+            return { outcome: 'review', label: OUTCOMES.review, reasons: reasons };
+        }
+        const notes = (qa && qa.counts && qa.counts.warning) || coverage.outcome === 'passed-with-notes' || !qa || dispositionedOnly;
         if (notes) return { outcome: 'passed-with-notes', label: OUTCOMES['passed-with-notes'], reasons: reasons };
         return { outcome: 'passed', label: OUTCOMES.passed, reasons: reasons };
     }
@@ -1039,14 +1226,22 @@
         OUT_OF_SCOPE_STANDARD: 'Requirement from a standard outside the audit scope',
         CONTRADICTORY_MAPPING: 'Clause that means different things in the selected standards',
         CYCLE_REQUIREMENT_GAP: 'Requirement audited nowhere in the cycle',
-        CYCLE_CONTROL_GAP: 'Applicable control sampled nowhere in the cycle',
+        CYCLE_CONTROL_GAP: 'Annex A control in the pool sampled nowhere in the cycle',
         RISK_CONTROL_GAP: 'Risk-driven control not sampled',
         CYCLE_PROCESS_GAP: 'Critical process audited nowhere in the cycle',
         VALIDATION_UNAVAILABLE: 'Checklist could not be validated',
         COVERAGE_UNAVAILABLE: 'Coverage could not be assessed',
         COVERAGE_NOT_ASSESSED: 'Coverage pass did not run',
-        STANDARD_NOT_LINKED: 'Checklist not linked to every standard in the audit scope'
+        STANDARD_NOT_LINKED: 'Checklist not linked to every standard in the audit scope',
+        // QA criticals that used to fall through to "notes" and let a
+        // checklist be released with them. They block only when critical
+        // (SEVERITY_GATED_CODES): a surveillance rates a missing requirement
+        // 'info' and a thin Annex A sample 'warning', which stay notes.
+        MISSING_REQUIREMENT: 'Mandatory requirement not covered',
+        MISSING_ANNEX_A: 'No Annex A control sampled',
+        EXCESSIVE_COUNT: 'More questions than the scope justifies'
     };
+    const SEVERITY_GATED_CODES = { MISSING_REQUIREMENT: true, MISSING_ANNEX_A: true, EXCESSIVE_COUNT: true };
 
     // Cycle gaps are judged over the whole certification cycle. assess() rates
     // them critical only at the audit that closes the cycle (recertification);
@@ -1101,6 +1296,7 @@
             const label = BLOCKING_CODES[i.code];
             if (!label) { notes.push(i); return; }
             if (CYCLE_GAP_CODES[i.code] && i.severity === 'info') { notes.push(i); return; }
+            if (SEVERITY_GATED_CODES[i.code] && i.severity !== 'critical') { notes.push(i); return; }
             // An issue an auditor has explicitly dispositioned — item removed,
             // clause assigned, or a recorded justification — stops blocking.
             const key = i.code + '|' + (i.itemRef || '') + '|' + (i.nearRef || '');
@@ -1145,6 +1341,9 @@
         summarize: summarize,
         riskDrivenControls: riskDrivenControls,
         coverageOf: coverageOf,
+        itemKeys: itemKeys,
+        executedByChecklist: executedByChecklist,
+        isFinalReport: isFinalReport,
         flatten: flatten,
         refsInText: refsInText,
         docText: docText,

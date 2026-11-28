@@ -1999,8 +1999,15 @@ function readinessCardHTML(checklist, res) {
         ['Duplicate questions', r.blockers.filter(b => b.code === 'DUPLICATE_QUESTION' || b.code === 'NEAR_DUPLICATE')],
         ['Unmapped / no-clause items', r.blockers.filter(b => b.code === 'IRRELEVANT_REQUIREMENT' || b.code === 'AUDITOR_REVIEW' || b.code === 'INVALID_REF')],
         ['Scope and mapping', r.blockers.filter(b => b.code === 'OUT_OF_SCOPE_STANDARD' || b.code === 'CONTRADICTORY_MAPPING')],
-        ['Cycle coverage gaps', r.blockers.filter(b => b.code.indexOf('CYCLE_') === 0 || b.code === 'RISK_CONTROL_GAP')]
-    ].filter(g => g[1].length);
+        ['Cycle coverage gaps', r.blockers.filter(b => b.code.indexOf('CYCLE_') === 0 || b.code === 'RISK_CONTROL_GAP')],
+        ['Completeness for this audit type', r.blockers.filter(b => b.code === 'MISSING_REQUIREMENT' || b.code === 'MISSING_ANNEX_A' || b.code === 'EXCESSIVE_COUNT')]
+    ];
+    // Any blocker the groups above do not name is still shown — a blocker
+    // the card does not list is a gate the auditor cannot see to clear.
+    const grouped = new Set(groups.reduce((acc, g) => acc.concat(g[1]), []));
+    const other = r.blockers.filter(b => !grouped.has(b));
+    if (other.length) groups.push(['Other', other]);
+    const shownGroups = groups.filter(g => g[1].length);
 
     const actionsFor = (b) => {
         const removable = b.code === 'DUPLICATE_QUESTION' || b.code === 'NEAR_DUPLICATE'
@@ -2044,7 +2051,7 @@ function readinessCardHTML(checklist, res) {
             : `<button class="btn ${r.ready ? 'btn-primary' : 'btn-secondary'}" data-action="markChecklistReadyForAudit" data-id="${esc(id)}"${r.ready ? '' : ' disabled title="Resolve the issues below first"'} aria-label="Mark ready for audit"><i class="fa-solid fa-circle-check" style="margin-right:0.4rem;"></i>Mark Ready for Audit</button>`}
                 </div>
             </div>
-            ${groups.map(g => `
+            ${shownGroups.map(g => `
                 <div style="margin-top:1rem;">
                     <div style="font-size:0.78rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem;">${esc(g[0])} (${g[1].length})</div>
                     ${g[1].map(b => `
@@ -2108,17 +2115,24 @@ function coverageCardHTML(cov, checklist) {
     const c = cov.coverage;
     const cycle = c.cycle || {};
     const checklistId = checklist ? String(checklist.id) : '';
-    const bar = (num, den) => {
+    // Planned figures are drawn in a neutral colour: a full bar of PLANNED
+    // questions is not a requirement audited, and green read as "done" on a
+    // checklist where every question was still "Not checked". Only the
+    // audited column uses the traffic-light colours.
+    const bar = (num, den, planned) => {
+        if (num == null) return '<span style="color:#94a3b8;">&mdash;</span>';
         const pct = den ? Math.round((num / den) * 100) : 0;
-        const color = pct >= 100 ? '#059669' : pct >= 70 ? '#f59e0b' : '#dc2626';
+        const color = planned ? '#94a3b8' : (pct >= 100 ? '#059669' : pct >= 70 ? '#f59e0b' : '#dc2626');
         return `<div style="display:flex;align-items:center;gap:0.5rem;">
             <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${color};"></div></div>
             <span style="font-size:0.8rem;color:#475569;min-width:64px;text-align:right;">${num} / ${den}</span></div>`;
     };
+    // [label, planned this audit, planned over cycle, denominator, extra, audited (this audit + earlier final reports)]
+    const verifiedOf = (x) => (x.cycleVerified == null ? null : x.cycleVerified);
     const rows = []
-        .concat((c.clauses || []).map(cl => [`${cl.label} — requirements`, cl.thisAudit, cl.cycle, cl.total, '']))
-        .concat((c.controls || []).map(ct => [`${ct.label} — Annex A applicable (${annexACoverageLabel(ct)})`, ct.thisAudit, ct.cycle, ct.pool, soaSupplyActionsHTML(ct, checklistId)]));
-    if (c.processes && c.processes.total) rows.push(['Critical processes', null, c.processes.covered, c.processes.total, '']);
+        .concat((c.clauses || []).map(cl => [`${cl.label} — requirements`, cl.thisAudit, cl.cycle, cl.total, '', verifiedOf(cl)]))
+        .concat((c.controls || []).map(ct => [`${ct.label} — Annex A ${ct.soaDriven ? 'applicable' : 'provisional pool'} (${annexACoverageLabel(ct)})`, ct.thisAudit, ct.cycle, ct.pool, soaSupplyActionsHTML(ct, checklistId), verifiedOf(ct)]));
+    if (c.processes && c.processes.total) rows.push(['Critical processes', null, c.processes.covered, c.processes.total, '', null]);
 
     const drivers = (c.controls || [])[0];
     // The three-year view belongs to a recertification. A surveillance still
@@ -2132,25 +2146,28 @@ function coverageCardHTML(cov, checklist) {
                 <i class="fa-solid fa-shield-halved" style="margin-right:0.5rem;color:var(--primary-color);"></i>
                 ${heading}
             </h3>
-            <p style="margin:0 0 0.5rem;font-size:0.88rem;font-weight:600;color:${cov.outcome === 'blocked' || cov.outcome === 'failed' ? '#b91c1c' : (cov.outcome === 'passed-with-notes' || cov.outcome === 'not-assessed') ? '#a16207' : '#166534'};">${esc(window.ChecklistCoverage ? window.ChecklistCoverage.summarize(cov) : '')}</p>
+            <p style="margin:0 0 0.5rem;font-size:0.88rem;font-weight:600;color:${cov.outcome === 'blocked' || cov.outcome === 'failed' ? '#b91c1c' : (cov.outcome === 'passed-with-notes' || cov.outcome === 'not-assessed' || cov.outcome === 'review') ? '#a16207' : '#166534'};">${esc(window.ChecklistCoverage ? window.ChecklistCoverage.summarize(cov) : '')}</p>
             <p style="margin:0 0 1rem;color:var(--text-secondary);font-size:0.85rem;">
                 Cycle ${esc(cycle.start || '—')} to ${esc(cycle.end || '—')}${cycle.anchored ? ` (anchored on ${esc(cycle.anchored)})` : ''} &middot;
-                ${cycle.priorAudits || 0} prior audit(s), ${cycle.priorChecklists || 0} checklist(s) read for coverage.
+                ${cycle.priorAudits || 0} prior audit(s), ${cycle.priorChecklists || 0} checklist(s) on file, ${cycle.priorWithResults == null ? (cycle.priorChecklists || 0) : cycle.priorWithResults} with audited results.
             </p>
             <table style="width:100%;font-size:0.85rem;">
                 <thead><tr>
                     <th style="text-align:left;">Coverage</th>
-                    <th style="width:180px;">This audit</th>
-                    <th style="width:180px;">Over the cycle</th>
+                    <th style="width:160px;" title="Questions this checklist plans to ask — not yet audited">Planned this audit</th>
+                    <th style="width:160px;" title="Answered conform or nonconform at this audit or on a prior audit's final report">Audited so far</th>
+                    <th style="width:160px;" title="Planned at this audit plus audited earlier in the cycle">Planned over the cycle</th>
                 </tr></thead>
                 <tbody>
                     ${rows.map(row => `<tr>
                         <td style="padding:0.5rem 0.25rem;color:#334155;">${esc(row[0])}${row[4] || ''}</td>
-                        <td style="padding:0.5rem 0.25rem;">${row[1] === null ? '<span style="color:#94a3b8;">&mdash;</span>' : bar(row[1], row[3])}</td>
-                        <td style="padding:0.5rem 0.25rem;">${bar(row[2], row[3])}</td>
+                        <td style="padding:0.5rem 0.25rem;">${bar(row[1], row[3], true)}</td>
+                        <td style="padding:0.5rem 0.25rem;">${bar(row[5], row[3], false)}</td>
+                        <td style="padding:0.5rem 0.25rem;">${bar(row[2], row[3], true)}</td>
                     </tr>`).join('')}
                 </tbody>
             </table>
+            <p style="margin:0.5rem 0 0;font-size:0.8rem;color:var(--text-secondary);">Planned coverage shows what the checklist will ask; it is not evidence that a requirement was audited, and no coverage figure is a measure of conformity.</p>
             ${drivers ? `<p style="margin:0.75rem 0 0;font-size:0.8rem;color:var(--text-secondary);">
                 Control selection used: ${esc((drivers.driversUsed || []).join(', ') || 'no evidence source')}.
                 ${(drivers.driversMissing || []).length ? `Not available for this cycle: ${esc(drivers.driversMissing.join(', '))}.` : ''}
@@ -2707,7 +2724,7 @@ function printChecklist(id, planId) {
     // One status for the whole checklist, from both passes. Never "QA passed"
     // and "coverage validated" beside "coverage could not be assessed".
     const combined = window.ChecklistCoverage
-        ? window.ChecklistCoverage.combine(qa, coverage)
+        ? window.ChecklistCoverage.combine(qa, coverage, checklist)
         : { outcome: 'blocked', label: 'Blocked \u2014 coverage could not be assessed', reasons: ['The coverage module is not loaded.'] };
 
     // The plan page passes its own plan, so the document carries THAT audit's

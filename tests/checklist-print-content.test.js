@@ -62,10 +62,12 @@ describe('the printed checklist', () => {
     });
 
     it('heads the coverage panel for the audit type', () => {
-        expect(print('surveillance').text).toMatch(/Coverage validation — this audit and the cycle so far/i);
-        expect(print('surveillance').text).not.toMatch(/Recertification coverage validation/i);
-        expect(print('recertification').text).toMatch(/Recertification coverage validation/i);
-        expect(print('initial').text).toMatch(/Coverage validation/i);
+        expect(print('surveillance').text).toMatch(/Planned coverage — this audit and the cycle so far/i);
+        expect(print('surveillance').text).not.toMatch(/Recertification planned coverage/i);
+        expect(print('recertification').text).toMatch(/Recertification planned coverage — this audit and the certification cycle/i);
+        expect(print('initial').text).toMatch(/Planned coverage/i);
+        // Planned coverage is never presented as validation.
+        expect(print('recertification').text).not.toMatch(/coverage validation/i);
     });
 
     it('lets a long section code wrap in its column instead of overlapping the title', () => {

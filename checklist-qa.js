@@ -167,6 +167,34 @@
     }
 
     /**
+     * The `{stdId, ref}` pairs a question earns coverage credit for. ONE rule,
+     * used by the QA requirement check and by ChecklistCoverage, so the two can
+     * never count differently.
+     *
+     *  - An item that carries explicit `refs` credits exactly those. Its display
+     *    clause is NOT credited to every standard in scope: a 20000-1 "8.2.2
+     *    Plan the services" question used to count as covering 22301 8.2.2
+     *    (business impact analysis) and, by prefix, 27001 8.2.
+     *  - A citation the generator only SUGGESTED for an auditor to confirm
+     *    (auditorReview, criterionConfirmed !== true) earns nothing, nor does an
+     *    awareness note.
+     *  - A Knowledge Base clause belongs to its own standard, not a registry one.
+     *  - Only a legacy item with no `refs` at all keeps the old reading: its bare
+     *    clause number applies to each selected standard.
+     */
+    function creditedRefs(it, ids) {
+        if (!it || it.documentNote) return [];
+        const raw = it.raw || {};
+        if (it.auditorReview && raw.criterionConfirmed !== true) return [];
+        if (Array.isArray(it.refs)) {
+            return it.refs.filter(r => r && r.stdId && r.ref).map(r => ({ stdId: r.stdId, ref: String(r.ref).trim() }));
+        }
+        if (isPseudoRef(it.clause) || isSurveillanceElement(it) || isKnowledgeBaseItem(it)) return [];
+        const clause = String(it.clause || '').trim();
+        return (ids || []).map(id => ({ stdId: id, ref: clause }));
+    }
+
+    /**
      * Two items asking about genuinely different requirements.
      *
      * Similar wording between items that test DIFFERENT requirements is a
@@ -377,17 +405,18 @@
         if (Std && ids.length) {
             const coveredRefs = new Set();
             items.forEach(it => {
-                (it.refs || []).forEach(r => coveredRefs.add(`${r.stdId}::${r.ref}`));
-                if (!isPseudoRef(it.clause)) ids.forEach(id => coveredRefs.add(`${id}::${it.clause}`));
+                creditedRefs(it, ids).forEach(r => coveredRefs.add(`${r.stdId}::${r.ref}`));
             });
+            const isCovered = (id, ref) => (typeof Std.refCovered === 'function'
+                ? Std.refCovered(coveredRefs, id, ref)
+                : coveredRefs.has(`${id}::${ref}`));
             ids.forEach(id => {
                 const std = Std.byId(id);
                 if (!std) return;
+                // A parent row is covered by a sub-clause citation only when the
+                // registry holds no sub-clause rows of its own for it.
                 const missing = std.clauses
-                    .filter(cl => cl.mandatory && !coveredRefs.has(`${id}::${cl.ref}`))
-                    // A parent clause is covered when a sub-clause of it is.
-                    .filter(cl => !Array.from(coveredRefs).some(k =>
-                        k.indexOf(`${id}::${cl.ref}.`) === 0));
+                    .filter(cl => cl.mandatory && !isCovered(id, cl.ref));
                 if (missing.length) {
                     issues.push(issue('MISSING_REQUIREMENT',
                         c.auditType === 'surveillance' ? 'info' : 'critical',
@@ -466,7 +495,7 @@
         return `QA: ${bits.join(', ')} across ${result.itemCount} questions.`;
     }
 
-    const API = { validate, summarize, flatten, normalizeText, jaccard, tokens, FOREIGN_TERMS, isPseudoRef };
+    const API = { validate, summarize, flatten, normalizeText, jaccard, tokens, FOREIGN_TERMS, isPseudoRef, creditedRefs };
     global.ChecklistQA = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
     if (global.Logger) global.Logger.debug('Modules', 'checklist-qa.js loaded successfully.');

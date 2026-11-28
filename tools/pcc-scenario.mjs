@@ -72,7 +72,7 @@ export async function buildScenario(o) {
 
     const qa = QA.validate(checklist, checklist.qaContext);
     const coverage = CC.assess(checklist, CC.buildContext(checklist, { client, planId: plan.id, scopeStandards: standardText }));
-    const combined = CC.combine(qa, coverage);
+    const combined = CC.combine(qa, coverage, checklist);
 
     const asm = IPI.assemble({ plan, client, auditors, state, checklist, settings: {}, competenceValid: true, domain: Domain });
     Object.assign(plan, asm.patch);

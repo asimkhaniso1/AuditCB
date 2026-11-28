@@ -75,21 +75,29 @@ describe('lifecycle and item status', () => {
 });
 
 describe('validation status is stated once and never contradicts itself', () => {
-    it('prints the combined outcome, and "validated" only when coverage was assessed', () => {
-        expect(text()).toContain('Passed with notes — coverage validated with identified limitations');
+    it('prints the combined outcome, and never says coverage was "validated"', () => {
+        // The PC CONNECTION build leaves an item for the auditor (no defensible
+        // citation) and an unsampled provisional-pool control, so it needs a
+        // decision before release.
+        expect(text()).toContain('Requires auditor review — items need a decision before the checklist is released');
         expect(text()).not.toMatch(/Coverage could not be assessed/i);
+        expect(text()).not.toMatch(/coverage validated/i);
     });
-    it('a blocked checklist prints Blocked — and nothing that says validated', () => {
+    it('a blocked checklist prints Failed validation — and nothing that says validated', () => {
         const ck = Object.assign({}, s.checklist, { standardIds: [], qaContext: {}, standard: '', clauses: [] });
         const cov = CC.assess(ck, CC.buildContext(ck, { client: s.client }));
         const html = CD.build(ck, Object.assign(brandCtx(), { plan: s.plan, client: s.client, qa: s.qa, coverage: cov, combined: CC.combine(s.qa, cov) }));
         const t = DF.renderedText(html);
-        expect(t).toContain('Blocked — coverage could not be assessed');
+        expect(t).toContain('Failed validation — coverage could not be assessed');
         expect(t).not.toMatch(/coverage validated/i);
         expect(t).toContain('internal error');
     });
-    it('reports coverage per standard as planned, inherited and remaining', () => {
-        ['Planned this audit', 'Inherited from cycle', 'Remaining', 'Integrated view'].forEach(h => expect(text()).toContain(h));
+    it('reports coverage per standard as planned, audited, audited earlier and remaining', () => {
+        ['Planned this audit', 'Audited so far', 'Audited earlier in cycle', 'Remaining', 'Integrated view'].forEach(h => expect(text()).toContain(h));
+        expect(text()).toContain('no coverage figure is a measure of conformity');
+    });
+    it('a checklist with nothing answered prints 0 audited beside its planned figure', () => {
+        expect(text()).toMatch(/ISO\/IEC 27001:2022 — requirements\s*25 \/ 25\s*0 \/ 25/);
     });
 });
 
@@ -141,3 +149,28 @@ describe('page furniture and text hygiene', () => {
 function brandCtx() {
     return { brand: { primary: '#0f2a43', dark: '#0a1c2e', deep: '#16324d', text: '#0f2a43', tint: '#eaf0f6', tintBorder: '#b8c9db' }, cbName: 'Company Certification International', siblings: [s.checklist] };
 }
+
+describe('R1 — the PC CONNECTION recertification checklist', () => {
+    const items = () => s.checklist.clauses.reduce((a, c) => a.concat(c.subClauses.map(q => Object.assign({ section: c.mainClause }, q))), []);
+    it('asks ISO/IEC 20000-1 6.3 as the SMS plan, and keeps it out of "Planning of changes"', () => {
+        const plan = items().find(q => q.title === 'Service management system plan');
+        expect(plan.refs).toEqual([{ stdId: 'iso20000', ref: '6.3' }]);
+        const changes = items().find(q => q.section === 'IMS' && q.title === 'Planning of changes');
+        expect(changes.refs.map(r => r.stdId)).toEqual(['iso27001', 'iso22301']);
+        // The consolidated question names only the systems that share it.
+        expect(changes.requirement).toMatch(/the ISMS and BCMS/);
+        expect(changes.requirement).not.toMatch(/SMS are planned|BCMS and SMS/);
+    });
+    it('cites complaints under 20000-1 8.3.2 and asks 22301 8.4.5 recovery', () => {
+        const inc = items().find(q => q.title === 'Incidents, disruptions and complaints over the cycle');
+        expect(inc.refs.filter(r => r.stdId === 'iso20000').map(r => r.ref)).toEqual(['8.6.1', '8.3.2']);
+        expect(items().some(q => (q.refs || []).some(r => r.stdId === 'iso22301' && r.ref === '8.4.5'))).toBe(true);
+    });
+    it('plans full requirement coverage but has audited none of it', () => {
+        s.coverage.coverage.clauses.forEach(row => {
+            expect(row.planned).toBe(row.total);
+            expect(row.completed).toBe(0);
+            expect(row.cycleVerified).toBe(0);
+        });
+    });
+});
