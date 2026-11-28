@@ -230,15 +230,40 @@
             base = 'Certification recommendation';
         }
 
+        // Acceptance is not closure. With only minor nonconformities the
+        // certification body reviews and accepts the correction and corrective
+        // action plans before its decision, and verifies implementation at the
+        // next audit; with a major it verifies correction and corrective action
+        // before the decision. "Subject to satisfactory closure of applicable
+        // nonconformities" said a minor had to be closed first, contradicting
+        // the report's own conclusion (PC Connection technical review,
+        // 28 Nov 2026).
+        const nc = (n) => (n === 1 ? 'nonconformity' : 'nonconformities');
         let suffix;
         if (majorNC > 0) {
-            suffix = ' subject to satisfactory closure of the identified nonconformities, including verification of implemented corrective actions for major nonconformities.';
+            suffix = " subject to the certification body's verification of the correction and corrective action for the major " + nc(majorNC)
+                + (minorNC > 0 ? ', and its review and acceptance of the correction and corrective action plans for the minor ' + nc(minorNC) : '') + '.';
         } else if (minorNC > 0) {
-            suffix = ' subject to satisfactory closure of applicable nonconformities.';
+            suffix = " subject to the certification body's review and acceptance of the correction and corrective action plans for the minor " + nc(minorNC) + '.';
         } else {
             suffix = '.';
         }
         return base + suffix;
+    }
+
+    // The sentence recommendationText produced before 28 Nov 2026, frozen.
+    // An issued report's "modified since issue" fingerprint was computed over
+    // it (ai-service.js finalizeAndPublish); fingerprinting the current wording
+    // instead would flag every issued report with an open nonconformity as
+    // modified, though nothing in it changed. It depends only on the audit
+    // type and the major/minor counts, which is what the fingerprint is for.
+    function recommendationFingerprint(auditType, counts) {
+        const majorNC = (counts && Number(counts.majorNC)) || 0;
+        const minorNC = (counts && Number(counts.minorNC)) || 0;
+        const base = recommendationText(auditType, { majorNC: 0, minorNC: 0 }).replace(/\.$/, '');
+        if (majorNC > 0) return base + ' subject to satisfactory closure of the identified nonconformities, including verification of implemented corrective actions for major nonconformities.';
+        if (minorNC > 0) return base + ' subject to satisfactory closure of applicable nonconformities.';
+        return base + '.';
     }
 
     // ─── What a report's recommendation prints as ────────────────────────────
@@ -408,6 +433,110 @@
             if (titles.every((t) => t && t === titles[0])) return { standard: '', basis: 'common', standards: having };
         }
         return { standard: '', basis: 'ambiguous', standards };
+    }
+
+    // ── A finding's clause, cited against its own standard(s) ────────────────
+    // Integrated reports printed the auditor's working shorthand: "Clause 9.2
+    // (22301)", "Clause 7.5.3 (integrated)", "Clause 10.2 / 10.1"; and the
+    // corrective-action table named one standard for a two-standard reference
+    // ("ISO 27001:2022 — Clause 10.2 / 10.1", where 10.1 is the ISO 22301 and
+    // ISO/IEC 20000-1 clause). PC Connection technical review, 28 Nov 2026.
+    // This resolves the citation from the standards registry
+    // (window.ChecklistStandards), which keys clauses by concept, so a number
+    // that means different things in different standards is never attributed
+    // by number alone:
+    //   single standard          -> "ISO 9001:2015 clause 8.5.2"
+    //   tagged "9.2 (22301)"     -> "ISO 22301:2019 clause 9.2"
+    //   "7.5.3 (integrated)"     -> "ISO/IEC 27001:2022, ISO 22301:2019 and ISO/IEC 20000-1:2018 clause 7.5.3"
+    //   "10.2 / 10.1" on 3 stds  -> "ISO/IEC 27001:2022 clause 10.2 / ISO 22301:2019 and ISO/IEC 20000-1:2018 clause 10.1"
+    // Returns '' when it cannot be resolved unambiguously; callers then keep
+    // the reference as recorded. Never changes the finding.
+    function citeFinding(finding, reportStandard) {
+        const f = finding || {};
+        const CS = global.ChecklistStandards;
+        const raw = trim(f.criterionRef) || trim(f.clause);
+        if (!raw || FOCUS_REF_RE.test(raw)) return '';
+        const refs = raw.replace(/\([^)]*\)/g, ' ').split(/\s*[/,;]\s*|\s+and\s+/i).map(clauseNumberOf).filter(Boolean);
+        if (!refs.length) return '';
+        const names = splitStandards(reportStandard);
+        const reg = (name) => {
+            if (!CS || typeof CS.resolve !== 'function') return null;
+            const hit = CS.resolve(name).standards[0];
+            return hit || null;
+        };
+        const label = (name) => { const r = reg(name); return r ? r.label : name; };
+        const join = (list) => list.length <= 1 ? (list[0] || '') : list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+        // Annex A references are controls, not clauses.
+        const clausesWord = (rs) => (rs.every((r) => /^A\./i.test(r)) ? (rs.length === 1 ? 'Annex A control ' : 'Annex A controls ') : (rs.length === 1 ? 'clause ' : 'clauses ')) + join(rs);
+        // A tag names the finding's standard outright.
+        const tagged = raw.match(/\(\s*(?:ISO(?:\/IEC)?\s*)?(\d{4,5})(?:[-:]\d+)?\s*\)/i);
+        let scope = names;
+        if (tagged) {
+            const s = names.find((x) => standardNumber(x) === tagged[1]);
+            if (!s) return '';
+            scope = [s];
+        }
+        if (!scope.length) return '';
+        if (scope.length === 1) return label(scope[0]) + ' ' + clausesWord(refs);
+        // Several standards: only the registry can say which clause is which.
+        if (!CS || typeof CS.lookupRef !== 'function') return '';
+        const regs = scope.map((n) => ({ name: n, r: reg(n) }));
+        if (regs.some((x) => !x.r)) return '';
+        // A sub-clause the registry does not list (7.5.3) takes its parent's
+        // meaning (7.5).
+        const hitOf = (x, ref, exact) => {
+            if (exact) return CS.lookupRef([x.r.id], ref)[0] || null;
+            for (let r = ref; r; r = r.includes('.') ? r.slice(0, r.lastIndexOf('.')) : '') {
+                if (/^[A-Za-z]$/.test(r)) break;
+                const h = CS.lookupRef([x.r.id], r)[0];
+                if (h) return h;
+            }
+            return null;
+        };
+        const concept = (h) => h ? (h.shared || ('title:' + normTitle(h.title))) : null;
+        const integrated = /\(\s*integrated\s*\)/i.test(raw);
+        if (refs.length === 1) {
+            // The auditor tagged it as common to the integrated system.
+            if (integrated && regs.every((x) => hitOf(x, refs[0]))) return join(regs.map((x) => x.r.label)) + ' ' + clausesWord(refs);
+            // Exact references only: 8.6.2 is ISO/IEC 20000-1's alone, though
+            // ISO 22301 has an 8.6.
+            const having = regs.filter((x) => hitOf(x, refs[0], true));
+            // Untagged: only a reference that exists in one standard says which
+            // it is (A.5.9, 8.6.2). A clause the standards share (7.5, 8.1) is
+            // left as recorded: naming all of them would say the finding
+            // concerns every system, which the auditor did not record.
+            if (having.length !== 1) return '';
+            return having[0].r.label + ' ' + clausesWord(refs);
+        }
+        // "10.2 / 10.1": every standard must have exactly one of the refs for a
+        // concept all of them share; the standards are grouped by that ref.
+        const conceptsPer = regs.map((x) => refs.map((ref) => ({ ref, c: concept(hitOf(x, ref)) })).filter((e) => e.c));
+        const candidates = Array.from(new Set(conceptsPer[0].map((e) => e.c)))
+            .filter((c) => conceptsPer.every((list) => list.filter((e) => e.c === c).length === 1));
+        let shared = candidates.length === 1 ? candidates[0] : '';
+        if (candidates.length > 1) {
+            // 27001 10.1/10.2 and 22301 10.2/10.1 pair up both ways (continual
+            // improvement, and nonconformity). The finding's own wording decides;
+            // when it names neither, the citation is left as recorded.
+            const text = normTitle([f.ncrDescription, f.requirement, f.comment, f.title].filter(Boolean).join(' '));
+            const score = (c) => {
+                const title = (hitOf(regs[0], conceptsPer[0].find((e) => e.c === c).ref) || {}).title || '';
+                const words = normTitle(title).split(' ').filter((w) => w.length > 3 && w !== 'general');
+                return words.filter((w) => text.includes(w)).length;
+            };
+            const scored = candidates.map((c) => ({ c, s: score(c) })).sort((a, b) => b.s - a.s);
+            if (scored[0].s > 0 && scored[0].s > scored[1].s) shared = scored[0].c;
+        }
+        if (!shared) return '';
+        const byRef = [];
+        regs.forEach((x, i) => {
+            const ref = conceptsPer[i].find((e) => e.c === shared).ref;
+            let g = byRef.find((b) => b.ref === ref);
+            if (!g) { g = { ref, labels: [] }; byRef.push(g); }
+            g.labels.push(x.r.label);
+        });
+        byRef.sort((a, b) => refs.indexOf(a.ref) - refs.indexOf(b.ref));
+        return byRef.map((g) => join(g.labels) + ' clause ' + g.ref).join(' / ');
     }
 
     function formatCriterion(finding, opts) {
@@ -1771,12 +1900,14 @@
         }
         const auditTypeForRec = report.auditType || auditPlan.type || auditPlan.auditType || '';
         recommendation = recommendationText(auditTypeForRec, { majorNC: decisionMajor, minorNC: decisionMinor });
+        const recommendationKey = recommendationFingerprint(auditTypeForRec, { majorNC: decisionMajor, minorNC: decisionMinor });
 
         // Always populated (never conditional) — exact wording per spec, shown
         // next to the coverage/conformity figures in every consumer.
+        // No conformity figure is printed (PC Connection technical review,
+        // 28 Nov 2026), so the note no longer defines one.
         const methodologyNote = 'Audit Coverage = items assessed ÷ applicable checklist items (N/A excluded). '
-            + 'Conformity indicator = assessed items without nonconformity ÷ assessed items; observations and OFIs '
-            + 'do not reduce it. Analytical indicators only — not certification scores.';
+            + 'Analytical indicator only — not a certification score.';
 
         // ── Reconciliation checks ──
         const reconciliation = [];
@@ -1826,6 +1957,7 @@
             auditStatus,
             statusColor,
             recommendation,
+            recommendationKey,
             recColor,
             methodologyNote,
             reconciliation
@@ -2099,6 +2231,7 @@
         auditAreaResolver,
         UNTIED_AREA_LABEL,
         recommendationText,
+        recommendationFingerprint,
         resolveRecommendation,
         buildProgramme,
         cycleState,
@@ -2109,6 +2242,7 @@
         formatCriterion,
         classifyCriterion,
         resolveFindingStandard,
+        citeFinding,
         splitStandards,
         cleanEvidenceText,
         effectivenessStatements,

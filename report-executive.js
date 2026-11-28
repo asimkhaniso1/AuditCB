@@ -400,12 +400,11 @@ Return ONLY the raw JSON object, no markdown fences.`;
         const deptEntries = Object.entries(depts);
 
         const strengths = [];
-        const conformPct = computeConformPct(d, stats) ?? 0;
-        // conformPct is ReportStats.conformityPct: assessed items WITHOUT a
-        // nonconformity (observations and OFIs included), over ASSESSED items.
-        // It was labelled "of applicable items", which PC Connection's
-        // recertification printed as 93% against 56 of 109 applicable items.
-        if (conformPct >= 70) strengths.push(`Strong overall conformity across assessed clauses (${conformPct}% of assessed items without a nonconformity).`);
+        // No conformity percentage. Sampled items without a nonconformity, over
+        // the items assessed, reads as a measure of the management system that
+        // sampling does not support (PC Connection technical review, 28 Nov
+        // 2026: "misleading conformity percentages"). Audit coverage, which says
+        // what was sampled, stays.
         deptEntries.filter(([, v]) => v.total > 0 && v.nc === 0).slice(0, 3).forEach(([name]) => strengths.push(`${name} demonstrated full conformity during this audit.`));
         if (!strengths.length) strengths.push('No specific strengths were separately highlighted during this surveillance audit.');
 
@@ -450,29 +449,24 @@ Return ONLY the raw JSON object, no markdown fences.`;
             strengths,
             findings,
             concerns,
+            // The certification-process statement is factual: what the
+            // certification body does next under its process, and nothing
+            // predicted. The AI-written "impact & risk" and "forward readiness"
+            // text it replaces claimed effects the evidence did not support
+            // ("may affect the scope of verification at the next audit", "high
+            // confidence in continued conformity") and cited only some of the
+            // nonconformities (PC Connection technical review, 28 Nov 2026).
+            // Minor: the certification body reviews and accepts the plans
+            // before its decision; implementation is verified at the next audit.
+            // Major: correction and corrective action are verified before the
+            // decision. Neither is closure of the minor nonconformities.
             businessImpact: stats.majorNC > 0
-                ? `Unresolved major findings put the certification decision and closure timeline at risk.`
+                ? `${stats.majorNC} major ${stats.majorNC === 1 ? 'nonconformity remains' : 'nonconformities remain'} open${stats.minorNC > 0 ? ', with ' + stats.minorNC + ' minor' : ''}. Correction and corrective action for each major nonconformity must be verified by the certification body before the certification decision is taken${stats.minorNC > 0 ? '; the correction and corrective action plans for the minor nonconformities are reviewed and accepted before the decision' : ''}.${recurrenceNote}`
                 : stats.minorNC > 0
-                    ? `${stats.minorNC} ${minorWord} open. Certification status depends on corrective action for each being completed within the required timeframe.${recurrenceNote}`
-                    : `Current audit results do not indicate risks likely to affect certification status or the verification scope of the next audit stage.`,
-            risks: stats.majorNC > 0
-                ? 'Failure to close major non-conformities within the required timeframe may delay or jeopardize certification issuance.'
-                : stats.minorNC > 0
-                    ? 'A minor nonconformity that is not corrected effectively can recur and be raised as a major nonconformity at a later audit.'
-                    : 'Continued monitoring of observations is advised to prevent them from developing into nonconformities.',
-            forwardOutlook: stats.majorNC > 0
-                ? `Certification remains achievable on the current timeline provided the major finding(s) identified above are closed within the corrective-action window; the audit team has moderate confidence in readiness pending that closure.`
-                // Open minor nonconformities make continued conformity
-                // CONDITIONAL, however high the conformity percentage. The
-                // previous branch read only conformPct, so an audit carrying
-                // four open minor NCs was issued with "high confidence in
-                // continued conformity" — an assurance the findings do not
-                // support. Confidence language is reserved for a clean audit.
-                : stats.minorNC > 0
-                    ? `Continued conformity is dependent upon satisfactory corrective action and closure of the ${stats.minorNC === 1 ? 'identified minor nonconformity' : (['', '', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][stats.minorNC] || stats.minorNC) + ' identified minor nonconformities'} within the required timeframe.`
-                    : conformPct >= 80
-                        ? `The management system is on a stable trajectory toward the next audit stage; the audit team has high confidence in continued conformity if current controls are sustained.`
-                        : `Closure of the findings above, verified at the next audit, is what the certification programme requires from this point.`
+                    ? `${stats.minorNC} ${minorWord} open. The certification body reviews and accepts the correction and corrective action plans before the certification decision; their implementation and effectiveness are verified at the next audit.${recurrenceNote}`
+                    : `No nonconformities are open; no correction or corrective action is required before the certification decision.`,
+            risks: '',
+            forwardOutlook: ''
         };
     }
 
@@ -493,9 +487,9 @@ Return ONLY the raw JSON object, no markdown fences.`;
         return `
 ${briefHtml}
 <div class="b4-card b4-callout b4-callout--info" style="margin:var(--b4-s5) 0;">
-  <div class="b4-eyebrow">${icon('shield')} Certification-Process Impact &amp; Risk</div>
-  <p class="b4-body" style="margin:0 0 6px;">${esc(data.businessImpact || '')}</p>
-  <p class="b4-body" style="margin:0;">${esc(data.risks || '')}</p>
+  <div class="b4-eyebrow">${icon('shield')} Certification Process</div>
+  <p class="b4-body" style="margin:0;">${esc(data.businessImpact || '')}</p>${data.risks ? `
+  <p class="b4-body" style="margin:6px 0 0;">${esc(data.risks)}</p>` : ''}
 </div>
 
 ${showConcerns ? `
@@ -508,23 +502,6 @@ ${data.forwardOutlook ? `
 <div class="b4-rule"></div>
 <div class="b4-eyebrow">${icon('trend')} Forward Readiness &amp; Confidence</div>
 <p class="b4-body" style="margin:0;">${esc(data.forwardOutlook)}</p>` : ''}`;
-    }
-
-    // Prefers the canonical window.ReportStats conformityPct (blank-status
-    // excluded, advisories treated as conforming-with-comment) when the module
-    // is available; falls back to conform+advisories over assessed, blank-excluded.
-    function computeConformPct(d, _stats) {
-        try {
-            if (window.ReportStats && typeof window.ReportStats.build === 'function') {
-                const ds = window.ReportStats.build(d || {});
-                if (ds && ds.conformityPct != null) return ds.conformityPct;
-            }
-        } catch (_e) { /* fall through to legacy calc */ }
-        const items = safeArr(d && d.hydratedProgress).filter(i => i.status && i.status !== 'na' && i.status !== 'not_sampled');
-        if (!items.length) return null;
-        const conform = items.filter(i => i.status === 'conform').length;
-        const advisories = items.filter(i => i.status === 'nc' && ['observation', 'ofi'].includes((i.ncrType || '').toLowerCase())).length;
-        return Math.round(((conform + advisories) / items.length) * 100);
     }
 
     // AUDIT COVERAGE (items-assessed metric — distinct from evidence-attachment
@@ -672,7 +649,11 @@ ${data.forwardOutlook ? `
         if (minor) labelParts.push(`${minor} minor`);
         const noun = total === 1 ? 'nonconformity' : 'nonconformities';
         const verb = total === 1 ? 'requires' : 'require';
-        return `The ${labelParts.join(' and ')} ${noun} ${verb} corrective action and satisfactory closure in accordance with the certification body's corrective-action process.`;
+        // Acceptance of the plans is not closure (see ReportStats.recommendationText).
+        const process = major
+            ? 'Correction and corrective action for each major nonconformity are verified by the certification body before the certification decision' + (minor ? '; the plans for the minor nonconformities are reviewed and accepted before the decision and their implementation verified at the next audit.' : '.')
+            : 'The correction and corrective action plans are reviewed and accepted by the certification body before the certification decision; implementation and effectiveness are verified at the next audit.';
+        return `The ${labelParts.join(' and ')} ${noun} ${verb} correction and corrective action. ${process}`;
     }
 
     // Join a list of strings in prose form: "A", "A and B", "A, B and C".
@@ -700,10 +681,22 @@ ${data.forwardOutlook ? `
     // duplicate-finding check exists is exactly this kind of near-repeat.
     function buildKeyFindingsSummary(d, stats) {
         const bySeverity = { major: [], minor: [] };
+        // Each finding is cited against its own standard(s) when the registry
+        // can resolve it ("ISO 22301:2019 clause 9.2"), not as the recorded
+        // shorthand "Clause 9.2 (22301)" (PC Connection technical review,
+        // 28 Nov 2026). Citations name standards with commas, so entries are
+        // then separated by semicolons.
+        const reportStandard = (d && d.report && d.report.standard) || (d && d.auditPlan && d.auditPlan.standard) || '';
+        let cited = false;
         getRealNCs(d).forEach((item) => {
             const sev = String(item.ncrType || '').toLowerCase();
             if (sev !== 'major' && sev !== 'minor') return;
-            const label = clauseText(item);
+            let cite = '';
+            try {
+                if (window.ReportStats && typeof window.ReportStats.citeFinding === 'function') cite = window.ReportStats.citeFinding(item, reportStandard);
+            } catch (_e) { cite = ''; }
+            if (cite) cited = true;
+            const label = cite || clauseText(item);
             const dept = normalizeDept(item.department);
             const key = label + '|' + dept;
             const bucket = bySeverity[sev];
@@ -718,7 +711,8 @@ ${data.forwardOutlook ? `
             if (!entries.length) return;
             const count = sev === 'major' ? (stats.majorNC || entries.length) : (stats.minorNC || entries.length);
             const noun = count === 1 ? 'nonconformity' : 'nonconformities';
-            const clauseList = joinProse(entries.map((e) => e.label + deptNote(e.dept)));
+            const labels = entries.map((e) => e.label + deptNote(e.dept));
+            const clauseList = cited ? labels.join('; ') : joinProse(labels);
             sentences.push(`${count} ${sev} ${noun} identified: ${clauseList}.`);
         });
         return sentences;
@@ -940,7 +934,16 @@ ${data.forwardOutlook ? `
             const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
             if (Array.isArray(parsed.strengths)) parsed.strengths = filterStrengthsAgainstNCs(d, parsed.strengths);
-            const merged = capExecSummaryLists(Object.assign({}, fallback, parsed), d);
+            // Strengths may come from the AI; the certification-process
+            // statement and the concerns never do (see fallbackExecSummaryData):
+            // they are statements about the certification decision, and the
+            // AI's versions made claims the findings did not support.
+            const merged = capExecSummaryLists(Object.assign({}, fallback, parsed, {
+                businessImpact: fallback.businessImpact,
+                risks: fallback.risks,
+                forwardOutlook: fallback.forwardOutlook,
+                concerns: fallback.concerns
+            }), d);
             return { html: renderExecSummaryHtml(merged, buildAuditOutcomeSummary(d, merged)) };
         } catch (err) {
             console.warn('[ReportExecutive] generateExecutiveSummary AI failed, using fallback:', err);

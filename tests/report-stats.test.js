@@ -127,9 +127,9 @@ describe('ReportStats.build', () => {
 
     it('methodologyNote is always populated with the exact required wording', () => {
         const populated = window.ReportStats.build({ report: {}, hydratedProgress: [item({ status: 'conform' })] });
+        // No conformity figure is printed (technical review, 28 Nov 2026).
         const EXACT = 'Audit Coverage = items assessed ÷ applicable checklist items (N/A excluded). '
-            + 'Conformity indicator = assessed items without nonconformity ÷ assessed items; observations and OFIs '
-            + 'do not reduce it. Analytical indicators only — not certification scores.';
+            + 'Analytical indicator only — not a certification score.';
         expect(populated.methodologyNote).toBe(EXACT);
 
         // Still populated (non-empty) even on the malformed/empty-input fallback path.

@@ -2238,6 +2238,142 @@
         }
     }
 
+    // ── Auditor decisions the report cannot make ────────────────────────────
+    // PC Connection technical review, 28 Nov 2026. These raise warnings for
+    // the auditor and the technical reviewer; none changes a finding, its
+    // grading, a register record or the certification decision.
+
+    const CLOSED_NCR_RE = /^(closed|verified|withdrawn|cancel+ed|void)$/i;
+    // "7.5.3 (integrated)" -> "7.5"; "A.5.9" -> "A.5"; "" when no number.
+    function clauseFamily(ref) {
+        const m = trim(ref).replace(/^(clause|section)\s+/i, '').match(/^([A-Za-z]\.)?\d+(?:\.\d+)?/);
+        return m ? m[0] : '';
+    }
+    function ncrLabel(id) { return 'NCR-' + String(id).padStart(3, '0'); }
+
+    // W36: a nonconformity raised on a clause where a previous audit's
+    // nonconformity is still open. NCR-088 (7.5.3) repeated NCR-085 (7.5),
+    // open since February with no correction recorded, and was graded minor
+    // without the grading being looked at again. Whether an uncorrected or
+    // recurring nonconformity is major is the auditor's call under the
+    // certification body's grading rules; the warning says whether the finding
+    // states that call ("graded minor/major because …") and never changes it.
+    function checkW36RecurringOpenNc(input, results) {
+        const { report, client } = input;
+        const RS = global.ReportStats;
+        const register = safeArr(global.state && global.state.ncrs);
+        if (!register.length) return;
+        const owner = {
+            id: report && report.clientId != null ? report.clientId : (client && client.id != null ? client.id : null),
+            name: (report && (report.client || report.clientName)) || (client && client.name) || ''
+        };
+        const mine = (rec) => (RS && typeof RS.recordBelongsTo === 'function')
+            ? RS.recordBelongsTo(rec, owner)
+            : (owner.id != null ? String(rec.clientId) === String(owner.id) : lower(rec.clientName) === lower(owner.name));
+        const planId = report && report.planId != null ? String(report.planId) : '';
+        const openPrevious = register.filter((n) => n && mine(n)
+            && String(n.auditId) !== planId
+            && ['major', 'minor'].includes(lower(n.severity))
+            && !CLOSED_NCR_RE.test(trim(n.status)) && !n.verifiedDate);
+        if (!openPrevious.length) return;
+        const seen = new Set();
+        safeArr(report && report.checklistProgress).forEach((i) => {
+            if (!i || i.status !== 'nc' || !['major', 'minor'].includes(lower(i.ncrType))) return;
+            const fam = clauseFamily(i.criterionRef || i.clause);
+            if (!fam) return;
+            const prev = openPrevious.filter((n) => clauseFamily(n.criterionRef || n.clause) === fam);
+            if (!prev.length) return;
+            const own = register.find((n) => n && String(n.auditId) === planId && n.sourceItemIdx != null && String(n.sourceItemIdx) === String(i.itemIdx));
+            const ref = own ? ncrLabel(own.id) : 'The ' + lower(i.ncrType) + ' nonconformity';
+            const key = ref + '|' + prev.map((n) => n.id).join(',');
+            if (seen.has(key)) return;
+            seen.add(key);
+            const stated = /\bgraded\s+(?:as\s+)?(?:a\s+)?(?:minor|major)\b/i.test([i.ncrDescription, i.comment].join(' '));
+            const prevText = prev.map((n) => ncrLabel(n.id) + ' (clause ' + trim(n.criterionRef || n.clause) + ', ' + lower(n.severity) + ', ' + (trim(n.status) || 'open') + ')').join(', ');
+            results.warnings.push(item(
+                'W36-' + (own ? own.id : fam),
+                'warning',
+                'findings',
+                ref + ' (' + lower(i.ncrType) + ', clause ' + trim(i.criterionRef || i.clause) + ') is raised where ' + prevText + ' from a previous audit is still open. '
+                    + (stated ? 'The finding states its grading; confirm it at technical review.' : 'The finding does not state that its grading was reassessed.'),
+                'checklistProgress[].ncrType vs state.ncrs (previous audit, open)',
+                'Reassess the grading: an uncorrected or recurring nonconformity may be major under the certification body’s grading rules. Record the decision and the reason in the nonconformity statement. The grading is not changed automatically.'
+            ));
+        });
+    }
+
+    // W37: the audit duration is stated in the report without a recorded
+    // justification. PC Connection's plan: 4.5 auditor-days baseline for three
+    // standards, delivered as 1.5 in the agenda and 3 as remote document review
+    // before the audit, with no justification recorded and the duration
+    // methodology version still the placeholder "ENTER-APPROVED-VERSION".
+    // IAF MD 5 / ISO/IEC 17021-1 9.1.4: the duration and any adjustment to it
+    // are justified and recorded.
+    const PLACEHOLDER_RE = /enter[-\s]?approved|^tbd$|^to be (?:confirmed|determined)$|^draft$|^x+$/i;
+    function checkW37DurationJustification(input, results) {
+        const { auditPlan } = input;
+        if (!auditPlan) return;
+        const d = auditPlan.durationCalculation || {};
+        const rec = auditPlan.durationRecord || {};
+        const baseline = Number(rec.baselineDays != null ? rec.baselineDays : d.baselineDays) || 0;
+        const agenda = Number(rec.finalDays != null ? rec.finalDays : (d.finalDays != null ? d.finalDays : auditPlan.manDays)) || 0;
+        // No duration recorded at all is the plan gate's DURATION_MISSING
+        // (audit-plan-integrity.js); this check is about a recorded one.
+        if (!baseline && !agenda) return;
+        const gaps = [];
+        const version = trim((rec.methodology && rec.methodology.version) || d.methodologyVersion);
+        if (!version || PLACEHOLDER_RE.test(version)) gaps.push('the duration methodology version is ' + (version ? '"' + version + '"' : 'not recorded'));
+        const approvedBy = trim((rec.approval && rec.approval.approvedBy) || d.approvedBy);
+        if (!approvedBy || d.provisional) gaps.push('the duration is not approved');
+        const justification = trim(d.justification) || trim(d.imsJustification);
+        safeArr(rec.reductions).concat(safeArr(rec.increases))
+            .filter((a) => a && !trim(a.justification))
+            .forEach((a) => gaps.push('the ' + lower(a.type || 'adjustment') + ' of ' + a.days + ' day(s) has no justification'));
+        const off = d.offAgendaReview || rec.offAgendaReview || null;
+        const offDays = off ? Number(off.days) || 0 : 0;
+        if (baseline && agenda < baseline && !justification) {
+            gaps.push(offDays
+                ? agenda + ' of the ' + baseline + ' auditor-days are in the audit agenda and ' + offDays + ' are remote document review outside it, with no justification recorded'
+                : 'the audit time (' + agenda + ' auditor-days) is below the ' + baseline + '-day baseline with no justification recorded');
+        }
+        if (!gaps.length) return;
+        results.warnings.push(item('W37', 'warning', 'audit-information',
+            'Audit duration is not documented as justified: ' + gaps.join('; ') + '.',
+            'auditPlan.durationCalculation / durationRecord',
+            'Record the duration justification (basis, adjustments, and why time outside the agenda counts toward the duration) and the approved methodology version on the audit plan.'));
+    }
+
+    // W38: a nonconformity against internal audit (clause 9.2 of a management
+    // system standard) whose evidence names individual audits or reports but
+    // not the internal audit programme. NCR-091 ("the 2026 internal audit did
+    // not include the BCMS") rested on the latest internal audit report;
+    // whether the programme covers the BCMS over the cycle is what clause 9.2
+    // asks.
+    const PROGRAMME_RE = /\bprogram(?:me)?s?\b|\baudit (?:plan|schedule)\b|\bschedule of (?:internal )?audits\b/i;
+    function checkW38InternalAuditProgramme(input, results) {
+        const { report } = input;
+        safeArr(report && report.checklistProgress).forEach((i) => {
+            if (!i || i.status !== 'nc' || !['major', 'minor'].includes(lower(i.ncrType))) return;
+            const ref = trim(i.criterionRef || i.clause);
+            if (clauseFamily(ref) !== '9.2') return;
+            // The objective evidence, not the statement: NCR-091's statement
+            // said the programme "does extend to ISO 22301" through an earlier
+            // audit, while its evidence recorded only the 2026 summary report.
+            const evidence = [i.clientEvidenceStatement, i.comment].join(' ');
+            if (PROGRAMME_RE.test(evidence)) return;
+            const claimed = PROGRAMME_RE.test(i.ncrDescription || '');
+            results.warnings.push(item(
+                'W38-' + (i.itemIdx != null ? i.itemIdx : ref),
+                'warning',
+                'findings',
+                'The ' + lower(i.ncrType) + ' nonconformity at clause ' + ref + ' (internal audit): its objective evidence does not record that the complete internal audit programme for the certification cycle was reviewed; it refers only to individual audits or reports.'
+                    + (claimed ? ' The nonconformity statement relies on the programme, which the evidence does not show.' : ''),
+                'checklistProgress[].comment / ncrDescription',
+                'Verify the finding against the full internal audit programme (all planned and completed audits in the cycle) and record the programme reviewed in the objective evidence. The finding is not changed automatically.'
+            ));
+        });
+    }
+
     function check(input) {
         const safeInput = input || {};
         const report = safeInput.report || {};
@@ -2309,6 +2445,11 @@
         runCheck('checkB20ConclusionOmitsContingency', () => checkB20ConclusionOmitsContingency(report, ncrs, results), results);
         runCheck('checkW24PreviousFindingsClosureContradiction', () => checkW24PreviousFindingsClosureContradiction({ report, auditPlan, client }, results), results);
         runCheck('checkW25BareParentClauseCitation', () => checkW25BareParentClauseCitation({ report, auditPlan, ncrs }, results), results);
+
+        // Auditor decisions the report cannot make (technical review, 28 Nov 2026).
+        runCheck('checkW36RecurringOpenNc', () => checkW36RecurringOpenNc({ report, client }, results), results);
+        runCheck('checkW37DurationJustification', () => checkW37DurationJustification({ auditPlan }, results), results);
+        runCheck('checkW38InternalAuditProgramme', () => checkW38InternalAuditProgramme({ report }, results), results);
 
         runCheck('checkInformation', () => checkInformation(report, results), results);
 

@@ -38,6 +38,7 @@ beforeAll(() => {
     globalThis.openCreateReportModal = () => { };
     globalThis.openEditReportModal = () => { };
     loadScript('./ai-service.js', { params: { module: undefined } });
+    loadScript('./checklist-standards.js', { params: { module: undefined } });
     loadScript('./report-stats.js', { global: true });
     loadScript('./report-executive.js', { params: { module: undefined } });
     loadScript('./report-integrity.js', { params: { module: undefined } });
@@ -85,10 +86,20 @@ describe('the requirement printed beside a finding', () => {
 describe('the corrective-action criterion cell', () => {
     const cell = (f) => { const el = document.createElement('div'); el.innerHTML = window._formalCriterionCell(f, STD); return el.textContent; };
 
+    // Cited from the standards registry (ReportStats.citeFinding), technical
+    // review 28 Nov 2026: the standard's full name, "clause" or "Annex A control".
     it('names only the finding’s own standard', () => {
-        expect(cell({ clause: 'A.5.9' })).toBe('ISO 27001:2022 — Clause A.5.9');
-        expect(cell({ clause: '8.6.2' })).toBe('ISO 20000-1:2018 — Clause 8.6.2');
-        expect(cell({ clause: '8.2.2', criterionRef: '8.2.2 (22301)' })).toBe('ISO 22301:2019 — Clause 8.2.2');
+        expect(cell({ clause: 'A.5.9' })).toBe('ISO/IEC 27001:2022 Annex A control A.5.9');
+        expect(cell({ clause: '8.6.2' })).toBe('ISO/IEC 20000-1:2018 clause 8.6.2');
+        expect(cell({ clause: '8.2.2', criterionRef: '8.2.2 (22301)' })).toBe('ISO 22301:2019 clause 8.2.2');
+    });
+
+    it('cites a two-standard reference against each standard, not the first', () => {
+        const stmt = 'ISO/IEC 27001:2022 clause 10.2, and ISO 22301:2019 and ISO/IEC 20000-1:2018 clause 10.1, require the organization to react to a nonconformity and take corrective action.';
+        expect(cell({ clause: '10.2 / 10.1', ncrDescription: stmt }))
+            .toBe('ISO/IEC 27001:2022 clause 10.2 / ISO/IEC 20000-1:2018 and ISO 22301:2019 clause 10.1');
+        expect(cell({ clause: '7.5', criterionRef: '7.5.3 (integrated)' }))
+            .toBe('ISO/IEC 20000-1:2018, ISO/IEC 27001:2022 and ISO 22301:2019 clause 7.5.3');
     });
 
     it('names none, rather than all three, when the standard is not recorded or the clause is common', () => {

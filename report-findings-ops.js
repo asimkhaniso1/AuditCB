@@ -90,6 +90,21 @@
     // must never be presented as the finding's clause in a formal table.
     // Default label is the real clause only (e.g. "9.2") — no FOCUS/SURV/ORG/DOC
     // parenthetical. See ReportStats.formatCriterion() contract.
+    // The CAR form cites the finding against its own standard(s), e.g.
+    // "ISO 22301:2019 clause 9.2", from ReportStats.citeFinding; the recorded
+    // reference is kept when that cannot be resolved (PC Connection technical
+    // review, 28 Nov 2026: forms printed "10.2 / 10.1" and "9.2 (22301)").
+    function carCriterion(d, item) {
+        try {
+            if (global.ReportStats && typeof global.ReportStats.citeFinding === 'function') {
+                var std = (d && d.report && d.report.standard) || (d && d.auditPlan && d.auditPlan.standard) || '';
+                var cite = global.ReportStats.citeFinding(item, std);
+                if (cite) return esc(cite);
+            }
+        } catch (_e) { /* noop */ }
+        return criterionCell(item);
+    }
+
     function criterionCell(item) {
         try {
             if (global.ReportStats && typeof global.ReportStats.formatCriterion === 'function') {
@@ -668,7 +683,7 @@
         var partA = '<h4 class="b4-subhead">PART A — NONCONFORMITY</h4>'
             + '<table class="b4-tbl b4-tbl--compact' + (partADense ? ' car-dense' : '') + '" style="margin-bottom:var(--b4-s3);">'
             + '<tbody>'
-            + '<tr><td style="font-weight:700;width:130px;">Criterion</td><td>' + criterionCell(item) + '</td></tr>'
+            + '<tr><td style="font-weight:700;width:130px;">Criterion</td><td>' + carCriterion(d, item) + '</td></tr>'
             // The statement names the clause and what it requires, so the
             // Requirement row (on most checklists the audit question, e.g.
             // "Verify… Sample two internal audit reports") prints only when no

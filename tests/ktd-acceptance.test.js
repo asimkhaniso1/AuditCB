@@ -49,7 +49,8 @@ describe('KTD surveillance acceptance', () => {
     // 25.1 — surveillance recommendation wording
     it('surveillance recommendation never grants certification', () => {
         const text = window.ReportStats.recommendationText('Surveillance', { majorNC: 0, minorNC: 4 });
-        expect(text).toBe('Continued certification is recommended subject to satisfactory closure of applicable nonconformities.');
+        // Acceptance of the plans, not closure (technical review, 28 Nov 2026).
+        expect(text).toBe("Continued certification is recommended subject to the certification body's review and acceptance of the correction and corrective action plans for the minor nonconformities.");
         expect(text.toLowerCase()).not.toContain('recommended for certification');
         expect(window.ReportStats.recommendationText('Recertification', { majorNC: 0, minorNC: 1 }))
             .toMatch(/^Recertification is recommended/);
@@ -1140,12 +1141,17 @@ describe('Executive summary fallback — client-release wording', () => {
         return window.ReportExecutive.fallbackExecSummaryData(d);
     }
 
-    it('makes continued conformity conditional when minor NCs are open', () => {
-        const out = fallback(4).forwardOutlook;
-        expect(out).toContain('Continued conformity is dependent upon satisfactory corrective action');
-        expect(out).toContain('four identified minor nonconformities');
-        expect(out).toContain('within the required timeframe');
-        expect(out).not.toMatch(/high confidence/i);
+    // Technical review, 28 Nov 2026: the certification-process statement is
+    // factual (what the certification body does next) and the forward
+    // readiness / confidence statement is gone.
+    it('states what the certification body does next when minor NCs are open', () => {
+        const out = fallback(4);
+        expect(out.businessImpact).toContain('4 minor nonconformities remain open');
+        expect(out.businessImpact).toContain('reviews and accepts the correction and corrective action plans before the certification decision');
+        expect(out.businessImpact).toContain('verified at the next audit');
+        expect(out.forwardOutlook).toBe('');
+        expect(out.risks).toBe('');
+        expect(out.businessImpact).not.toMatch(/confidence|closure|may affect/i);
     });
 
     // Technical review of PC Connection's 2026 recertification: five open
@@ -1157,20 +1163,23 @@ describe('Executive summary fallback — client-release wording', () => {
         expect(text).not.toMatch(/do not indicate risks/i);
         expect(text).not.toMatch(/stable level of implementation/i);
         expect(out.businessImpact).toContain('2 minor nonconformities remain open');
-        expect(out.businessImpact).toContain('Certification status depends on corrective action');
-        expect(out.risks).toMatch(/recur/);
     });
 
-    it('keeps the no-risk statement for an audit with no open nonconformity', () => {
-        expect(fallback(0).businessImpact).toMatch(/do not indicate risks/);
+    it('states plainly that nothing is required for an audit with no open nonconformity', () => {
+        expect(fallback(0).businessImpact).toBe('No nonconformities are open; no correction or corrective action is required before the certification decision.');
     });
 
     it('uses the singular for one open minor NC', () => {
-        expect(fallback(1).forwardOutlook).toContain('the identified minor nonconformity within');
+        expect(fallback(1).businessImpact).toContain('1 minor nonconformity remains open');
     });
 
-    it('keeps the confidence wording for a clean, highly conforming audit', () => {
-        expect(fallback(0).forwardOutlook).toMatch(/high confidence in continued conformity/);
+    it('makes no confidence or readiness claim, even for a clean audit', () => {
+        const text = [fallback(0).businessImpact, fallback(0).risks, fallback(0).forwardOutlook].join(' ');
+        expect(text).not.toMatch(/confidence|trajectory|readiness/i);
+    });
+
+    it('lists no conformity percentage among the strengths', () => {
+        expect(fallback(0).strengths.join(' ')).not.toMatch(/\d+%/);
     });
 
     it('never states evidence-attachment coverage as a client concern', () => {

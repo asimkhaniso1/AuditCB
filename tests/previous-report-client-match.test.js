@@ -98,9 +98,10 @@ describe('Report Integrity B33 — another client\'s NCR in the narrative', () =
 });
 
 describe('Key Strengths wording', () => {
-    it('labels the conformity figure as a share of assessed items', () => {
+    // Technical review, 28 Nov 2026: no conformity percentage at all.
+    it('prints no conformity percentage', () => {
         const src = fs.readFileSync(path.resolve('./report-executive.js'), 'utf8');
         expect(src).not.toMatch(/% of applicable items conforming/);
-        expect(src).toMatch(/% of assessed items without a nonconformity/);
+        expect(src).not.toMatch(/% of assessed items without a nonconformity/);
     });
 });

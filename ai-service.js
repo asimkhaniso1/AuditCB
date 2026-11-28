@@ -3156,7 +3156,9 @@ window.finalizeAndPublish = async function (reportId) {
     const statsSummary = rs ? {
         majorNC: rs.majorNC, minorNC: rs.minorNC, observationCount: rs.observationCount,
         ofiCount: rs.ofiCount, coveragePct: rs.coveragePct, conformityPct: rs.conformityPct,
-        recommendation: rs.recommendation
+        // The frozen sentence, so wording changes never alter the fingerprint
+        // (see ReportStats.recommendationFingerprint).
+        recommendation: rs.recommendationKey != null ? rs.recommendationKey : rs.recommendation
     } : null;
     const contentHash = window._reportContentHash(report, statsSummary);
     report.issuedSnapshot = { version: newVersion, issuedAt: nowIso, issuedBy: issuerName, statsSummary, contentHash };

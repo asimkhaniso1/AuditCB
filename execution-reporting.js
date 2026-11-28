@@ -768,6 +768,13 @@
         if (fc && fc.kind === 'unverified') {
             return '<div>' + esc(real) + '</div>';
         }
+        // Cited against the finding's own standard(s), resolved by concept in
+        // the standards registry (ReportStats.citeFinding). This table named one
+        // standard for a two-standard reference: "ISO 27001:2022 — Clause
+        // 10.2 / 10.1" (PC Connection technical review, 28 Nov 2026).
+        const cite = (window.ReportStats && typeof window.ReportStats.citeFinding === 'function')
+            ? window.ReportStats.citeFinding(finding, standard) : '';
+        if (cite) return '<div>' + esc(cite) + '</div>';
         // An integrated report passes all its standards; name only the one
         // this finding belongs to, or none when that isn't recorded.
         const own = (window.ReportStats && typeof window.ReportStats.resolveFindingStandard === 'function')
@@ -1240,7 +1247,8 @@
             const statsSummaryNow = rs ? {
                 majorNC: rs.majorNC, minorNC: rs.minorNC, observationCount: rs.observationCount,
                 ofiCount: rs.ofiCount, coveragePct: rs.coveragePct, conformityPct: rs.conformityPct,
-                recommendation: rs.recommendation
+                // Same frozen sentence as finalizeAndPublish fingerprints.
+                recommendation: rs.recommendationKey != null ? rs.recommendationKey : rs.recommendation
             } : null;
             const currentHash = window._reportContentHash(d.report, statsSummaryNow);
             return currentHash !== snap.contentHash;
@@ -2188,8 +2196,8 @@
                                     <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">per ISO 17021-1</div>
                                 </div>
                                 
-                                <!-- Coverage, not Conformity — Conformity % is reserved for the Analytics
-                                     Dashboard annex (see PDF export), so this exec-summary tile only ever
+                                <!-- Coverage, not Conformity — no conformity percentage is printed anywhere (technical review, 28 Nov 2026; it was in the Analytics
+                                     Dashboard annex), so this exec-summary tile only ever
                                      shows Coverage, which is fine in a formal context as long as it always
                                      carries its one-line definition (release item 3 support). -->
                                 <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid #8b5cf6;">
@@ -4981,10 +4989,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div class="stat-box" style="background:#eff6ff;border-color:#1d4ed8;"><div class="stat-val" style="color:#1d4ed8;">' + d.stats.observationCount + '</div><div class="stat-lbl">Observations</div></div>'
                 + '<div class="stat-box" style="background:#f1f5f9;border-color:#475569;"><div class="stat-val" style="color:#475569;">' + d.stats.ofiCount + '</div><div class="stat-lbl">OFI</div></div>'
                 + '<div class="stat-box" style="background:#f8fafc;border-color:#94a3b8;"><div class="stat-val" style="color:#64748b;">' + d.stats.notAssessedCount + '</div><div class="stat-lbl">Not Assessed</div></div></div>'
-                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0;">'
-                + '<div class="stat-box" style="background:#ecfdf5;border-color:#059669;"><div class="stat-val" style="color:#059669;">' + (d.stats.coveragePct === null || d.stats.coveragePct === undefined ? '—' : d.stats.coveragePct + '%') + '</div><div class="stat-lbl">Audit Coverage %</div></div>'
-                + '<div class="stat-box" style="background:#eef2ff;border-color:#4338ca;"><div class="stat-val" style="color:#4338ca;">' + (d.stats.conformityPct === null || d.stats.conformityPct === undefined ? '—' : d.stats.conformityPct + '%') + '</div><div class="stat-lbl">Conformity %</div></div></div>'
-                + '<div style="font-size:0.76rem;color:#64748b;line-height:1.5;margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:6px;">' + (d.stats.rs?.methodologyNote || 'Coverage = items assessed (conform + NC + advisories) ÷ applicable items (excludes N/A). Conformity = conform ÷ (conform + NC); observations and OFIs are advisories and do not reduce conformity.') + '</div>'
+                // Audit coverage only: the Conformity % box was removed (PC
+                // Connection technical review, 28 Nov 2026). Sampled items
+                // without a nonconformity read as a measure of the management
+                // system that sampling does not support.
+                + '<div style="display:grid;grid-template-columns:1fr;gap:14px;margin:14px 0;">'
+                + '<div class="stat-box" style="background:#ecfdf5;border-color:#059669;"><div class="stat-val" style="color:#059669;">' + (d.stats.coveragePct === null || d.stats.coveragePct === undefined ? '—' : d.stats.coveragePct + '%') + '</div><div class="stat-lbl">Audit Coverage %</div></div></div>'
+                + '<div style="font-size:0.76rem;color:#64748b;line-height:1.5;margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:6px;">' + (d.stats.rs?.methodologyNote || 'Coverage = items assessed (conform + NC + advisories) ÷ applicable items (excludes N/A).') + '</div>'
                 + (d.stats.rs?.reconciliation?.length ? '<div class="b4-card b4-callout b4-callout--warn" style="margin-bottom:16px;"><strong style="display:block;margin-bottom:4px;">Data Quality Notes</strong><ul style="margin:0;padding-left:18px;">' + d.stats.rs.reconciliation.map(function (r) { return '<li>' + htmlEsc(r.message || r.code || '') + '</li>'; }).join('') + '</ul></div>' : '')
                 + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Findings Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div></div>'
