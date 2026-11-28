@@ -4469,13 +4469,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '*{margin:0;padding:0;box-sizing:border-box;}'
             + "body{font-family:'Inter','Segoe UI',Helvetica,Arial,sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;font-size:11pt;line-height:1.6;}"
             + '@media print{'
-            // Running header/footer: .rpt-hdr/.rpt-ftr are rows of a table that
-            // wraps the report (see .rpt-running below) and repeat on every page.
-            // The page number is a page margin box in the @page rule further down:
-            // Chrome has printed margin boxes with counter(page)/counter(pages)
-            // since version 131, which the old note here said it could not.
+            // Running header: .rpt-hdr is the header row of a table that wraps
+            // the report (see .rpt-running below) and repeats on every page. The
+            // running footer and page number are page margin boxes in the @page
+            // rule further down (Chrome 131+ prints counter(page)/counter(pages)
+            // there, which an old note here said it could not).
             +   'body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10pt;padding-top:0;padding-bottom:0;}'
-            +   '.rpt-hdr,.rpt-ftr{display:flex !important;}'
+            +   '.rpt-hdr{display:flex !important;}'
             +   '.page-break{page-break-before:always;}'
             +   '.no-print{display:none !important;}'
             +   '.section-card,tr,thead{break-inside:avoid;}'
@@ -4495,13 +4495,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // Every other section starts a new page when less than half a page
             // is left (PC Connection, 28 Nov 2026: sections began in the last
             // few centimetres of a page). CSS has no "break if less than N left",
-            // so an unbreakable 115 mm spacer (half the ~233 mm body area) sits
-            // before each section header with a -115 mm bottom margin: when it
+            // so an unbreakable 125 mm spacer (half the ~250 mm body area) sits
+            // before each section header with a -125 mm bottom margin: when it
             // fits, the margin takes it back and the section stays where it was;
             // when it does not, it moves to the next page and the section goes
             // with it. It carries the header's 34px top gap, which a page break
             // then drops. Measured in Chrome 158 with this stylesheet.
-            +   '.sec-keep{display:block;height:115mm;margin:34px 0 -115mm;break-inside:avoid;page-break-inside:avoid;}'
+            +   '.sec-keep{display:block;height:125mm;margin:34px 0 -125mm;break-inside:avoid;page-break-inside:avoid;}'
             +   '.sec-keep + .sh{margin-top:0;}'
             // The watermark prints on a draft and on a final changed since issue.
             +   ((!isReportFinal(d.report) || modifiedSinceIssue) ? '.watermark{display:flex !important;}' : '')
@@ -4558,19 +4558,30 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // so the contents page still starts on page 2.
             +   '.cover{min-height:0 !important;height:auto !important;padding:24px 40px 28px !important;page-break-after:always;break-after:page;}'
             +   '.cover-doc{position:static !important;left:auto !important;right:auto !important;bottom:auto !important;width:100%;margin-top:28px;}'
-            // "Page X of Y" in the bottom margin, under the running footer row.
-            // The page count comes from the print engine (Chrome 131+ page
-            // margin boxes, as print-shell.js uses for the plan and checklist),
-            // so it is always true. The cover carries no number. PC Connection
-            // asked for page numbers on 28 Nov 2026; the report had none.
-            // All six margin boxes are defined (five empty): Chrome then drops
-            // its own date/URL decoration even with "Headers and footers" on.
-            // With only the number defined it still printed its date at the top
-            // of every page, and its URL on the cover. Measured in Chrome 158.
-            +   '@page{size:A4;margin:20mm 14mm 16mm 14mm;'
-            +     '@top-left{content:"";}@top-center{content:"";}@top-right{content:"";}@bottom-left{content:"";}@bottom-center{content:"";}'
-            +     '@bottom-right{content:"Page " counter(page) " of " counter(pages);font:7.5pt Inter,"Segoe UI",Helvetica,Arial,sans-serif;color:#64748b;vertical-align:top;text-align:right;padding-top:3mm;}}'
-            +   '@page :first{@bottom-right{content:"";}}'
+            // The running footer is the page's bottom margin boxes: issue status
+            // on the left, the confidentiality notice in the middle, "Page X of Y"
+            // on the right, where the Audit360 credit used to be (PC
+            // Connection, 28 Nov 2026). The page count comes from the print
+            // engine (Chrome 131+ margin boxes, as print-shell.js uses for the
+            // plan and checklist), so it is always true; a footer row in the
+            // page body cannot show it. The footer no longer takes 12 mm of
+            // every page's body, so the margins are 12 mm top (the logo header
+            // row sits under it) and 18 mm bottom (the footer).
+            // All six margin boxes are defined: Chrome then prints no date or
+            // URL of its own, even with "Headers and footers" on. The cover has
+            // the footer but no number. The side boxes are equal (25/50/25):
+            // the centre box is always centred on the page, so unequal sides left
+            // a gap in the footer rule on one side. Measured in Chrome 158.
+            +   (function () {
+                    const cssStr = (s) => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/</g, '\\3C ').replace(/[\r\n]+/g, ' ') + '"';
+                    const box = 'font:7pt Inter,"Segoe UI",Helvetica,Arial,sans-serif;color:#64748b;vertical-align:top;border-top:1.5pt solid #1d4ed8;padding-top:2mm;margin-top:3mm;';
+                    return '@page{size:A4;margin:12mm 14mm 18mm 14mm;'
+                        + '@top-left{content:"";}@top-center{content:"";}@top-right{content:"";}'
+                        + '@bottom-left{content:' + cssStr('Confidential — ' + window._reportIssueLabel(d, modifiedSinceIssue)) + ';' + box + 'width:25%;text-align:left;font-weight:600;color:#1e3a5f;}'
+                        + '@bottom-center{content:' + cssStr('This document is confidential and intended solely for the audited organization. Unauthorized copying or distribution is prohibited.') + ';' + box + 'width:50%;text-align:center;font-style:italic;font-size:6.5pt;color:#94a3b8;}'
+                        + '@bottom-right{content:"Page " counter(page) " of " counter(pages);' + box + 'width:25%;text-align:right;font-weight:700;color:#1e3a5f;}}'
+                        + '@page :first{@bottom-right{content:"";}}';
+                })()
             + '}'
             // The running header is 18mm tall with 3mm of vertical padding, so its
             // content box is only ~12mm (≈34px). A 36px logo did not fit and was
@@ -4604,10 +4615,6 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + 'td span[style*="border-radius:12px"],td span[style*="border-radius: 12px"],'
             + 'td span[style*="border-radius:999px"],th span[style*="border-radius:12px"]'
             + '{display:inline-block;line-height:1.3;vertical-align:middle;white-space:nowrap;}'
-            + '.rpt-ftr{display:none;height:12mm;border-top:2px solid #1d4ed8;padding:2mm 0;align-items:center;justify-content:space-between;font-size:0.65rem;color:#64748b;background:white;}'
-            + '.rpt-ftr-left{font-weight:500;color:#1e3a5f;font-size:0.65rem;max-width:35%;}'
-            + '.rpt-ftr-center{flex:1;text-align:center;font-size:0.58rem;color:#94a3b8;font-style:italic;padding:0 6px;}'
-            + '.rpt-ftr-right{text-align:right;font-weight:700;color:#1e3a5f;font-size:0.68rem;white-space:nowrap;}'
             // Consulting-deliverable cover: flat, restrained, no gradient wash.
             + '.cover{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:#fbfcfd;border-top:6px solid #0f2a43;padding:88px 56px;position:relative;}'
             + '.cover-line{width:64px;height:3px;background:#0f2a43;border-radius:0;margin:0 auto 32px;}'
@@ -4664,13 +4671,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     ? '<div class="watermark"><span style="color:rgba(220,38,38,0.16);font-size:48pt;">MODIFIED SINCE ISSUE</span></div>'
                     : '<div class="watermark"><span>CONFIDENTIAL</span></div>'))
             + (modifiedSinceIssue ? '<div class="no-print" style="position:sticky;top:0;left:0;right:0;background:#dc2626;color:white;text-align:center;padding:10px 16px;font-weight:700;font-size:0.85rem;letter-spacing:0.3px;z-index:1001;">&#9888; MODIFIED SINCE ISSUE — this final report has changed since it was last issued (v' + (d.report.issuedSnapshot && d.report.issuedSnapshot.version) + '). Re-issue via Finalize &amp; Publish before distributing.</div>' : '')
-            // Everything printable lives in one table so the header/footer rows repeat
-            // per page and reserve their own space in flow (see .rpt-running above).
+            // Everything printable lives in one table so the header row repeats per
+            // page and reserves its own space in flow (see .rpt-running above). The
+            // footer is in the page margin (see the @page rule).
             + '<table class="rpt-running"><thead><tr><td>'
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + htmlEsc(d.cbLogo) + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + htmlEsc(cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + htmlEsc(standard) + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">Audit360 &mdash; ' + reportRef(d) + '</div></div>'
-            + '</td></tr></thead><tfoot><tr><td>'
-            + '<div class="rpt-ftr"><div class="rpt-ftr-left">Confidential &mdash; ' + htmlEsc(window._reportIssueLabel(d, modifiedSinceIssue)) + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">Generated by Audit360</div></div>'
-            + '</td></tr></tfoot><tbody><tr><td>'
+            + '</td></tr></thead><tbody><tr><td>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
             + '<button data-action="print" style="background:linear-gradient(135deg,#1d4ed8,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:500;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Download"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
             + '<button data-action="close" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:500;">Close</button></div>'
