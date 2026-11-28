@@ -1994,7 +1994,8 @@ window.openPlanChecklists = function (planId) {
                 <td style="padding: 6px; text-align: right;">${facts.itemCount}</td>
                 <td style="padding: 6px;">${sent}</td>
                 <td style="padding: 6px; white-space: nowrap;">
-                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="printChecklist" data-arg1="${esc(String(cl.id))}" data-arg2="${esc(String(plan.id))}"><i class="fa-solid fa-print"></i> Print</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="printChecklist" data-arg1="${esc(String(cl.id))}" data-arg2="${esc(String(plan.id))}" title="Internal checklist with validation and coverage — not for the client"><i class="fa-solid fa-print"></i> Auditor copy</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="printClientChecklist" data-arg1="${esc(String(cl.id))}" data-arg2="${esc(String(plan.id))}" title="Client Preparation Checklist — no internal diagnostics"><i class="fa-solid fa-file-export"></i> Client copy</button>
                     <button type="button" class="btn btn-sm btn-secondary" data-action="openRecordChecklistSent" data-arg1="${esc(String(plan.id))}" data-arg2="${esc(String(cl.id))}"><i class="fa-solid fa-paper-plane"></i> Record as sent</button>
                 </td>
             </tr>`;

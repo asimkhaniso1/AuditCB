@@ -281,8 +281,11 @@ function renderChecklistLibrary(clientId) {
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;" aria-label="View">
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm" data-action="printChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Print" aria-label="Print">
+                                            <button class="btn btn-sm" data-action="printChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Print Auditor Checklist (internal)" aria-label="Print Auditor Checklist">
                                                 <i class="fa-solid fa-print"></i>
+                                            </button>
+                                            <button class="btn btn-sm" data-action="printClientChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Print Client Preparation Checklist (to send to the client)" aria-label="Print Client Preparation Checklist">
+                                                <i class="fa-solid fa-file-export"></i>
                                             </button>
                                             ${canEditGlobal ? `
                                                 <button class="btn btn-sm edit-checklist" data-id="${c.id}" style="margin-right: 0.25rem;" aria-label="Edit">
@@ -337,8 +340,11 @@ function renderChecklistLibrary(clientId) {
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;" aria-label="View">
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm" data-action="printChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Print" aria-label="Print">
+                                            <button class="btn btn-sm" data-action="printChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Print Auditor Checklist (internal)" aria-label="Print Auditor Checklist">
                                                 <i class="fa-solid fa-print"></i>
+                                            </button>
+                                            <button class="btn btn-sm" data-action="printClientChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Print Client Preparation Checklist (to send to the client)" aria-label="Print Client Preparation Checklist">
+                                                <i class="fa-solid fa-file-export"></i>
                                             </button>
                                             <button class="btn btn-sm edit-checklist" data-id="${c.id}" style="margin-right: 0.25rem;" aria-label="Edit">
                                                 <i class="fa-solid fa-edit"></i>
@@ -1567,8 +1573,11 @@ function viewChecklistDetail(id) {
                             <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem; color: #ef4444;"></i> Export PDF
                         </button>
                     ` : ''}
-                    <button class="btn btn-secondary" data-action="printChecklist" data-id="${id}" title="Print Checklist" aria-label="Print">
-                        <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print
+                    <button class="btn btn-secondary" data-action="printChecklist" data-id="${id}" title="Internal checklist with validation and coverage — not for the client" aria-label="Print Auditor Checklist">
+                        <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Auditor Checklist
+                    </button>
+                    <button class="btn btn-secondary" data-action="printClientChecklist" data-id="${id}" title="Areas, clauses and evidence to prepare — no internal diagnostics" aria-label="Print Client Preparation Checklist">
+                        <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i> Client Preparation Checklist
                     </button>
                 </div>
             </div>
@@ -2678,13 +2687,22 @@ function brandPalette() {
     };
 }
 
-function printChecklist(id, planId) {
+/**
+ * Print a checklist for one of two audiences, from the same stored questions.
+ *   'auditor' (default) — the internal Auditor Checklist: validation status,
+ *     cycle coverage, item status and auditor evidence columns.
+ *   'client' — the Client Preparation Checklist: audit areas, the clauses of
+ *     each standard, what to prepare and the client's own documents. No QA,
+ *     coverage, document statistics or SoA handling is printed on it.
+ */
+function printChecklist(id, planId, audience) {
     const checklist = state.checklists.find(c => String(c.id) === String(id));
     if (!checklist) return;
     if (!window.ChecklistDocument || !window.PrintShell) {
         window.showNotification('The print module is not loaded. Reload the page and try again.', 'warning');
         return;
     }
+    if (audience === 'client') { printClientChecklistDocument(checklist, planId); return; }
 
     // ── Automated QA validation, before anything is rendered ──────────
     // The checklist that goes to an auditor has to be defensible: no clauses
@@ -2742,6 +2760,48 @@ function printChecklist(id, planId) {
         window.showNotification('Pop-up blocked. Allow pop-ups for this site to print the checklist.', 'warning');
     }
 }
+
+/**
+ * The Client Preparation Checklist. QA still runs, because a checklist with
+ * critical defects should not go out, but its result is only ever shown to
+ * the user here, in the app — none of it is passed to the document.
+ */
+function printClientChecklistDocument(checklist, planId) {
+    const qa = runChecklistQA(checklist);
+    if (qa && qa.blocking && typeof window.confirm === 'function') {
+        const proceed = window.confirm(
+            `This checklist has ${qa.counts.critical} critical QA issue(s). Review them on the checklist before sending it to the client.` +
+            '\n\nExport the client copy anyway? Nothing from the QA check is printed on it.');
+        if (!proceed) return;
+    }
+    const plan = (planId != null && (state.auditPlans || []).find(p => String(p.id) === String(planId)))
+        || planForChecklist(checklist);
+    const client = (state.clients || []).find(c => String(c.id) === String(checklist.clientId))
+        || (state.clients || []).find(c => c.name === checklist.clientName) || null;
+    const cb = window.state?.cbSettings || {};
+    const logoUrl = cb.logoUrl && (cb.logoUrl.startsWith('data:') || cb.logoUrl.startsWith('http')) ? cb.logoUrl : '';
+
+    const html = window.ChecklistDocument.build(checklist, {
+        audience: 'client',
+        brand: brandPalette(),
+        cbName: cb.cbName || 'ISOXPERT Audit360',
+        logoUrl,
+        plan, client, siblings: state.checklists || [],
+        classification: cb.documentClassification || cb.confidentialityLabel || ''
+    });
+    const problems = window.PrintShell.lint(html);
+    if (problems.length && window.Logger) window.Logger.warn('ChecklistDocument', 'Client print lint: ' + problems.map(p => p.code).join(', '));
+
+    const win = window.PrintShell.open(html);
+    if (!win) {
+        window.showNotification('Pop-up blocked. Allow pop-ups for this site to print the checklist.', 'warning');
+    }
+}
+
+/** Button entry point for the Client Preparation Checklist. */
+function printClientChecklist(id, planId) {
+    printChecklist(id, planId, 'client');
+}
 // Permanently delete an archived checklist (no recovery)
 function permanentDeleteChecklist(id) {
     const checklist = state.checklists?.find(c => String(c.id) === String(id));
@@ -2771,6 +2831,7 @@ window.archiveChecklist = archiveChecklist;
 window.restoreChecklist = restoreChecklist;
 window.permanentDeleteChecklist = permanentDeleteChecklist;
 window.printChecklist = printChecklist;
+window.printClientChecklist = printClientChecklist;
 window.markChecklistReadyForAudit = markChecklistReadyForAudit;
 window.unmarkChecklistReadyForAudit = unmarkChecklistReadyForAudit;
 window.removeChecklistQuestion = removeChecklistQuestion;
@@ -2791,5 +2852,5 @@ window.coveragePanelHTML = coveragePanelHTML;
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { downloadChecklistTemplate, openImportChecklistModal, renderChecklistEditor, saveChecklistFromEditor, renderChecklistLibrary, openAddChecklistModal, openEditChecklistModal, viewChecklistDetail, deleteChecklist, archiveChecklist, restoreChecklist, permanentDeleteChecklist, printChecklist };
+    module.exports = { downloadChecklistTemplate, openImportChecklistModal, renderChecklistEditor, saveChecklistFromEditor, renderChecklistLibrary, openAddChecklistModal, openEditChecklistModal, viewChecklistDetail, deleteChecklist, archiveChecklist, restoreChecklist, permanentDeleteChecklist, printChecklist, printClientChecklist };
 }

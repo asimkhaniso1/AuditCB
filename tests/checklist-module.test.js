@@ -586,6 +586,88 @@ describe('printChecklist — print button and brand colours', () => {
     });
 });
 
+// Two exports from the checklist screen: the internal Auditor Checklist and
+// the Client Preparation Checklist. The client copy must never carry the QA
+// or coverage output, even when QA finds critical issues.
+describe('printClientChecklist — the Client Preparation Checklist export', () => {
+    let written;
+    let confirms;
+
+    function capture() {
+        const doc = document.implementation.createHTMLDocument('');
+        window.open = () => ({ document: { write: (h) => { written.push(h); doc.open(); doc.write(h); doc.close(); }, close() {}, querySelector: (q) => doc.querySelector(q) },
+            addEventListener() {}, focus() {}, print() {} });
+    }
+
+    beforeEach(() => {
+        written = [];
+        confirms = [];
+        window.Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+        window.showNotification = () => {};
+        window.confirm = (msg) => { confirms.push(msg); return true; };
+        window.state = {
+            cbSettings: { cbName: 'Company Certification International', primaryColor: '#1d4ed8' },
+            checklists: [{
+                id: 'cl-1', name: 'Recertification Audit Checklist', standard: 'ISO/IEC 27001:2022', clientName: 'Acme Ltd',
+                type: 'custom', items: [{ clause: '6.3', requirement: 'Verify changes to the ISMS are planned. Record the evidence seen.' }]
+            }],
+            clients: []
+        };
+        loadModule('./validation.js');
+        loadModule('./doc-format.js');
+        loadModule('./print-shell.js');
+        loadModule('./checklist-document.js');
+        loadModule('./checklist-module.js');
+        // A blocking QA result, as the real pass returns for a defective checklist.
+        window.ChecklistQA = { validate: () => ({ ok: false, blocking: true, itemCount: 1, counts: { critical: 1, warning: 0, info: 0 },
+            issues: [{ severity: 'critical', itemRef: '6.3', message: 'INTERNAL-QA-MARKER duplicate question' }] }), summarize: () => 'INTERNAL-QA-MARKER summary' };
+        window.ChecklistStandards = { resolve: () => ({ standards: [{ id: 'iso27001' }] }) };
+        capture();
+    });
+
+    it('both exports are offered on the checklist detail screen', () => {
+        window.contentArea = document.createElement('div');
+        document.body.appendChild(window.contentArea);
+        window.viewChecklistDetail('cl-1');
+        const html = window.contentArea.innerHTML;
+        expect(html).toContain('data-action="printChecklist"');
+        expect(html).toContain('Auditor Checklist');
+        expect(html).toContain('data-action="printClientChecklist"');
+        expect(html).toContain('Client Preparation Checklist');
+        expect(typeof window.printClientChecklist).toBe('function');
+    });
+
+    it('prints the client copy with no QA, validation or coverage output', () => {
+        window.printClientChecklist('cl-1');
+        expect(written).toHaveLength(1);
+        const html = written[0];
+        expect(html).toContain('Audit Preparation Checklist');
+        expect(html).toContain('Be prepared to show changes to the ISMS are planned.');
+        expect(html).not.toContain('INTERNAL-QA-MARKER');
+        expect(html).not.toContain('qa-panel');
+        expect(html).not.toContain('Checklist validation status');
+        expect(html).not.toContain('coverage');
+        expect(html).not.toContain('Record the evidence');
+    });
+
+    it('warns the user in the app about critical QA issues, without their text', () => {
+        window.printClientChecklist('cl-1');
+        expect(confirms).toHaveLength(1);
+        expect(confirms[0]).toContain('1 critical QA issue');
+        expect(confirms[0]).not.toContain('INTERNAL-QA-MARKER');
+        window.confirm = () => false;
+        written = [];
+        window.printClientChecklist('cl-1');
+        expect(written).toHaveLength(0);
+    });
+
+    it('the auditor print is unchanged: it still carries the validation status', () => {
+        window.printChecklist('cl-1');
+        expect(written[0]).toContain('Checklist validation status');
+        expect(written[0]).toContain('Auditor comments / evidence');
+    });
+});
+
 // The Ready-for-Audit gate as the UI reaches it: the release is refused while
 // blockers stand, granted once they are resolved, and withdrawn automatically
 // when the checklist changes afterwards.
